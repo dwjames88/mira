@@ -237,3 +237,16 @@ Installed with `scripts/install.sh` (Mira already granted Photos access), driven
 - Benchmarks (`mira-sheet --bench --films Films`, 24 MP synthetic, 1500×1000 canvas, M1 Pro): preview frame 12.0 → 4.7 ms median (p95 13.6 → 6.5); with crop + 6° straighten 6.5 → 3.8 ms; first preview 62 → 53 ms; 32 thumbnails warm ~40–57 ms; 24 MP export ~100–110 ms.
 
 Not measured: SwiftUI-side slider drag latency and grid scroll frame rate (no reliable headless measure); use the `com.fieldframes.mira` / `perf` signposts in Instruments.
+
+## Verification log (2026-10-21, develop workflow)
+
+Installed with `scripts/install.sh` and driven live (test asset in "Emulsion Test" only; nothing saved to Photos):
+
+- Library: empty window toolbar (wordmark only); collapsible LIBRARY / ALBUMS sections; albums and folders in the same order as Photos' own sidebar; breadcrumb for nested albums; FILTER popover with scope, show-only toggles, CAMERA and LENS lists populated from the metadata index (e.g. Fujifilm X100V 246) and "INDEXING n / 48873" progress.
+- Menus: File (Open…, Export…, Save to Photos, Revert to Original…, Back to Library), Edit (Reset Adjustments, Reset All), View (Films, Develop, Crop, Toggle Full Screen, Zoom In/Out, Zoom to Fit).
+- Editor tabs via 1/2/3: FILMS (strip + strength), DEVELOP (live histogram; a curve point added and dragged; Orange hue +48 in the color mixer; status UNSAVED), CROP (handles, controls, readout).
+- Click-to-zoom shows 100% with the readout; `]` steps to 200%, sharp; ⌘0 fits. Holding C shows the original.
+- F: true full screen, photo on ink, window toolbar hidden; Esc exits.
+- Photos extension: listed in Photos' Extensions menu; with the fix it fills the editing window (1723×1063, then follows a resize to 1300×808 — confirmed by the `extension` log category); tabs FILMS / DEVELOP / CROP. Cancelled without saving.
+
+Not verified live: Space-drag pan, mixer eyedropper, SAVE through the new sub-toolbar button, file-from-disk sidecar flow in the new layout.
