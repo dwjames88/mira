@@ -1,13 +1,15 @@
 import CoreImage
-import EmulsionCore
+import MiraCore
 import Foundation
 import OSLog
 import Photos
 
 /// Launch-argument self tests (`--selftest-photos`, `--selftest-sidecar`). They only ever touch
 /// an asset they import themselves into the "Emulsion Test" album.
+/// The album keeps its pre-rename name on purpose so every test asset stays in one album
+/// (created before the rename) that can be deleted in one go.
 enum SelfTest {
-    private static let log = Logger(subsystem: "com.dwjames.emulsion", category: "selftest")
+    private static let log = Logger(subsystem: "com.fieldframes.mira", category: "selftest")
 
     private static func note(_ message: String) {
         log.notice("SELFTEST \(message, privacy: .public)")
@@ -18,7 +20,7 @@ enum SelfTest {
     @MainActor
     static func runSidecar() {
         let fm = FileManager.default
-        let dir = fm.temporaryDirectory.appendingPathComponent("emulsion-selftest-\(UUID().uuidString)", isDirectory: true)
+        let dir = fm.temporaryDirectory.appendingPathComponent("mira-selftest-\(UUID().uuidString)", isDirectory: true)
         defer { try? fm.removeItem(at: dir) }
         do {
             try fm.createDirectory(at: dir, withIntermediateDirectories: true)

@@ -1,6 +1,6 @@
-name: Emulsion
+name: Mira
 options:
-  bundleIdPrefix: com.dwjames
+  bundleIdPrefix: com.fieldframes
   deploymentTarget:
     macOS: "26.0"
   createIntermediateGroups: true
@@ -18,12 +18,12 @@ settings:
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
 packages:
-  EmulsionCore:
-    path: Packages/EmulsionCore
-  EmulsionUI:
-    path: Packages/EmulsionUI
+  MiraCore:
+    path: Packages/MiraCore
+  MiraUI:
+    path: Packages/MiraUI
 targets:
-  Emulsion:
+  Mira:
     type: application
     platform: macOS
     sources:
@@ -34,14 +34,14 @@ targets:
       - path: App/SelfTest
         type: folder
     dependencies:
-      - target: EmulsionPhotos
+      - target: MiraPhotos
       - sdk: Photos.framework
-      - package: EmulsionCore
-        product: EmulsionCore
-      - package: EmulsionUI
-        product: EmulsionUI
+      - package: MiraCore
+        product: MiraCore
+      - package: MiraUI
+        product: MiraUI
     entitlements:
-      path: App/Emulsion.entitlements
+      path: App/Mira.entitlements
       properties:
         com.apple.security.app-sandbox: true
         com.apple.security.files.user-selected.read-write: true
@@ -49,14 +49,14 @@ targets:
     info:
       path: App/Info.plist
       properties:
-        CFBundleDisplayName: Emulsion
-        CFBundleName: Emulsion
+        CFBundleDisplayName: Mira
+        CFBundleName: Mira
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSApplicationCategoryType: public.app-category.photography
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
-        NSHumanReadableCopyright: "Copyright 2026 DW James. Film looks: Pat David, CC BY-SA 4.0."
-        NSPhotoLibraryUsageDescription: "Emulsion shows your Photos library so you can apply film looks. Edits are saved non-destructively; Revert to Original in Photos restores your picture."
+        NSHumanReadableCopyright: "Copyright 2026 FieldFrames. Film looks: Pat David, CC BY-SA 4.0."
+        NSPhotoLibraryUsageDescription: "Mira shows your Photos library so you can apply film looks. Edits are saved non-destructively; Revert to Original in Photos restores your picture."
         CFBundleDocumentTypes:
           - CFBundleTypeName: Image
             CFBundleTypeRole: Viewer
@@ -71,37 +71,37 @@ targets:
               - public.image
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.dwjames.emulsion
-        PRODUCT_NAME: Emulsion
+        PRODUCT_BUNDLE_IDENTIFIER: com.fieldframes.mira
+        PRODUCT_NAME: Mira
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         COMBINE_HIDPI_IMAGES: YES
-  EmulsionPhotos:
+  MiraPhotos:
     type: app-extension
     platform: macOS
     sources:
       - path: PhotosExtension
         excludes:
           - Info.plist
-          - EmulsionPhotos.entitlements
+          - MiraPhotos.entitlements
       - path: Films
         type: folder
     dependencies:
-      - package: EmulsionCore
-        product: EmulsionCore
-      - package: EmulsionUI
-        product: EmulsionUI
+      - package: MiraCore
+        product: MiraCore
+      - package: MiraUI
+        product: MiraUI
       - sdk: Photos.framework
       - sdk: PhotosUI.framework
     entitlements:
-      path: PhotosExtension/EmulsionPhotos.entitlements
+      path: PhotosExtension/MiraPhotos.entitlements
       properties:
         com.apple.security.app-sandbox: true
     info:
       path: PhotosExtension/Info.plist
       properties:
-        CFBundleDisplayName: Emulsion
-        CFBundleName: EmulsionPhotos
+        CFBundleDisplayName: Mira
+        CFBundleName: MiraPhotos
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
@@ -113,14 +113,14 @@ targets:
               - Image
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.dwjames.emulsion.photos
-        PRODUCT_NAME: EmulsionPhotos
+        PRODUCT_BUNDLE_IDENTIFIER: com.fieldframes.mira.photos
+        PRODUCT_NAME: MiraPhotos
         APPLICATION_EXTENSION_API_ONLY: YES
 schemes:
-  Emulsion:
+  Mira:
     build:
       targets:
-        Emulsion: all
-        EmulsionPhotos: all
+        Mira: all
+        MiraPhotos: all
     run:
       config: Debug

@@ -1,5 +1,5 @@
 import AppKit
-import EmulsionCore
+import MiraCore
 import Foundation
 import Photos
 
@@ -18,7 +18,7 @@ enum PhotoKitBridge {
 
     nonisolated static func makeOptions(progress: (@Sendable (Double) -> Void)?) -> PHContentEditingInputRequestOptions {
         let options = PHContentEditingInputRequestOptions()
-        options.canHandleAdjustmentData = { @Sendable data in EmulsionAdjustment.canHandle(data) }
+        options.canHandleAdjustmentData = { @Sendable data in MiraAdjustment.canHandle(data) }
         options.isNetworkAccessAllowed = true
         if let progress {
             options.progressHandler = { @Sendable value, _ in progress(value) }

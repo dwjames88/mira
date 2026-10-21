@@ -1,6 +1,6 @@
 import AppKit
-import EmulsionCore
-import EmulsionUI
+import MiraCore
+import MiraUI
 import ImageIO
 import Photos
 import PhotosUI
@@ -27,7 +27,7 @@ final class PhotoEditingViewController: NSViewController, PHContentEditingContro
         preferredContentSize = NSSize(width: 1100, height: 750)
 
         guard let library = FilmLibrary.bundled() else {
-            let label = NSTextField(labelWithString: "Emulsion could not load its film library.")
+            let label = NSTextField(labelWithString: "Mira could not load its film library.")
             label.frame = container.bounds
             label.alignment = .center
             label.autoresizingMask = [.width, .height]
@@ -45,14 +45,14 @@ final class PhotoEditingViewController: NSViewController, PHContentEditingContro
     // MARK: PHContentEditingController
 
     func canHandle(_ adjustmentData: PHAdjustmentData) -> Bool {
-        EmulsionAdjustment.canHandle(adjustmentData)
+        MiraAdjustment.canHandle(adjustmentData)
     }
 
     func startContentEditing(with contentEditingInput: PHContentEditingInput, placeholderImage: NSImage) {
         input = contentEditingInput
         _ = view // make sure loadView ran
         var recipe = Recipe.neutral
-        if let data = contentEditingInput.adjustmentData, let decoded = EmulsionAdjustment.recipe(from: data) {
+        if let data = contentEditingInput.adjustmentData, let decoded = MiraAdjustment.recipe(from: data) {
             recipe = decoded
         }
         startRecipe = recipe
@@ -80,7 +80,7 @@ final class PhotoEditingViewController: NSViewController, PHContentEditingContro
         let recipe = model.recipe
         let renderer = model.renderer
         let output = PHContentEditingOutput(contentEditingInput: input)
-        guard let adjustment = try? EmulsionAdjustment.adjustmentData(for: recipe), let source = model.source else {
+        guard let adjustment = try? MiraAdjustment.adjustmentData(for: recipe), let source = model.source else {
             completionHandler(nil)
             return
         }

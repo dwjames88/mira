@@ -1,4 +1,4 @@
-import EmulsionUI
+import MiraUI
 import SwiftUI
 
 struct ContentView: View {
@@ -44,7 +44,7 @@ struct ContentView: View {
         .toolbar(removing: .title)
         .toolbar {
             ToolbarItem(placement: .navigation) {
-                Text("Emulsion")
+                Text("Mira")
                     .font(FieldFramesTheme.display(18))
                     .foregroundStyle(FieldFramesTheme.paper)
                     .padding(.horizontal, FieldFramesTheme.cells(1))
@@ -92,7 +92,7 @@ struct ContentView: View {
                  ? "This removes the edit from the picture in Photos. The original is untouched."
                  : "This deletes the saved recipe (sidecar) for this file. The file itself is untouched.")
         }
-        .alert("Emulsion", isPresented: Binding(
+        .alert("Mira", isPresented: Binding(
             get: { state.errorMessage != nil },
             set: { if !$0 { state.errorMessage = nil } })
         ) {
@@ -149,7 +149,7 @@ private struct EmptyState: View {
             title: "Open a photo",
             subtitle: "Drop an image here, or choose one to start",
             buttonTitle: "Open\u{2026}",
-            note: "To edit inside Photos, open a picture, click Edit, then choose \u{22EF} \u{25B8} Extensions \u{25B8} Emulsion.",
+            note: "To edit inside Photos, open a picture, click Edit, then choose \u{22EF} \u{25B8} Extensions \u{25B8} Mira.",
             action: { state.presentOpenPanel() })
     }
 }

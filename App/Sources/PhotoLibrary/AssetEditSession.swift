@@ -1,6 +1,6 @@
 import AppKit
 import CoreImage
-import EmulsionCore
+import MiraCore
 import ImageIO
 import Photos
 
@@ -62,7 +62,7 @@ final class AssetEditSession {
         var ours = false
         var foreign: String?
         if let data = input.adjustmentData {
-            if let decoded = EmulsionAdjustment.recipe(from: data) {
+            if let decoded = MiraAdjustment.recipe(from: data) {
                 recipe = decoded
                 ours = true
             } else {
@@ -105,7 +105,7 @@ final class AssetEditSession {
         guard isFullSize, let inputURL = input.fullSizeImageURL else { throw AssetEditError.noFullSizeImage }
 
         let output = PHContentEditingOutput(contentEditingInput: input)
-        output.adjustmentData = try EmulsionAdjustment.adjustmentData(for: recipe)
+        output.adjustmentData = try MiraAdjustment.adjustmentData(for: recipe)
         let outputURL = output.renderedContentURL
         let colorSpace = ImageSource.outputColorSpace(url: inputURL, image: source)
 

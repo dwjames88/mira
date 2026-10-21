@@ -1,7 +1,7 @@
 import AppKit
 import CoreImage
-import EmulsionCore
-import EmulsionUI
+import MiraCore
+import MiraUI
 import Observation
 import Photos
 import UniformTypeIdentifiers
@@ -180,7 +180,7 @@ final class AppState {
 
     private func openFile(_ url: URL) {
         guard let library else {
-            errorMessage = "Emulsion could not load its film library."
+            errorMessage = "Mira could not load its film library."
             return
         }
         flushSidecar()
@@ -215,7 +215,7 @@ final class AppState {
 
     private func loadAsset(_ session: AssetEditSession) async {
         guard let library else {
-            errorMessage = "Emulsion could not load its film library."
+            errorMessage = "Mira could not load its film library."
             return
         }
         loadGeneration += 1
@@ -386,7 +386,7 @@ final class AppState {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [format.type]
         panel.canCreateDirectories = true
-        panel.nameFieldStringValue = baseName + " Emulsion." + format.fileExtension
+        panel.nameFieldStringValue = baseName + " Mira." + format.fileExtension
         panel.title = "Export Photo"
         guard panel.runModal() == .OK, let outputURL = panel.url else { return }
 

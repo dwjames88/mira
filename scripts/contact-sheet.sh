@@ -6,8 +6,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 INPUT="${1:-Fixtures/sample.jpg}"
 
-swift build -c release --package-path Packages/EmulsionCore --product emulsion-sheet
-BIN="$(swift build -c release --package-path Packages/EmulsionCore --show-bin-path)/emulsion-sheet"
+swift build -c release --package-path Packages/MiraCore --product mira-sheet
+BIN="$(swift build -c release --package-path Packages/MiraCore --show-bin-path)/mira-sheet"
 
 mkdir -p build
 "$BIN" --films Films --input "$INPUT" --output build/contact-sheet.png

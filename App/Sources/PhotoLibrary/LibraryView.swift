@@ -1,5 +1,5 @@
 import AppKit
-import EmulsionUI
+import MiraUI
 import Photos
 import SwiftUI
 
@@ -26,9 +26,9 @@ struct LibraryView: View {
             case .denied:
                 FFEmptyState(
                     title: "Photos is off limits",
-                    subtitle: "Emulsion has no access to your library",
+                    subtitle: "Mira has no access to your library",
                     buttonTitle: "Open Privacy Settings",
-                    note: "Allow Emulsion under Privacy & Security \u{25B8} Photos, then come back. You can still open files from disk.",
+                    note: "Allow Mira under Privacy & Security \u{25B8} Photos, then come back. You can still open files from disk.",
                     action: openPrivacySettings)
             default:
                 FFEmptyState(
