@@ -91,10 +91,48 @@ public struct FFButtonChrome<Label: View>: View {
     }
 }
 
+/// Chrome-less toolbar button: mono uppercase text, paperMid, paper on hover, lichen when prominent.
+public struct FFToolbarButtonStyle: ButtonStyle {
+    public var prominent: Bool
+
+    public init(prominent: Bool = false) {
+        self.prominent = prominent
+    }
+
+    public func makeBody(configuration: Configuration) -> some View {
+        FFToolbarButtonLabel(prominent: prominent, pressed: configuration.isPressed) { configuration.label }
+    }
+}
+
+private struct FFToolbarButtonLabel<Label: View>: View {
+    @Environment(\.isEnabled) private var isEnabled
+    @State private var hovering = false
+    let prominent: Bool
+    let pressed: Bool
+    @ViewBuilder let label: Label
+
+    var body: some View {
+        let color = isEnabled ? ((prominent || pressed || hovering) ? T.lichen : T.paperMid) : T.paperDim
+        label
+            .labelStyle(.titleOnly)
+            .ffLabel(size: 11, color: color, weight: .medium)
+            .lineLimit(1)
+            .padding(.horizontal, T.cells(1))
+            .frame(minHeight: T.rows(2))
+            .contentShape(Rectangle())
+            .opacity(isEnabled ? 1 : 0.5)
+            .onHover { hovering = $0 }
+    }
+}
+
 extension ButtonStyle where Self == FFButtonStyle {
     public static var ff: FFButtonStyle { FFButtonStyle() }
     public static var ffProminent: FFButtonStyle { FFButtonStyle(prominent: true) }
 }
+
+extension ButtonStyle where Self == FFToolbarButtonStyle {
+    public static var ffToolbar: FFToolbarButtonStyle { FFToolbarButtonStyle() }
+    public static var ffToolbarProminent: FFToolbarButtonStyle { FFToolbarButtonStyle(prominent: true) }}
 
 // MARK: Toggle
 

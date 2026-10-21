@@ -6,6 +6,13 @@ struct ContentView: View {
     @Environment(\.openWindow) private var openWindow
     @State private var isTargeted = false
 
+    /// A glass-free mono text toolbar button; the title doubles as the accessibility label.
+    private func textButton(_ title: String, prominent: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) { Text(title.uppercased()) }
+            .buttonStyle(prominent ? .ffToolbarProminent : .ffToolbar)
+            .accessibilityLabel(title)
+    }
+
     var body: some View {
         Group {
             switch state.mode {
@@ -33,24 +40,37 @@ struct ContentView: View {
             return true
         } isTargeted: { isTargeted = $0 }
         .fieldFramesWindow()
+        .safeAreaInset(edge: .top, spacing: 0) { FFHairline() }
+        .toolbar(removing: .title)
         .toolbar {
-            ToolbarItemGroup {
-                if state.mode == .editor {
-                    Button("Library", systemImage: "square.grid.3x3") { state.showLibrary() }
-                }
-                Button("Open", systemImage: "photo.badge.plus") { state.presentOpenPanel() }
-                Button("Films", systemImage: "film.stack") { openWindow(id: "films") }
-                Button("Export", systemImage: "square.and.arrow.up") { state.showExportSheet = true }
-                    .disabled(!state.hasPhoto || state.isExporting || state.isBusy)
-                if state.mode == .editor {
-                    if state.isAssetTarget {
-                        Button("Save", systemImage: "checkmark.circle") { Task { await state.saveToPhotos() } }
-                            .disabled(!state.canSave)
+            ToolbarItem(placement: .navigation) {
+                Text("Emulsion")
+                    .font(FieldFramesTheme.display(18))
+                    .foregroundStyle(FieldFramesTheme.paper)
+                    .padding(.horizontal, FieldFramesTheme.cells(1))
+                    .accessibilityAddTraits(.isHeader)
+            }
+            .sharedBackgroundVisibility(.hidden)
+            ToolbarItem {
+                HStack(spacing: FieldFramesTheme.cells(1)) {
+                    if state.mode == .editor {
+                        textButton("Library") { state.showLibrary() }
                     }
-                    Button("Revert", systemImage: "arrow.uturn.backward") { state.showRevertConfirm = true }
-                        .disabled(!state.canRevert)
+                    textButton("Open") { state.presentOpenPanel() }
+                    textButton("Films") { openWindow(id: "films") }
+                    textButton("Export") { state.showExportSheet = true }
+                        .disabled(!state.hasPhoto || state.isExporting || state.isBusy)
+                    if state.mode == .editor {
+                        if state.isAssetTarget {
+                            textButton("Save", prominent: true) { Task { await state.saveToPhotos() } }
+                                .disabled(!state.canSave)
+                        }
+                        textButton("Revert") { state.showRevertConfirm = true }
+                            .disabled(!state.canRevert)
+                    }
                 }
             }
+            .sharedBackgroundVisibility(.hidden)
         }
         .toolbarBackground(FieldFramesTheme.ink, for: .windowToolbar)
         .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
