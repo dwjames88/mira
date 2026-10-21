@@ -154,6 +154,9 @@ final class AppState {
         }
     }
 
+    /// Tabs, zoom and full screen: a photo is open and nothing is loading.
+    var canUseEditorView: Bool { editor?.source != nil && !isBusy }
+
     var canExport: Bool { hasPhoto && !isExporting && !isBusy && !isCropping }
     var canRevertNow: Bool { canRevert && !isCropping }
 

@@ -77,30 +77,28 @@ struct ContentView: View {
     }
 }
 
-/// The editor plus, when the "Show edit-source footer" setting is on, a mono footer: sidecar / Photos
-/// status, notes and progress.
+/// The editor with the app's sub-toolbar extras (LIBRARY, status, SAVE) and, when the "Show
+/// edit-source footer" setting is on, a mono footer under the canvas: sidecar / Photos status,
+/// notes and progress.
 private struct EditorScreen: View {
-    @AppStorage(MiraSettings.showEditSourceFooterKey) private var showFooter = false
     let state: AppState
     let editor: EditorModel
 
+    private var hostBar: EditorHostBar {
+        let status = state.toolbarStatus
+        return EditorHostBar(
+            onLibrary: { state.showLibrary() },
+            status: status,
+            statusHelp: state.toolbarStatusHelp,
+            save: .init(isEnabled: state.canSaveNow, isSaved: status == "SAVED",
+                        action: { Task { await state.saveNow() } }))
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
-            EditorView(model: editor)
-                .disabled(state.isOpening)
-            if showFooter {
-            FFHairline()
-            HStack(spacing: FieldFramesTheme.cells(2)) {
-                if let status = state.statusLine { Text(status).ffLabel(size: 10) }
-                if let note = state.editorNote { Text(note).ffLabel(size: 10, color: FieldFramesTheme.lichen) }
-                Spacer()
-                if let result = state.resultLine { Text(result).ffLabel(size: 10, color: FieldFramesTheme.lichen) }
-                if state.isDirty { Text("UNSAVED").ffLabel(size: 10, color: FieldFramesTheme.paperMid) }
-            }
-            .padding(.horizontal, FieldFramesTheme.cells(2))
-            .frame(height: FieldFramesTheme.rows(2))
-            }
+        EditorView(model: editor, host: hostBar, windowFullScreen: true) {
+            EditorFooter(state: state)
         }
+        .disabled(state.isOpening)
         .overlay {
             if let busy = state.busyText {
                 VStack(spacing: FieldFramesTheme.rows(0.5)) {
@@ -114,6 +112,29 @@ private struct EditorScreen: View {
                 .padding(FieldFramesTheme.cells(4))
                 .background(FieldFramesTheme.ink)
                 .overlay(Rectangle().strokeBorder(FieldFramesTheme.hair, lineWidth: 1))
+            }
+        }
+    }
+}
+
+private struct EditorFooter: View {
+    @AppStorage(MiraSettings.showEditSourceFooterKey) private var showFooter = false
+    let state: AppState
+
+    var body: some View {
+        if showFooter {
+            VStack(spacing: 0) {
+                FFHairline()
+                HStack(spacing: FieldFramesTheme.cells(2)) {
+                    if let status = state.statusLine { Text(status).ffLabel(size: 10) }
+                    if let note = state.editorNote { Text(note).ffLabel(size: 10, color: FieldFramesTheme.lichen) }
+                    Spacer()
+                    if let result = state.resultLine { Text(result).ffLabel(size: 10, color: FieldFramesTheme.lichen) }
+                    if state.isDirty { Text("UNSAVED").ffLabel(size: 10, color: FieldFramesTheme.paperMid) }
+                }
+                .padding(.horizontal, FieldFramesTheme.cells(2))
+                .frame(height: FieldFramesTheme.rows(2))
+                .background { FFPanelBackground() }
             }
         }
     }

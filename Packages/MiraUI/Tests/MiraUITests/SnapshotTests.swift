@@ -86,4 +86,35 @@ struct SnapshotTests {
         model.cancelCrop()
         model.cancelWork()
     }
+
+    /// The sub-toolbar and each tab: `editor-tab-films.png`, `editor-tab-develop.png`, `editor-tab-crop.png`.
+    @Test func renderTabs() async throws {
+        FieldFramesTheme.registerFonts()
+        let model = try await Self.makeModel()
+        let host = EditorHostBar(onLibrary: {}, status: "UNSAVED", statusHelp: nil,
+                                 save: .init(isEnabled: true, isSaved: false, action: {}))
+        let size = CGSize(width: 1280, height: 800)
+
+        model.selectTab(.films)
+        try Self.writePNG(EditorView(model: model, host: host), size: size, scheme: .dark, name: "editor-tab-films")
+
+        model.selectTab(.develop)
+        await model.refreshHistogramNow()
+        try Self.writePNG(EditorView(model: model, host: host), size: size, scheme: .dark, name: "editor-tab-develop")
+
+        model.selectTab(.crop)
+        model.straighten = 4
+        model.setAspect("3:2")
+        let before = model.previewImage
+        let deadline = Date().addingTimeInterval(30)
+        while model.previewImage === before, Date() < deadline { try await Task.sleep(for: .milliseconds(50)) }
+        try await Task.sleep(for: .milliseconds(300))
+        try Self.writePNG(EditorView(model: model, host: host).environment(\.ffCropForceGrid, true),
+                          size: size, scheme: .dark, name: "editor-tab-crop")
+
+        // The extension's bar: tabs only.
+        model.selectTab(.films)
+        try Self.writePNG(EditorView(model: model), size: size, scheme: .light, name: "editor-tab-films-extension-light")
+        model.cancelWork()
+    }
 }

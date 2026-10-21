@@ -219,10 +219,12 @@ struct CropControls: View {
     }
 
     @ViewBuilder private var endButtons: some View {
-        Button("Cancel") { model.cancelCrop() }
+        Button("Cancel") { model.revertCrop() }
+            .help("Put back the crop you had; stay in the tool")
             .keyboardShortcut(.cancelAction)
             .buttonStyle(.ff)
         Button("Done") { model.commitCrop() }
+            .help("Keep the crop and go back")
             .keyboardShortcut(.defaultAction)
             .buttonStyle(.ffProminent)
     }

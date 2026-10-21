@@ -84,6 +84,8 @@ public enum FieldFramesTheme {
 
     // Colours (dynamic: they follow the system appearance).
     public static var ink: Color { inkToken.color }
+    /// The dark ink in both appearances: the ground behind a photograph shown alone (full screen).
+    public static var inkAlways: Color { Color(nsColor: inkToken.dark.nsColor) }
     public static var inkSoft: Color { inkSoftToken.color }
     public static var paper: Color { paperToken.color }
     public static var paperSoft: Color { paperSoftToken.color }

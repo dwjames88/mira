@@ -3,35 +3,75 @@ import SwiftUI
 
 private typealias T = FieldFramesTheme
 
-/// The shared editor: preview, film strip and inspector.
-public struct EditorView: View {
+/// The shared editor: the sub-toolbar with its FILMS / DEVELOP / CROP tabs, the canvas, and the
+/// panels each tab brings (film strip and film header; histogram and sliders; crop controls).
+public struct EditorView<Footer: View>: View {
     @Bindable private var model: EditorModel
-    private let showsCanvasCropButton: Bool
+    private let host: EditorHostBar?
+    private let windowFullScreen: Bool
+    private let footer: Footer
+    @Environment(\.ffImageCanvas) private var imageCanvas
 
-    /// `showsCanvasCropButton` adds a crop icon over the canvas; the app has a toolbar button instead,
-    /// the Photos extension has no toolbar.
-    public init(model: EditorModel, showsCanvasCropButton: Bool = false) {
+    /// `host` adds `← LIBRARY`, the status and SAVE (the app); the Photos extension passes nil.
+    /// `windowFullScreen` lets F also put the window in macOS full screen (the app); the extension
+    /// only hides the panels. `footer` sits under the canvas column.
+    public init(model: EditorModel, host: EditorHostBar? = nil, windowFullScreen: Bool = false,
+                @ViewBuilder footer: () -> Footer) {
         self.model = model
-        self.showsCanvasCropButton = showsCanvasCropButton
+        self.host = host
+        self.windowFullScreen = windowFullScreen
+        self.footer = footer()
     }
 
     public var body: some View {
-        HStack(spacing: 0) {
-            VStack(spacing: 0) {
-                PreviewPane(model: model, showsCropButton: showsCanvasCropButton)
-                if model.isCropping {
-                    FFHairline()
-                    CropControls(model: model)
-                }
-                FFHairline()
-                FilmStrip(model: model)
+        VStack(spacing: 0) {
+            if !model.isImmersive {
+                EditorSubToolbar(model: model, host: host)
             }
-            FFHairline(.vertical)
-            InspectorView(model: model)
-                .frame(width: T.cells(36))
+            HStack(spacing: 0) {
+                VStack(spacing: 0) {
+                    PreviewPane(model: model)
+                    if !model.isImmersive {
+                        if model.isCropping {
+                            FFHairline()
+                            CropControls(model: model)
+                        }
+                        if model.tab == .films {
+                            FFHairline()
+                            FilmStrip(model: model)
+                        }
+                        footer
+                    }
+                }
+                if !model.isImmersive {
+                    FFHairline(.vertical)
+                    panel
+                        .frame(width: T.cells(36))
+                }
+            }
         }
         .frame(minWidth: 760, minHeight: 520)
+        .background { if model.isImmersive { T.inkAlways } }
         .fieldFramesWindow()
+        .background {
+            if !imageCanvas { EditorKeyHost(model: model, windowFullScreen: windowFullScreen)
+                .frame(width: 0, height: 0)
+                .accessibilityHidden(true) }
+        }
+    }
+
+    @ViewBuilder private var panel: some View {
+        switch model.tab {
+        case .films: FilmsPanel(model: model)
+        case .develop: DevelopPanel(model: model)
+        case .crop: CropPanel(model: model)
+        }
+    }
+}
+
+extension EditorView where Footer == EmptyView {
+    public init(model: EditorModel, host: EditorHostBar? = nil, windowFullScreen: Bool = false) {
+        self.init(model: model, host: host, windowFullScreen: windowFullScreen) { EmptyView() }
     }
 }
 
@@ -39,7 +79,6 @@ public struct EditorView: View {
 
 private struct PreviewPane: View {
     @Bindable var model: EditorModel
-    var showsCropButton = false
     @Environment(\.ffImageCanvas) private var imageCanvas
     @Environment(\.displayScale) private var displayScale
     @State private var paneSize = CGSize.zero
@@ -56,7 +95,7 @@ private struct PreviewPane: View {
     var body: some View {
         ZStack {
             // The photograph sits on plain ink: no grain, no veil over it.
-            T.ink
+            (model.isImmersive ? T.inkAlways : T.ink)
             if let frame = model.displayedFrame {
                 canvas(frame)
                     .aspectRatio(frame.pixelSize, contentMode: .fit)
@@ -88,25 +127,6 @@ private struct PreviewPane: View {
                 CompareButton(model: model)
                     .padding(T.cells(2))
             }
-        }
-        .overlay(alignment: .topTrailing) {
-            if !model.isCropping, showsCropButton {
-                Button { model.beginCrop() } label: { Image(systemName: "crop") }
-                    .buttonStyle(.ffToolbarIcon)
-                    .accessibilityLabel("Crop")
-                    .background(T.backdrop)
-                    .padding(T.cells(2))
-                    .disabled(model.displayedFrame == nil)
-                    .help("Crop, rotate and straighten (C)")
-            }
-        }
-        .background {
-            // C toggles the crop tool in both hosts (Done when it is already open).
-            Button("Toggle crop") { model.toggleCrop() }
-                .keyboardShortcut("c", modifiers: [])
-                .opacity(0)
-                .frame(width: 0, height: 0)
-                .accessibilityHidden(true)
         }
         .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
             paneSize = size
@@ -211,174 +231,5 @@ private struct FilmStrip: View {
 
     private func caption(for film: Film) -> String {
         film.iso > 0 ? "\(film.brand) \u{00B7} \(film.iso)" : film.brand
-    }
-}
-
-// MARK: Inspector
-
-private struct SliderSpec: Identifiable {
-    let id: String
-    let label: String
-    let keyPath: WritableKeyPath<Recipe, Double>
-    let range: ClosedRange<Double>
-    let defaultValue: Double
-
-    init(_ id: String, _ label: String, _ keyPath: WritableKeyPath<Recipe, Double>,
-         _ range: ClosedRange<Double>, default defaultValue: Double) {
-        self.id = id
-        self.label = label
-        self.keyPath = keyPath
-        self.range = range
-        self.defaultValue = defaultValue
-    }
-}
-
-private struct SliderGroup: Identifiable {
-    let title: String
-    let specs: [SliderSpec]
-    var id: String { title }
-}
-
-private struct InspectorView: View {
-    @Bindable var model: EditorModel
-
-    private static let groups: [SliderGroup] = [
-        SliderGroup(title: "Film", specs: [
-            SliderSpec("strength", "Strength", \.strength, 0...1, default: 1),
-        ]),
-        SliderGroup(title: "Tone", specs: [
-            SliderSpec("exposure", "Exposure", \.exposure, -2...2, default: 0),
-            SliderSpec("contrast", "Contrast", \.contrast, -1...1, default: 0),
-        ]),
-        SliderGroup(title: "Color", specs: [
-            SliderSpec("saturation", "Saturation", \.saturation, -1...1, default: 0),
-            SliderSpec("warmth", "Warmth", \.warmth, -1...1, default: 0),
-            SliderSpec("tint", "Tint", \.tint, -1...1, default: 0),
-        ]),
-        SliderGroup(title: "Texture", specs: [
-            SliderSpec("grain", "Grain", \.grainAmount, 0...1, default: 0),
-            SliderSpec("grainSize", "Grain size", \.grainSize, 0...1, default: 0.5),
-            SliderSpec("halation", "Halation", \.halationAmount, 0...1, default: 0),
-            SliderSpec("halationRadius", "Halation radius", \.halationRadius, 0...1, default: 0.5),
-            SliderSpec("bloom", "Bloom", \.bloomAmount, 0...1, default: 0),
-        ]),
-    ]
-
-    private func binding(_ keyPath: WritableKeyPath<Recipe, Double>) -> Binding<Double> {
-        Binding(
-            get: { model.recipe[keyPath: keyPath] },
-            set: { model.recipe[keyPath: keyPath] = $0 })
-    }
-
-    private func sliders(_ specs: [SliderSpec]) -> some View {
-        ForEach(specs) { spec in
-            FFSlider(spec.label, value: binding(spec.keyPath), in: spec.range, default: spec.defaultValue)
-        }
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            header
-                .padding(.horizontal, T.cells(2))
-                .padding(.top, T.rows(2))
-                .padding(.bottom, T.rows(1))
-            FFHairline()
-            FFScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    HistogramView(model: model)
-                    ForEach(Self.groups) { group in
-                        FFSectionLabel(group.title)
-                            .padding(.top, T.rows(1))
-                            .padding(.bottom, 4)
-                        sliders(group.specs)
-                        if group.title == "Color" {
-                            CurvesPanel(model: model)
-                            ColorMixerPanel(model: model)
-                        }
-                    }
-                    FFSectionLabel("Frame")
-                        .padding(.top, T.rows(1))
-                        .padding(.bottom, 4)
-                    sliders([SliderSpec("vignette", "Vignette", \.vignetteAmount, 0...1, default: 0)])
-                    FFToggle("Border", isOn: $model.recipe.borderEnabled)
-                        .padding(.bottom, 8)
-                    if model.recipe.borderEnabled {
-                        sliders([SliderSpec("borderWidth", "Border width", \.borderWidth, 0...0.3, default: 0.04)])
-                    }
-                }
-                .padding(.horizontal, T.cells(2))
-                .padding(.bottom, T.rows(1))
-            }
-            FFHairline()
-            HStack {
-                Spacer()
-                Button("Reset") { model.reset() }
-                    .buttonStyle(FFButtonStyle())
-                    .disabled(model.recipe == Recipe(filmID: model.recipe.filmID, crop: model.recipe.crop))
-                    .help("Reset all sliders and keep the selected film")
-            }
-            .padding(.horizontal, T.cells(2))
-            .padding(.vertical, T.rows(1))
-        }
-        .ffPanel()
-    }
-
-    /// Fixed-height header: name (one line), meta label (one line), description (three lines). The
-    /// height is the same for Original and every film, so the sliders below never shift.
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(model.selectedFilm?.displayName ?? "Original")
-                .font(T.display(26, weight: .medium))
-                .foregroundStyle(T.paper)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .frame(height: T.rows(2), alignment: .leading)
-            Text(metaLine)
-                .ffLabel(color: T.lichen)
-                .lineLimit(1)
-                .frame(height: T.rows(1), alignment: .leading)
-            // Reserved even when the picture is not cropped, so the header never changes height.
-            Text(cropLine ?? " ")
-                .ffLabel(color: T.paperDim)
-                .lineLimit(1)
-                .frame(height: T.rows(1), alignment: .leading)
-                .accessibilityHidden(cropLine == nil)
-            Text(descriptionText)
-                .font(.system(size: 12))
-                .lineSpacing(2)
-                .foregroundStyle(T.paperMid)
-                .lineLimit(3)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, minHeight: Self.descriptionHeight, maxHeight: Self.descriptionHeight,
-                       alignment: .topLeading)
-                .padding(.top, 6)
-        }
-    }
-
-    /// Three lines of 12 pt text with 2 pt line spacing.
-    private static let descriptionHeight: CGFloat = T.rows(3) + 4
-
-    private var metaLine: String {
-        guard let film = model.selectedFilm else { return "No film \u{00B7} source image" }
-        let iso = film.iso > 0 ? "ISO \(film.iso)" : nil
-        return [film.brand, iso, film.family.displayName].compactMap { $0 }.joined(separator: " \u{00B7} ")
-    }
-
-    /// `CROP · 3:2 · 4.2°`, nil when the committed crop is the identity.
-    private var cropLine: String? {
-        let c = model.recipe.crop
-        guard !c.isIdentity else { return nil }
-        var parts = ["Crop"]
-        if !c.rect.isFull { parts.append(c.aspect == CropAspect.free ? "Free" : CropAspect.label(c.aspect)) }
-        if abs(c.straighten) > 1e-9 {
-            parts.append(c.straighten.formatted(.number.precision(.fractionLength(1))) + "\u{00B0}")
-        }
-        if c.normalizedQuarterTurns != 0 { parts.append("\(c.normalizedQuarterTurns * 90)\u{00B0} turn") }
-        if c.flipH || c.flipV { parts.append("Flip " + (c.flipH ? "H" : "") + (c.flipV ? "V" : "")) }
-        return parts.joined(separator: " \u{00B7} ")
-    }
-
-    private var descriptionText: String {
-        model.selectedFilm?.description ?? "The photograph as it was taken. Choose a film from the strip to grade it."
     }
 }

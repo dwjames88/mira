@@ -71,6 +71,47 @@ public final class EditorModel {
     }
     public var familyFilter: FilmFamily?
 
+    // MARK: Chrome
+
+    /// Panels, sub-toolbar and film strip are hidden; only the photo remains (key F).
+    public private(set) var isImmersive = false
+    /// Space is held: a drag pans the zoomed picture.
+    public private(set) var isSpaceHeld = false
+
+    public func setImmersive(_ on: Bool) {
+        guard on != isImmersive else { return }
+        if on { endHover() }
+        isImmersive = on
+    }
+
+    public func toggleImmersive() { setImmersive(!isImmersive) }
+
+    /// Ends press-and-hold states (compare, Space) when the window loses focus or the editor closes.
+    public func releaseHolds() {
+        showOriginal = false
+        isSpaceHeld = false
+    }
+
+    /// Runs a key-map action. Zoom and compare actions are handled alongside the zoom state.
+    public func perform(_ action: EditorKeyAction) {
+        switch action {
+        case .selectTab(let tab): selectTab(tab)
+        case .toggleImmersive: toggleImmersive()
+        case .exitImmersive: setImmersive(false)
+        case .compare(let held): if !isCropping || !held { showOriginal = held }
+        case .space(let held): isSpaceHeld = held
+        case .zoomIn, .zoomOut, .swallow: break
+        }
+    }
+
+    // MARK: Tabs
+
+    /// The tab the right panel and the canvas surroundings show. `.crop` is on exactly while the
+    /// crop tool is open (`isCropping`): entering it begins a crop, leaving it commits.
+    public private(set) var tab: EditorTab = .films
+    /// The tab to return to when the crop tool closes.
+    @ObservationIgnored private var tabBeforeCrop: EditorTab = .films
+
     /// The latest rendered frame (graded, or the cropping canvas while cropping).
     public private(set) var previewFrame: PreviewFrame?
     /// Thumbnails by film id. The key `EditorModel.originalTileID` holds the untouched tile.
@@ -176,6 +217,7 @@ public final class EditorModel {
         sourceGeneration += 1
         contentGeneration += 1
         isCropping = false
+        leaveCropTab()
         source = image
         isSourceFull = isFull
         engine.setSource(image)
@@ -283,6 +325,8 @@ public final class EditorModel {
         showOriginal = false
         crop = recipe.crop
         isCropping = true
+        if tab != .crop { tabBeforeCrop = tab }
+        tab = .crop
         schedulePreview()
     }
 
@@ -293,6 +337,7 @@ public final class EditorModel {
         result.rect = result.rect.clamped()
         if result.isIdentity { result = .identity }
         isCropping = false
+        leaveCropTab()
         recipe.crop = result
         schedulePreview()
     }
@@ -301,12 +346,32 @@ public final class EditorModel {
     public func cancelCrop() {
         guard isCropping else { return }
         isCropping = false
+        leaveCropTab()
         crop = recipe.crop
         schedulePreview()
     }
 
-    public func toggleCrop() {
-        if isCropping { commitCrop() } else { beginCrop() }
+    /// CANCEL in the crop tab: drops the changes made so far and stays in the tool, showing the
+    /// committed crop again.
+    public func revertCrop() {
+        guard isCropping else { return }
+        crop = recipe.crop
+        schedulePreview()
+    }
+
+    private func leaveCropTab() {
+        if tab == .crop { tab = tabBeforeCrop }
+    }
+
+    /// Switches tab. Entering CROP begins the crop tool; leaving it commits (the same as DONE).
+    public func selectTab(_ new: EditorTab) {
+        guard new != tab else { return }
+        if tab == .crop { commitCrop() }
+        if new == .crop {
+            beginCrop()
+        } else {
+            tab = new
+        }
     }
 
     /// Back to the whole, unrotated picture; the tool stays open.

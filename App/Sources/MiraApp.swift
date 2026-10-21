@@ -40,6 +40,14 @@ struct MiraApp: App {
                     .keyboardShortcut(.leftArrow, modifiers: .command)
                     .disabled(!state.hasPhoto)
             }
+            CommandGroup(before: .toolbar) {
+                ForEach(EditorTab.allCases) { tab in
+                    Button(tab.title) { state.editor?.selectTab(tab) }
+                        .keyboardShortcut(KeyEquivalent(Character(tab.key)), modifiers: [])
+                        .disabled(!state.canUseEditorView)
+                }
+                Divider()
+            }
             CommandGroup(after: .undoRedo) {
                 Divider()
                 Button("Reset Adjustments") { state.resetAdjustments() }
