@@ -66,6 +66,16 @@ enum Bench {
     static let effectsRecipe = Recipe(
         filmID: "fuji-velvia-50", grainAmount: 0.4, halationAmount: 0.3, bloomAmount: 0.2, vignetteAmount: 0.3)
 
+    /// The effects recipe plus a colour-mixer move and an S-curve with a red-channel tweak.
+    static var gradeRecipe: Recipe {
+        var r = effectsRecipe
+        r.colorMixer.orange = ColorAdjust(hue: 0.3, saturation: 0.25, luminance: 0.1)
+        r.colorMixer.blue = ColorAdjust(hue: -0.2, saturation: -0.2, luminance: -0.1)
+        r.curves.rgb = [CurvePoint(x: 0, y: 0), CurvePoint(x: 0.25, y: 0.2), CurvePoint(x: 0.75, y: 0.8), CurvePoint(x: 1, y: 1)]
+        r.curves.red = [CurvePoint(x: 0, y: 0), CurvePoint(x: 0.5, y: 0.55), CurvePoint(x: 1, y: 1)]
+        return r
+    }
+
     static func cropRecipe() -> Recipe {
         var r = effectsRecipe
         r.crop.rect = CropRect(x: 0.15, y: 0.1, w: 0.6, h: 0.7)

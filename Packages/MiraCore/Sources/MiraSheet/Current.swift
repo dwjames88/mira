@@ -26,7 +26,8 @@ enum Current {
 
         // a. preview frames
         for (name, canvasSize) in [("1500x1000", canvas), ("2400x1600", CGSize(width: 2400, height: 1600))] {
-            for (label, base) in [("effects", Bench.effectsRecipe), ("crop+6deg", Bench.cropRecipe())] {
+            for (label, base) in [("effects", Bench.effectsRecipe), ("effects+mixer+curves", Bench.gradeRecipe),
+                                  ("crop+6deg", Bench.cropRecipe())] {
                 var first = 0.0
                 var samples: [Double] = []
                 for i in 0..<61 {
@@ -77,6 +78,9 @@ enum Current {
             ("film + bloom 0.2", Recipe(filmID: film, bloomAmount: 0.2)),
             ("film + vignette 0.3", Recipe(filmID: film, vignetteAmount: 0.3)),
             ("all effects", Bench.effectsRecipe),
+            ("film + color mixer (2 ranges)", Recipe(filmID: film, colorMixer: Bench.gradeRecipe.colorMixer)),
+            ("film + curves (RGB + red)", Recipe(filmID: film, curves: Bench.gradeRecipe.curves)),
+            ("all effects + mixer + curves", Bench.gradeRecipe),
         ]
         for (label, base) in parts {
             _ = engine.render(base, canvas: canvas)

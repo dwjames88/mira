@@ -11,6 +11,8 @@ let package = Package(
     targets: [
         .target(
             name: "MiraCore",
+            // Precompiled Core Image kernels (scripts/build-kernels.sh).
+            resources: [.copy("Resources/Grade.ci.metallib")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .executableTarget(

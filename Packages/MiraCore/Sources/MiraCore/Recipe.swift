@@ -21,6 +21,10 @@ public struct Recipe: Codable, Hashable, Sendable {
     public var version: Int
     /// Crop, rotation, flips and straighten; identity by default.
     public var crop: CropSettings
+    /// Tone curves (RGB, red, green, blue, luminance); identity by default.
+    public var curves: CurvesSettings
+    /// Per-hue-range hue, saturation and luminance; identity by default.
+    public var colorMixer: ColorMixerSettings
 
     public static let neutral = Recipe()
 
@@ -41,7 +45,9 @@ public struct Recipe: Codable, Hashable, Sendable {
         borderEnabled: Bool = false,
         borderWidth: Double = 0.04,
         version: Int = 1,
-        crop: CropSettings = .identity
+        crop: CropSettings = .identity,
+        curves: CurvesSettings = .identity,
+        colorMixer: ColorMixerSettings = .identity
     ) {
         self.filmID = filmID
         self.strength = strength
@@ -60,12 +66,14 @@ public struct Recipe: Codable, Hashable, Sendable {
         self.borderWidth = borderWidth
         self.version = version
         self.crop = crop
+        self.curves = curves
+        self.colorMixer = colorMixer
     }
 
     private enum CodingKeys: String, CodingKey {
         case filmID, strength, exposure, contrast, saturation, warmth, tint
         case grainAmount, grainSize, halationAmount, halationRadius, bloomAmount
-        case vignetteAmount, borderEnabled, borderWidth, version, crop
+        case vignetteAmount, borderEnabled, borderWidth, version, crop, curves, colorMixer
     }
 
     public init(from decoder: Decoder) throws {
@@ -88,6 +96,33 @@ public struct Recipe: Codable, Hashable, Sendable {
         borderWidth = try c.decodeIfPresent(Double.self, forKey: .borderWidth) ?? d.borderWidth
         version = try c.decodeIfPresent(Int.self, forKey: .version) ?? d.version
         crop = try c.decodeIfPresent(CropSettings.self, forKey: .crop) ?? .identity
+        curves = try c.decodeIfPresent(CurvesSettings.self, forKey: .curves) ?? .identity
+        colorMixer = try c.decodeIfPresent(ColorMixerSettings.self, forKey: .colorMixer) ?? .identity
+    }
+
+    /// Curves and the colour mixer are written only when they change something, so recipes
+    /// that do not use them keep exactly the bytes older versions wrote.
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(filmID, forKey: .filmID)
+        try c.encode(strength, forKey: .strength)
+        try c.encode(exposure, forKey: .exposure)
+        try c.encode(contrast, forKey: .contrast)
+        try c.encode(saturation, forKey: .saturation)
+        try c.encode(warmth, forKey: .warmth)
+        try c.encode(tint, forKey: .tint)
+        try c.encode(grainAmount, forKey: .grainAmount)
+        try c.encode(grainSize, forKey: .grainSize)
+        try c.encode(halationAmount, forKey: .halationAmount)
+        try c.encode(halationRadius, forKey: .halationRadius)
+        try c.encode(bloomAmount, forKey: .bloomAmount)
+        try c.encode(vignetteAmount, forKey: .vignetteAmount)
+        try c.encode(borderEnabled, forKey: .borderEnabled)
+        try c.encode(borderWidth, forKey: .borderWidth)
+        try c.encode(version, forKey: .version)
+        try c.encode(crop, forKey: .crop)
+        if !curves.isIdentity { try c.encode(curves, forKey: .curves) }
+        if !colorMixer.isIdentity { try c.encode(colorMixer, forKey: .colorMixer) }
     }
 
     /// JSON with sorted keys, so equal recipes produce equal bytes.

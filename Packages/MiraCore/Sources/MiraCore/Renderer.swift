@@ -20,7 +20,7 @@ public enum RendererError: Error, CustomStringConvertible {
     }
 }
 
-/// Builds the film look as a pure CIFilter graph.
+/// Builds the film look as a pure CIFilter graph (plus two small Metal kernels for curves and the colour mixer).
 ///
 /// Colour management: the shared context works in extended *linear* sRGB. Film LUTs are
 /// authored on sRGB-encoded values, so the cube is applied with
@@ -82,6 +82,15 @@ public struct Renderer: Sendable {
             f.inputImage = image
             f.ev = Float(clamp(recipe.exposure, -2, 2))
             image = f.outputImage ?? image
+        }
+
+        // 1b. Colour mixer, then curves: the user's own colour and tone corrections, applied
+        // before the film look so the film sits on top of them. Skipped when they do nothing.
+        if !recipe.colorMixer.isIdentity {
+            image = GradeKernels.applyColorMixer(recipe.colorMixer, to: image)
+        }
+        if !recipe.curves.isIdentity {
+            image = GradeKernels.applyCurves(recipe.curves, to: image)
         }
 
         // 2. Film LUT, blended with the pre-LUT image by strength

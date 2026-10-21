@@ -42,6 +42,7 @@ private struct PreviewPane: View {
     var showsCropButton = false
     @Environment(\.ffImageCanvas) private var imageCanvas
     @Environment(\.displayScale) private var displayScale
+    @State private var paneSize = CGSize.zero
 
     @ViewBuilder
     private func canvas(_ frame: PreviewFrame) -> some View {
@@ -108,13 +109,26 @@ private struct PreviewPane: View {
                 .accessibilityHidden(true)
         }
         .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
+            paneSize = size
             // The picture area is the pane minus its padding; previews are rendered at that size in pixels.
             let inset = T.cells(3) * 2
             model.setCanvas(pixels: CGSize(width: max(1, size.width - inset) * displayScale,
                                            height: max(1, size.height - inset) * displayScale))
         }
         .contentShape(Rectangle())
-        .gesture(holdToCompare(model), isEnabled: !model.isCropping)
+        .gesture(holdToCompare(model), isEnabled: !model.isCropping && !model.eyedropperActive)
+        .gesture(
+            SpatialTapGesture().onEnded { tap in
+                guard let frame = model.displayedFrame,
+                      let p = PreviewHitMapping.normalizedPoint(tap.location, pane: paneSize, inset: T.cells(3),
+                                                                image: frame.pixelSize) else {
+                    model.eyedropperActive = false
+                    return
+                }
+                model.sampleRange(atImagePoint: p)
+            },
+            isEnabled: model.eyedropperActive && !model.isCropping)
+        .pointerStyle(model.eyedropperActive ? .rectSelection : .default)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .help(model.isCropping ? "" : "Press and hold to see the original")
     }
@@ -271,11 +285,16 @@ private struct InspectorView: View {
             FFHairline()
             FFScrollView {
                 VStack(alignment: .leading, spacing: 0) {
+                    HistogramView(model: model)
                     ForEach(Self.groups) { group in
                         FFSectionLabel(group.title)
                             .padding(.top, T.rows(1))
                             .padding(.bottom, 4)
                         sliders(group.specs)
+                        if group.title == "Color" {
+                            CurvesPanel(model: model)
+                            ColorMixerPanel(model: model)
+                        }
                     }
                     FFSectionLabel("Frame")
                         .padding(.top, T.rows(1))

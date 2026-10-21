@@ -46,6 +46,20 @@ public final class EditorModel {
     }
     public var showOriginal = false
 
+    // MARK: Histogram and colour mixer
+
+    /// Histogram of the frame on the canvas (graded, original or hover), nil until the first frame.
+    public private(set) var histogram: HistogramData?
+    /// The colour-mixer range the sliders edit.
+    public var mixerRange: ColorRange = .red
+    /// While true, the next click on the canvas picks a colour-mixer range from the pixel under it.
+    public var eyedropperActive = false
+    @ObservationIgnored private var histogramInFlight = false
+    @ObservationIgnored private var histogramPending: PreviewFrame?
+    @ObservationIgnored private var histogramLast: ContinuousClock.Instant?
+    /// Minimum time between histogram passes (about 20 Hz).
+    nonisolated static let histogramInterval: Duration = .milliseconds(50)
+
     /// True while the crop tool is open. `crop` is the working copy; `recipe.crop` only changes on Done.
     public private(set) var isCropping = false
     /// The working crop while `isCropping` (rect, straighten, rotation, flips, aspect preset).
@@ -562,6 +576,54 @@ public final class EditorModel {
             }
         }
         thumbnailCache[crop]?[key] = image
+    }
+
+    // MARK: Histogram
+
+    /// Tells the model which frame is on the canvas. The histogram follows at most 20 times a
+    /// second, off the main actor; a pass never starts while another is running, and only the
+    /// newest frame waits.
+    public func histogramFrameChanged(_ frame: PreviewFrame?) {
+        guard let frame else { return }
+        histogramPending = frame
+        pumpHistogram()
+    }
+
+    /// Computes the histogram of the displayed frame now and waits for it (tests and snapshots).
+    func refreshHistogramNow() async {
+        guard let frame = displayedFrame else { return }
+        let data = await Task.detached { HistogramData.compute(frame: frame) }.value
+        histogram = data
+    }
+
+    private func pumpHistogram() {
+        guard !histogramInFlight, histogramPending != nil else { return }
+        histogramInFlight = true
+        let wait: Duration = histogramLast.map { max(.zero, Self.histogramInterval - ($0.duration(to: .now))) } ?? .zero
+        Task { [weak self] in
+            if wait > .zero { try? await Task.sleep(for: wait) }
+            guard let self, let frame = self.histogramPending else { self?.histogramInFlight = false; return }
+            self.histogramPending = nil
+            let data = await Task.detached(priority: .utility) { HistogramData.compute(frame: frame) }.value
+            self.histogram = data
+            self.histogramLast = .now
+            self.histogramInFlight = false
+            if self.histogramPending != nil { self.pumpHistogram() }
+        }
+    }
+
+    // MARK: Eyedropper
+
+    /// Picks the colour-mixer range for the colour at `point` (fractions of the displayed picture,
+    /// origin top left), selects it and turns the eyedropper off. Returns nil, leaving the
+    /// selection alone, for greys and points outside the picture.
+    @discardableResult
+    public func sampleRange(atImagePoint point: CGPoint) -> ColorRange? {
+        defer { eyedropperActive = false }
+        guard let frame = displayedFrame, let c = frame.color(atNormalized: point),
+              let range = ColorRange.nearest(sRGB: c.r, c.g, c.b) else { return nil }
+        mixerRange = range
+        return range
     }
 
     /// Stops background work (used when an editing session is cancelled).
