@@ -19,6 +19,8 @@ public struct Recipe: Codable, Hashable, Sendable {
     public var borderEnabled: Bool
     public var borderWidth: Double
     public var version: Int
+    /// Crop, rotation, flips and straighten; identity by default.
+    public var crop: CropSettings
 
     public static let neutral = Recipe()
 
@@ -38,7 +40,8 @@ public struct Recipe: Codable, Hashable, Sendable {
         vignetteAmount: Double = 0,
         borderEnabled: Bool = false,
         borderWidth: Double = 0.04,
-        version: Int = 1
+        version: Int = 1,
+        crop: CropSettings = .identity
     ) {
         self.filmID = filmID
         self.strength = strength
@@ -56,12 +59,13 @@ public struct Recipe: Codable, Hashable, Sendable {
         self.borderEnabled = borderEnabled
         self.borderWidth = borderWidth
         self.version = version
+        self.crop = crop
     }
 
     private enum CodingKeys: String, CodingKey {
         case filmID, strength, exposure, contrast, saturation, warmth, tint
         case grainAmount, grainSize, halationAmount, halationRadius, bloomAmount
-        case vignetteAmount, borderEnabled, borderWidth, version
+        case vignetteAmount, borderEnabled, borderWidth, version, crop
     }
 
     public init(from decoder: Decoder) throws {
@@ -83,6 +87,7 @@ public struct Recipe: Codable, Hashable, Sendable {
         borderEnabled = try c.decodeIfPresent(Bool.self, forKey: .borderEnabled) ?? d.borderEnabled
         borderWidth = try c.decodeIfPresent(Double.self, forKey: .borderWidth) ?? d.borderWidth
         version = try c.decodeIfPresent(Int.self, forKey: .version) ?? d.version
+        crop = try c.decodeIfPresent(CropSettings.self, forKey: .crop) ?? .identity
     }
 
     /// JSON with sorted keys, so equal recipes produce equal bytes.
