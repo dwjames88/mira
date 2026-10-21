@@ -23,7 +23,11 @@ public final class EditorModel {
     public private(set) var previewSource: CIImage?
 
     public var recipe: Recipe {
-        didSet { if recipe != oldValue { schedulePreview() } }
+        didSet {
+            guard recipe != oldValue else { return }
+            schedulePreview()
+            recipeChangedWhileHovering()
+        }
     }
     public var showOriginal = false
     public var familyFilter: FilmFamily?
@@ -32,6 +36,22 @@ public final class EditorModel {
     public private(set) var previewImage: NSImage?
     /// Thumbnails by film id. The key `EditorModel.originalTileID` holds the untouched tile.
     public private(set) var thumbnails: [String: NSImage] = [:]
+
+    /// What the pointer is over in the film strip. Preview-only state: it never touches `recipe`.
+    public enum HoverTarget: Hashable, Sendable {
+        case original
+        case film(String)
+
+        var filmID: String? {
+            if case .film(let id) = self { return id }
+            return nil
+        }
+    }
+
+    /// The card under the pointer, or nil when the pointer is elsewhere. Set immediately; the
+    /// preview image follows after the debounce.
+    public private(set) var hoveredTarget: HoverTarget?
+    @ObservationIgnored private var hoverImage: NSImage?
 
     public static let originalTileID = "__original__"
     public nonisolated static let previewLongSide: CGFloat = 1600
@@ -42,6 +62,17 @@ public final class EditorModel {
     @ObservationIgnored private var thumbnailTask: Task<Void, Never>?
     @ObservationIgnored private var originalPreview: NSImage?
     @ObservationIgnored private var sourceGeneration = 0
+    @ObservationIgnored private var hoverTask: Task<Void, Never>?
+    @ObservationIgnored private var hoverGeneration = 0
+    @ObservationIgnored private var hoverCache: [HoverKey: NSImage] = [:]
+    @ObservationIgnored private var hoverCacheOrder: [HoverKey] = []
+
+    private struct HoverKey: Hashable {
+        let filmID: String?
+        let recipe: Recipe
+    }
+    private static let hoverCacheLimit = 6
+    nonisolated static let hoverDebounce: Duration = .milliseconds(120)
 
     public init(library: FilmLibrary, recipe: Recipe = .neutral) {
         self.library = library
@@ -76,6 +107,9 @@ public final class EditorModel {
         thumbnails = [:]
         originalPreview = nil
         previewImage = nil
+        hoverCache = [:]
+        hoverCacheOrder = []
+        if let target = hoveredTarget { startHover(target, keepImage: false) }
         schedulePreview()
         startThumbnails()
     }
@@ -98,6 +132,7 @@ public final class EditorModel {
     // MARK: Editing
 
     public func selectFilm(_ id: String?) {
+        endHover()
         recipe.filmID = id
     }
 
@@ -134,9 +169,97 @@ public final class EditorModel {
         }
     }
 
-    /// The image to show for the current state.
+    /// The image to show for the current state. Press-and-hold compare wins over a hover preview.
     public var displayedImage: NSImage? {
-        showOriginal ? (originalPreview ?? previewImage) : previewImage
+        if showOriginal { return originalPreview ?? previewImage }
+        return visibleHoverImage ?? previewImage
+    }
+
+    /// The hover render, only while it is ready and differs from the applied look.
+    private var visibleHoverImage: NSImage? {
+        guard let target = hoveredTarget, target != appliedTarget else { return nil }
+        return hoverImage
+    }
+
+    private var appliedTarget: HoverTarget {
+        recipe.filmID.map(HoverTarget.film) ?? .original
+    }
+
+    /// The film being previewed, non-nil only while its hover image is actually displayed.
+    public var hoverPreviewFilm: Film? {
+        guard !showOriginal, visibleHoverImage != nil, let id = hoveredTarget?.filmID else { return nil }
+        return library.film(id: id)
+    }
+
+    /// Label text for the canvas chip ("Original" or the film name), nil unless a hover image is displayed.
+    public var hoverPreviewName: String? {
+        guard !showOriginal, visibleHoverImage != nil, let target = hoveredTarget else { return nil }
+        if case .original = target { return "Original" }
+        return hoverPreviewFilm?.displayName
+    }
+
+    // MARK: Hover preview
+
+    /// Previews `id` (nil for Original) on the canvas with the current sliders, after a short debounce.
+    public func hoverFilm(_ id: String?) {
+        startHover(id.map(HoverTarget.film) ?? .original, keepImage: false)
+    }
+
+    /// The pointer left the film strip: back to the applied look immediately.
+    public func endHover() {
+        hoverGeneration += 1
+        hoverTask?.cancel()
+        hoverTask = nil
+        hoveredTarget = nil
+        hoverImage = nil
+    }
+
+    private func recipeChangedWhileHovering() {
+        hoverCache = [:]
+        hoverCacheOrder = []
+        if let target = hoveredTarget { startHover(target, keepImage: true) }
+    }
+
+    private func startHover(_ target: HoverTarget, keepImage: Bool) {
+        hoverGeneration += 1
+        let generation = hoverGeneration
+        hoverTask?.cancel()
+        hoverTask = nil
+        hoveredTarget = target
+        if !keepImage { hoverImage = nil }
+        guard let input = previewSource else { return }
+
+        var swapped = recipe
+        swapped.filmID = target.filmID
+        let graded = swapped
+        let key = HoverKey(filmID: target.filmID, recipe: graded)
+        if let cached = hoverCache[key] {
+            hoverImage = cached
+            return
+        }
+        let renderer = renderer
+        let context = context
+        let box = Unchecked(value: input)
+        hoverTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.hoverDebounce)
+            if Task.isCancelled { return }
+            let cg = await Task.detached(priority: .userInitiated) {
+                renderer.render(graded, input: box.value, context: context).map(Unchecked.init)
+            }.value
+            guard !Task.isCancelled, let self, self.hoverGeneration == generation, let cg else { return }
+            let image = Self.nsImage(cg.value)
+            self.storeHover(image, for: key)
+            self.hoverImage = image
+        }
+    }
+
+    private func storeHover(_ image: NSImage, for key: HoverKey) {
+        hoverCache[key] = image
+        hoverCacheOrder.removeAll { $0 == key }
+        hoverCacheOrder.append(key)
+        while hoverCacheOrder.count > Self.hoverCacheLimit {
+            hoverCache[hoverCacheOrder.removeFirst()] = nil
+        }
     }
 
     // MARK: Thumbnails
@@ -197,6 +320,7 @@ public final class EditorModel {
     public func cancelWork() {
         previewTask?.cancel()
         thumbnailTask?.cancel()
+        hoverTask?.cancel()
     }
 
     private static func nsImage(_ cg: CGImage) -> NSImage {

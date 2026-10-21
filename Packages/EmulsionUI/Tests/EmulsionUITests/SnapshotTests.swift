@@ -56,6 +56,14 @@ struct SnapshotTests {
             try Self.writePNG(FilmsBrowserView(library: model.library), size: CGSize(width: 1280, height: 800), scheme: scheme, name: "films-\(tag)")
         }
         try Self.writePNG(FilmsBrowserView(library: model.library), size: CGSize(width: 1280, height: 3000), scheme: .dark, name: "films-tall-dark")
+        if let bw = model.films.first(where: { $0.family == .blackAndWhite }) {
+            model.hoverFilm(bw.id)
+            let deadline = Date().addingTimeInterval(30)
+            while model.hoverPreviewFilm == nil, Date() < deadline { try await Task.sleep(for: .milliseconds(50)) }
+            #expect(model.hoverPreviewFilm?.id == bw.id)
+            try Self.writePNG(EditorView(model: model), size: CGSize(width: 1280, height: 800), scheme: .dark, name: "editor-hover-dark")
+            model.endHover()
+        }
         model.recipe.filmID = nil
         try Self.writePNG(EditorView(model: model), size: CGSize(width: 1280, height: 800), scheme: .dark, name: "editor-original-dark")
         model.cancelWork()

@@ -285,9 +285,12 @@ public struct FilmCard: View {
     private let image: NSImage?
     private let isSelected: Bool
     private let action: () -> Void
+    private let onHoverChange: ((Bool) -> Void)?
     @State private var hovering = false
 
-    public init(title: String, caption: String, image: NSImage?, isSelected: Bool, action: @escaping () -> Void) {
+    public init(title: String, caption: String, image: NSImage?, isSelected: Bool,
+                onHoverChange: ((Bool) -> Void)? = nil, action: @escaping () -> Void) {
+        self.onHoverChange = onHoverChange
         self.title = title
         self.caption = caption
         self.image = image
@@ -324,7 +327,7 @@ public struct FilmCard: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .onHover { hovering = $0 }
+        .onHover { hovering = $0; onHoverChange?($0) }
         .accessibilityLabel("\(title), \(caption)")
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }

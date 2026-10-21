@@ -47,6 +47,19 @@ private struct PreviewPane: View {
                 Text("Developing").ffLabel()
             }
         }
+        .overlay(alignment: .topLeading) {
+            if let name = model.hoverPreviewName {
+                Text("Preview \u{00B7} \(name)")
+                    .ffLabel(color: T.onPhoto)
+                    .lineLimit(1)
+                    .padding(.horizontal, T.cells(1))
+                    .padding(.vertical, 4)
+                    .background(T.onPhotoVeil)
+                    .padding(T.cells(2))
+                    .allowsHitTesting(false)
+                    .accessibilityLabel("Previewing \(name)")
+            }
+        }
         .overlay(alignment: .bottomTrailing) {
             CompareButton(model: model)
                 .padding(T.cells(2))
@@ -100,7 +113,8 @@ private struct FilmStrip: View {
                     FilmCard(
                         title: "Original", caption: "No film",
                         image: model.thumbnails[EditorModel.originalTileID],
-                        isSelected: model.recipe.filmID == nil
+                        isSelected: model.recipe.filmID == nil,
+                        onHoverChange: { hover($0, nil) }
                     ) { model.selectFilm(nil) }
 
                     ForEach(model.visibleFilms) { film in
@@ -108,7 +122,8 @@ private struct FilmStrip: View {
                             title: film.displayName,
                             caption: caption(for: film),
                             image: model.thumbnails[film.id],
-                            isSelected: model.recipe.filmID == film.id
+                            isSelected: model.recipe.filmID == film.id,
+                            onHoverChange: { hover($0, film.id) }
                         ) { model.selectFilm(film.id) }
                     }
                 }
@@ -118,6 +133,17 @@ private struct FilmStrip: View {
             .frame(height: T.rows(9))
         }
         .ffPanel()
+    }
+
+    /// Enter previews the card; exit only ends the hover if no other card has taken over, so the
+    /// exit/enter order between neighbours does not matter.
+    private func hover(_ inside: Bool, _ id: String?) {
+        let target: EditorModel.HoverTarget = id.map(EditorModel.HoverTarget.film) ?? .original
+        if inside {
+            model.hoverFilm(id)
+        } else if model.hoveredTarget == target {
+            model.endHover()
+        }
     }
 
     private func caption(for film: Film) -> String {
