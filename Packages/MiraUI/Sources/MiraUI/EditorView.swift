@@ -199,8 +199,9 @@ private struct PreviewPane: View {
             },
             isEnabled: model.eyedropperActive && !model.isCropping)
         .pointerStyle(pointer)
+        .background(TrackpadZoomPan(model: model, scale: displayScale))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .help(model.canZoom ? "Click to zoom to 100%, drag to pan" : "")
+        .help(model.canZoom ? "Click to zoom to 200%, drag or scroll to pan, pinch to zoom" : "")
     }
 
     /// The aspect-fit rectangle of a whole-picture frame at fit, in device pixels (used when the zoom
@@ -324,5 +325,77 @@ private struct FilmStrip: View {
 
     private func caption(for film: Film) -> String {
         film.iso > 0 ? "\(film.brand) \u{00B7} \(film.iso)" : film.brand
+    }
+}
+
+// MARK: Scroll and pinch
+
+/// Two-finger scroll and the scroll wheel pan the zoomed picture; pinch zooms. A local event monitor
+/// scoped to this view's rect, so it works under SwiftUI's own hit testing. At fit, scroll passes
+/// through untouched.
+private struct TrackpadZoomPan: NSViewRepresentable {
+    let model: EditorModel
+    let scale: CGFloat
+
+    func makeNSView(context: Context) -> TrackpadMonitorView { TrackpadMonitorView() }
+
+    func updateNSView(_ view: TrackpadMonitorView, context: Context) {
+        view.model = model
+        view.backingScale = scale
+    }
+}
+
+@MainActor
+private final class TrackpadMonitorView: NSView {
+    weak var model: EditorModel?
+    var backingScale: CGFloat = 2
+    private var monitor: Any?
+
+    override var isFlipped: Bool { true }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if let monitor { NSEvent.removeMonitor(monitor); self.monitor = nil }
+        guard window != nil else { return }
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel, .magnify]) { [weak self] event in
+            // Only plain values cross into the main actor; NSEvent itself is not Sendable.
+            let input = Input(isMagnify: event.type == .magnify, windowNumber: event.windowNumber,
+                              location: event.locationInWindow, magnification: Double(event.magnification),
+                              dx: event.scrollingDeltaX, dy: event.scrollingDeltaY,
+                              precise: event.hasPreciseScrollingDeltas)
+            let consumed = MainActor.assumeIsolated { self?.handle(input) ?? false }
+            return consumed ? nil : event
+        }
+    }
+
+    isolated deinit { if let monitor { NSEvent.removeMonitor(monitor) } }
+
+    private struct Input: Sendable {
+        var isMagnify: Bool
+        var windowNumber: Int
+        var location: CGPoint
+        var magnification: Double
+        var dx: CGFloat
+        var dy: CGFloat
+        var precise: Bool
+    }
+
+    /// True when the event was used and must not travel on.
+    private func handle(_ e: Input) -> Bool {
+        guard let model, model.canZoom, !model.eyedropperActive, let window, e.windowNumber == window.windowNumber else { return false }
+        let local = convert(e.location, from: nil)
+        guard bounds.contains(local) else { return false }
+        let pane = CGPoint(x: local.x * backingScale, y: local.y * backingScale)
+        if e.isMagnify {
+            model.zoomPinch(by: 1 + e.magnification, atPane: pane)
+            return true
+        }
+        guard !model.zoom.isFit else { return false }
+        // Points for a trackpad; a wheel reports lines, about ten points each. The system has
+        // already applied the natural-direction setting, so the picture follows the fingers.
+        let unit: CGFloat = e.precise ? 1 : 10
+        model.zoomPan(byPane: CGSize(width: e.dx * unit * backingScale, height: e.dy * unit * backingScale))
+        return true
     }
 }

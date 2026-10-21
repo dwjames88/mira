@@ -120,8 +120,8 @@ Keys (single keys work when no text field is being edited, in the app and the ex
 | F | Full screen: window full screen (app) and every panel hidden, the photo alone on pure ink. Not available while cropping. In the extension F only hides the panels |
 | Esc | Leaves that view (restores panels, leaves full screen). In the crop tab Esc is CANCEL |
 | C (hold) | Shows the original while held; releasing returns to the edit. Mouse: press and hold HOLD TO COMPARE |
-| Click on the photo | Fit → 100% (1 picture pixel = 1 screen pixel) centred on the click; click again → fit. Not in the crop tab, not while the eyedropper is active |
-| Drag, or Space + drag | Pans while zoomed. Space alone does nothing |
+| Click on the photo | Fit → 200% centred on the click; click again → fit. Not in the crop tab, not while the eyedropper is active |
+| Drag, Space + drag, two-finger scroll or wheel | Pans while zoomed (scroll follows the fingers, momentum included; at fit scroll passes through). Space alone does nothing. Pinch zooms between fit and 400% at the pointer |
 | ] / [ | Zoom in / out through fit, 50%, 100%, 200%, 400% (anchored at the pointer over the photo, else the centre); a readout (100%) shows bottom left for about a second |
 | ⌘0 | Zoom to Fit |
 | ⌘O / ⌘E / ⌘S / ⌘← / ⌘, | Open / Export / Save / Back to Library / Settings |
@@ -132,7 +132,7 @@ Check by hand after a change to the editor chrome:
 1. Open a photo. The strip shows `← LIBRARY`, FILMS (underlined in lichen), DEVELOP, CROP. FILMS shows the film strip and, on the right, the film name and STRENGTH. DEVELOP shows the histogram, sliders, curves, mixer, TEXTURE and FRAME with RESET at the foot, and no film strip.
 2. Press 3: the crop box appears. Change the ratio, press CANCEL: the box returns to the committed crop and the tab stays. Press DONE: the crop is kept and the previous tab returns. Press 3 then 1: the crop is committed.
 3. Press F: the window goes full screen with only the photo on dark ink. F or Esc returns. In the Photos extension F hides the panels only.
-4. Hold C: the original shows; release: the edit returns. Click the photo: 100% around the click, with `100%` bottom left for about a second; drag pans; hold Space and drag pans; `]` and `[` step; click again or ⌘0 fits. In DEVELOP at 100%, moving a slider updates the zoomed view at once.
+4. Hold C: the original shows; release: the edit returns. Click the photo: 200% around the click, with `200%` bottom left for about a second; drag pans; two-finger scroll pans; pinch zooms; hold Space and drag pans; `]` and `[` step; click again or ⌘0 fits. In DEVELOP at 200%, moving a slider updates the zoomed view at once.
 5. File ▸ Save adapts: Save to Photos for a Photos picture, Save Sidecar for a file. The SAVE button in the strip does the same and reads SAVED afterwards.
 6. In Photos, resize the Mira editing window: the editor follows the window; the right panel is 300 to 340 pt wide and scrolls.
 
@@ -245,7 +245,7 @@ Installed with `scripts/install.sh` and driven live (test asset in "Emulsion Tes
 - Library: empty window toolbar (wordmark only); collapsible LIBRARY / ALBUMS sections; albums and folders in the same order as Photos' own sidebar; breadcrumb for nested albums; FILTER popover with scope, show-only toggles, CAMERA and LENS lists populated from the metadata index (e.g. Fujifilm X100V 246) and "INDEXING n / 48873" progress.
 - Menus: File (Open…, Export…, Save to Photos, Revert to Original…, Back to Library), Edit (Reset Adjustments, Reset All), View (Films, Develop, Crop, Toggle Full Screen, Zoom In/Out, Zoom to Fit).
 - Editor tabs via 1/2/3: FILMS (strip + strength), DEVELOP (live histogram; a curve point added and dragged; Orange hue +48 in the color mixer; status UNSAVED), CROP (handles, controls, readout).
-- Click-to-zoom shows 100% with the readout; `]` steps to 200%, sharp; ⌘0 fits. Holding C shows the original.
+- Click-to-zoom shows 200% with the readout; `]` steps to 400%, sharp; ⌘0 fits. Holding C shows the original.
 - F: true full screen, photo on ink, window toolbar hidden; Esc exits.
 - Photos extension: listed in Photos' Extensions menu; with the fix it fills the editing window (1723×1063, then follows a resize to 1300×808 — confirmed by the `extension` log category); tabs FILMS / DEVELOP / CROP. Cancelled without saving.
 

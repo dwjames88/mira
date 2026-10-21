@@ -485,7 +485,7 @@ public final class EditorModel {
         return ZoomGeometry.paneRect(ofContentRect: frame.contentRect(whole: vp.content), state: zoom, in: vp)
     }
 
-    /// A click on the photo: fit goes to 100% around the point, zoomed goes back to fit.
+    /// A click on the photo: fit goes to 200% around the point, zoomed goes back to fit.
     public func zoomClick(atPane point: CGPoint) {
         guard canZoom, let vp = zoomViewport else { return }
         setZoom(ZoomGeometry.clicked(zoom, atPane: point, in: vp))
@@ -509,6 +509,12 @@ public final class EditorModel {
     public func zoomPan(byPane delta: CGSize) {
         guard canZoom, let vp = zoomViewport, !zoom.isFit else { return }
         setZoom(ZoomGeometry.panned(zoom, byPane: delta, in: vp), showReadout: false)
+    }
+
+    /// Pinch: scales the zoom by `factor` between fit and 400%, anchored at a pane point (device pixels).
+    public func zoomPinch(by factor: Double, atPane point: CGPoint) {
+        guard canZoom, let vp = zoomViewport else { return }
+        setZoom(ZoomGeometry.scaled(zoom, by: factor, anchor: point, in: vp))
     }
 
     private func setZoom(_ new: ZoomState, showReadout: Bool = true) {

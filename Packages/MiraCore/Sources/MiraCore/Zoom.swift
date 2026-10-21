@@ -133,14 +133,17 @@ public enum ZoomGeometry {
 
     // MARK: Transitions
 
-    /// A click on the picture: fit zooms to 100% centred on the click point, zoomed returns to fit.
-    /// A picture that already fills the pane at fit or more has nothing to zoom to.
+    /// The scale a click on the fitted picture zooms to.
+    public static let clickScale: Double = 2
+
+    /// A click on the picture: fit zooms to 200% centred on the click point, zoomed returns to fit.
+    /// A picture that already fills the pane at that scale at fit has nothing to zoom to.
     public static func clicked(_ state: ZoomState, atPane p: CGPoint, in vp: ZoomViewport) -> ZoomState {
         guard vp.isValid else { return state }
         guard state.isFit else { return .fit }
-        guard fitScale(vp) < 1 - 1e-6 else { return state }
+        guard fitScale(vp) < clickScale - 1e-6 else { return state }
         let point = clampToContent(contentPoint(atPane: p, state: state, in: vp), in: vp)
-        return ZoomState(scale: 1, center: clampCenter(point, scale: 1, in: vp))
+        return ZoomState(scale: clickScale, center: clampCenter(point, scale: clickScale, in: vp))
     }
 
     /// The scales the keys step through: fit, then each level above the fit scale.
@@ -171,6 +174,20 @@ public enum ZoomGeometry {
         let c = center(of: state, in: vp)
         let moved = CGPoint(x: c.x - delta.width / CGFloat(s), y: c.y - delta.height / CGFloat(s))
         return ZoomState(scale: s, center: clampCenter(moved, scale: s, in: vp))
+    }
+
+    /// Pinch: multiplies the scale by `factor`, between fit and the top level (400%), keeping the
+    /// picture point under `anchor` (a pane point) where it is. At or below the fit scale it is fit.
+    public static func scaled(_ state: ZoomState, by factor: Double, anchor: CGPoint, in vp: ZoomViewport) -> ZoomState {
+        guard vp.isValid, factor > 0, factor.isFinite else { return state }
+        let fit = fitScale(vp)
+        let top = levels.last ?? 4
+        let newScale = min(scale(of: state, in: vp) * factor, max(top, fit))
+        if newScale <= fit * 1.001 { return .fit }
+        let p = clampToContent(contentPoint(atPane: anchor, state: state, in: vp), in: vp)
+        let center = CGPoint(x: p.x - (anchor.x - vp.pane.width / 2) / CGFloat(newScale),
+                             y: p.y - (anchor.y - vp.pane.height / 2) / CGFloat(newScale))
+        return ZoomState(scale: newScale, center: clampCenter(center, scale: newScale, in: vp))
     }
 
     /// The same state re-expressed for a changed viewport (window resize): fit stays fit; a zoomed

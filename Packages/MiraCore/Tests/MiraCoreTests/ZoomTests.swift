@@ -20,10 +20,10 @@ import Testing
         #expect(abs(r.height - 904) < 1e-6)
     }
 
-    @Test func clickZoomsTo100PercentAroundThePointAndBack() {
+    @Test func clickZoomsTo200PercentAroundThePointAndBack() {
         // The pane centre is the picture centre.
         let z = ZoomGeometry.clicked(.fit, atPane: CGPoint(x: 750, y: 500), in: vp)
-        #expect(z.scale == 1)
+        #expect(z.scale == 2)
         #expect(near(z.center, CGPoint(x: 3000, y: 2000)))
 
         // A point right of and below centre: that picture point becomes the centre.
@@ -39,24 +39,24 @@ import Testing
 
     @Test func clickNearAnEdgeIsClampedToTheImage() {
         let z = ZoomGeometry.clicked(.fit, atPane: CGPoint(x: 80, y: 60), in: vp)
-        #expect(z.scale == 1)
-        // The view may not show anything outside the picture: half a pane from the corner.
-        #expect(near(z.center, CGPoint(x: 750, y: 500)))
+        #expect(z.scale == 2)
+        // The view may not show anything outside the picture: half a pane (at 200%) from the corner.
+        #expect(near(z.center, CGPoint(x: 375, y: 250)))
         let visible = ZoomGeometry.visibleContentRect(state: z, in: vp)
-        #expect(visible == CGRect(x: 0, y: 0, width: 1500, height: 1000))
+        #expect(visible == CGRect(x: 0, y: 0, width: 750, height: 500))
 
         // A click on the letterbox of a narrow picture lands on the picture's edge.
         let narrow = ZoomViewport(content: CGSize(width: 1000, height: 4000), pane: vp.pane, fitArea: vp.fitArea)
         let z2 = ZoomGeometry.clicked(.fit, atPane: CGPoint(x: 20, y: 500), in: narrow)
-        #expect(z2.scale == 1)
-        #expect(z2.center.x == 500) // the picture is narrower than the pane: centred
+        #expect(z2.scale == 2)
+        #expect(z2.center.x == 375) // clamped to the picture's left edge
     }
 
     @Test func smallPicturesDoNotZoomOnClick() {
-        let small = ZoomViewport(content: CGSize(width: 800, height: 600), pane: vp.pane, fitArea: vp.fitArea)
-        #expect(ZoomGeometry.fitScale(small) > 1)
+        let small = ZoomViewport(content: CGSize(width: 400, height: 300), pane: vp.pane, fitArea: vp.fitArea)
+        #expect(ZoomGeometry.fitScale(small) > 2)
         #expect(ZoomGeometry.clicked(.fit, atPane: CGPoint(x: 750, y: 500), in: small).isFit)
-        #expect(ZoomGeometry.ladder(in: small).count == 3) // fit, 200%, 400%
+        #expect(ZoomGeometry.ladder(in: small).count == 2) // fit, 400%
     }
 
     @Test func stepsClampAtBothEnds() {

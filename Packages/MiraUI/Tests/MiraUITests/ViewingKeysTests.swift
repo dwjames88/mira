@@ -86,20 +86,20 @@ struct ViewingModelTests {
         return model
     }
 
-    @Test func clickZoomsTo100AndBack() async throws {
+    @Test func clickZoomsTo200AndBack() async throws {
         let model = try await Self.makeModel()
         #expect(model.zoom.isFit && model.canZoom)
         model.zoomClick(atPane: CGPoint(x: 900, y: 560))
-        #expect(model.zoom.scale == 1)
-        #expect(model.zoomReadout == "100%")
+        #expect(model.zoom.scale == 2)
+        #expect(model.zoomReadout == "200%")
 
         // A frame of the visible region arrives, 1:1, sized like the pane at most.
         try await HoverTests.waitFor { model.previewFrame?.placement != nil && model.isPreviewIdle }
         let frame = try #require(model.previewFrame)
-        #expect(frame.placement?.scale == 1)
+        #expect(frame.placement?.scale == 2)
         #expect(frame.pixelSize.width <= 1501 && frame.pixelSize.height <= 1001, "\(frame.pixelSize) \(String(describing: model.source?.extent))")
         let rect = try #require(model.paneRect(of: frame))
-        #expect(abs(rect.width - frame.pixelSize.width) < 1e-6) // 1 picture pixel on 1 device pixel
+        #expect(abs(rect.width - frame.pixelSize.width) < 1e-6) // the frame is drawn 1:1 on device pixels
 
         model.zoomClick(atPane: CGPoint(x: 10, y: 10))
         #expect(model.zoom.isFit)
@@ -116,10 +116,37 @@ struct ViewingModelTests {
         model.zoomClick(atPane: CGPoint(x: 750, y: 500))
         let start = model.zoom.center
         model.zoomPan(byPane: CGSize(width: -100, height: -40))
-        #expect(model.zoom.center.x == start.x + 100 && model.zoom.center.y == start.y + 40)
+        #expect(model.zoom.center.x == start.x + 50 && model.zoom.center.y == start.y + 20)
         model.zoomPan(byPane: CGSize(width: -1e7, height: -1e7))
         let vp = try #require(model.zoomViewport)
-        #expect(model.zoom.center == CGPoint(x: vp.content.width - 750, y: vp.content.height - 500))
+        #expect(model.zoom.center == CGPoint(x: vp.content.width - 375, y: vp.content.height - 250))
+        model.cancelWork()
+    }
+
+    @Test func scrollPanIsIgnoredAtFitAndClampedAtEdges() async throws {
+        let model = try await Self.makeModel()
+        model.zoomPan(byPane: CGSize(width: -300, height: -300)) // what a scroll event routes to
+        #expect(model.zoom.isFit)
+        model.zoomClick(atPane: CGPoint(x: 750, y: 500))
+        #expect(model.zoom.scale == 2)
+        let vp = try #require(model.zoomViewport)
+        // Scrolling the content left and up (negative deltas) moves to the bottom right edge.
+        model.zoomPan(byPane: CGSize(width: -1e7, height: -1e7))
+        #expect(model.zoom.center == CGPoint(x: vp.content.width - 375, y: vp.content.height - 250))
+        // And the other way to the top left edge.
+        model.zoomPan(byPane: CGSize(width: 1e7, height: 1e7))
+        #expect(model.zoom.center == CGPoint(x: 375, y: 250))
+        model.cancelWork()
+    }
+
+    @Test func pinchScalesBetweenFitAndTop() async throws {
+        let model = try await Self.makeModel()
+        model.zoomPinch(by: 0.5, atPane: CGPoint(x: 750, y: 500))
+        #expect(model.zoom.isFit)
+        model.zoomPinch(by: 100, atPane: CGPoint(x: 750, y: 500))
+        #expect(model.zoom.scale == 4)
+        model.zoomPinch(by: 0.001, atPane: CGPoint(x: 750, y: 500))
+        #expect(model.zoom.isFit)
         model.cancelWork()
     }
 
