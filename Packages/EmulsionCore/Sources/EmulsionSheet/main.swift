@@ -22,6 +22,7 @@ struct Options {
     var film: String?
     var recipeJSON: String?
     var limit: Int?
+    var timeLUTs = false
 }
 
 func parseArguments() -> Options {
@@ -46,6 +47,7 @@ func parseArguments() -> Options {
         case "--film": o.film = next(flag)
         case "--recipe-json": o.recipeJSON = next(flag)
         case "--limit": o.limit = nextInt(flag)
+        case "--time-luts": o.timeLUTs = true
         default: fail("unknown argument \(flag)")
         }
     }
@@ -53,6 +55,39 @@ func parseArguments() -> Options {
 }
 
 let opts = parseArguments()
+
+/// `--time-luts`: loads every film LUT cold (empty cache, sequential and parallel) and warm.
+func timeLUTs(filmsPath: String) -> Never {
+    let dir = URL(fileURLWithPath: filmsPath, isDirectory: true)
+    func fresh() -> URL {
+        FileManager.default.temporaryDirectory.appendingPathComponent("emulsion-lut-time-\(UUID().uuidString)")
+    }
+    func time(_ label: String, _ body: () throws -> Void) rethrows {
+        let t0 = DispatchTime.now().uptimeNanoseconds
+        try body()
+        let ms = Double(DispatchTime.now().uptimeNanoseconds - t0) / 1e6
+        print(String(format: "%-40@ %8.0f ms", label as NSString, ms))
+    }
+    do {
+        let seqCache = fresh(), parCache = fresh()
+        let seq = try FilmLibrary(directory: dir, cacheDirectory: seqCache)
+        try time("cold, sequential (\(seq.films.count) films)") { for f in seq.films { _ = try seq.lut(for: f) } }
+        let par = try FilmLibrary(directory: dir, cacheDirectory: parCache)
+        time("cold, prewarm concurrency 4") { par.prewarmSync(concurrency: 4) }
+        let warm = try FilmLibrary(directory: dir, cacheDirectory: parCache)
+        try time("warm, sequential") { for f in warm.films { _ = try warm.lut(for: f) } }
+        let warm2 = try FilmLibrary(directory: dir, cacheDirectory: parCache)
+        time("warm, prewarm concurrency 4") { warm2.prewarmSync(concurrency: 4) }
+        try? FileManager.default.removeItem(at: seqCache)
+        try? FileManager.default.removeItem(at: parCache)
+        exit(0)
+    } catch { fail("time-luts failed: \(error)") }
+}
+if opts.timeLUTs {
+    guard let p = opts.films else { fail("--time-luts needs --films <dir>") }
+    timeLUTs(filmsPath: p)
+}
+
 guard let filmsPath = opts.films, let inputPath = opts.input, let outputPath = opts.output else {
     fail("usage: emulsion-sheet --films <dir> --input <image> --output <png> [--columns 6] [--tile 360] [--film id] [--recipe-json '{...}'] [--limit N]")
 }
@@ -66,7 +101,7 @@ if let json = opts.recipeJSON {
     do { base = try Recipe.decode(Data(json.utf8)) } catch { fail("bad --recipe-json: \(error)") }
 }
 
-guard let source = CIImage(contentsOf: URL(fileURLWithPath: inputPath), options: [.applyOrientationProperty: true]) else {
+guard let source = ImageSource.load(url: URL(fileURLWithPath: inputPath)) else {
     fail("cannot load \(inputPath)")
 }
 

@@ -287,10 +287,22 @@ public struct Renderer: Sendable {
     public func export(
         _ recipe: Recipe, inputURL: URL, outputURL: URL, type: UTType, quality: Double
     ) throws {
-        guard let input = CIImage(contentsOf: inputURL, options: [.applyOrientationProperty: true]) else {
+        guard let loaded = ImageSource.loadWithColorSpace(url: inputURL) else {
             throw RendererError.cannotLoad(inputURL)
         }
-        let space = Self.outputColorSpace(for: input.colorSpace)
+        try export(recipe, source: loaded.image, metadataFrom: inputURL, outputURL: outputURL,
+                   type: type, quality: quality, colorSpace: loaded.colorSpace)
+    }
+
+    /// Renders an already loaded, upright `source` and writes it. Metadata is copied from
+    /// `metadataFrom` when readable (orientation reset to 1, pixel dimensions and RAW-only
+    /// dictionaries dropped). `colorSpace` nil picks sRGB or Display P3 from the source.
+    public func export(
+        _ recipe: Recipe, source input: CIImage, metadataFrom: URL?, outputURL: URL,
+        type: UTType, quality: Double, colorSpace: CGColorSpace? = nil
+    ) throws {
+        let inputURL = metadataFrom
+        let space = colorSpace ?? Self.outputColorSpace(for: input.colorSpace)
         let context = Self.makeContext()
         let out = apply(recipe, to: input)
         let format: CIFormat = type == .tiff ? .RGBA16 : .RGBA8
@@ -300,11 +312,15 @@ public struct Renderer: Sendable {
 
         // Keep source metadata; pixels are upright now, so orientation becomes 1.
         var props: [CFString: Any] = [:]
-        if let src = CGImageSourceCreateWithURL(inputURL as CFURL, nil),
+        if let inputURL, let src = CGImageSourceCreateWithURL(inputURL as CFURL, nil),
            let copy = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any] {
             props = copy
         }
         props[kCGImagePropertyOrientation] = 1
+        // RAW-only dictionaries and maker blobs that do not belong in a JPEG/HEIC/TIFF.
+        for key in [kCGImagePropertyDNGDictionary, kCGImagePropertyRawDictionary, kCGImagePropertyCIFFDictionary] {
+            props.removeValue(forKey: key)
+        }
         for key in [kCGImagePropertyPixelWidth, kCGImagePropertyPixelHeight, kCGImagePropertyProfileName,
                     kCGImagePropertyDepth, kCGImagePropertyHasAlpha, kCGImagePropertyColorModel] {
             props.removeValue(forKey: key)

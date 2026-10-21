@@ -1,6 +1,7 @@
 import AppKit
 import CoreImage
 import EmulsionCore
+import ImageIO
 import Observation
 
 /// Carries a non-Sendable Core Image / Core Graphics value across a task boundary. Core Image
@@ -79,10 +80,17 @@ public final class EditorModel {
         startThumbnails()
     }
 
-    /// Loads an image file, applying its EXIF orientation exactly once.
+    /// Loads an image file (RAW included), applying its own orientation exactly once.
     @discardableResult
     public func loadSource(url: URL) -> Bool {
-        guard let image = CIImage(contentsOf: url, options: [.applyOrientationProperty: true]) else { return false }
+        loadSource(url: url, orientation: nil)
+    }
+
+    /// Loads an image file and applies `orientation` to its pixels (Photos'
+    /// `fullSizeImageOrientation`). nil uses the file's own orientation.
+    @discardableResult
+    public func loadSource(url: URL, orientation: CGImagePropertyOrientation?) -> Bool {
+        guard let image = ImageSource.load(url: url, orientation: orientation) else { return false }
         setSource(image)
         return true
     }
@@ -154,14 +162,33 @@ public final class EditorModel {
 
             var ids: [String?] = [nil]
             ids.append(contentsOf: films.map { Optional($0.id) })
-            for id in ids {
-                if Task.isCancelled { return }
-                let recipe = Recipe(filmID: id)
-                let cg = await Task.detached(priority: .utility) {
-                    renderer.render(recipe, input: tiny.value, context: context).map(Unchecked.init)
-                }.value
-                guard let self, !Task.isCancelled, self.sourceGeneration == generation else { return }
-                if let cg { self.thumbnails[id ?? Self.originalTileID] = Self.nsImage(cg.value) }
+            let maxInFlight = 4
+
+            // Bounded parallelism: keep up to `maxInFlight` renders going, publish each as it lands.
+            await withTaskGroup(of: (String?, Unchecked<CGImage>?).self) { group in
+                var iterator = ids.makeIterator()
+                func addNext() -> Bool {
+                    guard let id = iterator.next() else { return false }
+                    let recipe = Recipe(filmID: id)
+                    group.addTask(priority: .utility) {
+                        if Task.isCancelled { return (id, nil) }
+                        return (id, renderer.render(recipe, input: tiny.value, context: context).map(Unchecked.init))
+                    }
+                    return true
+                }
+                for _ in 0..<maxInFlight { if !addNext() { break } }
+                while let (id, cg) = await group.next() {
+                    if Task.isCancelled {
+                        group.cancelAll()
+                        continue
+                    }
+                    guard let self, self.sourceGeneration == generation else {
+                        group.cancelAll()
+                        continue
+                    }
+                    if let cg { self.thumbnails[id ?? Self.originalTileID] = Self.nsImage(cg.value) }
+                    _ = addNext()
+                }
             }
         }
     }
