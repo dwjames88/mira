@@ -49,6 +49,9 @@ struct ContentView: View {
                     .accessibilityAddTraits(.isHeader)
             }
             .sharedBackgroundVisibility(.hidden)
+            // Flexible spacer pushes the toggle to the trailing edge (otherwise .primaryAction
+            // collapses next to the wordmark on macOS 26+).
+            ToolbarSpacer(.flexible, placement: .primaryAction)
             ToolbarItem(placement: .primaryAction) {
                 AppearanceToggle(isDark: appearance.isDark, raw: $appearanceRaw)
             }
