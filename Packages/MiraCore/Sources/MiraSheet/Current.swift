@@ -42,6 +42,20 @@ enum Current {
             }
         }
 
+        // Frame via CGImage readback (the old hand-off) on the same cached base, for comparison.
+        if let base = engine.previewBase(crop: .identity, canvas: canvas) {
+            var cgSamples: [Double] = []
+            for i in 0..<60 {
+                var r = Bench.effectsRecipe
+                r.exposure = -1 + 2 * Double(i) / 59
+                cgSamples.append(Bench.time {
+                    renderer.render(r, input: base, context: context)
+                }.1)
+            }
+            let g = Bench.stats(cgSamples)
+            Bench.row("a. same frame read back as 8-bit CGImage", String(format: "median %7.1f ms   p95 %7.1f ms", g.median, g.p95))
+        }
+
         // a'. stage breakdown on the cached base
         let film = Bench.effectsRecipe.filmID
         let parts: [(String, Recipe)] = [
@@ -89,7 +103,7 @@ enum Current {
             let ids: [String?] = [nil] + lib.films.map { Optional($0.id) }
             let count = BenchCounter()
             let (_, ms) = Bench.time {
-                eng.renderThumbnails(ids: ids, crop: .identity, longSide: 256, workers: 4) { _, _ in count.bump() }
+                eng.renderThumbnails(ids: ids, crop: .identity, longSide: 256) { _, _ in count.bump() }
             }
             Bench.row(label, String(format: "%8.0f ms   (\(count.value) thumbnails)", ms))
         }

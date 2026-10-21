@@ -111,6 +111,17 @@ enum Legacy {
         Bench.row("b. open: ImageSource.load (lazy)", String(format: "%8.1f ms", loadMs))
         Bench.row("b. open: first displayable preview (load+first render)", String(format: "%8.1f ms", loadMs + firstMs))
 
+        // Full-res ready: a first render that reads full-resolution pixels (a 256 px window of the
+        // photo at 1:1) forces the decode the lazy source defers.
+        let freshSource = ImageSource.load(url: jpeg)!
+        let (_, readyMs) = Bench.time {
+            let e = freshSource.extent
+            let window = freshSource.cropped(to: CGRect(x: e.midX - 128, y: e.midY - 128, width: 256, height: 256))
+            return context.createCGImage(window, from: window.extent, format: .RGBA8,
+                                         colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
+        }
+        Bench.row("b. open: full-res source ready (load + first 1:1 read)", String(format: "%8.1f ms", loadMs + readyMs))
+
         let previewSource = renderer.previewImage(from: source, maxPixelSize: 1600)
         // a. preview frames
         for (label, base) in [("a. preview frame, effects", Bench.effectsRecipe), ("a. preview frame, crop+6deg", Bench.cropRecipe())] {
