@@ -103,13 +103,14 @@ It imports `App/SelfTest/sample.jpg` into the album "Emulsion Test", saves Velvi
 
 ## Key map and menus
 
-The window toolbar shows only the Mira wordmark. Every command is in the menu bar, and the editor has a strip under the title bar: `← LIBRARY` (app only), the FILMS · DEVELOP · CROP tabs, then the status (UNSAVED / SAVED / REVERTED / READ ONLY) and SAVE (app only; the Photos extension shows the tabs only and uses Photos' own Save).
+The window toolbar shows the Mira wordmark and, at the trailing edge, the appearance toggle. Every command is in the menu bar, and the editor has a strip under the title bar: `← LIBRARY` (app only), the FILMS · DEVELOP · CROP tabs, then the status (UNSAVED / SAVED / REVERTED / READ ONLY) and SAVE (app only; the Photos extension shows the tabs only and uses Photos' own Save).
 
 Menus:
 
 - **File**: Open… (⌘O); Export… (⌘E, photo open, not while the crop tab is open); Save to Photos (⌘S; for a file the same item reads Save Sidecar and writes the sidecar now; disabled when there is nothing to save, read-only or preview-only); Revert to Original… (asks first); Back to Library (⌘←, guarded: asks about unsaved Photos edits).
 - **Edit**: Reset Adjustments (sliders, curves and mixer; keeps film and crop); Reset All (everything except the photo).
 - **View**: Films (1), Develop (2), Crop (3), Toggle Full Screen (F), Zoom In (]), Zoom Out ([), Zoom to Fit (⌘0).
+- **View ▸ Appearance**: System / Light / Dark (checkmark on current), the same choice as the sun/moon button at the trailing edge of the window toolbar (click toggles Light/Dark, right-click offers all three; hidden in full screen) and Settings ▸ APPEARANCE; stored in `mira.appearance`.
 - Mira ▸ Settings… (⌘,) and About Mira are unchanged.
 
 Keys (single keys work when no text field is being edited, in the app and the extension; the extension has no menus):

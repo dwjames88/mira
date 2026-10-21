@@ -25,6 +25,10 @@ final class PhotoEditingViewController: NSViewController, PHContentEditingContro
         let container = NSView(frame: NSRect(x: 0, y: 0, width: 1100, height: 750))
         container.autoresizingMask = [.width, .height]
         view = container
+        // Own sandbox container: normally unset, so the extension inherits Photos' appearance.
+        if let preference = AppearancePreference.stored(), preference != .system {
+            container.appearance = preference.nsAppearance
+        }
         // Only a starting hint (large but harmless): Photos owns the window and the root view is
         // re-fitted to it on appearance and every resize. After appearance this tracks the real size.
         preferredContentSize = NSSize(width: 1600, height: 1000)

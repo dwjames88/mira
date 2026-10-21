@@ -129,13 +129,15 @@ private struct FFToolbarButtonLabel<Label: View>: View {
 /// `active`, dimmed when disabled. Pair with `.help` and `.accessibilityLabel`.
 public struct FFToolbarIconButtonStyle: ButtonStyle {
     public var active: Bool
+    public var size: CGFloat
 
-    public init(active: Bool = false) {
+    public init(active: Bool = false, size: CGFloat = 17) {
         self.active = active
+        self.size = size
     }
 
     public func makeBody(configuration: Configuration) -> some View {
-        FFToolbarIconLabel(active: active, pressed: configuration.isPressed) { configuration.label }
+        FFToolbarIconLabel(active: active, size: size, pressed: configuration.isPressed) { configuration.label }
     }
 }
 
@@ -143,6 +145,7 @@ private struct FFToolbarIconLabel<Label: View>: View {
     @Environment(\.isEnabled) private var isEnabled
     @State private var hovering = false
     let active: Bool
+    let size: CGFloat
     let pressed: Bool
     @ViewBuilder let label: Label
 
@@ -150,7 +153,7 @@ private struct FFToolbarIconLabel<Label: View>: View {
         let color = isEnabled ? ((active || pressed) ? T.lichen : (hovering ? T.paper : T.paperMid)) : T.paperDim
         label
             .labelStyle(.iconOnly)
-            .font(.system(size: 17, weight: .regular))
+            .font(.system(size: size, weight: .regular))
             .foregroundStyle(color)
             .frame(minWidth: T.rows(2), minHeight: T.rows(2))
             .padding(.horizontal, 2)
@@ -162,6 +165,7 @@ private struct FFToolbarIconLabel<Label: View>: View {
 
 extension ButtonStyle where Self == FFToolbarIconButtonStyle {
     public static var ffToolbarIcon: FFToolbarIconButtonStyle { FFToolbarIconButtonStyle() }
+    public static func ffToolbarIcon(active: Bool = false, size: CGFloat) -> FFToolbarIconButtonStyle { FFToolbarIconButtonStyle(active: active, size: size) }
     public static func ffToolbarIcon(active: Bool) -> FFToolbarIconButtonStyle { FFToolbarIconButtonStyle(active: active) }
 }
 

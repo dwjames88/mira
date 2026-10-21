@@ -4,6 +4,8 @@ import SwiftUI
 struct ContentView: View {
     @Bindable var state: AppState
     @State private var isTargeted = false
+    @State private var appearance = AppearanceController.shared
+    @AppStorage(AppearancePreference.key) private var appearanceRaw = AppearancePreference.system.rawValue
 
     /// F / full screen: only the photo on ink remains, so the window toolbar and its hairline go too.
     private var isImmersive: Bool { state.mode == .editor && (state.editor?.isImmersive ?? false) }
@@ -45,6 +47,10 @@ struct ContentView: View {
                     .foregroundStyle(FieldFramesTheme.paper)
                     .padding(.horizontal, FieldFramesTheme.cells(1))
                     .accessibilityAddTraits(.isHeader)
+            }
+            .sharedBackgroundVisibility(.hidden)
+            ToolbarItem(placement: .primaryAction) {
+                AppearanceToggle(isDark: appearance.isDark, raw: $appearanceRaw)
             }
             .sharedBackgroundVisibility(.hidden)
         }
@@ -187,5 +193,29 @@ private struct ExportSheet: View {
         .padding(FieldFramesTheme.cells(3))
         .frame(width: FieldFramesTheme.cells(44))
         .fieldFramesWindow()
+    }
+}
+
+/// Trailing toolbar toggle: sun when the effective appearance is dark (click: Light), moon when light
+/// (click: Dark). The context menu offers Light / Dark / System.
+private struct AppearanceToggle: View {
+    let isDark: Bool
+    @Binding var raw: String
+
+    var body: some View {
+        let target = AppearancePreference.next(toggleFrom: isDark)
+        Button { raw = target.rawValue } label: {
+            Image(systemName: isDark ? "sun.max" : "moon")
+        }
+        .buttonStyle(.ffToolbarIcon(size: 15))
+        .help("Appearance")
+        .accessibilityLabel(isDark ? "Switch to light appearance" : "Switch to dark appearance")
+        .contextMenu {
+            Picker("Appearance", selection: $raw) {
+                ForEach(AppearancePreference.allCases, id: \.rawValue) { Text($0.title).tag($0.rawValue) }
+            }
+            .pickerStyle(.inline)
+            .labelsHidden()
+        }
     }
 }

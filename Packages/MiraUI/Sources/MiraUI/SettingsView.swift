@@ -12,6 +12,8 @@ public enum MiraSettings {
 public struct SettingsView: View {
     @AppStorage(MiraSettings.showEditSourceFooterKey) private var showEditSourceFooter = false
 
+    @AppStorage(AppearancePreference.key) private var appearance = AppearancePreference.system.rawValue
+
     public init() {}
 
     public var body: some View {
@@ -25,6 +27,12 @@ public struct SettingsView: View {
                 .padding(.top, T.rows(2))
             FFPanel {
                 VStack(alignment: .leading, spacing: T.rows(1)) {
+                    HStack(spacing: T.cells(3)) {
+                        Text("APPEARANCE").ffLabel(color: T.paperMid)
+                        FFTabBar(AppearancePreference.allCases.map { (value: $0.rawValue, title: $0.rawValue.uppercased()) },
+                                 selection: $appearance)
+                    }
+                    FFHairline()
                     FFToggle("Show edit-source footer", isOn: $showEditSourceFooter)
                     Text("A status line under the editor that says where the edit is stored and whether the original is kept.")
                         .font(.system(size: 11))

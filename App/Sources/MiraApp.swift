@@ -7,6 +7,7 @@ struct MiraApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var state = AppState.shared
     @Environment(\.openWindow) private var openWindow
+    @AppStorage(AppearancePreference.key) private var appearanceRaw = AppearancePreference.system.rawValue
 
     init() {
         FieldFramesTheme.registerFonts()
@@ -61,6 +62,14 @@ struct MiraApp: App {
                     .keyboardShortcut("0")
                     .disabled(!state.canZoom)
                 Divider()
+            }
+            CommandGroup(after: .toolbar) {
+                Menu("Appearance") {
+                    Picker("Appearance", selection: $appearanceRaw) {
+                        ForEach(AppearancePreference.allCases, id: \.rawValue) { Text($0.title).tag($0.rawValue) }
+                    }
+                    .pickerStyle(.inline)
+                }
             }
             CommandGroup(after: .undoRedo) {
                 Divider()
