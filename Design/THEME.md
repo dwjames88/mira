@@ -46,6 +46,10 @@ Fonts are bundled (OFL, see `Resources/Fonts/`): Cormorant Garamond roman and it
 
 `FFHairline`, `FFSectionLabel`, `FFSlider`, `FFToggle`, `FFButtonStyle` (`.ff`, `.ffProminent`) and `FFButtonChrome`, `FFTabBar`, `FilmCard`, `FFPanel` / `.ffPanel()` / `FFPanelBackground`, `FFGroundBackground`, `FFEmptyState`, `.fieldFramesWindow()`, `.ffLabel`, `.ffDisplay`, `.ffGrain`.
 
+## Library UI and toolbar
+
+The Photos library browser (`App/Sources/PhotoLibrary/`) reuses the components above: the sidebar and grid sit on `FFGroundBackground` with `FFHairline` dividers, section and count labels use `.ffLabel`, and RAW and EDITED badges are small mono labels on the thumbnail. The window toolbar is a mono text bar with no Liquid Glass capsule: `.ffToolbar` and `.ffToolbarProminent` button styles (uppercase labels), the "Emulsion" title in Cormorant on the ink ground, and a hairline under it. The editor footer is a two-row mono status line.
+
 ## What deliberately differs from the site
 
 - The app follows the system appearance; the site defaults to dark and ignores the OS.
