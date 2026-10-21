@@ -51,7 +51,7 @@ public final class EditorModel {
     /// The card under the pointer, or nil when the pointer is elsewhere. Set immediately; the
     /// preview image follows after the debounce.
     public private(set) var hoveredTarget: HoverTarget?
-    @ObservationIgnored private var hoverImage: NSImage?
+    private var hoverImage: NSImage?
 
     public static let originalTileID = "__original__"
     public nonisolated static let previewLongSide: CGFloat = 1600

@@ -89,4 +89,19 @@ struct HoverTests {
         #expect(model.hoverPreviewFilm == nil)
         model.cancelWork()
     }
+
+    /// Regression: the canvas only redraws if the hover image change is observable.
+    @Test func hoverImageChangeIsObserved() async throws {
+        let (model, others) = try await Self.makeModel()
+        let film = try #require(others.first(where: { $0.family == .blackAndWhite }))
+        final class Flag: @unchecked Sendable { var fired = false }
+        let flag = Flag()
+        withObservationTracking { _ = model.displayedImage } onChange: { flag.fired = true }
+        model.hoverFilm(film.id)
+        flag.fired = false
+        withObservationTracking { _ = model.displayedImage } onChange: { flag.fired = true }
+        try await Self.waitFor { model.hoverPreviewFilm != nil }
+        #expect(model.hoverPreviewFilm != nil)
+        #expect(flag.fired, "displayedImage must notify observers when the hover render lands")
+    }
 }
