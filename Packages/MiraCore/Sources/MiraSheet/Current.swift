@@ -43,6 +43,45 @@ enum Current {
             }
         }
 
+        // z. zoomed frames: only the visible region of the full-resolution picture is rendered.
+        let content = PreviewEngine.zoomContentSize(for: Recipe(), imageSize: full.extent.size)
+        let viewport = ZoomViewport(content: content, pane: canvas, fitArea: canvas)
+        for (zoom, label) in [(1.0, "100%"), (0.5, "50%"), (2.0, "200%")] {
+            for (name, base) in [("effects+mixer+curves", Bench.gradeRecipe), ("crop+6deg", Bench.cropRecipe())] {
+                let vp = name == "crop+6deg"
+                    ? ZoomViewport(content: PreviewEngine.zoomContentSize(for: base, imageSize: full.extent.size), pane: canvas, fitArea: canvas)
+                    : viewport
+                let centre = CGPoint(x: vp.content.width / 2, y: vp.content.height / 2)
+                // Slider drag at this zoom: same region, new exposure each frame.
+                var firstSlider = 0.0
+                var slider: [Double] = []
+                for i in 0..<61 {
+                    var r = base
+                    r.exposure = -1 + 2 * Double(i) / 60
+                    let region = ZoomGeometry.renderRegion(state: ZoomState(scale: zoom, center: centre), in: vp)!
+                    let (frame, ms) = Bench.time { engine.renderZoomed(r, region: region) }
+                    precondition(frame != nil)
+                    if i == 0 { firstSlider = ms } else { slider.append(ms) }
+                }
+                let ss = Bench.stats(slider)
+                Bench.row("z. zoom \(label) \(name), slider drag",
+                          String(format: "median %7.1f ms   p95 %7.1f ms   (first, base build: %.1f ms)", ss.median, ss.p95, firstSlider))
+                // Pan: a new region every frame, recipe fixed.
+                var pan: [Double] = []
+                for i in 0..<60 {
+                    let dx = CGFloat(i) * 23 - 700, dy = CGFloat(i % 12) * 17 - 100
+                    let state = ZoomState(scale: zoom, center: CGPoint(x: centre.x + dx, y: centre.y + dy))
+                    guard let region = ZoomGeometry.renderRegion(state: state, in: vp) else { continue }
+                    let (frame, ms) = Bench.time { engine.renderZoomed(base, region: region) }
+                    precondition(frame != nil)
+                    pan.append(ms)
+                }
+                let ps = Bench.stats(pan)
+                Bench.row("z. zoom \(label) \(name), pan drag",
+                          String(format: "median %7.1f ms   p95 %7.1f ms", ps.median, ps.p95))
+            }
+        }
+
         // Straighten drag in the crop tool: every frame has new geometry, so the base is rebuilt each time.
         var tickSamples: [Double] = []
         for i in 0..<60 {

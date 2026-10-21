@@ -112,6 +112,17 @@ struct SnapshotTests {
         try Self.writePNG(EditorView(model: model, host: host).environment(\.ffCropForceGrid, true),
                           size: size, scheme: .dark, name: "editor-tab-crop")
 
+        // Zoomed to 100% with the readout chip, panels hidden (F): only the photo on ink.
+        model.selectTab(.films)
+        model.setViewport(pane: CGSize(width: 1280, height: 800), fitArea: CGSize(width: 1232, height: 752))
+        model.zoomClick(atPane: CGPoint(x: 700, y: 300))
+        try await HoverTests.waitFor { model.previewFrame?.placement != nil && model.isPreviewIdle }
+        try Self.writePNG(EditorView(model: model, host: host), size: size, scheme: .dark, name: "editor-zoom-100")
+        model.setImmersive(true)
+        try Self.writePNG(EditorView(model: model, host: host), size: size, scheme: .light, name: "editor-immersive")
+        model.setImmersive(false)
+        model.zoomToFit()
+
         // The extension's bar: tabs only.
         model.selectTab(.films)
         try Self.writePNG(EditorView(model: model), size: size, scheme: .light, name: "editor-tab-films-extension-light")

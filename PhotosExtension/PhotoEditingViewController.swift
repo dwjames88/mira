@@ -24,6 +24,7 @@ final class PhotoEditingViewController: NSViewController, PHContentEditingContro
         let container = NSView(frame: NSRect(x: 0, y: 0, width: 1100, height: 750))
         container.autoresizingMask = [.width, .height]
         view = container
+        // Only a starting size: Photos owns the window, and the editor follows whatever size it gives.
         preferredContentSize = NSSize(width: 1100, height: 750)
 
         guard let library = FilmLibrary.bundled() else {
@@ -36,10 +37,7 @@ final class PhotoEditingViewController: NSViewController, PHContentEditingContro
         }
         let model = EditorModel(library: library)
         self.model = model
-        let host = NSHostingView(rootView: EditorView(model: model))
-        host.frame = container.bounds
-        host.autoresizingMask = [.width, .height]
-        container.addSubview(host)
+        ExtensionHosting.install(model, in: container)
     }
 
     // MARK: PHContentEditingController

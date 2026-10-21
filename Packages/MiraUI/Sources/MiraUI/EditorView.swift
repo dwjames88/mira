@@ -12,6 +12,9 @@ public struct EditorView<Footer: View>: View {
     private let footer: Footer
     @Environment(\.ffImageCanvas) private var imageCanvas
 
+    /// The right panel's width range in points; the canvas takes everything else.
+    static var panelWidth: ClosedRange<CGFloat> { 300...340 }
+
     /// `host` adds `← LIBRARY`, the status and SAVE (the app); the Photos extension passes nil.
     /// `windowFullScreen` lets F also put the window in macOS full screen (the app); the extension
     /// only hides the panels. `footer` sits under the canvas column.
@@ -46,7 +49,7 @@ public struct EditorView<Footer: View>: View {
                 if !model.isImmersive {
                     FFHairline(.vertical)
                     panel
-                        .frame(width: T.cells(36))
+                        .frame(minWidth: Self.panelWidth.lowerBound, idealWidth: 320, maxWidth: Self.panelWidth.upperBound)
                 }
             }
         }
@@ -82,6 +85,8 @@ private struct PreviewPane: View {
     @Environment(\.ffImageCanvas) private var imageCanvas
     @Environment(\.displayScale) private var displayScale
     @State private var paneSize = CGSize.zero
+    @State private var panning = false
+    @State private var lastTranslation = CGSize.zero
 
     @ViewBuilder
     private func canvas(_ frame: PreviewFrame) -> some View {
@@ -92,15 +97,36 @@ private struct PreviewPane: View {
         }
     }
 
+    /// True when the frame is laid out by the zoom maths (zoomed, or still a zoomed frame on its way
+    /// back to fit); a whole-picture frame at fit uses the plain aspect-fit layout.
+    private func usesZoomLayout(_ frame: PreviewFrame) -> Bool {
+        !model.zoom.isFit || frame.placement != nil
+    }
+
+    @ViewBuilder
+    private func zoomedCanvas(_ frame: PreviewFrame) -> some View {
+        if let r = model.paneRect(of: frame) {
+            let s = displayScale
+            canvas(frame)
+                .frame(width: r.width / s, height: r.height / s)
+                .position(x: r.midX / s, y: r.midY / s)
+        }
+    }
+
     var body: some View {
         ZStack {
             // The photograph sits on plain ink: no grain, no veil over it.
             (model.isImmersive ? T.inkAlways : T.ink)
             if let frame = model.displayedFrame {
-                canvas(frame)
-                    .aspectRatio(frame.pixelSize, contentMode: .fit)
-                    .padding(T.cells(3))
-                    .accessibilityLabel(model.showOriginal ? "Original photo" : "Edited photo")
+                if usesZoomLayout(frame) {
+                    zoomedCanvas(frame)
+                        .accessibilityLabel(model.showOriginal ? "Original photo" : "Edited photo")
+                } else {
+                    canvas(frame)
+                        .aspectRatio(frame.pixelSize, contentMode: .fit)
+                        .padding(T.cells(3))
+                        .accessibilityLabel(model.showOriginal ? "Original photo" : "Edited photo")
+                }
                 if model.isCropping {
                     CropOverlay(model: model)
                         .padding(T.cells(3))
@@ -109,8 +135,9 @@ private struct PreviewPane: View {
                 Text("Developing").ffLabel()
             }
         }
+        .clipped()
         .overlay(alignment: .topLeading) {
-            if let name = model.hoverPreviewName {
+            if let name = model.hoverPreviewName, !model.isImmersive {
                 Text("Preview \u{00B7} \(name)")
                     .ffLabel(color: T.onPhoto)
                     .lineLimit(1)
@@ -123,35 +150,101 @@ private struct PreviewPane: View {
             }
         }
         .overlay(alignment: .bottomTrailing) {
-            if !model.isCropping {
+            if !model.isCropping, !model.isImmersive {
                 CompareButton(model: model)
                     .padding(T.cells(2))
             }
         }
+        .overlay(alignment: .bottomLeading) {
+            if let readout = model.zoomReadout {
+                Text(readout)
+                    .ffLabel(color: T.onPhoto)
+                    .padding(.horizontal, T.cells(1))
+                    .padding(.vertical, 4)
+                    .background(T.onPhotoVeil)
+                    .padding(T.cells(2))
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+                    .accessibilityLabel("Zoom \(readout)")
+            }
+        }
+        .animation(.easeOut(duration: 0.15), value: model.zoomReadout)
         .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
             paneSize = size
             // The picture area is the pane minus its padding; previews are rendered at that size in pixels.
             let inset = T.cells(3) * 2
-            model.setCanvas(pixels: CGSize(width: max(1, size.width - inset) * displayScale,
-                                           height: max(1, size.height - inset) * displayScale))
+            let fit = CGSize(width: max(1, size.width - inset) * displayScale,
+                             height: max(1, size.height - inset) * displayScale)
+            model.setCanvas(pixels: fit)
+            model.setViewport(pane: CGSize(width: size.width * displayScale, height: size.height * displayScale),
+                              fitArea: fit)
+        }
+        .onContinuousHover { phase in
+            switch phase {
+            case .active(let p): model.pointerInPane = CGPoint(x: p.x * displayScale, y: p.y * displayScale)
+            case .ended: model.pointerInPane = nil
+            }
         }
         .contentShape(Rectangle())
-        .gesture(holdToCompare(model), isEnabled: !model.isCropping && !model.eyedropperActive)
+        .gesture(navigation, isEnabled: model.canZoom && !model.eyedropperActive)
         .gesture(
             SpatialTapGesture().onEnded { tap in
-                guard let frame = model.displayedFrame,
-                      let p = PreviewHitMapping.normalizedPoint(tap.location, pane: paneSize, inset: T.cells(3),
-                                                                image: frame.pixelSize) else {
+                let pane = CGPoint(x: tap.location.x * displayScale, y: tap.location.y * displayScale)
+                guard let frame = model.displayedFrame, let r = model.paneRect(of: frame) ?? fitRect(frame),
+                      r.width > 0, r.height > 0, r.contains(pane) else {
                     model.eyedropperActive = false
                     return
                 }
-                model.sampleRange(atImagePoint: p)
+                model.sampleRange(atImagePoint: CGPoint(x: (pane.x - r.minX) / r.width, y: (pane.y - r.minY) / r.height))
             },
             isEnabled: model.eyedropperActive && !model.isCropping)
-        .pointerStyle(model.eyedropperActive ? .rectSelection : .default)
+        .pointerStyle(pointer)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .help(model.isCropping ? "" : "Press and hold to see the original")
+        .help(model.canZoom ? "Click to zoom to 100%, drag to pan" : "")
     }
+
+    /// The aspect-fit rectangle of a whole-picture frame at fit, in device pixels (used when the zoom
+    /// maths has no viewport yet).
+    private func fitRect(_ frame: PreviewFrame) -> CGRect? {
+        let inset = T.cells(3) * displayScale
+        let area = CGRect(x: inset, y: inset, width: paneSize.width * displayScale - 2 * inset,
+                          height: paneSize.height * displayScale - 2 * inset)
+        guard area.width > 0, area.height > 0 else { return nil }
+        return CropGeometry.aspectFit(contentSize: frame.pixelSize, in: area)
+    }
+
+    private var pointer: PointerStyle {
+        if model.eyedropperActive { return .rectSelection }
+        guard model.canZoom else { return .default }
+        return model.zoom.isFit ? .zoomIn : (panning ? .grabActive : .grabIdle)
+    }
+
+    /// One drag gesture does both: a press that barely moves is a click (zoom in or back to fit), a
+    /// drag pans the zoomed picture. Space held makes any movement a pan.
+    private var navigation: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { drag in
+                let moved = hypot(drag.translation.width, drag.translation.height)
+                if !panning, !model.zoom.isFit, moved >= Self.clickSlop || model.isSpaceHeld {
+                    panning = true
+                    lastTranslation = .zero
+                }
+                guard panning else { return }
+                let step = CGSize(width: (drag.translation.width - lastTranslation.width) * displayScale,
+                                  height: (drag.translation.height - lastTranslation.height) * displayScale)
+                lastTranslation = drag.translation
+                model.zoomPan(byPane: step)
+            }
+            .onEnded { drag in
+                let moved = hypot(drag.translation.width, drag.translation.height)
+                if !panning, moved < Self.clickSlop, !model.isSpaceHeld {
+                    model.zoomClick(atPane: CGPoint(x: drag.location.x * displayScale, y: drag.location.y * displayScale))
+                }
+                panning = false
+            }
+    }
+
+    private static let clickSlop: CGFloat = 3
 }
 
 @MainActor

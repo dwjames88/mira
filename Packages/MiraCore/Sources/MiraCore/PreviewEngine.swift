@@ -11,6 +11,23 @@ public struct PreviewFrame: @unchecked Sendable {
     public let pixelBuffer: CVPixelBuffer
     /// Increases with every rendered frame.
     public let id: Int
+    /// Where a zoomed frame sits in the picture; nil for a frame that shows the whole picture.
+    public let placement: ZoomPlacement?
+
+    public init(pixelBuffer: CVPixelBuffer, id: Int, placement: ZoomPlacement? = nil) {
+        self.pixelBuffer = pixelBuffer
+        self.id = id
+        self.placement = placement
+    }
+
+    /// The part of the picture this frame shows, in picture pixels (the cropped output with its
+    /// border). A frame of the whole picture covers `[0, whole]`.
+    public func contentRect(whole: CGSize) -> CGRect {
+        guard let placement else { return CGRect(origin: .zero, size: whole) }
+        let s = CGFloat(placement.scale)
+        return CGRect(x: placement.origin.x / s, y: placement.origin.y / s,
+                      width: pixelSize.width / s, height: pixelSize.height / s)
+    }
 
     public var pixelSize: CGSize {
         CGSize(width: CVPixelBufferGetWidth(pixelBuffer), height: CVPixelBufferGetHeight(pixelBuffer))
@@ -23,6 +40,18 @@ public struct PreviewFrame: @unchecked Sendable {
         let srgb = CGColorSpace(name: CGColorSpace.sRGB)!
         let image = CIImage(cvPixelBuffer: pixelBuffer, options: [.colorSpace: srgb])
         return context.createCGImage(image, from: image.extent, format: .RGBA8, colorSpace: srgb)
+    }
+}
+
+/// Where a zoomed frame sits: its scale (frame pixels per picture pixel) and the position of its top
+/// left corner in scaled picture pixels (picture pixels x scale).
+public struct ZoomPlacement: Equatable, Sendable {
+    public let scale: Double
+    public let origin: CGPoint
+
+    public init(scale: Double, origin: CGPoint) {
+        self.scale = scale
+        self.origin = origin
     }
 }
 
@@ -44,6 +73,8 @@ public final class PreviewEngine: @unchecked Sendable {
     private var levels: [Int: CIImage] = [:]
     private var bases: [BaseKey: CIImage] = [:]
     private var baseOrder: [BaseKey] = []
+    private var zoomBases: [ZoomBaseKey: CIImage] = [:]
+    private var zoomBaseOrder: [ZoomBaseKey] = []
     private var pools: [PoolKey: CVPixelBufferPool] = [:]
     private var poolOrder: [PoolKey] = []
     private var frameCounter = 0
@@ -53,6 +84,13 @@ public final class PreviewEngine: @unchecked Sendable {
         let crop: CropSettings
         let width: Int
         let height: Int
+    }
+
+    private struct ZoomBaseKey: Hashable {
+        let generation: Int
+        let crop: CropSettings
+        /// Scale in thousandths.
+        let scale: Int
     }
 
     private struct PoolKey: Hashable {
@@ -65,6 +103,7 @@ public final class PreviewEngine: @unchecked Sendable {
     public static let defaultThumbnailWorkers = max(2, min(8, ProcessInfo.processInfo.activeProcessorCount))
 
     private static let baseLimit = 6
+    private static let zoomBaseLimit = 3
     private static let maxLevel = 6
 
     public static let linearSpace = CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!
@@ -92,6 +131,8 @@ public final class PreviewEngine: @unchecked Sendable {
         levels = [:]
         bases = [:]
         baseOrder = []
+        zoomBases = [:]
+        zoomBaseOrder = []
         return generation
     }
 
@@ -132,8 +173,8 @@ public final class PreviewEngine: @unchecked Sendable {
         render(Recipe(crop: crop), canvas: canvas)
     }
 
-    private func renderFrame(_ image: CIImage) -> PreviewFrame? {
-        let extent = image.extent
+    private func renderFrame(_ image: CIImage, from region: CGRect? = nil, placement: ZoomPlacement? = nil) -> PreviewFrame? {
+        let extent = region ?? image.extent
         guard !extent.isInfinite, !extent.isEmpty else { return nil }
         let w = Int(extent.width.rounded()), h = Int(extent.height.rounded())
         guard let buffer = makeBuffer(width: w, height: h, format: kCVPixelFormatType_32BGRA) else { return nil }
@@ -150,7 +191,7 @@ public final class PreviewEngine: @unchecked Sendable {
         frameCounter += 1
         let id = frameCounter
         lock.unlock()
-        return PreviewFrame(pixelBuffer: buffer, id: id)
+        return PreviewFrame(pixelBuffer: buffer, id: id, placement: placement)
     }
 
     // MARK: Bases
@@ -242,6 +283,80 @@ public final class PreviewEngine: @unchecked Sendable {
             return nil
         }
         return CIImage(cvPixelBuffer: buffer, options: [.colorSpace: Self.linearSpace])
+    }
+
+    // MARK: Zoomed frames
+
+    /// The size of the whole picture as the canvas shows it for `recipe`: the cropped output plus the
+    /// border (the same size `ZoomGeometry` works in).
+    public static func zoomContentSize(for recipe: Recipe, imageSize: CGSize) -> CGSize {
+        let size = CropGeometry.outputExtent(for: recipe.crop, imageExtent: CGRect(origin: .zero, size: imageSize)).size
+        guard recipe.borderEnabled else { return size }
+        let pad = min(max(recipe.borderWidth, 0), 0.3) * min(size.width, size.height)
+        return CGSize(width: size.width + 2 * pad, height: size.height + 2 * pad)
+    }
+
+    /// Renders only `region` (scaled picture pixels, origin top left) of the full-resolution picture
+    /// at `region.scale`, with `recipe` applied. The crop and straighten are applied to the source
+    /// lazily, the grade runs on that lazy picture (so every spatial effect follows the zoomed
+    /// picture's size, as in the export), and Core Image renders just the region of interest.
+    /// The frame carries its `placement` so the view can position it, and move it while a newer
+    /// frame is being made.
+    public func renderZoomed(_ recipe: Recipe, region: ZoomRegion) -> PreviewFrame? {
+        Perf.interval("preview render zoomed") {
+            guard region.scale > 0, let base = zoomBase(crop: recipe.crop, scale: region.scale) else { return nil }
+            let graded = renderer.grade(recipe, cropped: base)
+            let extent = graded.extent
+            guard !extent.isInfinite, !extent.isEmpty else { return nil }
+            let whole = CGRect(x: 0, y: 0, width: extent.width, height: extent.height)
+            let r = region.rect.intersection(whole)
+            guard !r.isNull, r.width >= 1, r.height >= 1 else { return nil }
+            // Core Image's origin is bottom left; the region's is top left.
+            let ci = CGRect(x: extent.minX + r.minX, y: extent.maxY - r.maxY, width: r.width, height: r.height)
+            return renderFrame(graded, from: ci,
+                               placement: ZoomPlacement(scale: region.scale, origin: r.origin))
+        }
+    }
+
+    /// The cropped picture at `scale` as a lazy image with origin zero. Cached per (source, crop, scale)
+    /// so panning and slider changes reuse it. Below 100% it starts from the pyramid level that is
+    /// still at least as sharp as asked for; above 100% it enlarges the full-resolution crop.
+    func zoomBase(crop: CropSettings, scale: Double) -> CIImage? {
+        guard let (source, generation) = snapshot() else { return nil }
+        let key = ZoomBaseKey(generation: generation, crop: crop, scale: Int((scale * 1000).rounded()))
+        lock.lock()
+        if let hit = zoomBases[key] {
+            zoomBaseOrder.removeAll { $0 == key }
+            zoomBaseOrder.append(key)
+            lock.unlock()
+            return hit
+        }
+        lock.unlock()
+
+        var level = 0
+        while level < Self.maxLevel, scale < 1, 1 / Double(1 << (level + 1)) >= scale * 0.999 { level += 1 }
+        guard let input = self.level(level, source: source, generation: generation) else { return nil }
+        var image = CropGeometry.apply(crop, to: input)
+        let e = image.extent
+        if e.origin != .zero { image = image.transformed(by: CGAffineTransform(translationX: -e.minX, y: -e.minY)) }
+        let factor = scale * Double(1 << level)
+        if abs(factor - 1) > 1e-6 {
+            let size = CGSize(width: max(1, (e.width * CGFloat(factor)).rounded()),
+                              height: max(1, (e.height * CGFloat(factor)).rounded()))
+            image = factor < 1
+                ? Self.resample(image, to: size)
+                : image.transformed(by: CGAffineTransform(scaleX: size.width / e.width, y: size.height / e.height))
+                    .cropped(to: CGRect(origin: .zero, size: size))
+        }
+        lock.lock()
+        if self.generation == generation {
+            zoomBases[key] = image
+            zoomBaseOrder.removeAll { $0 == key }
+            zoomBaseOrder.append(key)
+            while zoomBaseOrder.count > Self.zoomBaseLimit { zoomBases[zoomBaseOrder.removeFirst()] = nil }
+        }
+        lock.unlock()
+        return image
     }
 
     // MARK: Thumbnail source

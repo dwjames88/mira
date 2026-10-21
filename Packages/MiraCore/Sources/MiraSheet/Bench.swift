@@ -12,6 +12,7 @@ import UniformTypeIdentifiers
 // b. open a 24 MP JPEG: first displayable preview and full-res source ready
 // c. fill all 32 film-strip thumbnails (cold LUT cache, warm disk cache, hot)
 // d. full-resolution 24 MP export
+// z. zoomed frames (50%, 100%, 200%): only the visible region of the 24 MP picture is rendered
 
 enum Bench {
     static let canvasPixels = CGSize(width: 1500, height: 1000)

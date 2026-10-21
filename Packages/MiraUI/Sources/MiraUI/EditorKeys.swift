@@ -197,6 +197,12 @@ struct EditorKeyHost: NSViewRepresentable {
             observers.forEach(NotificationCenter.default.removeObserver)
             observers = []
             model?.releaseHolds()
+            // Leaving the editor (back to the library) must not strand the window in full screen.
+            if windowFullScreen, lastImmersive, let window, window.styleMask.contains(.fullScreen) {
+                Task { @MainActor in window.toggleFullScreen(nil) }
+            }
+            if lastImmersive { model?.setImmersive(false) }
+            lastImmersive = false
         }
 
         /// True when the event was ours and is consumed.

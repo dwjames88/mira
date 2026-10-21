@@ -39,12 +39,18 @@ public final class EditorModel {
     public var recipe: Recipe {
         didSet {
             guard recipe != oldValue else { return }
+            if recipe.crop != oldValue.crop { resetZoom() } else { revalidateZoom() }
             schedulePreview()
             recipeChangedWhileHovering()
             if recipe.crop != oldValue.crop { startThumbnails() }
         }
     }
-    public var showOriginal = false
+    public var showOriginal = false {
+        didSet {
+            // A zoomed original is rendered on demand, so ask for it as soon as compare starts.
+            if showOriginal, !oldValue, zoomRegion != nil { schedulePreview() }
+        }
+    }
 
     // MARK: Histogram and colour mixer
 
@@ -100,7 +106,9 @@ public final class EditorModel {
         case .exitImmersive: setImmersive(false)
         case .compare(let held): if !isCropping || !held { showOriginal = held }
         case .space(let held): isSpaceHeld = held
-        case .zoomIn, .zoomOut, .swallow: break
+        case .zoomIn: zoomStep(1)
+        case .zoomOut: zoomStep(-1)
+        case .swallow: break
         }
     }
 
@@ -162,18 +170,22 @@ public final class EditorModel {
         let filmID: String?
         let recipe: Recipe
         let canvas: CGSize?
+        let zoom: ZoomRegion?
     }
 
     private struct OriginalKey: Equatable {
         let crop: CropSettings
         let canvas: CGSize?
         let generation: Int
+        let zoom: ZoomRegion?
     }
 
     private struct PreviewRequest: Sendable {
         let recipe: Recipe
         let canvas: CGSize?
         let generation: Int
+        /// The part of the picture to render at the zoom scale, nil to render the whole picture.
+        let zoom: ZoomRegion?
     }
 
     private static let hoverCacheLimit = 6
@@ -218,6 +230,7 @@ public final class EditorModel {
         contentGeneration += 1
         isCropping = false
         leaveCropTab()
+        resetZoom()
         source = image
         isSourceFull = isFull
         engine.setSource(image)
@@ -239,6 +252,7 @@ public final class EditorModel {
     /// stays until the sharper one is ready, and the film strip is kept.
     public func replaceSource(_ image: CIImage, isFull: Bool = true) {
         sourceGeneration += 1
+        resetZoom()
         source = image
         isSourceFull = isFull
         engine.setSource(image)
@@ -323,6 +337,8 @@ public final class EditorModel {
         guard !isCropping, source != nil else { return }
         endHover()
         showOriginal = false
+        setImmersive(false)
+        resetZoom()
         crop = recipe.crop
         isCropping = true
         if tab != .crop { tabBeforeCrop = tab }
@@ -423,6 +439,116 @@ public final class EditorModel {
         [c.straighten, Double(c.normalizedQuarterTurns), c.flipH ? 1 : 0, c.flipV ? 1 : 0]
     }
 
+
+    // MARK: Zoom
+
+    /// How the picture is shown: fitted, or zoomed (device pixels per picture pixel, so 1 is 100%).
+    public private(set) var zoom: ZoomState = .fit
+    /// "100%", "50%" or "FIT" for a moment after the zoom changes, else nil.
+    public private(set) var zoomReadout: String?
+    /// The pane under the pointer in device pixels, nil when the pointer is elsewhere (anchors `[` and `]`).
+    @ObservationIgnored public var pointerInPane: CGPoint?
+    @ObservationIgnored private var paneSize = CGSize.zero
+    @ObservationIgnored private var fitAreaSize = CGSize.zero
+    @ObservationIgnored private var readoutTask: Task<Void, Never>?
+    /// How long the zoom readout stays on screen.
+    nonisolated static let readoutDuration: Duration = .milliseconds(1200)
+
+    /// The pane the picture is shown in and the area fit mode letterboxes it into, in device pixels.
+    public func setViewport(pane: CGSize, fitArea: CGSize) {
+        guard pane.width >= 1, pane.height >= 1 else { return }
+        paneSize = pane
+        fitAreaSize = CGSize(width: max(1, fitArea.width), height: max(1, fitArea.height))
+        revalidateZoom()
+    }
+
+    /// The geometry the zoom maths works in, nil until there is a photo and a pane.
+    public var zoomViewport: ZoomViewport? {
+        guard let source, paneSize.width >= 1 else { return nil }
+        let vp = ZoomViewport(content: PreviewEngine.zoomContentSize(for: recipe, imageSize: source.extent.size),
+                              pane: paneSize, fitArea: fitAreaSize)
+        return vp.isValid ? vp : nil
+    }
+
+    /// Zoom works on the full-resolution photo, outside the crop tool.
+    public var canZoom: Bool { isSourceFull && !isCropping && zoomViewport != nil }
+
+    /// The region the zoomed render covers, nil while fitted or when zooming is unavailable.
+    private var zoomRegion: ZoomRegion? {
+        guard canZoom, let vp = zoomViewport else { return nil }
+        return ZoomGeometry.renderRegion(state: zoom, in: vp)
+    }
+
+    /// Where `frame` sits in the pane, in device pixels, for the current zoom. nil without a viewport.
+    public func paneRect(of frame: PreviewFrame) -> CGRect? {
+        guard let vp = zoomViewport else { return nil }
+        return ZoomGeometry.paneRect(ofContentRect: frame.contentRect(whole: vp.content), state: zoom, in: vp)
+    }
+
+    /// A click on the photo: fit goes to 100% around the point, zoomed goes back to fit.
+    public func zoomClick(atPane point: CGPoint) {
+        guard canZoom, let vp = zoomViewport else { return }
+        setZoom(ZoomGeometry.clicked(zoom, atPane: point, in: vp))
+    }
+
+    /// `]` (direction 1) and `[` (-1): one step along fit, 50%, 100%, 200%, 400%, anchored at the
+    /// pointer when it is over the photo, else at the centre.
+    public func zoomStep(_ direction: Int) {
+        guard canZoom, let vp = zoomViewport else { return }
+        var anchor = pointerInPane
+        if let a = anchor, a.x < 0 || a.y < 0 || a.x > vp.pane.width || a.y > vp.pane.height { anchor = nil }
+        setZoom(ZoomGeometry.stepped(zoom, by: direction, anchor: anchor, in: vp))
+    }
+
+    public func zoomToFit() {
+        guard canZoom else { return }
+        setZoom(.fit)
+    }
+
+    /// Drags the zoomed picture by `delta` device pixels.
+    public func zoomPan(byPane delta: CGSize) {
+        guard canZoom, let vp = zoomViewport, !zoom.isFit else { return }
+        setZoom(ZoomGeometry.panned(zoom, byPane: delta, in: vp), showReadout: false)
+    }
+
+    private func setZoom(_ new: ZoomState, showReadout: Bool = true) {
+        guard new != zoom else { return }
+        let scaleChanged = new.scale != zoom.scale
+        zoom = new
+        if showReadout && scaleChanged { flashReadout() }
+        schedulePreview()
+        if let target = hoveredTarget { startHover(target, keepImage: true) }
+    }
+
+    /// Back to fit without a readout (new photo, crop tool, new crop).
+    private func resetZoom() {
+        guard !zoom.isFit else { return }
+        zoom = .fit
+        readoutTask?.cancel()
+        zoomReadout = nil
+    }
+
+    /// Keeps the zoom valid after the pane or the picture's size changed.
+    private func revalidateZoom() {
+        guard !zoom.isFit else { return }
+        guard let vp = zoomViewport else { return }
+        let valid = ZoomGeometry.revalidated(zoom, in: vp)
+        guard valid != zoom else { return }
+        zoom = valid
+        if valid.isFit { zoomReadout = nil }
+        schedulePreview()
+    }
+
+    private func flashReadout() {
+        zoomReadout = ZoomGeometry.readout(for: zoom)
+        readoutTask?.cancel()
+        readoutTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.readoutDuration)
+            guard !Task.isCancelled else { return }
+            self?.zoomReadout = nil
+        }
+    }
+
     // MARK: Canvas
 
     /// The size of the area the picture is shown in, in pixels (points x backing scale). Previews
@@ -454,18 +580,28 @@ public final class EditorModel {
     /// waiting one, so a fast slider drag renders only the frames it can keep up with.
     private func schedulePreview() {
         guard engine.hasSource else { return }
-        let request = PreviewRequest(recipe: previewRecipe, canvas: canvasPixels, generation: sourceGeneration)
+        let request = PreviewRequest(recipe: previewRecipe, canvas: canvasPixels, generation: sourceGeneration,
+                                     zoom: zoomRegion)
         if let start = gate.submit(request) { run(start) }
     }
 
     private func run(_ request: PreviewRequest) {
         let engine = engine
-        let key = OriginalKey(crop: request.recipe.crop, canvas: request.canvas, generation: request.generation)
-        let needsOriginal = !isCropping && originalKey != key
+        let key = OriginalKey(crop: request.recipe.crop, canvas: request.canvas, generation: request.generation,
+                              zoom: request.zoom)
+        // The whole-picture original is kept ready; a zoomed one is only made while compare is held.
+        let needsOriginal = !isCropping && originalKey != key && (request.zoom == nil || showOriginal)
         previewTask = Task { [weak self] in
             let result = await Task.detached(priority: .userInitiated) { () -> (PreviewFrame?, PreviewFrame?) in
-                let graded = engine.render(request.recipe, canvas: request.canvas)
-                let original = needsOriginal ? engine.renderOriginal(crop: request.recipe.crop, canvas: request.canvas) : nil
+                let graded: PreviewFrame?
+                var original: PreviewFrame?
+                if let region = request.zoom {
+                    graded = engine.renderZoomed(request.recipe, region: region)
+                    original = needsOriginal ? engine.renderZoomed(Recipe(crop: request.recipe.crop), region: region) : nil
+                } else {
+                    graded = engine.render(request.recipe, canvas: request.canvas)
+                    original = needsOriginal ? engine.renderOriginal(crop: request.recipe.crop, canvas: request.canvas) : nil
+                }
                 return (graded, original)
             }.value
             guard let self else { return }
@@ -567,7 +703,8 @@ public final class EditorModel {
         swapped.filmID = target.filmID
         let graded = swapped
         let canvas = canvasPixels
-        let key = HoverKey(filmID: target.filmID, recipe: graded, canvas: canvas)
+        let zoom = zoomRegion
+        let key = HoverKey(filmID: target.filmID, recipe: graded, canvas: canvas, zoom: zoom)
         if let cached = hoverCache[key] {
             hoverFrame = cached
             return
@@ -577,7 +714,7 @@ public final class EditorModel {
             try? await Task.sleep(for: Self.hoverDebounce)
             if Task.isCancelled { return }
             let frame = await Task.detached(priority: .userInitiated) {
-                engine.render(graded, canvas: canvas)
+                zoom.map { engine.renderZoomed(graded, region: $0) } ?? engine.render(graded, canvas: canvas)
             }.value
             guard !Task.isCancelled, let self, self.hoverGeneration == generation, let frame else { return }
             self.storeHover(frame, for: key)

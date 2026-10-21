@@ -47,6 +47,20 @@ struct MiraApp: App {
                         .disabled(!state.canUseEditorView)
                 }
                 Divider()
+                Button("Toggle Full Screen") { state.editor?.toggleImmersive() }
+                    .keyboardShortcut("f", modifiers: [])
+                    .disabled(!state.canUseEditorView || state.isCropping)
+                Divider()
+                Button("Zoom In") { state.editor?.zoomStep(1) }
+                    .keyboardShortcut("]", modifiers: [])
+                    .disabled(!state.canZoom)
+                Button("Zoom Out") { state.editor?.zoomStep(-1) }
+                    .keyboardShortcut("[", modifiers: [])
+                    .disabled(!state.canZoom)
+                Button("Zoom to Fit") { state.editor?.zoomToFit() }
+                    .keyboardShortcut("0")
+                    .disabled(!state.canZoom)
+                Divider()
             }
             CommandGroup(after: .undoRedo) {
                 Divider()
