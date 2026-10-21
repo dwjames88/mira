@@ -32,7 +32,26 @@ final class LibraryStore {
     private(set) var selectedNodeID: String
     /// Folders the user has opened, persisted by folder id.
     private(set) var expanded: Set<String>
+    /// Sections the user has folded away, persisted by section id.
+    private(set) var collapsedSections: Set<String>
     private(set) var fetchResult: PHFetchResult<PHAsset>?
+    /// The grid's criteria. Change it with `updateFilter`.
+    private(set) var filter = LibraryFilter()
+    /// Indices into `fetchResult` that pass the filter; nil when the whole fetch is shown.
+    private(set) var displayIndices: [Int]?
+    /// A filter pass is running, so the grid may not match the criteria yet.
+    private(set) var filterPending = false
+    /// Camera and lens counts for the current collection, from the metadata index.
+    private(set) var facets = FilterFacets()
+    private(set) var indexProgress = IndexProgress()
+    /// Set by the filter popover; while it is open the facets are kept fresh as the index grows.
+    private(set) var filterPanelOpen = false
+
+    func setFilterPanelOpen(_ open: Bool) {
+        guard open != filterPanelOpen else { return }
+        filterPanelOpen = open
+        if open { schedulePass(delay: .milliseconds(50), replace: true) }
+    }
     /// Bumped whenever the library changes, so cells re-read their asset (edited badges, thumbnails).
     private(set) var revision = 0
     var selectedIndex: Int?
@@ -42,6 +61,17 @@ final class LibraryStore {
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
     @ObservationIgnored private var treeTask: Task<Void, Never>?
     @ObservationIgnored private var restoredExpansion = false
+    @ObservationIgnored let metadataStore = MetadataStore(fileURL: MetadataStore.defaultFileURL())
+    @ObservationIgnored private var passTask: Task<Void, Never>?
+    @ObservationIgnored private var passGeneration = 0
+    @ObservationIgnored private var scan: CollectionScan?
+    @ObservationIgnored private var rawIDs: Set<String>?
+    @ObservationIgnored private var indexTask: Task<Void, Never>?
+    @ObservationIgnored private var indexRestartTask: Task<Void, Never>?
+    @ObservationIgnored private var indexFlag = IndexCancelFlag()
+    @ObservationIgnored private var indexRun = 0
+    @ObservationIgnored private var metadataLoaded = false
+    @ObservationIgnored private var lastCovered = false
     @ObservationIgnored private var rawCache: [String: Bool] = [:]
     @ObservationIgnored private var cachedAssets: [PHAsset] = []
     @ObservationIgnored private var cachedRange: Range<Int> = 0..<0
@@ -68,14 +98,21 @@ final class LibraryStore {
 
     private static let selectionKey = "mira.sidebar.selection"
     private static let expandedKey = "mira.sidebar.expanded"
+    private static let collapsedSectionsKey = "mira.sidebar.collapsedSections"
 
     init() {
         selectedNodeID = UserDefaults.standard.string(forKey: Self.selectionKey) ?? "all"
         expanded = Set(UserDefaults.standard.stringArray(forKey: Self.expandedKey) ?? [])
+        collapsedSections = Set(UserDefaults.standard.stringArray(forKey: Self.collapsedSectionsKey) ?? [])
     }
 
     var isAuthorized: Bool { authorization == .authorized || authorization == .limited }
-    var count: Int { fetchResult?.count ?? 0 }
+    /// Photos shown in the grid: the filtered list when a filter is active, else the whole fetch.
+    var count: Int { displayIndices?.count ?? fetchResult?.count ?? 0 }
+    /// Photos in the collection before the filter's per-asset criteria.
+    var collectionCount: Int { fetchResult?.count ?? 0 }
+    /// The index has seen every photo in the current collection (the filter's metadata criteria are complete).
+    var indexCoversCollection: Bool { indexProgress.finished || indexProgress.scope == .library }
 
     var selectedNode: SidebarNode? { SidebarModel.node(withID: selectedNodeID, in: sections) }
     /// Titles from the root to the selected node ("Trips", "2021", "West Coast").
@@ -85,7 +122,14 @@ final class LibraryStore {
 
     /// Rows that can be selected, in display order, for the up/down keys.
     var selectableRows: [SidebarNode] {
-        sections.flatMap { SidebarModel.visibleRows(in: $0, expanded: expanded).map(\.node) }.filter { !$0.isFolder }
+        SidebarModel.selectableNodes(in: sections, expanded: expanded, collapsedSections: collapsedSections)
+    }
+
+    func isSectionCollapsed(_ id: String) -> Bool { collapsedSections.contains(id) }
+
+    func toggleSection(_ id: String) {
+        if collapsedSections.contains(id) { collapsedSections.remove(id) } else { collapsedSections.insert(id) }
+        UserDefaults.standard.set(Array(collapsedSections).sorted(), forKey: Self.collapsedSectionsKey)
     }
 
     func isExpanded(_ id: String) -> Bool { expanded.contains(id) }
@@ -114,15 +158,29 @@ final class LibraryStore {
         authorization = status
         if isAuthorized {
             registerObserver()
+            await loadMetadataStore()
             reload()
         }
+    }
+
+    private func loadMetadataStore() async {
+        guard !metadataLoaded else { return }
+        metadataLoaded = true
+        let store = metadataStore
+        await Task.detached(priority: .utility) { _ = store.load() }.value
     }
 
     func refreshAuthorization() {
         let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
         guard status != authorization else { return }
         authorization = status
-        if isAuthorized { registerObserver(); reload() }
+        if isAuthorized {
+            registerObserver()
+            Task { [weak self] in
+                await self?.loadMetadataStore()
+                self?.reload()
+            }
+        }
     }
 
     private func registerObserver() {
@@ -156,7 +214,8 @@ final class LibraryStore {
     /// Refetches the current grid now and rebuilds the sidebar tree off the main actor.
     func reload() {
         guard isAuthorized else { return }
-        refetchGrid()
+        refetchGrid(keepVisible: true)
+        restartIndexing(delay: .milliseconds(500))
         treeTask?.cancel()
         treeTask = Task { [weak self] in
             let built = await Task.detached(priority: .userInitiated) { SidebarLoader.load() }.value
@@ -180,14 +239,34 @@ final class LibraryStore {
             UserDefaults.standard.set("all", forKey: Self.selectionKey)
             selectedIndex = nil
             refetchGrid()
+            restartIndexing(delay: .zero)
         }
     }
 
-    private func refetchGrid() {
-        fetchResult = fetch(forNodeID: selectedNodeID)
-        if let i = selectedIndex, i >= count { selectedIndex = nil }
-        stopAllCaching()
-        revision += 1
+    /// Refetches the current collection. With a per-asset filter active the new fetch is filtered off the
+    /// main actor first; `keepVisible` keeps the old grid on screen until that finishes (library changes),
+    /// otherwise the grid empties while it runs (a different collection).
+    private func refetchGrid(keepVisible: Bool = false) {
+        let fresh = SidebarLoader.fetchAssets(nodeID: selectedNodeID, filter: filter)
+        scan = nil
+        if filter.needsAssetPass {
+            if !keepVisible {
+                fetchResult = fresh
+                displayIndices = []
+                stopAllCaching()
+                revision += 1
+            }
+            runPass(newFetch: fresh)
+        } else {
+            fetchResult = fresh
+            displayIndices = nil
+            filterPending = false
+            if let i = selectedIndex, i >= count { selectedIndex = nil }
+            stopAllCaching()
+            revision += 1
+            // Facets for the popover and the metadata criteria's bookkeeping.
+            if filterPanelOpen { runPass(newFetch: nil) }
+        }
     }
 
     func select(_ node: SidebarNode) {
@@ -196,33 +275,148 @@ final class LibraryStore {
         UserDefaults.standard.set(node.id, forKey: Self.selectionKey)
         selectedIndex = nil
         refetchGrid()
+        restartIndexing(delay: .milliseconds(400))
     }
 
-    private func fetch(forNodeID id: String) -> PHFetchResult<PHAsset> {
-        switch id {
-        case "all":
-            return PHAsset.fetchAssets(with: SidebarLoader.imageOptions())
-        case "fav":
-            return PHAsset.fetchAssets(with: SidebarLoader.favouriteOptions())
-        case "recent":
-            if let c = SidebarLoader.smartCollection(PHAssetCollectionSubtype.smartAlbumRecentlyAdded.rawValue) {
-                return PHAsset.fetchAssets(in: c, options: SidebarLoader.imageOptions())
+    /// The photo at a grid position, mapped through the filter.
+    func asset(at index: Int) -> PHAsset? {
+        guard let fetchResult, index >= 0, index < count else { return nil }
+        let source = displayIndices?[index] ?? index
+        guard source < fetchResult.count else { return nil }
+        return fetchResult.object(at: source)
+    }
+
+    // MARK: Filter
+
+    /// Applies a change to the criteria. PhotoKit-expressible ones (favorites, scope) refetch; the rest
+    /// re-run the off-main pass over the collection.
+    func updateFilter(_ change: (inout LibraryFilter) -> Void) {
+        let old = filter
+        var new = old
+        change(&new)
+        guard new != old else { return }
+        filter = new
+        selectedIndex = nil
+        if old.fetchCriteria != new.fetchCriteria {
+            refetchGrid()
+        } else if new.needsAssetPass {
+            filterPending = true
+            schedulePass(delay: .milliseconds(150), replace: true)
+        } else {
+            passTask?.cancel()
+            passGeneration += 1
+            displayIndices = nil
+            filterPending = false
+            revision += 1
+        }
+    }
+
+    func resetFilter() {
+        updateFilter { $0 = LibraryFilter() }
+    }
+
+    private func schedulePass(delay: Duration, replace: Bool) {
+        if !replace, passTask != nil { return }
+        passTask?.cancel()
+        passGeneration += 1
+        let generation = passGeneration
+        passTask = Task { [weak self] in
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled, let self, generation == self.passGeneration else { return }
+            self.runPass(newFetch: nil)
+        }
+    }
+
+    /// Runs the filter off the main actor and publishes the result if nothing newer started meanwhile.
+    /// With `newFetch` the grid swaps to that fetch together with the filtered list.
+    private func runPass(newFetch: PHFetchResult<PHAsset>?) {
+        guard let target = newFetch ?? fetchResult else { return }
+        passTask?.cancel()
+        passGeneration += 1
+        let generation = passGeneration
+        let criteria = filter
+        let box = Unchecked(value: target)
+        let store = metadataStore
+        let previousScan = newFetch == nil ? scan : nil
+        let previousRAW = rawIDs
+        filterPending = criteria.needsAssetPass
+        passTask = Task { [weak self] in
+            let work = Task.detached(priority: .userInitiated) {
+                FilterEngine.compute(fetch: box, filter: criteria, store: store, previousScan: previousScan, previousRAW: previousRAW)
             }
-        default:
-            if id.hasPrefix("smart:"), let raw = Int(id.dropFirst(6)) {
-                if let c = SidebarLoader.smartCollection(raw) {
-                    return PHAsset.fetchAssets(in: c, options: SidebarLoader.imageOptions(includeHidden: SidebarLoader.includesHidden(raw: raw)))
-                }
-            } else if let c = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [id], options: nil).firstObject {
-                return PHAsset.fetchAssets(in: c, options: SidebarLoader.imageOptions())
+            let outcome = await withTaskCancellationHandler { await work.value } onCancel: { work.cancel() }
+            guard !Task.isCancelled, let self, generation == self.passGeneration, let outcome else { return }
+            self.passTask = nil
+            self.scan = outcome.scan
+            self.rawIDs = outcome.rawIDs
+            self.facets = outcome.facets
+            self.filterPending = false
+            if let newFetch {
+                self.fetchResult = newFetch
+                self.stopAllCaching()
+            }
+            if self.displayIndices != outcome.indices || newFetch != nil {
+                self.displayIndices = outcome.indices
+                if let i = self.selectedIndex, i >= self.count { self.selectedIndex = nil }
+                self.revision += 1
             }
         }
-        return PHAsset.fetchAssets(with: SidebarLoader.imageOptions())
     }
 
-    func asset(at index: Int) -> PHAsset? {
-        guard let fetchResult, index >= 0, index < fetchResult.count else { return nil }
-        return fetchResult.object(at: index)
+    // MARK: Metadata index
+
+    /// (Re)starts the background index on the current collection, then the rest of the library.
+    private func restartIndexing(delay: Duration) {
+        indexRestartTask?.cancel()
+        indexRestartTask = Task { [weak self] in
+            if delay > .zero { try? await Task.sleep(for: delay) }
+            guard !Task.isCancelled, let self, self.isAuthorized else { return }
+            self.startIndexing()
+        }
+    }
+
+    private func startIndexing() {
+        indexFlag.cancel()
+        indexTask?.cancel()
+        let flag = IndexCancelFlag()
+        indexFlag = flag
+        indexRun += 1
+        let run = indexRun
+        let nodeID = selectedNodeID
+        let store = metadataStore
+        let report = Self.makeProgressReporter(self, run: run)
+        indexTask = Task.detached(priority: .utility) {
+            // Unfiltered fetches: the index describes the collection whatever the filter currently hides.
+            let collection = Unchecked(value: SidebarLoader.fetchAssets(nodeID: nodeID))
+            let library = nodeID == "all" ? nil : Unchecked(value: PHAsset.fetchAssets(with: SidebarLoader.imageOptions()))
+            await MetadataIndexer.run(collection: collection, library: library, store: store, flag: flag, report: report)
+        }
+    }
+
+    /// Built in a `nonisolated` context so the `@Sendable` callback carries no main-actor isolation.
+    private nonisolated static func makeProgressReporter(_ store: LibraryStore, run: Int) -> @Sendable (IndexProgress) -> Void {
+        let weakStore = WeakStore(store)
+        return { @Sendable progress in
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { weakStore.store?.indexDidProgress(progress, run: run) }
+            }
+        }
+    }
+
+    private func indexDidProgress(_ progress: IndexProgress, run: Int) {
+        guard run == indexRun else { return }
+        indexProgress = progress
+        let covered = indexCoversCollection
+        let becameCovered = covered && !lastCovered
+        lastCovered = covered
+        guard filter.needsMetadata || filterPanelOpen else { return }
+        // While indexing, refresh the list and the facets about once a second; do it at once when the
+        // collection becomes fully covered or the run ends.
+        if becameCovered || progress.finished {
+            schedulePass(delay: .milliseconds(100), replace: true)
+        } else {
+            schedulePass(delay: .seconds(1), replace: false)
+        }
     }
 
     // MARK: Thumbnails
@@ -273,13 +467,13 @@ final class LibraryStore {
     /// Keeps a window of assets around `index` warm in the caching manager: the visible cells plus
     /// a little ahead and behind, nothing more.
     func prefetch(around index: Int) {
-        guard let fetchResult, fetchResult.count > 0 else { return }
+        guard count > 0 else { return }
         if index >= cachedRange.lowerBound + 12, index < cachedRange.upperBound - 24, !cachedAssets.isEmpty { return }
         let lower = max(0, index - 30)
-        let upper = min(fetchResult.count, index + 90)
+        let upper = min(count, index + 90)
         guard lower < upper else { return }
         let range = lower..<upper
-        let assets = fetchResult.objects(at: IndexSet(integersIn: range))
+        let assets = range.compactMap { asset(at: $0) }
         if !cachedAssets.isEmpty {
             let keep = Set(assets.map(\.localIdentifier))
             let stale = cachedAssets.filter { !keep.contains($0.localIdentifier) }

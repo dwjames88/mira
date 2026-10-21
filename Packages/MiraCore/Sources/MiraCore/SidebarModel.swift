@@ -7,7 +7,7 @@ public enum SidebarNodeKind: Hashable, Sendable {
     /// A Photos smart album, by its `PHAssetCollectionSubtype` raw value.
     case smart(Int)
     case library
-    case favourites
+    case favorites
     case recents
 }
 
@@ -57,18 +57,8 @@ public protocol CollectionNodeSource: Sendable {
 
 /// Pure sidebar construction and lookup, kept free of PhotoKit so it can be unit tested.
 public enum SidebarModel {
-    /// Folders and albums together, Finder-style: case-insensitive, numbers by value ("Album 2" < "Album 10").
-    public static func sortedByTitle(_ nodes: [SidebarNode]) -> [SidebarNode] {
-        nodes.sorted { a, b in
-            switch a.title.localizedStandardCompare(b.title) {
-            case .orderedAscending: true
-            case .orderedDescending: false
-            case .orderedSame: a.id < b.id
-            }
-        }
-    }
-
-    /// The user's albums as a sorted tree. Folders without any album inside (at any depth) are dropped.
+    /// The user's albums as a tree, in exactly the order the source lists them (Photos' manual order, folders and
+    /// albums interleaved, at every depth). Folders without any album inside (at any depth) are dropped.
     public static func albumNodes(from sources: [any CollectionNodeSource]) -> [SidebarNode] {
         var nodes: [SidebarNode] = []
         for source in sources {
@@ -80,7 +70,7 @@ public enum SidebarModel {
                 nodes.append(SidebarNode(id: source.identifier, title: source.title, kind: .album, count: source.assetCount))
             }
         }
-        return sortedByTitle(nodes)
+        return nodes
     }
 
     /// Entries whose count is known to be zero are not shown (Media Types, Utilities).
@@ -88,60 +78,16 @@ public enum SidebarModel {
         nodes.filter { ($0.count ?? 1) > 0 }
     }
 
-    /// Sort key for a rating album: 1-5 for star counts, 0 for Flagged/Picks, -1 for Rejected; nil when
-    /// the title is not a rating album.
-    public static func ratingRank(forTitle title: String) -> Int? {
-        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        let stripped = trimmed.replacingOccurrences(of: "\u{FE0F}", with: "")
-        if (1...5).contains(stripped.count), stripped.allSatisfy({ "\u{2605}\u{2606}\u{2B50}".contains($0) }) {
-            return stripped.count
-        }
-        switch trimmed.lowercased() {
-        case "flagged", "picks", "pick": return 0
-        case "rejected", "rejects": return -1
-        default: return nil
-        }
-    }
-
-    /// Pulls rating albums (stars, Flagged, Rejected) out of the albums tree at any depth. Returns them
-    /// ordered five stars first, then Flagged, then Rejected, and the tree without them (folders left
-    /// empty by the removal are pruned).
-    public static func extractRatings(from nodes: [SidebarNode]) -> (ratings: [SidebarNode], remaining: [SidebarNode]) {
-        var found: [(rank: Int, node: SidebarNode)] = []
-        func strip(_ nodes: [SidebarNode]) -> [SidebarNode] {
-            var kept: [SidebarNode] = []
-            for node in nodes {
-                if node.isFolder {
-                    let children = strip(node.children)
-                    if !children.isEmpty {
-                        kept.append(SidebarNode(id: node.id, title: node.title, kind: .folder, count: node.count, children: children))
-                    }
-                } else if let rank = ratingRank(forTitle: node.title) {
-                    found.append((rank, node))
-                } else {
-                    kept.append(node)
-                }
-            }
-            return kept
-        }
-        let remaining = strip(nodes)
-        let ordered = found.sorted { a, b in
-            a.rank != b.rank ? a.rank > b.rank : a.node.title.localizedStandardCompare(b.node.title) == .orderedAscending
-        }.map(\.node)
-        return (ordered, remaining)
-    }
-
-    /// The sidebar sections in Photos' order, with STARS after LIBRARY. Empty sections are left out; Media Types and
+    /// The sidebar sections in Photos' order, (LIBRARY, ALBUMS, SHARED ALBUMS, MEDIA TYPES, UTILITIES). Empty sections are left out; Media Types and
     /// Utilities lose their zero-count entries first.
     public static func sections(
-        library: [SidebarNode], stars: [SidebarNode] = [], albums: [SidebarNode], shared: [SidebarNode],
+        library: [SidebarNode], albums: [SidebarNode], shared: [SidebarNode],
         mediaTypes: [SidebarNode], utilities: [SidebarNode]
     ) -> [SidebarSection] {
         let all = [
             SidebarSection(id: "library", title: "Library", nodes: library),
-            SidebarSection(id: "stars", title: "Stars", nodes: visible(stars)),
             SidebarSection(id: "albums", title: "Albums", nodes: albums),
-            SidebarSection(id: "shared", title: "Shared Albums", nodes: sortedByTitle(shared)),
+            SidebarSection(id: "shared", title: "Shared Albums", nodes: shared),
             SidebarSection(id: "media", title: "Media Types", nodes: visible(mediaTypes)),
             SidebarSection(id: "utilities", title: "Utilities", nodes: visible(utilities)),
         ]
@@ -175,6 +121,15 @@ public enum SidebarModel {
         }
         walk(section.nodes, 0)
         return rows
+    }
+
+    /// Rows that can be selected with the arrow keys, in display order. Folders are skipped, and so is
+    /// everything inside a collapsed section or a collapsed folder.
+    public static func selectableNodes(in sections: [SidebarSection], expanded: Set<String>, collapsedSections: Set<String>) -> [SidebarNode] {
+        sections
+            .filter { !collapsedSections.contains($0.id) }
+            .flatMap { visibleRows(in: $0, expanded: expanded).map(\.node) }
+            .filter { !$0.isFolder }
     }
 
     private static func path(to id: String, in sections: [SidebarSection]) -> [SidebarNode]? {

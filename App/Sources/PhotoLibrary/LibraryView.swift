@@ -76,20 +76,22 @@ private struct LibrarySidebar: View {
                             .padding(.horizontal, T.cells(2))
                             .padding(.top, T.rows(1))
                     }
-                    Text(section.title).ffLabel()
-                        .padding(.horizontal, T.cells(2))
-                        .padding(.top, T.rows(1))
-                        .padding(.bottom, T.rows(0.5))
-                        .accessibilityAddTraits(.isHeader)
-                    let hasFolders = section.nodes.contains(where: \.isFolder)
-                    ForEach(SidebarModel.visibleRows(in: section, expanded: store.expanded), id: \.node.id) { row in
-                        SidebarRow(node: row.node, depth: row.depth, reserveChevron: hasFolders, monoTitle: section.id == "stars",
-                                   expanded: store.isExpanded(row.node.id),
-                                   selected: store.selectedNodeID == row.node.id) {
-                            focused = true
-                            if row.node.isFolder { store.toggleExpanded(row.node.id) } else { store.select(row.node) }
+                    let collapsed = store.isSectionCollapsed(section.id)
+                    SectionHeader(title: section.title, collapsed: collapsed) {
+                        focused = true
+                        withAnimation(.easeOut(duration: 0.12)) { store.toggleSection(section.id) }
+                    }
+                    if !collapsed {
+                        let hasFolders = section.nodes.contains(where: \.isFolder)
+                        ForEach(SidebarModel.visibleRows(in: section, expanded: store.expanded), id: \.node.id) { row in
+                            SidebarRow(node: row.node, depth: row.depth, reserveChevron: hasFolders,
+                                       expanded: store.isExpanded(row.node.id),
+                                       selected: store.selectedNodeID == row.node.id) {
+                                focused = true
+                                if row.node.isFolder { store.toggleExpanded(row.node.id) } else { store.select(row.node) }
+                            }
+                            .id(row.node.id)
                         }
-                        .id(row.node.id)
                     }
                 }
             }
@@ -104,11 +106,39 @@ private struct LibrarySidebar: View {
     }
 }
 
+/// A collapsible section title: mono uppercase label with a small chevron that turns when open.
+private struct SectionHeader: View {
+    let title: String
+    let collapsed: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: T.cells(1)) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(T.paperDim)
+                    .rotationEffect(.degrees(collapsed ? 0 : 90))
+                    .frame(width: T.cells(1.5))
+                Text(title).ffLabel()
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, T.cells(2))
+            .padding(.top, T.rows(1))
+            .padding(.bottom, T.rows(0.5))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(.isHeader)
+        .accessibilityLabel("\(title), \(collapsed ? "collapsed" : "expanded")")
+    }
+}
+
 private struct SidebarRow: View {
     let node: SidebarNode
     let depth: Int
     let reserveChevron: Bool
-    let monoTitle: Bool
     let expanded: Bool
     let selected: Bool
     let action: () -> Void
@@ -134,7 +164,7 @@ private struct SidebarRow: View {
                         .frame(width: T.cells(2))
                 }
                 Text(node.title)
-                    .font(monoTitle ? T.mono(12) : .system(size: 13))
+                    .font(.system(size: 13))
                     .foregroundStyle(selected ? T.paper : T.paperMid)
                     .lineLimit(1)
                 Spacer(minLength: T.cells(1))
@@ -180,8 +210,19 @@ private struct LibraryGridPane: View {
             header
             FFHairline()
             if store.count == 0 {
-                VStack { Text("Nothing here").ffLabel(size: 11) }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                VStack(spacing: T.rows(1)) {
+                    if store.filterPending {
+                        Text("Filtering").ffLabel(size: 11)
+                    } else if store.filter.isActive {
+                        Text("No photos match the filter").ffLabel(size: 11)
+                        if let line = store.indexProgress.line, store.filter.needsMetadata {
+                            Text("\(line) \u{00B7} only indexed photos can match").ffLabel(size: 10, color: T.lichen)
+                        }
+                    } else {
+                        Text("Nothing here").ffLabel(size: 11)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 GeometryReader { geo in
                     let columns = max(1, Int((geo.size.width - gap * 2 + gap) / (minCell + gap)))
@@ -212,7 +253,7 @@ private struct LibraryGridPane: View {
                     .font(T.display(30, weight: .medium))
                     .foregroundStyle(T.paper)
             }
-            Text("\(store.count) PHOTOS").ffLabel(size: 10)
+            Text(store.filter.needsAssetPass ? "\(store.count) OF \(store.collectionCount) PHOTOS" : "\(store.count) PHOTOS").ffLabel(size: 10)
             if store.isReadOnlySelection {
                 Text("READ ONLY").ffLabel(size: 10, color: T.lichen)
             }
@@ -220,6 +261,7 @@ private struct LibraryGridPane: View {
                 Text("LIMITED ACCESS").ffLabel(size: 10, color: T.lichen)
             }
             Spacer()
+            FilterButton(store: store)
         }
         .padding(.horizontal, T.cells(2))
         .padding(.vertical, T.rows(0.5))

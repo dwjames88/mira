@@ -23,18 +23,22 @@ enum SidebarLoader {
     nonisolated static func smartID(_ raw: Int) -> String { "smart:\(raw)" }
 
     /// Pictures only, newest first. Hidden and deleted assets are included only for their own albums.
-    nonisolated static func imageOptions(includeHidden: Bool = false) -> PHFetchOptions {
+    /// The filter's PhotoKit-expressible criteria (favorites, source scope) are folded into the fetch.
+    nonisolated static func imageOptions(includeHidden: Bool = false, filter: LibraryFilter = LibraryFilter()) -> PHFetchOptions {
         let options = PHFetchOptions()
-        options.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
+        var format = "mediaType == %d"
+        if filter.favoritesOnly { format += " AND favorite == YES" }
+        options.predicate = NSPredicate(format: format, PHAssetMediaType.image.rawValue)
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         options.includeHiddenAssets = includeHidden
+        if filter.scope == .myLibrary { options.includeAssetSourceTypes = [.typeUserLibrary] }
         return options
     }
 
-    nonisolated static func favouriteOptions() -> PHFetchOptions {
-        let options = imageOptions()
-        options.predicate = NSPredicate(format: "mediaType == %d AND favorite == YES", PHAssetMediaType.image.rawValue)
-        return options
+    nonisolated static func favoriteOptions() -> PHFetchOptions {
+        var filter = LibraryFilter()
+        filter.favoritesOnly = true
+        return imageOptions(filter: filter)
     }
 
     nonisolated static func smartCollection(_ raw: Int) -> PHAssetCollection? {
@@ -90,8 +94,8 @@ enum SidebarLoader {
         var library = [
             SidebarNode(id: "all", title: "Library", kind: .library,
                         count: PHAsset.fetchAssets(with: imageOptions()).count),
-            SidebarNode(id: "fav", title: "Favourites", kind: .favourites,
-                        count: PHAsset.fetchAssets(with: favouriteOptions()).count),
+            SidebarNode(id: "fav", title: "Favorites", kind: .favorites,
+                        count: PHAsset.fetchAssets(with: favoriteOptions()).count),
         ]
         if let recent = smartCollection(PHAssetCollectionSubtype.smartAlbumRecentlyAdded.rawValue) {
             library.append(SidebarNode(id: "recent", title: "Recently Saved", kind: .recents,
@@ -99,7 +103,8 @@ enum SidebarLoader {
         }
 
         // ALBUMS and SHARED ALBUMS
-        let (stars, albums) = SidebarModel.extractRatings(from: SidebarModel.albumNodes(from: userCollections(in: nil)))
+        // Photos' own manual order: no sorting here or in the builder.
+        let albums = SidebarModel.albumNodes(from: userCollections(in: nil))
         var shared: [SidebarNode] = []
         let sharedResult = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .albumCloudShared, options: nil)
         for index in 0..<sharedResult.count {
@@ -138,7 +143,32 @@ enum SidebarLoader {
         if let hidden = smartNode(hiddenRaw, title: "Hidden", includeHidden: true) { utilities.append(hidden) }
         if let deleted = smartNode(recentlyDeletedRaw, title: "Recently Deleted", includeHidden: true) { utilities.append(deleted) }
 
-        return SidebarModel.sections(library: library, stars: stars, albums: albums, shared: shared,
+        return SidebarModel.sections(library: library, albums: albums, shared: shared,
                                      mediaTypes: media, utilities: utilities)
+    }
+
+    /// The pictures of a sidebar node ("all", "fav", "recent", "smart:<raw>" or an album id), with the filter's fetch criteria.
+    nonisolated static func fetchAssets(nodeID id: String, filter: LibraryFilter = LibraryFilter()) -> PHFetchResult<PHAsset> {
+        switch id {
+        case "all":
+            return PHAsset.fetchAssets(with: imageOptions(filter: filter))
+        case "fav":
+            var f = filter
+            f.favoritesOnly = true
+            return PHAsset.fetchAssets(with: imageOptions(filter: f))
+        case "recent":
+            if let c = smartCollection(PHAssetCollectionSubtype.smartAlbumRecentlyAdded.rawValue) {
+                return PHAsset.fetchAssets(in: c, options: imageOptions(filter: filter))
+            }
+        default:
+            if id.hasPrefix("smart:"), let raw = Int(id.dropFirst(6)) {
+                if let c = smartCollection(raw) {
+                    return PHAsset.fetchAssets(in: c, options: imageOptions(includeHidden: includesHidden(raw: raw), filter: filter))
+                }
+            } else if let c = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [id], options: nil).firstObject {
+                return PHAsset.fetchAssets(in: c, options: imageOptions(filter: filter))
+            }
+        }
+        return PHAsset.fetchAssets(with: imageOptions(filter: filter))
     }
 }

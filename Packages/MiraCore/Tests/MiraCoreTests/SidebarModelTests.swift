@@ -29,11 +29,27 @@ struct SidebarModelTests {
         ])
     }
 
-    @Test func ordersFoldersAndAlbumsTogetherByStandardCompare() {
+    @Test func keepsPhotosOrderAtEveryDepthWithFoldersAndAlbumsInterleaved() {
         let top = tree().map(\.title)
-        #expect(top == ["Apple", "Trips", "zebra"])
+        #expect(top == ["zebra", "Trips", "Apple"])
         let trips = tree()[1].children.map(\.title)
-        #expect(trips == ["2021", "album 2", "Album 10"])
+        #expect(trips == ["2021", "Album 10", "album 2"])
+        #expect(tree()[1].children.map(\.isFolder) == [true, false, false])
+    }
+
+    @Test func interleavesFoldersAndAlbumsExactlyAsGiven() {
+        let nodes = SidebarModel.albumNodes(from: [
+            Fake.album("b"), Fake.folder("F2", [Fake.album("z"), Fake.folder("G", [Fake.album("y")]), Fake.album("x")]),
+            Fake.album("a"), Fake.folder("F1", [Fake.album("m")]),
+        ])
+        #expect(nodes.map(\.title) == ["b", "F2", "a", "F1"])
+        #expect(nodes[1].children.map(\.title) == ["z", "G", "x"])
+        #expect(nodes[1].children[1].children.map(\.title) == ["y"])
+    }
+
+    @Test func prunedFolderDoesNotDisturbNeighbourOrder() {
+        let nodes = SidebarModel.albumNodes(from: [Fake.album("c"), Fake.folder("Empty", []), Fake.album("a"), Fake.album("b")])
+        #expect(nodes.map(\.title) == ["c", "a", "b"])
     }
 
     @Test func prunesEmptyFoldersAtAnyDepth() {
@@ -80,39 +96,36 @@ struct SidebarModelTests {
 
     @Test func visibleRowsFollowExpansion() {
         let section = SidebarSection(id: "albums", title: "Albums", nodes: tree())
-        #expect(SidebarModel.visibleRows(in: section, expanded: []).map(\.node.title) == ["Apple", "Trips", "zebra"])
+        #expect(SidebarModel.visibleRows(in: section, expanded: []).map(\.node.title) == ["zebra", "Trips", "Apple"])
         let rows = SidebarModel.visibleRows(in: section, expanded: ["f:Trips", "f:2021"])
-        #expect(rows.map(\.node.title) == ["Apple", "Trips", "2021", "West Coast", "album 2", "Album 10", "zebra"])
+        #expect(rows.map(\.node.title) == ["zebra", "Trips", "2021", "West Coast", "Album 10", "album 2", "Apple"])
         #expect(rows.map(\.depth) == [0, 0, 1, 2, 1, 1, 0])
     }
 
-    @Test func extractsRatingAlbumsInOrderIncludingNested() {
-        let albums = SidebarModel.albumNodes(from: [
-            Fake.album("\u{2605}\u{2605}"), Fake.album("Rejected"), Fake.album("\u{2605}\u{2605}\u{2605}\u{2605}\u{2605}"),
-            Fake.album("flagged"), Fake.album("\u{2605}"), Fake.album("\u{2605} Trips"), Fake.album("Normal"),
-            Fake.folder("Old", [Fake.album(" \u{2605}\u{2605}\u{2605} ")]),
-            Fake.folder("Keep", [Fake.album("Inside"), Fake.album("Picks")]),
-        ])
-        let (ratings, rest) = SidebarModel.extractRatings(from: albums)
-        #expect(ratings.map(\.title) == ["\u{2605}\u{2605}\u{2605}\u{2605}\u{2605}", " \u{2605}\u{2605}\u{2605} ", "\u{2605}\u{2605}", "\u{2605}", "flagged", "Picks", "Rejected"])
-        #expect(rest.map(\.title) == ["\u{2605} Trips", "Keep", "Normal"])
-        #expect(rest[1].children.map(\.title) == ["Inside"])
+    @Test func sharedAlbumsKeepTheOrderTheyArriveIn() {
+        let n = { (id: String) in SidebarNode(id: id, title: id, kind: .album, count: 1) }
+        let sections = SidebarModel.sections(library: [n("l")], albums: [], shared: [n("z"), n("a"), n("m")], mediaTypes: [], utilities: [])
+        #expect(sections[1].nodes.map(\.id) == ["z", "a", "m"])
     }
 
-    @Test func ratingTitleMatching() {
-        #expect(SidebarModel.ratingRank(forTitle: "\u{2B50}\u{2B50}") == 2)
-        #expect(SidebarModel.ratingRank(forTitle: "\u{2606}") == 1)
-        #expect(SidebarModel.ratingRank(forTitle: "\u{2605}\u{2605}\u{2605}\u{2605}\u{2605}\u{2605}") == nil)
-        #expect(SidebarModel.ratingRank(forTitle: "Rejects") == -1)
-        #expect(SidebarModel.ratingRank(forTitle: "Pick") == 0)
-        #expect(SidebarModel.ratingRank(forTitle: "Picks 2021") == nil)
+    @Test func ratingNamedAlbumsAreOrdinaryAlbums() {
+        let nodes = SidebarModel.albumNodes(from: [Fake.album("\u{2605}\u{2605}"), Fake.album("Flagged"), Fake.album("Rejected")])
+        #expect(nodes.map(\.title) == ["\u{2605}\u{2605}", "Flagged", "Rejected"])
+        #expect(nodes.allSatisfy { $0.kind == .album })
+        let sections = SidebarModel.sections(library: [], albums: nodes, shared: [], mediaTypes: [], utilities: [])
+        #expect(sections.map(\.id) == ["albums"])
     }
 
-    @Test func starsSectionFollowsLibraryAndHidesEmpties() {
-        let n = { (id: String, c: Int) in SidebarNode(id: id, title: id, kind: .album, count: c) }
-        let sections = SidebarModel.sections(library: [n("l", 1)], stars: [n("s5", 2), n("s1", 0)], albums: [n("a", 1)],
-                                             shared: [], mediaTypes: [], utilities: [])
-        #expect(sections.map(\.id) == ["library", "stars", "albums"])
-        #expect(sections[1].nodes.map(\.id) == ["s5"])
+    @Test func arrowKeysSkipCollapsedSectionsAndFolders() {
+        let n = { (id: String) in SidebarNode(id: id, title: id, kind: .album, count: 1) }
+        let sections = SidebarModel.sections(library: [n("l1"), n("l2")], albums: tree(), shared: [n("s1")], mediaTypes: [n("m1")], utilities: [])
+        func ids(_ expanded: Set<String>, _ collapsed: Set<String>) -> [String] {
+            SidebarModel.selectableNodes(in: sections, expanded: expanded, collapsedSections: collapsed).map(\.id)
+        }
+        #expect(ids([], []) == ["l1", "l2", "a:zebra", "a:Apple", "s1", "m1"])
+        #expect(ids([], ["albums"]) == ["l1", "l2", "s1", "m1"])
+        #expect(ids(["f:Trips"], []).contains("a:Album 10"))
+        #expect(!ids(["f:Trips"], ["albums"]).contains("a:Album 10"))
+        #expect(ids([], ["library", "shared", "media", "albums"]).isEmpty)
     }
 }
