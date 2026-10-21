@@ -23,6 +23,10 @@ public enum ImageSource {
     /// With `orientation` (Photos' `fullSizeImageOrientation`) that orientation is applied to the
     /// file's pixels; without it the file's own metadata orientation is used.
     public static func load(url: URL, orientation: CGImagePropertyOrientation? = nil) -> CIImage? {
+        Perf.interval("source load") { loadUntraced(url: url, orientation: orientation) }
+    }
+
+    private static func loadUntraced(url: URL, orientation: CGImagePropertyOrientation?) -> CIImage? {
         if isRAW(url: url), let raw = CIRAWFilter(imageURL: url) {
             if let orientation { raw.orientation = orientation }
             if let out = raw.outputImage { return out }

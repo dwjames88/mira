@@ -263,9 +263,11 @@ public struct Renderer: Sendable {
     public func render(
         _ recipe: Recipe, input: CIImage, context: CIContext, colorSpace: CGColorSpace? = nil
     ) -> CGImage? {
-        let out = apply(recipe, to: input)
-        let space = colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
-        return context.createCGImage(out, from: out.extent, format: .RGBA8, colorSpace: space)
+        Perf.interval("preview render") {
+            let out = apply(recipe, to: input)
+            let space = colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
+            return context.createCGImage(out, from: out.extent, format: .RGBA8, colorSpace: space)
+        }
     }
 
     /// Lanczos downscale so the longest side is at most `maxPixelSize`. Never upscales.
@@ -304,6 +306,8 @@ public struct Renderer: Sendable {
         _ recipe: Recipe, source input: CIImage, metadataFrom: URL?, outputURL: URL,
         type: UTType, quality: Double, colorSpace: CGColorSpace? = nil
     ) throws {
+        let signpost = Perf.begin("export")
+        defer { Perf.end("export", signpost) }
         let inputURL = metadataFrom
         let space = colorSpace ?? Self.outputColorSpace(for: input.colorSpace)
         let context = Self.makeContext()

@@ -23,6 +23,9 @@ struct Options {
     var recipeJSON: String?
     var limit: Int?
     var timeLUTs = false
+    var bench = false
+    var benchDir = "build/bench"
+    var fixture = "Fixtures/sample.jpg"
 }
 
 func parseArguments() -> Options {
@@ -48,6 +51,9 @@ func parseArguments() -> Options {
         case "--recipe-json": o.recipeJSON = next(flag)
         case "--limit": o.limit = nextInt(flag)
         case "--time-luts": o.timeLUTs = true
+        case "--bench": o.bench = true
+        case "--bench-dir": o.benchDir = next(flag)
+        case "--fixture": o.fixture = next(flag)
         default: fail("unknown argument \(flag)")
         }
     }
@@ -86,6 +92,12 @@ func timeLUTs(filmsPath: String) -> Never {
 if opts.timeLUTs {
     guard let p = opts.films else { fail("--time-luts needs --films <dir>") }
     timeLUTs(filmsPath: p)
+}
+
+if opts.bench {
+    guard let p = opts.films else { fail("--bench needs --films <dir>") }
+    do { try Bench.run(filmsPath: p, fixturePath: opts.fixture, benchDir: opts.benchDir); exit(0) }
+    catch { fail("bench failed: \(error)") }
 }
 
 guard let filmsPath = opts.films, let inputPath = opts.input, let outputPath = opts.output else {
