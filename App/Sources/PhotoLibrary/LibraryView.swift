@@ -1,4 +1,5 @@
 import AppKit
+import MiraCore
 import MiraUI
 import Photos
 import SwiftUI
@@ -54,49 +55,81 @@ struct LibraryView: View {
 
 private struct LibrarySidebar: View {
     let store: LibraryStore
+    @FocusState private var focused: Bool
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                section("Library", store.librarySources)
-                if !store.albumSources.isEmpty { section("Albums", store.albumSources) }
-                if !store.smartSources.isEmpty { section("Smart albums", store.smartSources) }
+                ForEach(Array(store.sections.enumerated()), id: \.element.id) { offset, section in
+                    if offset > 0 {
+                        FFHairline()
+                            .padding(.horizontal, T.cells(2))
+                            .padding(.top, T.rows(1))
+                    }
+                    Text(section.title).ffLabel()
+                        .padding(.horizontal, T.cells(2))
+                        .padding(.top, T.rows(1))
+                        .padding(.bottom, T.rows(0.5))
+                        .accessibilityAddTraits(.isHeader)
+                    let hasFolders = section.nodes.contains(where: \.isFolder)
+                    ForEach(SidebarModel.visibleRows(in: section, expanded: store.expanded), id: \.node.id) { row in
+                        SidebarRow(node: row.node, depth: row.depth, reserveChevron: hasFolders,
+                                   expanded: store.isExpanded(row.node.id),
+                                   selected: store.selectedNodeID == row.node.id) {
+                            focused = true
+                            if row.node.isFolder { store.toggleExpanded(row.node.id) } else { store.select(row.node) }
+                        }
+                    }
+                }
             }
             .padding(.vertical, T.rows(1))
         }
         .background(T.inkSoft.opacity(0.5))
-    }
-
-    @ViewBuilder
-    private func section(_ title: String, _ sources: [LibrarySource]) -> some View {
-        Text(title).ffLabel()
-            .padding(.horizontal, T.cells(2))
-            .padding(.top, T.rows(1))
-            .padding(.bottom, T.rows(0.5))
-        ForEach(sources) { source in
-            SidebarRow(source: source, selected: store.selectedSourceID == source.id) {
-                store.select(source)
-            }
-        }
+        .focusable()
+        .focusEffectDisabled()
+        .focused($focused)
+        .onKeyPress(.upArrow) { store.moveSelection(-1); return .handled }
+        .onKeyPress(.downArrow) { store.moveSelection(1); return .handled }
     }
 }
 
 private struct SidebarRow: View {
-    let source: LibrarySource
+    let node: SidebarNode
+    let depth: Int
+    let reserveChevron: Bool
+    let expanded: Bool
     let selected: Bool
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: T.cells(1)) {
-                Text(source.title)
+                if reserveChevron {
+                    Group {
+                        if node.isFolder {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 8, weight: .semibold))
+                                .foregroundStyle(T.paperDim)
+                                .rotationEffect(.degrees(expanded ? 90 : 0))
+                        }
+                    }
+                    .frame(width: T.cells(1.5))
+                }
+                if let symbol {
+                    Image(systemName: symbol)
+                        .font(.system(size: 11))
+                        .foregroundStyle(T.paperDim)
+                        .frame(width: T.cells(2))
+                }
+                Text(node.title)
                     .font(.system(size: 13))
                     .foregroundStyle(selected ? T.paper : T.paperMid)
                     .lineLimit(1)
                 Spacer(minLength: T.cells(1))
-                Text("\(source.count)").ffLabel(size: 10)
+                if let count = node.count { Text("\(count)").ffLabel(size: 10) }
             }
-            .padding(.horizontal, T.cells(2))
+            .padding(.leading, T.cells(2) + CGFloat(depth) * T.cells(2))
+            .padding(.trailing, T.cells(2))
             .frame(height: T.rows(2))
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(alignment: .leading) {
@@ -107,6 +140,15 @@ private struct SidebarRow: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityLabel(node.isFolder ? "\(node.title), folder, \(expanded ? "expanded" : "collapsed")" : node.title)
+    }
+
+    private var symbol: String? {
+        switch node.kind {
+        case .folder: "folder"
+        case .album: "rectangle.stack"
+        default: nil
+        }
     }
 }
 
@@ -144,10 +186,19 @@ private struct LibraryGridPane: View {
 
     private var header: some View {
         HStack(alignment: .firstTextBaseline, spacing: T.cells(2)) {
-            Text(store.selectedSource?.title ?? "Photos")
-                .font(T.display(30, weight: .medium))
-                .foregroundStyle(T.paper)
+            VStack(alignment: .leading, spacing: 0) {
+                if store.breadcrumb.count > 1 {
+                    Text(store.breadcrumb.joined(separator: " \u{203A} ")).ffLabel(size: 10)
+                        .lineLimit(1)
+                }
+                Text(store.selectedNode?.title ?? "Photos")
+                    .font(T.display(30, weight: .medium))
+                    .foregroundStyle(T.paper)
+            }
             Text("\(store.count) PHOTOS").ffLabel(size: 10)
+            if store.isReadOnlySelection {
+                Text("READ ONLY").ffLabel(size: 10, color: T.lichen)
+            }
             if store.authorization == .limited {
                 Text("LIMITED ACCESS").ffLabel(size: 10, color: T.lichen)
             }
@@ -203,7 +254,7 @@ private struct LibraryGridPane: View {
 
     private func open(_ index: Int) {
         guard let asset = store.asset(at: index) else { return }
-        state.openAsset(asset)
+        state.openAsset(asset, readOnly: store.isReadOnlySelection)
     }
 }
 

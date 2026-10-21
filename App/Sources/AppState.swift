@@ -99,7 +99,7 @@ final class AppState {
     var canSave: Bool { isAssetTarget && canSaveToPhotos && isDirty && !isBusy }
     var canRevert: Bool {
         switch target {
-        case .asset(let session): session.asset.hasAdjustments && !isBusy
+        case .asset(let session): session.asset.hasAdjustments && !session.isReadOnly && !isBusy
         case .file(let file): (file.persisted != nil || editor?.recipe != .neutral) && !isBusy
         case nil: false
         }
@@ -207,9 +207,9 @@ final class AppState {
         track()
     }
 
-    func openAsset(_ asset: PHAsset) {
+    func openAsset(_ asset: PHAsset, readOnly: Bool = false) {
         guardedLeave { [self] in
-            Task { await loadAsset(AssetEditSession(asset: asset)) }
+            Task { await loadAsset(AssetEditSession(asset: asset, isReadOnly: readOnly)) }
         }
     }
 
@@ -237,9 +237,11 @@ final class AppState {
             editor = model
             target = .asset(session)
             loadedRecipe = loaded.recipe
-            canSaveToPhotos = loaded.isFullSize
+            canSaveToPhotos = loaded.isFullSize && !session.isReadOnly
             resultLine = nil
-            statusLine = "PHOTOS \u{00B7} ORIGINAL IS KEPT, REVERT IN PHOTOS OR HERE"
+            statusLine = session.isReadOnly
+                ? "RECENTLY DELETED \u{00B7} READ ONLY"
+                : "PHOTOS \u{00B7} ORIGINAL IS KEPT, REVERT IN PHOTOS OR HERE"
             if let foreign = loaded.foreignFormat {
                 editorNote = "Saving will replace edits made in \(Self.appHint(for: foreign))."
             } else if !loaded.isFullSize {

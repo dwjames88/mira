@@ -47,8 +47,12 @@ final class AssetEditSession {
     var localIdentifier: String { asset.localIdentifier }
     var fullSizeURL: URL? { input?.fullSizeImageURL }
 
-    init(asset: PHAsset) {
+    /// True for assets opened from Recently Deleted: viewable, never saved or reverted.
+    let isReadOnly: Bool
+
+    init(asset: PHAsset, isReadOnly: Bool = false) {
         self.asset = asset
+        self.isReadOnly = isReadOnly
     }
 
     // MARK: Open

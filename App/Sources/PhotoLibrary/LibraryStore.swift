@@ -3,19 +3,6 @@ import MiraCore
 import Observation
 import Photos
 
-/// One entry in the library sidebar.
-struct LibrarySource: Identifiable, Hashable {
-    enum Kind: Hashable {
-        case allPhotos
-        case favourites
-        case collection(String) // PHAssetCollection.localIdentifier
-    }
-    let id: String
-    let title: String
-    let kind: Kind
-    var count: Int
-}
-
 /// Bridges `PHPhotoLibraryChangeObserver` (arbitrary queue) to the main actor.
 private final class ChangeRelay: NSObject, PHPhotoLibraryChangeObserver, @unchecked Sendable {
     let onChange: @Sendable () -> Void
@@ -34,10 +21,10 @@ private final class WeakStore: @unchecked Sendable {
 @Observable
 final class LibraryStore {
     private(set) var authorization: PHAuthorizationStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-    private(set) var librarySources: [LibrarySource] = []
-    private(set) var albumSources: [LibrarySource] = []
-    private(set) var smartSources: [LibrarySource] = []
-    var selectedSourceID = "all"
+    private(set) var sections: [SidebarSection] = []
+    private(set) var selectedNodeID: String
+    /// Folders the user has opened, persisted by folder id.
+    private(set) var expanded: Set<String>
     private(set) var fetchResult: PHFetchResult<PHAsset>?
     /// Bumped whenever the library changes, so cells re-read their asset (edited badges, thumbnails).
     private(set) var revision = 0
@@ -46,6 +33,8 @@ final class LibraryStore {
     @ObservationIgnored let imageManager = PHCachingImageManager()
     @ObservationIgnored private var relay: ChangeRelay?
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
+    @ObservationIgnored private var treeTask: Task<Void, Never>?
+    @ObservationIgnored private var restoredExpansion = false
     @ObservationIgnored private var rawCache: [String: Bool] = [:]
     @ObservationIgnored private var cachedAssets: [PHAsset] = []
     @ObservationIgnored private var cachedRange: Range<Int> = 0..<0
@@ -53,14 +42,41 @@ final class LibraryStore {
     static let thumbnailPixels: CGFloat = 320
     static var thumbnailSize: CGSize { CGSize(width: thumbnailPixels, height: thumbnailPixels) }
 
+    private static let selectionKey = "mira.sidebar.selection"
+    private static let expandedKey = "mira.sidebar.expanded"
+
     init() {
+        selectedNodeID = UserDefaults.standard.string(forKey: Self.selectionKey) ?? "all"
+        expanded = Set(UserDefaults.standard.stringArray(forKey: Self.expandedKey) ?? [])
     }
 
     var isAuthorized: Bool { authorization == .authorized || authorization == .limited }
     var count: Int { fetchResult?.count ?? 0 }
 
-    var selectedSource: LibrarySource? {
-        (librarySources + albumSources + smartSources).first { $0.id == selectedSourceID }
+    var selectedNode: SidebarNode? { SidebarModel.node(withID: selectedNodeID, in: sections) }
+    /// Titles from the root to the selected node ("Trips", "2021", "West Coast").
+    var breadcrumb: [String] { SidebarModel.breadcrumb(to: selectedNodeID, in: sections) ?? [] }
+    /// Recently Deleted can be looked at but not edited.
+    var isReadOnlySelection: Bool { SidebarLoader.isReadOnly(nodeID: selectedNodeID) }
+
+    /// Rows that can be selected, in display order, for the up/down keys.
+    var selectableRows: [SidebarNode] {
+        sections.flatMap { SidebarModel.visibleRows(in: $0, expanded: expanded).map(\.node) }.filter { !$0.isFolder }
+    }
+
+    func isExpanded(_ id: String) -> Bool { expanded.contains(id) }
+
+    func toggleExpanded(_ id: String) {
+        if expanded.contains(id) { expanded.remove(id) } else { expanded.insert(id) }
+        UserDefaults.standard.set(Array(expanded).sorted(), forKey: Self.expandedKey)
+    }
+
+    func moveSelection(_ delta: Int) {
+        let rows = selectableRows
+        guard !rows.isEmpty else { return }
+        let current = rows.firstIndex { $0.id == selectedNodeID }
+        let next = min(max(0, (current ?? (delta > 0 ? -1 : rows.count)) + delta), rows.count - 1)
+        select(rows[next])
     }
 
     // MARK: Authorization
@@ -113,81 +129,71 @@ final class LibraryStore {
 
     // MARK: Fetching
 
-    private static func imageOptions() -> PHFetchOptions {
-        let options = PHFetchOptions()
-        options.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
-        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
-        return options
-    }
-
-    /// Rebuilds the sidebar and the current grid. Keeps the selection.
+    /// Refetches the current grid now and rebuilds the sidebar tree off the main actor.
     func reload() {
         guard isAuthorized else { return }
-        let imageOptions = Self.imageOptions()
-
-        var library = [LibrarySource(id: "all", title: "All Photos", kind: .allPhotos,
-                                     count: PHAsset.fetchAssets(with: imageOptions).count)]
-        let favOptions = Self.imageOptions()
-        favOptions.predicate = NSPredicate(format: "mediaType == %d AND favorite == YES", PHAssetMediaType.image.rawValue)
-        library.append(LibrarySource(id: "fav", title: "Favourites", kind: .favourites,
-                                     count: PHAsset.fetchAssets(with: favOptions).count))
-        librarySources = library
-
-        var albums: [LibrarySource] = []
-        PHAssetCollection.fetchAssetCollections(with: .album, subtype: .albumRegular, options: nil)
-            .enumerateObjects { collection, _, _ in
-                let n = PHAsset.fetchAssets(in: collection, options: imageOptions).count
-                albums.append(LibrarySource(id: collection.localIdentifier, title: collection.localizedTitle ?? "Untitled",
-                                            kind: .collection(collection.localIdentifier), count: n))
-            }
-        albumSources = albums
-
-        let smartTypes: [(PHAssetCollectionSubtype, String)] = [
-            (.smartAlbumRAW, "RAW"), (.smartAlbumRecentlyAdded, "Recently Added"),
-            (.smartAlbumScreenshots, "Screenshots"), (.smartAlbumSelfPortraits, "Selfies"),
-            (.smartAlbumDepthEffect, "Portrait"), (.smartAlbumPanoramas, "Panoramas"),
-            (.smartAlbumLivePhotos, "Live Photos"),
-        ]
-        var smart: [LibrarySource] = []
-        for (subtype, fallbackTitle) in smartTypes {
-            guard let collection = PHAssetCollection.fetchAssetCollections(with: .smartAlbum, subtype: subtype, options: nil).firstObject
-            else { continue }
-            let n = PHAsset.fetchAssets(in: collection, options: imageOptions).count
-            guard n > 0 else { continue }
-            smart.append(LibrarySource(id: collection.localIdentifier, title: collection.localizedTitle ?? fallbackTitle,
-                                       kind: .collection(collection.localIdentifier), count: n))
+        refetchGrid()
+        treeTask?.cancel()
+        treeTask = Task { [weak self] in
+            let built = await Task.detached(priority: .userInitiated) { SidebarLoader.load() }.value
+            guard !Task.isCancelled, let self else { return }
+            self.apply(built)
         }
-        smartSources = smart
+    }
 
-        if selectedSource == nil { selectedSourceID = "all" }
-        fetchResult = fetch(for: selectedSource?.kind ?? .allPhotos)
+    private func apply(_ built: [SidebarSection]) {
+        sections = built
+        if !restoredExpansion {
+            restoredExpansion = true
+            let ancestors = SidebarModel.ancestorIDs(of: selectedNodeID, in: built) ?? []
+            if !ancestors.isEmpty {
+                expanded.formUnion(ancestors)
+                UserDefaults.standard.set(Array(expanded).sorted(), forKey: Self.expandedKey)
+            }
+        }
+        if SidebarModel.node(withID: selectedNodeID, in: built) == nil, selectedNodeID != "all" {
+            selectedNodeID = "all"
+            UserDefaults.standard.set("all", forKey: Self.selectionKey)
+            selectedIndex = nil
+            refetchGrid()
+        }
+    }
+
+    private func refetchGrid() {
+        fetchResult = fetch(forNodeID: selectedNodeID)
         if let i = selectedIndex, i >= count { selectedIndex = nil }
         stopAllCaching()
         revision += 1
     }
 
-    func select(_ source: LibrarySource) {
-        selectedSourceID = source.id
+    func select(_ node: SidebarNode) {
+        guard !node.isFolder else { return }
+        selectedNodeID = node.id
+        UserDefaults.standard.set(node.id, forKey: Self.selectionKey)
         selectedIndex = nil
-        fetchResult = fetch(for: source.kind)
-        stopAllCaching()
-        revision += 1
+        refetchGrid()
     }
 
-    private func fetch(for kind: LibrarySource.Kind) -> PHFetchResult<PHAsset> {
-        switch kind {
-        case .allPhotos:
-            return PHAsset.fetchAssets(with: Self.imageOptions())
-        case .favourites:
-            let options = Self.imageOptions()
-            options.predicate = NSPredicate(format: "mediaType == %d AND favorite == YES", PHAssetMediaType.image.rawValue)
-            return PHAsset.fetchAssets(with: options)
-        case .collection(let id):
-            if let collection = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [id], options: nil).firstObject {
-                return PHAsset.fetchAssets(in: collection, options: Self.imageOptions())
+    private func fetch(forNodeID id: String) -> PHFetchResult<PHAsset> {
+        switch id {
+        case "all":
+            return PHAsset.fetchAssets(with: SidebarLoader.imageOptions())
+        case "fav":
+            return PHAsset.fetchAssets(with: SidebarLoader.favouriteOptions())
+        case "recent":
+            if let c = SidebarLoader.smartCollection(PHAssetCollectionSubtype.smartAlbumRecentlyAdded.rawValue) {
+                return PHAsset.fetchAssets(in: c, options: SidebarLoader.imageOptions())
             }
-            return PHAsset.fetchAssets(with: Self.imageOptions())
+        default:
+            if id.hasPrefix("smart:"), let raw = Int(id.dropFirst(6)) {
+                if let c = SidebarLoader.smartCollection(raw) {
+                    return PHAsset.fetchAssets(in: c, options: SidebarLoader.imageOptions(includeHidden: SidebarLoader.includesHidden(raw: raw)))
+                }
+            } else if let c = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [id], options: nil).firstObject {
+                return PHAsset.fetchAssets(in: c, options: SidebarLoader.imageOptions())
+            }
         }
+        return PHAsset.fetchAssets(with: SidebarLoader.imageOptions())
     }
 
     func asset(at index: Int) -> PHAsset? {

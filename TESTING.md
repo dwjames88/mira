@@ -161,6 +161,8 @@ Writes `build/contact-sheet.png` (every film) and `build/contact-sheet-effects.p
 - Adjacent sidecars are rarely possible under the App Sandbox, which grants only the chosen file, so recipes usually go to the Application Support fallback.
 - RAW+JPEG pairs: Photos may hand over the JPEG rather than the RAW.
 - The extension may write HEIC or TIFF when Photos prefers it, while the app always writes JPEG for Photos edits.
+- PhotoKit has no star ratings or keywords, so Mira can only show Favourites; ratings from Lightroom/Photomator are not visible.
+- Counts and grids are pictures only, so video-only albums (Videos, Slo-mo, Time-lapse) count 0 and are hidden from the sidebar.
 - Live Photos and video are unsupported (the extension declares Image only).
 - Bundled films only; there is no custom LUT import.
 - The LUTs from the 2015 collection are sRGB 8-bit.
