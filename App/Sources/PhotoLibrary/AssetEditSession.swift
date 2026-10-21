@@ -89,21 +89,10 @@ final class AssetEditSession {
     }
 
     private func requestInput(progress: (@MainActor (Double) -> Void)?) async throws -> PHContentEditingInput {
-        let options = PHContentEditingInputRequestOptions()
-        options.canHandleAdjustmentData = { EmulsionAdjustment.canHandle($0) }
-        options.isNetworkAccessAllowed = true
-        if let progress {
-            options.progressHandler = { value, _ in
-                Task { @MainActor in progress(value) }
-            }
+        let handler: (@Sendable (Double) -> Void)? = progress.map { progress in
+            { @Sendable value in Task { @MainActor in progress(value) } }
         }
-        let asset = Unchecked(value: self.asset)
-        let optionsBox = Unchecked(value: options)
-        let result: Unchecked<PHContentEditingInput>? = await withCheckedContinuation { continuation in
-            asset.value.requestContentEditingInput(with: optionsBox.value) { input, _ in
-                continuation.resume(returning: input.map(Unchecked.init))
-            }
-        }
+        let result = await PhotoKitBridge.requestEditingInput(asset: Unchecked(value: asset), progress: handler)
         guard let input = result?.value else { throw AssetEditError.inputUnavailable }
         return input
     }
@@ -128,10 +117,7 @@ final class AssetEditSession {
 
         let assetBox = Unchecked(value: asset)
         let outputBox = Unchecked(value: output)
-        try await PHPhotoLibrary.shared().performChanges {
-            let request = PHAssetChangeRequest(for: assetBox.value)
-            request.contentEditingOutput = outputBox.value
-        }
+        try await PhotoKitBridge.saveEdit(asset: assetBox, output: outputBox)
         try await refreshAsset()
     }
 
@@ -139,9 +125,7 @@ final class AssetEditSession {
 
     func revert() async throws {
         let assetBox = Unchecked(value: asset)
-        try await PHPhotoLibrary.shared().performChanges {
-            PHAssetChangeRequest(for: assetBox.value).revertAssetContentToOriginal()
-        }
+        try await PhotoKitBridge.revert(asset: assetBox)
         try await refreshAsset()
         input = nil
     }

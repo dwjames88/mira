@@ -118,35 +118,9 @@ enum SelfTest {
         }
     }
 
-    @MainActor
     private static func importSample(_ url: URL) async throws -> String {
-        let title = "Emulsion Test"
-        let existing = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .albumRegular, options: {
-            let o = PHFetchOptions()
-            o.predicate = NSPredicate(format: "title = %@", title)
-            return o
-        }())
-        let albumID = existing.firstObject?.localIdentifier
-        let box = Unchecked(value: Holder())
-        try await PHPhotoLibrary.shared().performChanges {
-            let creation = PHAssetCreationRequest.forAsset()
-            let options = PHAssetResourceCreationOptions()
-            options.originalFilename = "Emulsion Test Sample.jpg"
-            creation.addResource(with: .photo, fileURL: url, options: options)
-            guard let placeholder = creation.placeholderForCreatedAsset else { return }
-            box.value.assetID = placeholder.localIdentifier
-            let albumRequest: PHAssetCollectionChangeRequest?
-            if let albumID,
-               let album = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [albumID], options: nil).firstObject {
-                albumRequest = PHAssetCollectionChangeRequest(for: album)
-            } else {
-                albumRequest = PHAssetCollectionChangeRequest.creationRequestForAssetCollection(withTitle: title)
-            }
-            albumRequest?.addAssets([placeholder] as NSArray)
-        }
-        guard let id = box.value.assetID else { throw AssetEditError.notSaved("No identifier for the imported asset.") }
+        let id = try await PhotoKitBridge.importPhoto(url: url, filename: "Emulsion Test Sample.jpg", albumTitle: "Emulsion Test")
+        guard let id else { throw AssetEditError.notSaved("No identifier for the imported asset.") }
         return id
     }
-
-    private final class Holder: @unchecked Sendable { var assetID: String? }
 }

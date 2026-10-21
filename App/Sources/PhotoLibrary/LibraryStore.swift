@@ -19,8 +19,13 @@ struct LibrarySource: Identifiable, Hashable {
 /// Bridges `PHPhotoLibraryChangeObserver` (arbitrary queue) to the main actor.
 private final class ChangeRelay: NSObject, PHPhotoLibraryChangeObserver, @unchecked Sendable {
     let onChange: @Sendable () -> Void
-    init(onChange: @escaping @Sendable () -> Void) { self.onChange = onChange }
-    func photoLibraryDidChange(_ changeInstance: PHChange) { onChange() }
+    nonisolated init(onChange: @escaping @Sendable () -> Void) { self.onChange = onChange }
+    nonisolated func photoLibraryDidChange(_ changeInstance: PHChange) { onChange() }
+}
+
+private final class WeakStore: @unchecked Sendable {
+    weak var store: LibraryStore?
+    init(_ store: LibraryStore) { self.store = store }
 }
 
 /// The Photos library as the browser sees it: authorization, sidebar sources, the current
@@ -82,11 +87,19 @@ final class LibraryStore {
 
     private func registerObserver() {
         guard relay == nil else { return }
-        let relay = ChangeRelay { [weak self] in
-            Task { @MainActor in self?.scheduleRefresh() }
-        }
+        let relay = Self.makeRelay(self)
         self.relay = relay
         PHPhotoLibrary.shared().register(relay)
+    }
+
+    /// Built in a `nonisolated` context so the `@Sendable` callback carries no main-actor isolation.
+    private nonisolated static func makeRelay(_ store: LibraryStore) -> ChangeRelay {
+        let weakStore = WeakStore(store)
+        return ChangeRelay { @Sendable in
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { weakStore.store?.scheduleRefresh() }
+            }
+        }
     }
 
     private func scheduleRefresh() {
@@ -190,11 +203,8 @@ final class LibraryStore {
         options.deliveryMode = .opportunistic
         options.resizeMode = .fast
         options.isNetworkAccessAllowed = true
-        return imageManager.requestImage(for: asset, targetSize: Self.thumbnailSize,
-                                         contentMode: .aspectFill, options: options) { image, _ in
-            let box = Unchecked(value: image)
-            MainActor.assumeIsolated { handler(box.value) }
-        }
+        return PhotoKitBridge.requestImage(manager: imageManager, asset: asset, size: Self.thumbnailSize,
+                                           options: options, deliver: handler)
     }
 
     func cancelThumbnail(_ id: PHImageRequestID) {
@@ -240,10 +250,7 @@ final class LibraryStore {
         if let cached = rawCache[id] { return cached }
         let box = Unchecked(value: asset)
         let result = await Task.detached(priority: .utility) {
-            let ids = PHAssetResource.assetResources(for: box.value)
-                .filter { $0.type == .photo || $0.type == .alternatePhoto }
-                .map(\.uniformTypeIdentifier)
-            return RAWDetection.containsRAW(ids)
+            RAWDetection.containsRAW(PhotoKitBridge.resourceTypeIdentifiers(of: box))
         }.value
         rawCache[id] = result
         return result
