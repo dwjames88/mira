@@ -73,7 +73,7 @@ private struct LibrarySidebar: View {
                         .accessibilityAddTraits(.isHeader)
                     let hasFolders = section.nodes.contains(where: \.isFolder)
                     ForEach(SidebarModel.visibleRows(in: section, expanded: store.expanded), id: \.node.id) { row in
-                        SidebarRow(node: row.node, depth: row.depth, reserveChevron: hasFolders,
+                        SidebarRow(node: row.node, depth: row.depth, reserveChevron: hasFolders, monoTitle: section.id == "stars",
                                    expanded: store.isExpanded(row.node.id),
                                    selected: store.selectedNodeID == row.node.id) {
                             focused = true
@@ -97,6 +97,7 @@ private struct SidebarRow: View {
     let node: SidebarNode
     let depth: Int
     let reserveChevron: Bool
+    let monoTitle: Bool
     let expanded: Bool
     let selected: Bool
     let action: () -> Void
@@ -122,7 +123,7 @@ private struct SidebarRow: View {
                         .frame(width: T.cells(2))
                 }
                 Text(node.title)
-                    .font(.system(size: 13))
+                    .font(monoTitle ? T.mono(12) : .system(size: 13))
                     .foregroundStyle(selected ? T.paper : T.paperMid)
                     .lineLimit(1)
                 Spacer(minLength: T.cells(1))

@@ -85,4 +85,34 @@ struct SidebarModelTests {
         #expect(rows.map(\.node.title) == ["Apple", "Trips", "2021", "West Coast", "album 2", "Album 10", "zebra"])
         #expect(rows.map(\.depth) == [0, 0, 1, 2, 1, 1, 0])
     }
+
+    @Test func extractsRatingAlbumsInOrderIncludingNested() {
+        let albums = SidebarModel.albumNodes(from: [
+            Fake.album("\u{2605}\u{2605}"), Fake.album("Rejected"), Fake.album("\u{2605}\u{2605}\u{2605}\u{2605}\u{2605}"),
+            Fake.album("flagged"), Fake.album("\u{2605}"), Fake.album("\u{2605} Trips"), Fake.album("Normal"),
+            Fake.folder("Old", [Fake.album(" \u{2605}\u{2605}\u{2605} ")]),
+            Fake.folder("Keep", [Fake.album("Inside"), Fake.album("Picks")]),
+        ])
+        let (ratings, rest) = SidebarModel.extractRatings(from: albums)
+        #expect(ratings.map(\.title) == ["\u{2605}\u{2605}\u{2605}\u{2605}\u{2605}", " \u{2605}\u{2605}\u{2605} ", "\u{2605}\u{2605}", "\u{2605}", "flagged", "Picks", "Rejected"])
+        #expect(rest.map(\.title) == ["\u{2605} Trips", "Keep", "Normal"])
+        #expect(rest[1].children.map(\.title) == ["Inside"])
+    }
+
+    @Test func ratingTitleMatching() {
+        #expect(SidebarModel.ratingRank(forTitle: "\u{2B50}\u{2B50}") == 2)
+        #expect(SidebarModel.ratingRank(forTitle: "\u{2606}") == 1)
+        #expect(SidebarModel.ratingRank(forTitle: "\u{2605}\u{2605}\u{2605}\u{2605}\u{2605}\u{2605}") == nil)
+        #expect(SidebarModel.ratingRank(forTitle: "Rejects") == -1)
+        #expect(SidebarModel.ratingRank(forTitle: "Pick") == 0)
+        #expect(SidebarModel.ratingRank(forTitle: "Picks 2021") == nil)
+    }
+
+    @Test func starsSectionFollowsLibraryAndHidesEmpties() {
+        let n = { (id: String, c: Int) in SidebarNode(id: id, title: id, kind: .album, count: c) }
+        let sections = SidebarModel.sections(library: [n("l", 1)], stars: [n("s5", 2), n("s1", 0)], albums: [n("a", 1)],
+                                             shared: [], mediaTypes: [], utilities: [])
+        #expect(sections.map(\.id) == ["library", "stars", "albums"])
+        #expect(sections[1].nodes.map(\.id) == ["s5"])
+    }
 }

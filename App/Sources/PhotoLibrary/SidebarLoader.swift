@@ -99,7 +99,7 @@ enum SidebarLoader {
         }
 
         // ALBUMS and SHARED ALBUMS
-        let albums = SidebarModel.albumNodes(from: userCollections(in: nil))
+        let (stars, albums) = SidebarModel.extractRatings(from: SidebarModel.albumNodes(from: userCollections(in: nil)))
         var shared: [SidebarNode] = []
         let sharedResult = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .albumCloudShared, options: nil)
         for index in 0..<sharedResult.count {
@@ -138,7 +138,7 @@ enum SidebarLoader {
         if let hidden = smartNode(hiddenRaw, title: "Hidden", includeHidden: true) { utilities.append(hidden) }
         if let deleted = smartNode(recentlyDeletedRaw, title: "Recently Deleted", includeHidden: true) { utilities.append(deleted) }
 
-        return SidebarModel.sections(library: library, albums: albums, shared: shared,
+        return SidebarModel.sections(library: library, stars: stars, albums: albums, shared: shared,
                                      mediaTypes: media, utilities: utilities)
     }
 }

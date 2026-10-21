@@ -88,14 +88,58 @@ public enum SidebarModel {
         nodes.filter { ($0.count ?? 1) > 0 }
     }
 
-    /// The five sidebar sections in Photos' order. Empty sections are left out; Media Types and
+    /// Sort key for a rating album: 1-5 for star counts, 0 for Flagged/Picks, -1 for Rejected; nil when
+    /// the title is not a rating album.
+    public static func ratingRank(forTitle title: String) -> Int? {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let stripped = trimmed.replacingOccurrences(of: "\u{FE0F}", with: "")
+        if (1...5).contains(stripped.count), stripped.allSatisfy({ "\u{2605}\u{2606}\u{2B50}".contains($0) }) {
+            return stripped.count
+        }
+        switch trimmed.lowercased() {
+        case "flagged", "picks", "pick": return 0
+        case "rejected", "rejects": return -1
+        default: return nil
+        }
+    }
+
+    /// Pulls rating albums (stars, Flagged, Rejected) out of the albums tree at any depth. Returns them
+    /// ordered five stars first, then Flagged, then Rejected, and the tree without them (folders left
+    /// empty by the removal are pruned).
+    public static func extractRatings(from nodes: [SidebarNode]) -> (ratings: [SidebarNode], remaining: [SidebarNode]) {
+        var found: [(rank: Int, node: SidebarNode)] = []
+        func strip(_ nodes: [SidebarNode]) -> [SidebarNode] {
+            var kept: [SidebarNode] = []
+            for node in nodes {
+                if node.isFolder {
+                    let children = strip(node.children)
+                    if !children.isEmpty {
+                        kept.append(SidebarNode(id: node.id, title: node.title, kind: .folder, count: node.count, children: children))
+                    }
+                } else if let rank = ratingRank(forTitle: node.title) {
+                    found.append((rank, node))
+                } else {
+                    kept.append(node)
+                }
+            }
+            return kept
+        }
+        let remaining = strip(nodes)
+        let ordered = found.sorted { a, b in
+            a.rank != b.rank ? a.rank > b.rank : a.node.title.localizedStandardCompare(b.node.title) == .orderedAscending
+        }.map(\.node)
+        return (ordered, remaining)
+    }
+
+    /// The sidebar sections in Photos' order, with STARS after LIBRARY. Empty sections are left out; Media Types and
     /// Utilities lose their zero-count entries first.
     public static func sections(
-        library: [SidebarNode], albums: [SidebarNode], shared: [SidebarNode],
+        library: [SidebarNode], stars: [SidebarNode] = [], albums: [SidebarNode], shared: [SidebarNode],
         mediaTypes: [SidebarNode], utilities: [SidebarNode]
     ) -> [SidebarSection] {
         let all = [
             SidebarSection(id: "library", title: "Library", nodes: library),
+            SidebarSection(id: "stars", title: "Stars", nodes: visible(stars)),
             SidebarSection(id: "albums", title: "Albums", nodes: albums),
             SidebarSection(id: "shared", title: "Shared Albums", nodes: sortedByTitle(shared)),
             SidebarSection(id: "media", title: "Media Types", nodes: visible(mediaTypes)),
