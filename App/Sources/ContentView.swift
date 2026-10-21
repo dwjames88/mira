@@ -58,15 +58,19 @@ struct ContentView: View {
                     }
                     textButton("Open") { state.presentOpenPanel() }
                     textButton("Films") { openWindow(id: "films") }
+                    if state.mode == .editor, let editor = state.editor {
+                        textButton("Crop", prominent: editor.isCropping) { editor.toggleCrop() }
+                            .disabled(editor.source == nil || state.isBusy)
+                    }
                     textButton("Export") { state.showExportSheet = true }
-                        .disabled(!state.hasPhoto || state.isExporting || state.isBusy)
+                        .disabled(!state.hasPhoto || state.isExporting || state.isBusy || state.isCropping)
                     if state.mode == .editor {
                         if state.isAssetTarget {
                             textButton("Save", prominent: true) { Task { await state.saveToPhotos() } }
-                                .disabled(!state.canSave)
+                                .disabled(!state.canSave || state.isCropping)
                         }
                         textButton("Revert") { state.showRevertConfirm = true }
-                            .disabled(!state.canRevert)
+                            .disabled(!state.canRevert || state.isCropping)
                     }
                 }
             }

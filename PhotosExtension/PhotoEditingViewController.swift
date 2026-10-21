@@ -73,6 +73,8 @@ final class PhotoEditingViewController: NSViewController, PHContentEditingContro
 
     func finishContentEditing(completionHandler: @escaping (PHContentEditingOutput?) -> Void) {
         let done = Unchecked(value: completionHandler)
+        // Saving while the crop tool is open counts as Done.
+        model?.commitCrop()
         guard let model, let input, let inputURL = input.fullSizeImageURL else {
             completionHandler(nil)
             return
