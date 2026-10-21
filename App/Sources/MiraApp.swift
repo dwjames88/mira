@@ -47,12 +47,18 @@ struct MiraApp: App {
             }
         }
         .defaultSize(width: 520, height: 620)
+        .windowToolbarStyle(.unified)
     }
 
     private func showAbout() {
-        let credits = NSAttributedString(
+        let credits = NSMutableAttributedString(
+            string: "SOFTWARE BY FIELDFRAMES\n\n",
+            attributes: [.font: NSFont.monospacedSystemFont(ofSize: 10, weight: .regular),
+                         .foregroundColor: NSColor.secondaryLabelColor,
+                         .kern: 1.5])
+        credits.append(NSAttributedString(
             string: "Film looks are from the RawTherapee Film Simulation Collection by Pat David, licensed under CC BY-SA 4.0 (creativecommons.org/licenses/by-sa/4.0). Film stock names are used for information only; Mira is not affiliated with any film maker.",
-            attributes: [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.labelColor])
+            attributes: [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.labelColor]))
         NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
     }
 }

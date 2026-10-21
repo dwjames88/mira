@@ -402,6 +402,17 @@ extension View {
     }
 }
 
+// MARK: Byline
+
+/// "Software by FieldFrames" in the house mono label style.
+public struct FFByline: View {
+    public init() {}
+
+    public var body: some View {
+        Text("Software by FieldFrames").ffLabel(size: 10, color: T.paperDim)
+    }
+}
+
 // MARK: Empty state
 
 /// A quiet empty state: Cormorant headline, mono sub-label, one button.
@@ -426,6 +437,7 @@ public struct FFEmptyState: View {
             Text(title)
                 .font(T.display(52, weight: .regular))
                 .foregroundStyle(T.paper)
+            FFByline()
             Text(subtitle).ffLabel(size: 11)
             if let buttonTitle {
                 Button(buttonTitle, action: action)

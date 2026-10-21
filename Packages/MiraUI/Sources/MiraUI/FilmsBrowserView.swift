@@ -18,9 +18,12 @@ public struct FilmsBrowserView: View {
                     Text("Films")
                         .font(T.display(40, weight: .regular))
                         .foregroundStyle(T.paper)
+                    FFByline()
+                        .padding(.top, 2)
                     Text("\(library.films.count) looks \u{00B7} \(familyCount) families")
                         .ffLabel(color: T.paperDim)
                         .frame(height: T.rows(1))
+                        .padding(.top, T.rows(1) / 2)
                 }
                 .padding(.top, T.rows(2))
                 .padding(.bottom, T.rows(1))
@@ -47,6 +50,12 @@ public struct FilmsBrowserView: View {
         }
         .frame(minWidth: 420, minHeight: 360)
         .fieldFramesWindow()
+        // Same chrome as the main window: no system title text, an ink toolbar without glass, and
+        // content that starts below the toolbar so the header is fully visible at open.
+        .safeAreaInset(edge: .top, spacing: 0) { FFHairline() }
+        .toolbar(removing: .title)
+        .toolbarBackground(T.ink, for: .windowToolbar)
+        .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
     }
 
     private var familyCount: Int {

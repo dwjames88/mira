@@ -115,6 +115,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.fieldframes.mira.photos
         PRODUCT_NAME: MiraPhotos
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         APPLICATION_EXTENSION_API_ONLY: YES
 schemes:
   Mira:
