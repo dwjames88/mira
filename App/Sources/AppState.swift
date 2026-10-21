@@ -89,6 +89,8 @@ final class AppState {
     var isAssetTarget: Bool { if case .asset = target { true } else { false } }
     var isFileTarget: Bool { if case .file = target { true } else { false } }
     var isBusy: Bool { busyText != nil }
+    /// The crop tool is open: Save, Export and Revert wait until it is closed with Done or Cancel.
+    var isCropping: Bool { editor?.isCropping ?? false }
 
     /// Unsaved work in a Photos edit (files autosave to their sidecar).
     var isDirty: Bool {

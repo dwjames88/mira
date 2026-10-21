@@ -55,7 +55,10 @@ public struct Renderer: Sendable {
 
     // MARK: Graph
 
-    public func apply(_ recipe: Recipe, to input: CIImage) -> CIImage {
+    public func apply(_ recipe: Recipe, to source: CIImage) -> CIImage {
+        // 0. Crop, rotation, flips and straighten first, so every stage below (and the
+        // resolution-independent `scale`) sees the cropped output.
+        let input = CropGeometry.apply(recipe.crop, to: source)
         let extent = input.extent
         guard !extent.isInfinite, !extent.isEmpty else { return input }
         let scale = min(extent.width, extent.height) / 1000
