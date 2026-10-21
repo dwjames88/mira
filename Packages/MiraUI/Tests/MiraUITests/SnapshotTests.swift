@@ -19,6 +19,7 @@ struct SnapshotTests {
             view
                 .frame(width: size.width, height: size.height)
                 .environment(\.ffInlineScroll, true)
+                .environment(\.ffImageCanvas, true)
                 .environment(\.colorScheme, scheme))
         renderer.scale = 1
         renderer.proposedSize = ProposedViewSize(size)

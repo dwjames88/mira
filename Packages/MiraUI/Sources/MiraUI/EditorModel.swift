@@ -10,23 +10,38 @@ private struct Unchecked<Value>: @unchecked Sendable {
     let value: Value
 }
 
+/// Set from the main actor, read from worker threads, to stop a batch of renders early.
+private final class CancelFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var flag = false
+    func cancel() { lock.lock(); flag = true; lock.unlock() }
+    var isCancelled: Bool { lock.lock(); defer { lock.unlock() }; return flag }
+}
+
 /// State of the shared editor: the source photo, the current recipe, and the rendered previews.
+///
+/// Previews are rendered by a `PreviewEngine` at the size of the canvas (reported by the view with
+/// `setCanvas(pixels:)`), into IOSurface-backed frames the canvas shows without any CGImage or
+/// NSImage conversion. Requests are coalesced: at most one render is in flight and only the latest
+/// recipe waits behind it.
 @MainActor
 @Observable
 public final class EditorModel {
     public let library: FilmLibrary
     public let renderer: Renderer
 
-    /// Full-size source, orientation already applied.
+    /// Full-size source, orientation already applied. While a large file is still being decoded this
+    /// is a small stand-in (`isSourceFull` is false); use `fullSource()` for saving and exporting.
     public private(set) var source: CIImage?
-    /// Source scaled to about 1600 px on its long side. Previews render from this.
-    public private(set) var previewSource: CIImage?
+    /// False while `source` is only a quick low-resolution stand-in for the real photo.
+    public private(set) var isSourceFull = true
 
     public var recipe: Recipe {
         didSet {
             guard recipe != oldValue else { return }
             schedulePreview()
             recipeChangedWhileHovering()
+            if recipe.crop != oldValue.crop { startThumbnails() }
         }
     }
     public var showOriginal = false
@@ -42,8 +57,8 @@ public final class EditorModel {
     }
     public var familyFilter: FilmFamily?
 
-    /// The rendered preview (graded, or the original while `showOriginal`).
-    public private(set) var previewImage: NSImage?
+    /// The latest rendered frame (graded, or the cropping canvas while cropping).
+    public private(set) var previewFrame: PreviewFrame?
     /// Thumbnails by film id. The key `EditorModel.originalTileID` holds the untouched tile.
     public private(set) var thumbnails: [String: NSImage] = [:]
 
@@ -61,34 +76,59 @@ public final class EditorModel {
     /// The card under the pointer, or nil when the pointer is elsewhere. Set immediately; the
     /// preview image follows after the debounce.
     public private(set) var hoveredTarget: HoverTarget?
-    private var hoverImage: NSImage?
+    private var hoverFrame: PreviewFrame?
 
     public static let originalTileID = "__original__"
-    public nonisolated static let previewLongSide: CGFloat = 1600
-    public nonisolated static let thumbnailLongSide: CGFloat = 160
+    /// Long side of the film-strip thumbnails, in pixels.
+    public nonisolated static let thumbnailLongSide: CGFloat = 256
 
-    @ObservationIgnored private let context: CIContext
+    @ObservationIgnored let engine: PreviewEngine
     @ObservationIgnored private var previewTask: Task<Void, Never>?
+    @ObservationIgnored private var gate = RenderGate<PreviewRequest>()
+    @ObservationIgnored private var canvasPixels: CGSize?
+    /// Graded frames published so far (tests check that bursts are coalesced).
+    @ObservationIgnored private(set) var publishedFrames = 0
     @ObservationIgnored private var thumbnailTask: Task<Void, Never>?
-    @ObservationIgnored private var originalPreview: NSImage?
-    @ObservationIgnored private var originalPreviewCrop: CropSettings?
+    @ObservationIgnored private var thumbnailCancel: CancelFlag?
+    @ObservationIgnored private var thumbnailCache: [CropSettings: [String: NSImage]] = [:]
+    @ObservationIgnored private var thumbnailCacheOrder: [CropSettings] = []
+    @ObservationIgnored private var originalFrame: PreviewFrame?
+    @ObservationIgnored private var originalKey: OriginalKey?
     @ObservationIgnored private var sourceGeneration = 0
+    @ObservationIgnored private var contentGeneration = 0
+    @ObservationIgnored private var fullDecodeTask: Task<CIImage?, Never>?
     @ObservationIgnored private var hoverTask: Task<Void, Never>?
     @ObservationIgnored private var hoverGeneration = 0
-    @ObservationIgnored private var hoverCache: [HoverKey: NSImage] = [:]
+    @ObservationIgnored private var hoverCache: [HoverKey: PreviewFrame] = [:]
     @ObservationIgnored private var hoverCacheOrder: [HoverKey] = []
+    @ObservationIgnored private var imageCache: [Int: NSImage] = [:]
 
     private struct HoverKey: Hashable {
         let filmID: String?
         let recipe: Recipe
+        let canvas: CGSize?
     }
+
+    private struct OriginalKey: Equatable {
+        let crop: CropSettings
+        let canvas: CGSize?
+        let generation: Int
+    }
+
+    private struct PreviewRequest: Sendable {
+        let recipe: Recipe
+        let canvas: CGSize?
+        let generation: Int
+    }
+
     private static let hoverCacheLimit = 6
-    nonisolated static let hoverDebounce: Duration = .milliseconds(120)
+    private static let thumbnailCacheLimit = 4
+    nonisolated static let hoverDebounce: Duration = .milliseconds(60)
 
     public init(library: FilmLibrary, recipe: Recipe = .neutral) {
         self.library = library
         self.renderer = Renderer(library: library)
-        self.context = Renderer.makeContext()
+        self.engine = PreviewEngine(renderer: renderer, context: Renderer.sharedContext)
         self.recipe = recipe
     }
 
@@ -110,21 +150,53 @@ public final class EditorModel {
 
     // MARK: Source
 
-    /// Sets the photo to edit. `image` must already be upright.
-    public func setSource(_ image: CIImage) {
+    /// Photos longer than this are opened with a quick reduced-size decode first.
+    nonisolated static let standInThreshold: CGFloat = 2600
+    nonisolated static let standInLongSide: CGFloat = 1600
+
+    /// Sets the photo to edit. `image` must already be upright. `isFull` is false for a quick
+    /// stand-in that `replaceSource(_:)` swaps for the real photo later.
+    public func setSource(_ image: CIImage, isFull: Bool = true) {
+        fullDecodeTask?.cancel()
+        fullDecodeTask = nil
         sourceGeneration += 1
+        contentGeneration += 1
         isCropping = false
         source = image
-        previewSource = renderer.previewImage(from: image, maxPixelSize: Self.previewLongSide)
+        isSourceFull = isFull
+        engine.setSource(image)
         thumbnails = [:]
-        originalPreview = nil
-        originalPreviewCrop = nil
-        previewImage = nil
+        thumbnailCache = [:]
+        thumbnailCacheOrder = []
+        originalFrame = nil
+        originalKey = nil
+        previewFrame = nil
+        imageCache = [:]
         hoverCache = [:]
         hoverCacheOrder = []
         if let target = hoveredTarget { startHover(target, keepImage: false) }
         schedulePreview()
         startThumbnails()
+    }
+
+    /// Swaps the stand-in for the real photo (same picture, full resolution). The frame on screen
+    /// stays until the sharper one is ready, and the film strip is kept.
+    public func replaceSource(_ image: CIImage) {
+        sourceGeneration += 1
+        source = image
+        isSourceFull = true
+        engine.setSource(image)
+        originalKey = nil
+        hoverCache = [:]
+        hoverCacheOrder = []
+        if let target = hoveredTarget { startHover(target, keepImage: true) }
+        schedulePreview()
+    }
+
+    /// The full-size source, waiting for a background decode to finish. nil if it could not be decoded.
+    public func fullSource() async -> CIImage? {
+        if let task = fullDecodeTask { _ = await task.value }
+        return isSourceFull ? source : nil
     }
 
     /// Loads an image file (RAW included), applying its own orientation exactly once.
@@ -135,9 +207,28 @@ public final class EditorModel {
 
     /// Loads an image file and applies `orientation` to its pixels (Photos'
     /// `fullSizeImageOrientation`). nil uses the file's own orientation.
+    ///
+    /// Large files show a reduced decode at once and are decoded in full in the background;
+    /// `isSourceFull` and `fullSource()` tell when the real photo is in.
     @discardableResult
     public func loadSource(url: URL, orientation: CGImagePropertyOrientation?) -> Bool {
-        guard let image = ImageSource.load(url: url, orientation: orientation) else { return false }
+        if !ImageSource.isRAW(url: url),
+           let size = ImageSource.orientedPixelSize(url: url, orientation: orientation),
+           max(size.width, size.height) > Self.standInThreshold,
+           let stand = ImageSource.loadThumbnail(url: url, orientation: orientation, maxPixelSize: Self.standInLongSide) {
+            setSource(stand, isFull: false)
+            let generation = contentGeneration
+            fullDecodeTask = Task { [weak self] () -> CIImage? in
+                let decoded = await Task.detached(priority: .userInitiated) {
+                    ImageSource.loadDecoded(url: url, orientation: orientation).map(Unchecked.init)
+                }.value
+                guard !Task.isCancelled, let self, self.contentGeneration == generation, let decoded else { return nil }
+                self.replaceSource(decoded.value)
+                return decoded.value
+            }
+            return true
+        }
+        guard let image = ImageSource.loadDecoded(url: url, orientation: orientation) else { return false }
         setSource(image)
         return true
     }
@@ -159,7 +250,7 @@ public final class EditorModel {
     /// Opens the crop tool on a copy of the recipe's crop. The canvas then shows the whole picture
     /// (rotated, flipped and straightened) so the box can reach anything.
     public func beginCrop() {
-        guard !isCropping, previewSource != nil else { return }
+        guard !isCropping, source != nil else { return }
         endHover()
         showOriginal = false
         crop = recipe.crop
@@ -208,7 +299,7 @@ public final class EditorModel {
 
     /// Size of the crop canvas in preview pixels (oriented image size), nil without a photo.
     public var cropCanvasSize: CGSize? {
-        previewSource.map { CropGeometry.orientedSize(for: crop, size: $0.extent.size) }
+        source.map { CropGeometry.orientedSize(for: crop, size: $0.extent.size) }
     }
 
     /// Width / height the box is locked to, nil for a free box.
@@ -239,7 +330,26 @@ public final class EditorModel {
         [c.straighten, Double(c.normalizedQuarterTurns), c.flipH ? 1 : 0, c.flipV ? 1 : 0]
     }
 
-    /// What the preview renders: while cropping, the whole canvas instead of the cropped box.
+    // MARK: Canvas
+
+    /// The size of the area the picture is shown in, in pixels (points x backing scale). Previews
+    /// are rendered at this size, never larger than the photo. Sizes are rounded up to 64 px, so a
+    /// window resize does not rebuild the preview source for every pixel.
+    public func setCanvas(pixels: CGSize) {
+        guard pixels.width >= 1, pixels.height >= 1 else { return }
+        let size = PreviewSizing.quantised(canvas: pixels)
+        guard size != canvasPixels else { return }
+        canvasPixels = size
+        guard engine.hasSource else { return }
+        hoverCache = [:]
+        hoverCacheOrder = []
+        if let target = hoveredTarget { startHover(target, keepImage: true) }
+        schedulePreview()
+    }
+
+    // MARK: Preview
+
+    /// The recipe the canvas renders: while cropping, the whole canvas instead of the cropped box.
     private var previewRecipe: Recipe {
         guard isCropping else { return recipe }
         var r = recipe
@@ -247,49 +357,68 @@ public final class EditorModel {
         return r
     }
 
-    // MARK: Preview
-
+    /// Queues a render of the current state. At most one render runs; a newer request replaces any
+    /// waiting one, so a fast slider drag renders only the frames it can keep up with.
     private func schedulePreview() {
-        guard let input = previewSource else { return }
-        previewTask?.cancel()
-        let recipe = previewRecipe
-        let renderer = renderer
-        let context = context
-        let box = Unchecked(value: input)
-        let originalRecipe = Recipe(crop: recipe.crop)
-        let needsOriginal = originalPreview == nil || originalPreviewCrop != recipe.crop
+        guard engine.hasSource else { return }
+        let request = PreviewRequest(recipe: previewRecipe, canvas: canvasPixels, generation: sourceGeneration)
+        if let start = gate.submit(request) { run(start) }
+    }
+
+    private func run(_ request: PreviewRequest) {
+        let engine = engine
+        let key = OriginalKey(crop: request.recipe.crop, canvas: request.canvas, generation: request.generation)
+        let needsOriginal = !isCropping && originalKey != key
         previewTask = Task { [weak self] in
-            // Coalesce bursts of slider changes: the latest task wins.
-            try? await Task.sleep(for: .milliseconds(12))
-            if Task.isCancelled { return }
-            let result = await Task.detached(priority: .userInitiated) { () -> (Unchecked<CGImage>?, Unchecked<CGImage>?) in
-                let graded = renderer.render(recipe, input: box.value, context: context).map(Unchecked.init)
-                let original = needsOriginal
-                    ? renderer.render(originalRecipe, input: box.value, context: context).map(Unchecked.init)
-                    : nil
+            let result = await Task.detached(priority: .userInitiated) { () -> (PreviewFrame?, PreviewFrame?) in
+                let graded = engine.render(request.recipe, canvas: request.canvas)
+                let original = needsOriginal ? engine.renderOriginal(crop: request.recipe.crop, canvas: request.canvas) : nil
                 return (graded, original)
             }.value
-            if Task.isCancelled { return }
             guard let self else { return }
-            if let cg = result.1?.value {
-                self.originalPreview = Self.nsImage(cg)
-                self.originalPreviewCrop = originalRecipe.crop
+            if !Task.isCancelled, request.generation == self.sourceGeneration {
+                if let original = result.1 {
+                    self.originalFrame = original
+                    self.originalKey = key
+                }
+                if let graded = result.0 {
+                    self.previewFrame = graded
+                    self.publishedFrames += 1
+                }
             }
-            if let cg = result.0?.value { self.previewImage = Self.nsImage(cg) }
+            if let next = self.gate.finish() { self.run(next) }
         }
     }
 
-    /// The image to show for the current state. Press-and-hold compare wins over a hover preview.
-    public var displayedImage: NSImage? {
-        if isCropping { return previewImage }
-        if showOriginal { return originalPreview ?? previewImage }
-        return visibleHoverImage ?? previewImage
+    /// True when no render is running or waiting (tests wait on this to see the settled frame).
+    var isPreviewIdle: Bool { !gate.isBusy }
+
+    /// The frame to show for the current state. Press-and-hold compare wins over a hover preview.
+    public var displayedFrame: PreviewFrame? {
+        if isCropping { return previewFrame }
+        if showOriginal { return originalFrame ?? previewFrame }
+        return visibleHoverFrame ?? previewFrame
+    }
+
+    /// The rendered preview as an image (for snapshots and tests; the canvas shows `displayedFrame`).
+    public var previewImage: NSImage? { previewFrame.flatMap(nsImage) }
+
+    /// The image to show for the current state, as an `NSImage` (snapshots and tests).
+    public var displayedImage: NSImage? { displayedFrame.flatMap(nsImage) }
+
+    private func nsImage(_ frame: PreviewFrame) -> NSImage? {
+        if let hit = imageCache[frame.id] { return hit }
+        guard let cg = frame.cgImage(context: engine.context) else { return nil }
+        let image = NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
+        if imageCache.count > 8 { imageCache = [:] }
+        imageCache[frame.id] = image
+        return image
     }
 
     /// The hover render, only while it is ready and differs from the applied look.
-    private var visibleHoverImage: NSImage? {
+    private var visibleHoverFrame: PreviewFrame? {
         guard !isCropping, let target = hoveredTarget, target != appliedTarget else { return nil }
-        return hoverImage
+        return hoverFrame
     }
 
     private var appliedTarget: HoverTarget {
@@ -298,13 +427,13 @@ public final class EditorModel {
 
     /// The film being previewed, non-nil only while its hover image is actually displayed.
     public var hoverPreviewFilm: Film? {
-        guard !showOriginal, visibleHoverImage != nil, let id = hoveredTarget?.filmID else { return nil }
+        guard !showOriginal, visibleHoverFrame != nil, let id = hoveredTarget?.filmID else { return nil }
         return library.film(id: id)
     }
 
     /// Label text for the canvas chip ("Original" or the film name), nil unless a hover image is displayed.
     public var hoverPreviewName: String? {
-        guard !showOriginal, visibleHoverImage != nil, let target = hoveredTarget else { return nil }
+        guard !showOriginal, visibleHoverFrame != nil, let target = hoveredTarget else { return nil }
         if case .original = target { return "Original" }
         return hoverPreviewFilm?.displayName
     }
@@ -323,7 +452,7 @@ public final class EditorModel {
         hoverTask?.cancel()
         hoverTask = nil
         hoveredTarget = nil
-        hoverImage = nil
+        hoverFrame = nil
     }
 
     private func recipeChangedWhileHovering() {
@@ -338,35 +467,33 @@ public final class EditorModel {
         hoverTask?.cancel()
         hoverTask = nil
         hoveredTarget = target
-        if !keepImage { hoverImage = nil }
-        guard let input = previewSource else { return }
+        if !keepImage { hoverFrame = nil }
+        guard engine.hasSource else { return }
 
         var swapped = recipe
         swapped.filmID = target.filmID
         let graded = swapped
-        let key = HoverKey(filmID: target.filmID, recipe: graded)
+        let canvas = canvasPixels
+        let key = HoverKey(filmID: target.filmID, recipe: graded, canvas: canvas)
         if let cached = hoverCache[key] {
-            hoverImage = cached
+            hoverFrame = cached
             return
         }
-        let renderer = renderer
-        let context = context
-        let box = Unchecked(value: input)
+        let engine = engine
         hoverTask = Task { [weak self] in
             try? await Task.sleep(for: Self.hoverDebounce)
             if Task.isCancelled { return }
-            let cg = await Task.detached(priority: .userInitiated) {
-                renderer.render(graded, input: box.value, context: context).map(Unchecked.init)
+            let frame = await Task.detached(priority: .userInitiated) {
+                engine.render(graded, canvas: canvas)
             }.value
-            guard !Task.isCancelled, let self, self.hoverGeneration == generation, let cg else { return }
-            let image = Self.nsImage(cg.value)
-            self.storeHover(image, for: key)
-            self.hoverImage = image
+            guard !Task.isCancelled, let self, self.hoverGeneration == generation, let frame else { return }
+            self.storeHover(frame, for: key)
+            self.hoverFrame = frame
         }
     }
 
-    private func storeHover(_ image: NSImage, for key: HoverKey) {
-        hoverCache[key] = image
+    private func storeHover(_ frame: PreviewFrame, for key: HoverKey) {
+        hoverCache[key] = frame
         hoverCacheOrder.removeAll { $0 == key }
         hoverCacheOrder.append(key)
         while hoverCacheOrder.count > Self.hoverCacheLimit {
@@ -376,66 +503,74 @@ public final class EditorModel {
 
     // MARK: Thumbnails
 
+    private struct ThumbnailResult: @unchecked Sendable {
+        let id: String?
+        let image: CGImage
+    }
+
+    /// Renders the film strip: one small bitmap made from the full-size source (with the current
+    /// crop applied, so the strip matches the canvas), graded once per film, a few at a time.
+    /// Results are cached per crop, so going back to a crop already seen is instant.
     private func startThumbnails() {
         thumbnailTask?.cancel()
-        guard let input = previewSource else { return }
-        let generation = sourceGeneration
-        let renderer = renderer
-        let context = context
-        let films = library.films
-        let box = Unchecked(value: input)
+        thumbnailCancel?.cancel()
+        guard engine.hasSource else { return }
+        let crop = recipe.crop
+        let generation = contentGeneration
+        let ids: [String?] = [nil] + library.films.map { Optional($0.id) }
+        if let cached = thumbnailCache[crop], cached.count == ids.count {
+            thumbnails = cached
+            return
+        }
+        let cancel = CancelFlag()
+        thumbnailCancel = cancel
+        let engine = engine
+        let (stream, continuation) = AsyncStream.makeStream(of: ThumbnailResult.self)
         thumbnailTask = Task { [weak self] in
-            // Tiny source, rendered once to pixels so each film only grades ~160 px.
-            let tiny = await Task.detached(priority: .utility) { () -> Unchecked<CIImage>? in
-                let small = renderer.previewImage(from: box.value, maxPixelSize: Self.thumbnailLongSide)
-                guard let cg = context.createCGImage(small, from: small.extent, format: .RGBA8,
-                                                     colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
-                else { return nil }
-                return Unchecked(value: CIImage(cgImage: cg))
-            }.value
-            guard let tiny else { return }
-
-            var ids: [String?] = [nil]
-            ids.append(contentsOf: films.map { Optional($0.id) })
-            let maxInFlight = 4
-
-            // Bounded parallelism: keep up to `maxInFlight` renders going, publish each as it lands.
-            await withTaskGroup(of: (String?, Unchecked<CGImage>?).self) { group in
-                var iterator = ids.makeIterator()
-                func addNext() -> Bool {
-                    guard let id = iterator.next() else { return false }
-                    let recipe = Recipe(filmID: id)
-                    group.addTask(priority: .utility) {
-                        if Task.isCancelled { return (id, nil) }
-                        return (id, renderer.render(recipe, input: tiny.value, context: context).map(Unchecked.init))
+            await withTaskCancellationHandler {
+                Task.detached(priority: .utility) {
+                    engine.renderThumbnails(ids: ids, crop: crop, longSide: Self.thumbnailLongSide,
+                                            isCancelled: { cancel.isCancelled }) { id, cg in
+                        continuation.yield(ThumbnailResult(id: id, image: cg))
                     }
-                    return true
+                    continuation.finish()
                 }
-                for _ in 0..<maxInFlight { if !addNext() { break } }
-                while let (id, cg) = await group.next() {
-                    if Task.isCancelled {
-                        group.cancelAll()
-                        continue
+                for await item in stream {
+                    guard let self, self.contentGeneration == generation, !cancel.isCancelled else {
+                        cancel.cancel()
+                        break
                     }
-                    guard let self, self.sourceGeneration == generation else {
-                        group.cancelAll()
-                        continue
-                    }
-                    if let cg { self.thumbnails[id ?? Self.originalTileID] = Self.nsImage(cg.value) }
-                    _ = addNext()
+                    let image = NSImage(cgImage: item.image,
+                                        size: NSSize(width: item.image.width, height: item.image.height))
+                    let key = item.id ?? Self.originalTileID
+                    self.thumbnails[key] = image
+                    self.cacheThumbnail(image, key: key, crop: crop)
                 }
+            } onCancel: {
+                cancel.cancel()
+                continuation.finish()
             }
         }
     }
 
-    /// Stops background work (used when an editing session is cancelled).
-    public func cancelWork() {
-        previewTask?.cancel()
-        thumbnailTask?.cancel()
-        hoverTask?.cancel()
+    private func cacheThumbnail(_ image: NSImage, key: String, crop: CropSettings) {
+        if thumbnailCache[crop] == nil {
+            thumbnailCache[crop] = [:]
+            thumbnailCacheOrder.append(crop)
+            while thumbnailCacheOrder.count > Self.thumbnailCacheLimit {
+                thumbnailCache[thumbnailCacheOrder.removeFirst()] = nil
+            }
+        }
+        thumbnailCache[crop]?[key] = image
     }
 
-    private static func nsImage(_ cg: CGImage) -> NSImage {
-        NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
+    /// Stops background work (used when an editing session is cancelled).
+    public func cancelWork() {
+        gate.cancelPending()
+        previewTask?.cancel()
+        thumbnailTask?.cancel()
+        thumbnailCancel?.cancel()
+        hoverTask?.cancel()
+        fullDecodeTask?.cancel()
     }
 }

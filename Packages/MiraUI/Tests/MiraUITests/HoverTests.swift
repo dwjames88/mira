@@ -13,7 +13,7 @@ struct HoverTests {
         #expect(model.loadSource(url: root.appendingPathComponent("Fixtures/sample.jpg")))
         model.recipe.filmID = "fuji-velvia-50"
         model.recipe.contrast = 0.2
-        try await waitFor { model.previewImage != nil }
+        try await waitFor { model.previewImage != nil && model.isPreviewIdle }
         #expect(model.previewImage != nil)
         let others = library.films.filter { $0.id != "fuji-velvia-50" }
         return (model, others)

@@ -61,6 +61,9 @@ public final class PreviewEngine: @unchecked Sendable {
         let format: OSType
     }
 
+    /// Parallel thumbnail renders; the first run also decodes film LUTs, which parallelises well.
+    public static let defaultThumbnailWorkers = max(2, min(8, ProcessInfo.processInfo.activeProcessorCount))
+
     private static let baseLimit = 6
     private static let maxLevel = 6
 
@@ -252,7 +255,7 @@ public final class PreviewEngine: @unchecked Sendable {
     /// `workers` at a time, calling `deliver` from the worker threads as each one lands. Blocks until
     /// done or `isCancelled` returns true.
     public func renderThumbnails(
-        ids: [String?], crop: CropSettings, longSide: CGFloat, workers: Int = 4,
+        ids: [String?], crop: CropSettings, longSide: CGFloat, workers: Int = PreviewEngine.defaultThumbnailWorkers,
         isCancelled: @Sendable () -> Bool = { false },
         deliver: @Sendable (String?, CGImage) -> Void
     ) {

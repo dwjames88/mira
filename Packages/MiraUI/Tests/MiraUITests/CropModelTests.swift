@@ -11,7 +11,7 @@ struct CropModelTests {
         let library = try FilmLibrary(directory: root.appendingPathComponent("Films"))
         let model = EditorModel(library: library)
         #expect(model.loadSource(url: root.appendingPathComponent("Fixtures/sample.jpg")))
-        try await HoverTests.waitFor { model.previewImage != nil }
+        try await HoverTests.waitFor { model.previewImage != nil && model.isPreviewIdle }
         #expect(model.previewImage != nil)
         return model
     }

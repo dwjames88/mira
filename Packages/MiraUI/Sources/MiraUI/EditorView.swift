@@ -35,16 +35,25 @@ public struct EditorView: View {
 
 private struct PreviewPane: View {
     @Bindable var model: EditorModel
+    @Environment(\.ffImageCanvas) private var imageCanvas
+    @Environment(\.displayScale) private var displayScale
+
+    @ViewBuilder
+    private func canvas(_ frame: PreviewFrame) -> some View {
+        if imageCanvas, let image = model.displayedImage {
+            Image(nsImage: image).resizable().interpolation(.high)
+        } else {
+            FrameCanvas(frame: frame)
+        }
+    }
 
     var body: some View {
         ZStack {
             // The photograph sits on plain ink: no grain, no veil over it.
             T.ink
-            if let image = model.displayedImage {
-                Image(nsImage: image)
-                    .resizable()
-                    .interpolation(.high)
-                    .aspectRatio(contentMode: .fit)
+            if let frame = model.displayedFrame {
+                canvas(frame)
+                    .aspectRatio(frame.pixelSize, contentMode: .fit)
                     .padding(T.cells(3))
                     .accessibilityLabel(model.showOriginal ? "Original photo" : "Edited photo")
                 if model.isCropping {
@@ -80,7 +89,7 @@ private struct PreviewPane: View {
                     .buttonStyle(.ff)
                     .background(T.backdrop)
                     .padding(T.cells(2))
-                    .disabled(model.displayedImage == nil)
+                    .disabled(model.displayedFrame == nil)
                     .help("Crop, rotate and straighten (C)")
             }
         }
@@ -91,6 +100,12 @@ private struct PreviewPane: View {
                 .opacity(0)
                 .frame(width: 0, height: 0)
                 .accessibilityHidden(true)
+        }
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
+            // The picture area is the pane minus its padding; previews are rendered at that size in pixels.
+            let inset = T.cells(3) * 2
+            model.setCanvas(pixels: CGSize(width: max(1, size.width - inset) * displayScale,
+                                           height: max(1, size.height - inset) * displayScale))
         }
         .contentShape(Rectangle())
         .gesture(holdToCompare(model), isEnabled: !model.isCropping)
