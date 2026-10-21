@@ -5,6 +5,9 @@ struct ContentView: View {
     @Bindable var state: AppState
     @State private var isTargeted = false
 
+    /// F / full screen: only the photo on ink remains, so the window toolbar and its hairline go too.
+    private var isImmersive: Bool { state.mode == .editor && (state.editor?.isImmersive ?? false) }
+
     var body: some View {
         Group {
             switch state.mode {
@@ -32,7 +35,7 @@ struct ContentView: View {
             return true
         } isTargeted: { isTargeted = $0 }
         .fieldFramesWindow()
-        .safeAreaInset(edge: .top, spacing: 0) { FFHairline() }
+        .safeAreaInset(edge: .top, spacing: 0) { if !isImmersive { FFHairline() } }
         .toolbar(removing: .title)
         .toolbar {
             // The window toolbar carries only the wordmark; every command lives in the menu bar.
@@ -47,6 +50,7 @@ struct ContentView: View {
         }
         .toolbarBackground(FieldFramesTheme.ink, for: .windowToolbar)
         .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
+        .toolbar(isImmersive ? .hidden : .visible, for: .windowToolbar)
         .sheet(isPresented: $state.showExportSheet) {
             ExportSheet(state: state)
         }
