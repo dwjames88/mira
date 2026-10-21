@@ -120,6 +120,52 @@ final class AppState {
     }
 
     var canSave: Bool { isAssetTarget && canSaveToPhotos && isDirty && !isBusy }
+
+    /// Title of the one Save command: Photos assets save to Photos, files write their sidecar.
+    var saveTitle: String {
+        switch target {
+        case .asset: "Save to Photos"
+        case .file: "Save Sidecar"
+        case nil: "Save"
+        }
+    }
+
+    /// True when the Save command has something to do: an unsaved Photos edit, or a file whose
+    /// recipe differs from the sidecar on disk. Never while the crop tool is open.
+    var canSaveNow: Bool {
+        guard !isCropping, !isBusy else { return false }
+        switch target {
+        case .asset: return canSave
+        case .file(let file): return (editor?.recipe ?? .neutral) != (file.persisted ?? .neutral)
+        case nil: return false
+        }
+    }
+
+    /// Menu and sub-toolbar Save: Photos assets save to Photos, files write the sidecar now.
+    func saveNow() async {
+        switch target {
+        case .asset:
+            await saveToPhotos()
+        case .file:
+            flushSidecar()
+            if case .file(let file) = target, file.persisted == editor?.recipe { resultLine = "SAVED SIDECAR" }
+        case nil:
+            break
+        }
+    }
+
+    var canExport: Bool { hasPhoto && !isExporting && !isBusy && !isCropping }
+    var canRevertNow: Bool { canRevert && !isCropping }
+
+    // MARK: Reset
+
+    /// Edit > Reset Adjustments: sliders, curves and mixer to neutral; film and crop stay.
+    var canResetAdjustments: Bool { !isBusy && !isCropping && (editor?.canReset ?? false) }
+    func resetAdjustments() { editor?.reset() }
+
+    /// Edit > Reset All: everything except the source (film and crop included).
+    var canResetAll: Bool { !isBusy && !isCropping && (editor?.canResetAll ?? false) }
+    func resetAll() { editor?.resetAll() }
     var canRevert: Bool {
         switch target {
         case .asset(let session): session.asset.hasAdjustments && !session.isReadOnly && !isBusy

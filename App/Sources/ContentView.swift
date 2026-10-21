@@ -5,15 +5,6 @@ struct ContentView: View {
     @Bindable var state: AppState
     @State private var isTargeted = false
 
-    /// A glass-free SF Symbol toolbar button; the old mono label is the accessibility label.
-    private func iconButton(_ title: String, symbol: String, help: String, active: Bool = false,
-                            action: @escaping () -> Void) -> some View {
-        Button(action: action) { Image(systemName: symbol) }
-            .buttonStyle(.ffToolbarIcon(active: active))
-            .accessibilityLabel(title)
-            .help(help)
-    }
-
     var body: some View {
         Group {
             switch state.mode {
@@ -44,54 +35,13 @@ struct ContentView: View {
         .safeAreaInset(edge: .top, spacing: 0) { FFHairline() }
         .toolbar(removing: .title)
         .toolbar {
-            // Left: wordmark, then Library (editor), Open, Crop (editor).
+            // The window toolbar carries only the wordmark; every command lives in the menu bar.
             ToolbarItem(placement: .navigation) {
-                HStack(spacing: FieldFramesTheme.cells(1)) {
-                    Text("Mira")
-                        .font(FieldFramesTheme.display(18))
-                        .foregroundStyle(FieldFramesTheme.paper)
-                        .padding(.horizontal, FieldFramesTheme.cells(1))
-                        .accessibilityAddTraits(.isHeader)
-                    if state.mode == .editor {
-                        iconButton("Library", symbol: "photo.on.rectangle.angled", help: "Back to the library") {
-                            state.showLibrary()
-                        }
-                    }
-                    iconButton("Open", symbol: "folder", help: "Open\u{2026} \u{2318}O") { state.presentOpenPanel() }
-                    if state.mode == .editor, let editor = state.editor {
-                        iconButton("Crop", symbol: "crop", help: "Crop, rotate and straighten \u{2318}K",
-                                   active: editor.isCropping) { editor.toggleCrop() }
-                            .disabled(editor.source == nil || state.isBusy)
-                    }
-                }
-            }
-            .sharedBackgroundVisibility(.hidden)
-            // Right: status, Revert, Save, then Export at the trailing edge.
-            ToolbarItem(placement: .primaryAction) {
-                HStack(spacing: FieldFramesTheme.cells(1)) {
-                    if state.mode == .editor {
-                        if let status = state.toolbarStatus {
-                            Text(status)
-                                .ffLabel(size: 10, color: status == "UNSAVED" ? FieldFramesTheme.paperMid : FieldFramesTheme.lichen)
-                                .padding(.trailing, FieldFramesTheme.cells(1))
-                                .help(state.toolbarStatusHelp ?? "")
-                        }
-                        iconButton("Revert", symbol: "arrow.uturn.backward", help: "Revert to original") {
-                            state.showRevertConfirm = true
-                        }
-                        .disabled(!state.canRevert || state.isCropping)
-                        if state.isAssetTarget {
-                            iconButton("Save", symbol: "checkmark.circle", help: "Save to Photos \u{2318}S", active: state.canSave) {
-                                Task { await state.saveToPhotos() }
-                            }
-                            .disabled(!state.canSave || state.isCropping)
-                        }
-                    }
-                    iconButton("Export", symbol: "square.and.arrow.up", help: "Export\u{2026} \u{2318}E") {
-                        state.showExportSheet = true
-                    }
-                    .disabled(!state.hasPhoto || state.isExporting || state.isBusy || state.isCropping)
-                }
+                Text("Mira")
+                    .font(FieldFramesTheme.display(18))
+                    .foregroundStyle(FieldFramesTheme.paper)
+                    .padding(.horizontal, FieldFramesTheme.cells(1))
+                    .accessibilityAddTraits(.isHeader)
             }
             .sharedBackgroundVisibility(.hidden)
         }

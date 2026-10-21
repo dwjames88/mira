@@ -259,6 +259,20 @@ public final class EditorModel {
         recipe = Recipe(filmID: recipe.filmID, crop: recipe.crop)
     }
 
+    /// Back to a neutral recipe: no film, sliders, curves, mixer or crop. Only the source stays.
+    public func resetAll() {
+        if isCropping { cancelCrop() }
+        recipe = .neutral
+    }
+
+    /// True when `reset()` would change something (any adjustment differs from neutral).
+    public var canReset: Bool {
+        recipe != Recipe(filmID: recipe.filmID, crop: recipe.crop)
+    }
+
+    /// True when `resetAll()` would change something.
+    public var canResetAll: Bool { recipe != .neutral }
+
     // MARK: Crop
 
     /// Opens the crop tool on a copy of the recipe's crop. The canvas then shows the whole picture

@@ -26,17 +26,26 @@ struct MiraApp: App {
             CommandGroup(replacing: .newItem) {
                 Button("Open\u{2026}") { state.presentOpenPanel() }
                     .keyboardShortcut("o")
-                Button("Save to Photos") { Task { await state.saveToPhotos() } }
-                    .keyboardShortcut("s")
-                    .disabled(!state.canSave)
+                Divider()
                 Button("Export\u{2026}") { state.showExportSheet = true }
                     .keyboardShortcut("e")
+                    .disabled(!state.canExport)
+                Button(state.saveTitle) { Task { await state.saveNow() } }
+                    .keyboardShortcut("s")
+                    .disabled(!state.canSaveNow)
+                Button("Revert to Original\u{2026}") { state.showRevertConfirm = true }
+                    .disabled(!state.canRevertNow)
+                Divider()
+                Button("Back to Library") { state.showLibrary() }
+                    .keyboardShortcut(.leftArrow, modifiers: .command)
                     .disabled(!state.hasPhoto)
             }
-            CommandGroup(after: .toolbar) {
-                Button("Crop") { state.editor?.toggleCrop() }
-                    .keyboardShortcut("k")
-                    .disabled(state.editor?.source == nil || state.isBusy)
+            CommandGroup(after: .undoRedo) {
+                Divider()
+                Button("Reset Adjustments") { state.resetAdjustments() }
+                    .disabled(!state.canResetAdjustments)
+                Button("Reset All") { state.resetAll() }
+                    .disabled(!state.canResetAll)
             }
         }
 
