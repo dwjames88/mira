@@ -100,6 +100,25 @@ final class AppState {
         return EditDirtyCheck.isDirty(current: editor.recipe, loaded: loadedRecipe)
     }
 
+    /// The short mono label in the toolbar: SAVED / REVERTED right after those actions, UNSAVED while a
+    /// Photos edit has changes, otherwise why the picture cannot be saved. nil when there is nothing to say.
+    var toolbarStatus: String? {
+        guard editor != nil else { return nil }
+        if let result = resultLine { return result.hasPrefix("SAVED") ? "SAVED" : "REVERTED" }
+        if isDirty { return "UNSAVED" }
+        if case .asset(let session) = target {
+            if session.isReadOnly { return "READ ONLY" }
+            if !canSaveToPhotos { return "PREVIEW ONLY" }
+            if editorNote != nil { return "REPLACES EDITS" }
+        }
+        return nil
+    }
+
+    /// Longer explanation behind `toolbarStatus`, for the tooltip.
+    var toolbarStatusHelp: String? {
+        editorNote ?? statusLine
+    }
+
     var canSave: Bool { isAssetTarget && canSaveToPhotos && isDirty && !isBusy }
     var canRevert: Bool {
         switch target {

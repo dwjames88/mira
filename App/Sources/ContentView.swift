@@ -3,14 +3,15 @@ import SwiftUI
 
 struct ContentView: View {
     @Bindable var state: AppState
-    @Environment(\.openWindow) private var openWindow
     @State private var isTargeted = false
 
-    /// A glass-free mono text toolbar button; the title doubles as the accessibility label.
-    private func textButton(_ title: String, prominent: Bool = false, action: @escaping () -> Void) -> some View {
-        Button(action: action) { Text(title.uppercased()) }
-            .buttonStyle(prominent ? .ffToolbarProminent : .ffToolbar)
+    /// A glass-free SF Symbol toolbar button; the old mono label is the accessibility label.
+    private func iconButton(_ title: String, symbol: String, help: String, active: Bool = false,
+                            action: @escaping () -> Void) -> some View {
+        Button(action: action) { Image(systemName: symbol) }
+            .buttonStyle(.ffToolbarIcon(active: active))
             .accessibilityLabel(title)
+            .help(help)
     }
 
     var body: some View {
@@ -43,35 +44,53 @@ struct ContentView: View {
         .safeAreaInset(edge: .top, spacing: 0) { FFHairline() }
         .toolbar(removing: .title)
         .toolbar {
+            // Left: wordmark, then Library (editor), Open, Crop (editor).
             ToolbarItem(placement: .navigation) {
-                Text("Mira")
-                    .font(FieldFramesTheme.display(18))
-                    .foregroundStyle(FieldFramesTheme.paper)
-                    .padding(.horizontal, FieldFramesTheme.cells(1))
-                    .accessibilityAddTraits(.isHeader)
-            }
-            .sharedBackgroundVisibility(.hidden)
-            ToolbarItem {
                 HStack(spacing: FieldFramesTheme.cells(1)) {
+                    Text("Mira")
+                        .font(FieldFramesTheme.display(18))
+                        .foregroundStyle(FieldFramesTheme.paper)
+                        .padding(.horizontal, FieldFramesTheme.cells(1))
+                        .accessibilityAddTraits(.isHeader)
                     if state.mode == .editor {
-                        textButton("Library") { state.showLibrary() }
+                        iconButton("Library", symbol: "photo.on.rectangle.angled", help: "Back to the library") {
+                            state.showLibrary()
+                        }
                     }
-                    textButton("Open") { state.presentOpenPanel() }
-                    textButton("Films") { openWindow(id: "films") }
+                    iconButton("Open", symbol: "folder", help: "Open\u{2026} \u{2318}O") { state.presentOpenPanel() }
                     if state.mode == .editor, let editor = state.editor {
-                        textButton("Crop", prominent: editor.isCropping) { editor.toggleCrop() }
+                        iconButton("Crop", symbol: "crop", help: "Crop, rotate and straighten \u{2318}K",
+                                   active: editor.isCropping) { editor.toggleCrop() }
                             .disabled(editor.source == nil || state.isBusy)
                     }
-                    textButton("Export") { state.showExportSheet = true }
-                        .disabled(!state.hasPhoto || state.isExporting || state.isBusy || state.isCropping)
+                }
+            }
+            .sharedBackgroundVisibility(.hidden)
+            // Right: status, Revert, Save, then Export at the trailing edge.
+            ToolbarItem(placement: .primaryAction) {
+                HStack(spacing: FieldFramesTheme.cells(1)) {
                     if state.mode == .editor {
-                        if state.isAssetTarget {
-                            textButton("Save", prominent: true) { Task { await state.saveToPhotos() } }
-                                .disabled(!state.canSave || state.isCropping)
+                        if let status = state.toolbarStatus {
+                            Text(status)
+                                .ffLabel(size: 10, color: status == "UNSAVED" ? FieldFramesTheme.paperMid : FieldFramesTheme.lichen)
+                                .padding(.trailing, FieldFramesTheme.cells(1))
+                                .help(state.toolbarStatusHelp ?? "")
                         }
-                        textButton("Revert") { state.showRevertConfirm = true }
-                            .disabled(!state.canRevert || state.isCropping)
+                        iconButton("Revert", symbol: "arrow.uturn.backward", help: "Revert to original") {
+                            state.showRevertConfirm = true
+                        }
+                        .disabled(!state.canRevert || state.isCropping)
+                        if state.isAssetTarget {
+                            iconButton("Save", symbol: "checkmark.circle", help: "Save to Photos \u{2318}S", active: state.canSave) {
+                                Task { await state.saveToPhotos() }
+                            }
+                            .disabled(!state.canSave || state.isCropping)
+                        }
                     }
+                    iconButton("Export", symbol: "square.and.arrow.up", help: "Export\u{2026} \u{2318}E") {
+                        state.showExportSheet = true
+                    }
+                    .disabled(!state.hasPhoto || state.isExporting || state.isBusy || state.isCropping)
                 }
             }
             .sharedBackgroundVisibility(.hidden)
@@ -108,8 +127,10 @@ struct ContentView: View {
     }
 }
 
-/// The editor plus a mono footer: sidecar / Photos status, notes and progress.
+/// The editor plus, when the "Show edit-source footer" setting is on, a mono footer: sidecar / Photos
+/// status, notes and progress.
 private struct EditorScreen: View {
+    @AppStorage(MiraSettings.showEditSourceFooterKey) private var showFooter = false
     let state: AppState
     let editor: EditorModel
 
@@ -117,6 +138,7 @@ private struct EditorScreen: View {
         VStack(spacing: 0) {
             EditorView(model: editor)
                 .disabled(state.isOpening)
+            if showFooter {
             FFHairline()
             HStack(spacing: FieldFramesTheme.cells(2)) {
                 if let status = state.statusLine { Text(status).ffLabel(size: 10) }
@@ -127,6 +149,7 @@ private struct EditorScreen: View {
             }
             .padding(.horizontal, FieldFramesTheme.cells(2))
             .frame(height: FieldFramesTheme.rows(2))
+            }
         }
         .overlay {
             if let busy = state.busyText {

@@ -35,7 +35,7 @@
     "brand": "Fujifilm",
     "family": "colorNegative",
     "iso": "200",
-    "description": "Everyday snapshot colour with lively greens and blues.",
+    "description": "Everyday snapshot color with lively greens and blues.",
     "file": "HaldCLUT/fuji-superia-200.png",
     "source": "HaldCLUT/Color/Fuji/Fuji Superia 200.png"
   },
@@ -45,7 +45,7 @@
     "brand": "Fujifilm",
     "family": "colorNegative",
     "iso": "400",
-    "description": "Punchy consumer-film colour with a cool green cast.",
+    "description": "Punchy consumer-film color with a cool green cast.",
     "file": "HaldCLUT/fuji-superia-400.png",
     "source": "HaldCLUT/Color/Fuji/Fuji Superia 400 2.png"
   },
@@ -55,7 +55,7 @@
     "brand": "Fujifilm",
     "family": "colorNegative",
     "iso": "100",
-    "description": "Clean, accurate colour with neutral, true-to-life tones.",
+    "description": "Clean, accurate color with neutral, true-to-life tones.",
     "file": "HaldCLUT/fuji-superia-reala-100.png",
     "source": "HaldCLUT/Color/Fuji/Fuji Superia Reala 100.png"
   },
@@ -65,7 +65,7 @@
     "brand": "Kodak",
     "family": "colorNegative",
     "iso": "100",
-    "description": "Vivid, saturated colour with crisp contrast.",
+    "description": "Vivid, saturated color with crisp contrast.",
     "file": "HaldCLUT/kodak-ektar-100.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Ektar 100.png"
   },
@@ -105,7 +105,7 @@
     "brand": "Agfa",
     "family": "slide",
     "iso": "100",
-    "description": "Neutral, balanced slide colour with gentle contrast.",
+    "description": "Neutral, balanced slide color with gentle contrast.",
     "file": "HaldCLUT/agfa-precisa-100.png",
     "source": "HaldCLUT/Color/Agfa/Agfa Precisa 100.png"
   },
@@ -125,7 +125,7 @@
     "brand": "Fujifilm",
     "family": "slide",
     "iso": "100",
-    "description": "Neutral, clean slide colour with fine tonal detail.",
+    "description": "Neutral, clean slide color with fine tonal detail.",
     "file": "HaldCLUT/fuji-provia-100f.png",
     "source": "HaldCLUT/Color/Fuji/Fuji Provia 100F.png"
   },
@@ -135,7 +135,7 @@
     "brand": "Fujifilm",
     "family": "slide",
     "iso": "50",
-    "description": "Deeply saturated landscape colour with strong contrast.",
+    "description": "Deeply saturated landscape color with strong contrast.",
     "file": "HaldCLUT/fuji-velvia-50.png",
     "source": "HaldCLUT/Color/Fuji/Fuji Velvia 50.png"
   },
@@ -145,7 +145,7 @@
     "brand": "Kodak",
     "family": "slide",
     "iso": "100",
-    "description": "Vibrant, cool-leaning slide colour with a bright snap.",
+    "description": "Vibrant, cool-leaning slide color with a bright snap.",
     "file": "HaldCLUT/kodak-ektachrome-100-vs.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Ektachrome 100 VS.png"
   },
@@ -165,7 +165,7 @@
     "brand": "Lomography",
     "family": "slide",
     "iso": "200",
-    "description": "Cross-processed slide with shifted colour and high contrast.",
+    "description": "Cross-processed slide with shifted color and high contrast.",
     "file": "HaldCLUT/lomography-x-pro-slide-200.png",
     "source": "HaldCLUT/Color/Lomography/Lomography X-Pro Slide 200.png"
   },
@@ -255,7 +255,7 @@
     "brand": "Fujifilm",
     "family": "instant",
     "iso": "100",
-    "description": "Peel-apart instant look with soft, natural colour.",
+    "description": "Peel-apart instant look with soft, natural color.",
     "file": "HaldCLUT/fuji-fp-100c.png",
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c 3.png"
   },
@@ -285,7 +285,7 @@
     "brand": "Polaroid",
     "family": "instant",
     "iso": "600",
-    "description": "Bold instant colour with warm, contrasty shadows.",
+    "description": "Bold instant color with warm, contrasty shadows.",
     "file": "HaldCLUT/polaroid-px-680.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 3.png"
   },
@@ -295,7 +295,7 @@
     "brand": "Polaroid",
     "family": "instant",
     "iso": "80",
-    "description": "Dreamy, pastel instant colour with a hazy glow.",
+    "description": "Dreamy, pastel instant color with a hazy glow.",
     "file": "HaldCLUT/polaroid-px-70.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 3.png"
   },
@@ -305,7 +305,7 @@
     "brand": "Polaroid",
     "family": "instant",
     "iso": "80",
-    "description": "Expired-film drift with muddy tones and colour shifts.",
+    "description": "Expired-film drift with muddy tones and color shifts.",
     "file": "HaldCLUT/polaroid-time-zero-expired.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid Time Zero (Expired) 4.png"
   }

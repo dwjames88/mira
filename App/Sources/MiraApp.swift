@@ -21,7 +21,7 @@ struct MiraApp: App {
         .windowToolbarStyle(.unified)
         .commands {
             CommandGroup(replacing: .appInfo) {
-                Button("About Mira") { showAbout() }
+                Button("About Mira") { openWindow(id: "about") }
             }
             CommandGroup(replacing: .newItem) {
                 Button("Open\u{2026}") { state.presentOpenPanel() }
@@ -33,32 +33,22 @@ struct MiraApp: App {
                     .keyboardShortcut("e")
                     .disabled(!state.hasPhoto)
             }
-            CommandGroup(after: .windowArrangement) {
-                Button("Films") { openWindow(id: "films") }
-                    .keyboardShortcut("l", modifiers: [.command, .shift])
+            CommandGroup(after: .toolbar) {
+                Button("Crop") { state.editor?.toggleCrop() }
+                    .keyboardShortcut("k")
+                    .disabled(state.editor?.source == nil || state.isBusy)
             }
         }
 
-        Window("Films", id: "films") {
-            if let library = state.library {
-                FilmsBrowserView(library: library)
-            } else {
-                Text("The film library could not be loaded.").padding()
-            }
+        Window("About Mira", id: "about") {
+            AboutView(library: state.library)
         }
-        .defaultSize(width: 520, height: 620)
+        .defaultSize(width: 560, height: 720)
         .windowToolbarStyle(.unified)
-    }
 
-    private func showAbout() {
-        let credits = NSMutableAttributedString(
-            string: "SOFTWARE BY FIELDFRAMES\n\n",
-            attributes: [.font: NSFont.monospacedSystemFont(ofSize: 10, weight: .regular),
-                         .foregroundColor: NSColor.secondaryLabelColor,
-                         .kern: 1.5])
-        credits.append(NSAttributedString(
-            string: "Film looks are from the RawTherapee Film Simulation Collection by Pat David, licensed under CC BY-SA 4.0 (creativecommons.org/licenses/by-sa/4.0). Film stock names are used for information only; Mira is not affiliated with any film maker.",
-            attributes: [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.labelColor]))
-        NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
+        Settings {
+            SettingsView()
+        }
+        .windowToolbarStyle(.unified)
     }
 }
