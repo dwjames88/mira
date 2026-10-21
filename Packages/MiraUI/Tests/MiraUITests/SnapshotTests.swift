@@ -54,9 +54,10 @@ struct SnapshotTests {
         let model = try await Self.makeModel()
         for (scheme, tag) in [(ColorScheme.dark, "dark"), (.light, "light")] {
             try Self.writePNG(EditorView(model: model), size: CGSize(width: 1280, height: 800), scheme: scheme, name: "editor-\(tag)")
-            try Self.writePNG(FilmsBrowserView(library: model.library), size: CGSize(width: 1280, height: 800), scheme: scheme, name: "films-\(tag)")
         }
-        try Self.writePNG(FilmsBrowserView(library: model.library), size: CGSize(width: 1280, height: 3000), scheme: .dark, name: "films-tall-dark")
+        try Self.writePNG(AboutView(library: model.library, version: "VERSION 0.1.0 (1)"),
+                          size: CGSize(width: 560, height: 2500), scheme: .dark, name: "about-dark")
+        try Self.writePNG(SettingsView(), size: CGSize(width: 480, height: 384), scheme: .light, name: "settings-light")
         if let bw = model.films.first(where: { $0.family == .blackAndWhite }) {
             model.hoverFilm(bw.id)
             let deadline = Date().addingTimeInterval(30)
