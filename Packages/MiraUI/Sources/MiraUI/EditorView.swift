@@ -1,4 +1,5 @@
 import MiraCore
+import OSLog
 import SwiftUI
 
 private typealias T = FieldFramesTheme
@@ -345,11 +346,14 @@ private struct TrackpadZoomPan: NSViewRepresentable {
     }
 }
 
+private let zoomLog = Logger(subsystem: "com.fieldframes.mira", category: "zoom")
+
 @MainActor
-private final class TrackpadMonitorView: NSView {
+final class TrackpadMonitorView: NSView {
     weak var model: EditorModel?
     var backingScale: CGFloat = 2
     private var monitor: Any?
+    private var lastLog: [String: Date] = [:]
 
     override var isFlipped: Bool { true }
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
@@ -360,42 +364,81 @@ private final class TrackpadMonitorView: NSView {
         guard window != nil else { return }
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel, .magnify]) { [weak self] event in
             // Only plain values cross into the main actor; NSEvent itself is not Sendable.
-            let input = Input(isMagnify: event.type == .magnify, windowNumber: event.windowNumber,
-                              location: event.locationInWindow, magnification: Double(event.magnification),
-                              dx: event.scrollingDeltaX, dy: event.scrollingDeltaY,
-                              precise: event.hasPreciseScrollingDeltas)
-            let consumed = MainActor.assumeIsolated { self?.handle(input) ?? false }
+            nonisolated(unsafe) let event = event
+            let consumed = MainActor.assumeIsolated { self?.handle(Input(event: event)) ?? false }
             return consumed ? nil : event
         }
     }
 
     isolated deinit { if let monitor { NSEvent.removeMonitor(monitor) } }
 
-    private struct Input: Sendable {
+    struct Input: Sendable {
         var isMagnify: Bool
-        var windowNumber: Int
-        var location: CGPoint
+        /// Where the event happened, in Cocoa screen coordinates (bottom-left origin). Scroll events
+        /// posted at the HID tap can carry a window number of 0 and a screen-space
+        /// `locationInWindow`, so the window is never trusted for containment.
+        var screenPoint: CGPoint
         var magnification: Double
         var dx: CGFloat
         var dy: CGFloat
         var precise: Bool
+
+        init(isMagnify: Bool, screenPoint: CGPoint, magnification: Double, dx: CGFloat, dy: CGFloat, precise: Bool) {
+            self.isMagnify = isMagnify; self.screenPoint = screenPoint; self.magnification = magnification
+            self.dx = dx; self.dy = dy; self.precise = precise
+        }
+
+        @MainActor init(event: NSEvent) {
+            let point: CGPoint
+            if let cg = event.cgEvent, let primary = NSScreen.screens.first {
+                // Global display coordinates: top-left origin on the primary display.
+                point = CGPoint(x: cg.location.x, y: primary.frame.height - cg.location.y)
+            } else if let w = event.window {
+                point = w.convertPoint(toScreen: event.locationInWindow)
+            } else {
+                point = NSEvent.mouseLocation
+            }
+            if event.type == .magnify {
+                self.init(isMagnify: true, screenPoint: point, magnification: Double(event.magnification),
+                          dx: 0, dy: 0, precise: true)
+            } else {
+                self.init(isMagnify: false, screenPoint: point, magnification: 0, dx: event.scrollingDeltaX,
+                          dy: event.scrollingDeltaY, precise: event.hasPreciseScrollingDeltas)
+            }
+        }
+    }
+
+    /// One debug line per reason, at most one a second.
+    private func reject(_ reason: String, _ detail: String = "") -> Bool {
+        let now = Date()
+        if let t = lastLog[reason], now.timeIntervalSince(t) < 1 { return false }
+        lastLog[reason] = now
+        zoomLog.debug("scroll rejected: \(reason, privacy: .public) \(detail, privacy: .public)")
+        return false
     }
 
     /// True when the event was used and must not travel on.
-    private func handle(_ e: Input) -> Bool {
-        guard let model, model.canZoom, !model.eyedropperActive, let window, e.windowNumber == window.windowNumber else { return false }
-        let local = convert(e.location, from: nil)
-        guard bounds.contains(local) else { return false }
+    func handle(_ e: Input) -> Bool {
+        guard let model else { return reject("no model") }
+        guard model.canZoom else { return reject("cannot zoom") }
+        guard !model.eyedropperActive else { return reject("eyedropper active") }
+        guard let window else { return reject("no window") }
+        let inWindow = window.convertPoint(fromScreen: e.screenPoint)
+        let local = convert(inWindow, from: nil)
+        guard bounds.contains(local) else {
+            return reject("outside view", "local=\(local) bounds=\(bounds) screen=\(e.screenPoint)")
+        }
         let pane = CGPoint(x: local.x * backingScale, y: local.y * backingScale)
         if e.isMagnify {
             model.zoomPinch(by: 1 + e.magnification, atPane: pane)
             return true
         }
-        guard !model.zoom.isFit else { return false }
+        guard !model.zoom.isFit else { return reject("at fit") }
         // Points for a trackpad; a wheel reports lines, about ten points each. The system has
         // already applied the natural-direction setting, so the picture follows the fingers.
         let unit: CGFloat = e.precise ? 1 : 10
         model.zoomPan(byPane: CGSize(width: e.dx * unit * backingScale, height: e.dy * unit * backingScale))
+        zoomLog.debug("scroll pan dx=\(e.dx, privacy: .public) dy=\(e.dy, privacy: .public) precise=\(e.precise, privacy: .public)")
         return true
     }
 }
