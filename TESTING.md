@@ -1,4 +1,6 @@
-# Testing Emulsion
+# Testing Mira
+
+Mira is software by FieldFrames (renamed from Emulsion). Because the bundle ids changed, macOS asks for Photos access again on first launch, and the extension must be re-enabled in System Settings (Extensions ▸ Photos Editing, or the ⓘ button in Photos ▸ Edit ▸ ⋯ ▸ Extensions) even if Emulsion's was on. Photos edited by Emulsion and sidecars named `<filename>.emulsion.json` are still read.
 
 ## Install
 
@@ -6,38 +8,38 @@
 scripts/install.sh
 ```
 
-This regenerates the project with xcodegen, builds Release into `build/DerivedData`, copies `Emulsion.app` to `/Applications`, verifies its signature, removes the build products' own extension registrations so only the `/Applications` copy is known, refreshes Launch Services (`lsregister -f`), registers the extension with `pluginkit -a` (retrying while registration settles), and elects it with `pluginkit -e use -i com.dwjames.emulsion.photos`. It finishes by listing Photos editing extensions and fails if Emulsion is not among them.
+This regenerates the project with xcodegen, builds Release into `build/DerivedData`, copies `Mira.app` to `/Applications`, verifies its signature, removes the build products' own extension registrations so only the `/Applications` copy is known, refreshes Launch Services (`lsregister -f`), registers the extension with `pluginkit -a` (retrying while registration settles), and elects it with `pluginkit -e use -i com.fieldframes.mira.photos`. It finishes by listing Photos editing extensions and fails if Mira is not among them.
 
 ## Enable in Photos (macOS 26/27)
 
 1. Open System Settings ▸ General ▸ Login Items & Extensions.
 2. Scroll to the Extensions section and choose "By Category" (or by app).
-3. Under Photos Editing, click the ⓘ button and turn on Emulsion.
+3. Under Photos Editing, click the ⓘ button and turn on Mira.
 
 Alternative: in Photos open a photo ▸ Edit ▸ click the ⋯ (More) or Extensions button in the toolbar ▸ More… This opens the same pane.
 
 Then:
 
-1. Open a photo in Photos ▸ Edit ▸ ⋯ ▸ Emulsion.
+1. Open a photo in Photos ▸ Edit ▸ ⋯ ▸ Mira.
 2. Pick a film, adjust the sliders, and click Save Changes.
-3. To verify re-editability, choose Edit again ▸ ⋯ ▸ Emulsion and confirm the film and sliders are restored.
+3. To verify re-editability, choose Edit again ▸ ⋯ ▸ Mira and confirm the film and sliders are restored.
 4. Revert to Original should return the untouched photo.
 
 Check registration from the shell:
 
 ```sh
-pluginkit -m -p com.apple.photo-editing -v | grep emulsion
+pluginkit -m -p com.apple.photo-editing -v | grep mira
 ```
 
 ## Troubleshooting
 
-- **Extension missing from Photos or the list:** re-run `scripts/install.sh`; then `pluginkit -e use -i com.dwjames.emulsion.photos`; quit and reopen Photos; and, if needed, `/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f /Applications/Emulsion.app`.
-- **Extension fails to load or does nothing:** open Console, filter on `EmulsionPhotos`, and reproduce.
+- **Extension missing from Photos or the list:** re-run `scripts/install.sh`; then `pluginkit -e use -i com.fieldframes.mira.photos`; quit and reopen Photos; and, if needed, `/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f /Applications/Mira.app`.
+- **Extension fails to load or does nothing:** open Console, filter on `MiraPhotos`, and reproduce.
 - **Stopped working after a few days:** the project uses Personal Team development signing. Free-team provisioning profiles last 7 days, so re-run `scripts/install.sh` to re-sign if the extension stops loading.
 
 ## Photos access
 
-The first launch of the app asks for access to your Photos library (`NSPhotoLibraryUsageDescription`). Choose Allow Access to All Photos. To change the decision later, open System Settings ▸ Privacy & Security ▸ Photos and set Emulsion to Full Access, Limited Access or off. If access is denied the library shows a waiting message; files from disk still work.
+The first launch of the app asks for access to your Photos library (`NSPhotoLibraryUsageDescription`). Choose Allow Access to All Photos. To change the decision later, open System Settings ▸ Privacy & Security ▸ Photos and set Mira to Full Access, Limited Access or off. If access is denied the library shows a waiting message; files from disk still work.
 
 ## Host app
 
@@ -59,7 +61,7 @@ Check: the app opens; Open (or drag a photo onto the window) loads it; the film 
 ### Photos round trip
 
 1. Open a picture from the library, pick a film, adjust, and choose Save (Command-S). The footer reports the result and the EDITED badge appears.
-2. In Photos the picture shows the edit. Edit ▸ ⋯ ▸ Emulsion reopens it with the film and every slider restored.
+2. In Photos the picture shows the edit. Edit ▸ ⋯ ▸ Mira reopens it with the film and every slider restored.
 3. Save a change from the extension, then open the same picture in the app: the app restores the extension's recipe. The codec is shared, so it works both ways.
 4. In Photos, choose Revert to Original: the picture returns to the untouched original, and the app shows no EDITED badge.
 5. In the app, open an edited picture and choose Revert: the picture reverts in Photos and the original is untouched.
@@ -68,7 +70,7 @@ Check: the app opens; Open (or drag a photo onto the window) loads it; the film 
 
 ### Sidecar (files from disk)
 
-1. Open a JPEG from a folder in your home directory (Open panel). Change a slider; the footer reads SIDECAR · APP SUPPORT (folder not writable) under the sandbox, and a file named `<sha256 of path>.emulsion.json` appears in `~/Library/Containers/com.dwjames.emulsion/Data/Library/Application Support/Emulsion/Sidecars/`.
+1. Open a JPEG from a folder in your home directory (Open panel). Change a slider; the footer reads SIDECAR · APP SUPPORT (folder not writable) under the sandbox, and a file named `<sha256 of path>.mira.json` appears in `~/Library/Containers/com.fieldframes.mira/Data/Library/Application Support/Mira/Sidecars/`.
 2. Quit, reopen the same file: the recipe is restored. The original file's modification date is unchanged.
 3. Revert deletes the sidecar; the footer returns to the "written on first edit" line.
 4. Export writes a new file and leaves the original alone.
@@ -77,10 +79,10 @@ Check: the app opens; Open (or drag a photo onto the window) loads it; the film 
 ### Opening files at launch
 
 ```sh
-open -a /Applications/Emulsion.app Fixtures/sample.jpg
+open -a /Applications/Mira.app Fixtures/sample.jpg
 ```
 
-The app opens that file in the editor. Finder ▸ Open With ▸ Emulsion does the same for JPEG, HEIC, PNG, TIFF and RAW files.
+The app opens that file in the editor. Finder ▸ Open With ▸ Mira does the same for JPEG, HEIC, PNG, TIFF and RAW files.
 
 ### Hover preview
 
@@ -93,8 +95,8 @@ Switch System Settings ▸ Appearance between Light and Dark with the app and th
 ### Self-test
 
 ```sh
-open -a /Applications/Emulsion.app --args --selftest-photos
-log show --last 10m --info --predicate 'subsystem == "com.dwjames.emulsion"' | grep SELFTEST
+open -a /Applications/Mira.app --args --selftest-photos
+log show --last 10m --info --predicate 'subsystem == "com.fieldframes.mira"' | grep SELFTEST
 ```
 
 It imports `App/SelfTest/sample.jpg` into the album "Emulsion Test", saves Velvia with grain through `AssetEditSession`, checks `hasAdjustments` and the recipe round trip, reverts and checks again. It never touches existing photos, but it leaves the test asset in place: delete it by hand.
@@ -102,29 +104,29 @@ It imports `App/SelfTest/sample.jpg` into the album "Emulsion Test", saves Velvi
 ## Automated tests
 
 ```sh
-swift test --package-path Packages/EmulsionCore
-swift test --package-path Packages/EmulsionUI
+swift test --package-path Packages/MiraCore
+swift test --package-path Packages/MiraUI
 ```
 
-EmulsionCore has 33 tests:
+MiraCore has 36 tests:
 
 - Renderer (6): neutral recipe returns the input unchanged; rendering is deterministic; extents are preserved except with a border; warmth and tint move in the right direction; grain is resolution independent; export keeps orientation and size.
 - Recipe (4): JSON round trip; empty object gives defaults; unknown keys are ignored; adjustment format identifiers.
 - Film (2): a synthesised film round-trips through the library and Strength blends correctly; every bundled film renders plausibly.
 - LUT (7): identity `.cube` parses; `.cube` domain is normalised; bad `.cube` input is rejected; identity HaldCLUT; bad Hald size rejected; resampled identity stays identity; large Hald is capped at 64.
-- Adjustment, sidecar, source and cache (11): adjustment encode/decode round trip; foreign identifier and version rejected; `PHAdjustmentData` round trip; sidecar URL keeps the extension; save, load and remove; fallback when the folder is read-only; foreign sidecar format rejected; RAW detection; explicit orientation swaps dimensions; LUT cache hit matches and a corrupt cache file is tolerated; prewarm loads every film.
+- Adjustment, sidecar, source and cache (14): adjustment encode/decode round trip; foreign identifier and version rejected; legacy `com.dwjames.emulsion` still decodes and new saves write `com.fieldframes.mira`; legacy `.emulsion.json` sidecar is read, migrated on save and removed on revert; `PHAdjustmentData` round trip; sidecar URL keeps the extension; save, load and remove; fallback when the folder is read-only; foreign sidecar format rejected; RAW detection; explicit orientation swaps dimensions; LUT cache hit matches and a corrupt cache file is tolerated; prewarm loads every film.
 - Photo library logic (3): RAW identifiers; dirty check; sidecar status lines.
 
-EmulsionUI has 11 tests:
+MiraUI has 12 tests:
 
 - Theme (6): every token has the exact value in both appearances; CSS names are custom properties; fonts register and resolve; the display weight axis applies; the cell grid; the grain tile is generated and not uniform.
-- Hover (4): hover shows the preview after the debounce and ending it returns; hover never mutates the recipe; a rapid sweep ends on the last card; applied film and Compare behaviour.
+- Hover (5): hover shows the preview after the debounce and ending it returns; hover never mutates the recipe; a rapid sweep ends on the last card; applied film and Compare behaviour.
 - Snapshot (1): renders the editor and films browser headlessly to `build/snapshots`. Inspect them by eye.
 
 Timing of the LUT cache:
 
 ```sh
-swift run --package-path Packages/EmulsionCore emulsion-sheet --time-luts --films Films
+swift run --package-path Packages/MiraCore mira-sheet --time-luts --films Films
 ```
 
 Contact sheets:
