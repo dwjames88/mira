@@ -140,7 +140,7 @@ private func close(_ a: CGFloat, _ b: CGFloat, _ eps: CGFloat = 1e-6) -> Bool { 
 
     @Test func aspectFit() {
         let r = CropGeometry.aspectFit(contentSize: CGSize(width: 300, height: 200), in: CGRect(x: 0, y: 0, width: 600, height: 600))
-        #expect(r == CGRect(x: 0, y: 150, width: 600, height: 400))
+        #expect(r == CGRect(x: 0, y: 100, width: 600, height: 400))
     }
 
     @Test func rotateAndFlipUpdateRect() {
