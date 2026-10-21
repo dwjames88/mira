@@ -8,10 +8,15 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            if let editor = state.editor {
-                EditorView(model: editor)
-            } else {
-                EmptyState(state: state)
+            switch state.mode {
+            case .library:
+                LibraryView(state: state)
+            case .editor:
+                if let editor = state.editor {
+                    EditorScreen(state: state, editor: editor)
+                } else {
+                    EmptyState(state: state)
+                }
             }
         }
         .overlay {
@@ -30,14 +35,42 @@ struct ContentView: View {
         .fieldFramesWindow()
         .toolbar {
             ToolbarItemGroup {
+                if state.mode == .editor {
+                    Button("Library", systemImage: "square.grid.3x3") { state.showLibrary() }
+                }
                 Button("Open", systemImage: "photo.badge.plus") { state.presentOpenPanel() }
                 Button("Films", systemImage: "film.stack") { openWindow(id: "films") }
                 Button("Export", systemImage: "square.and.arrow.up") { state.showExportSheet = true }
-                    .disabled(!state.hasPhoto || state.isExporting)
+                    .disabled(!state.hasPhoto || state.isExporting || state.isBusy)
+                if state.mode == .editor {
+                    if state.isAssetTarget {
+                        Button("Save", systemImage: "checkmark.circle") { Task { await state.saveToPhotos() } }
+                            .disabled(!state.canSave)
+                    }
+                    Button("Revert", systemImage: "arrow.uturn.backward") { state.showRevertConfirm = true }
+                        .disabled(!state.canRevert)
+                }
             }
         }
+        .toolbarBackground(FieldFramesTheme.ink, for: .windowToolbar)
+        .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
         .sheet(isPresented: $state.showExportSheet) {
             ExportSheet(state: state)
+        }
+        .confirmationDialog("You have unsaved changes", isPresented: $state.showLeaveDialog, titleVisibility: .visible) {
+            Button("Save to Photos") { state.confirmLeaveSaving() }
+            Button("Discard Changes", role: .destructive) { state.confirmLeaveDiscarding() }
+            Button("Cancel", role: .cancel) { state.cancelLeave() }
+        } message: {
+            Text("This edit has not been saved to your Photos library.")
+        }
+        .confirmationDialog("Revert to original?", isPresented: $state.showRevertConfirm, titleVisibility: .visible) {
+            Button("Revert to Original", role: .destructive) { Task { await state.revertToOriginal() } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(state.isAssetTarget
+                 ? "This removes the edit from the picture in Photos. The original is untouched."
+                 : "This deletes the saved recipe (sidecar) for this file. The file itself is untouched.")
         }
         .alert("Emulsion", isPresented: Binding(
             get: { state.errorMessage != nil },
@@ -46,6 +79,44 @@ struct ContentView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(state.errorMessage ?? "")
+        }
+        .task { state.runSelfTestsIfRequested() }
+    }
+}
+
+/// The editor plus a mono footer: sidecar / Photos status, notes and progress.
+private struct EditorScreen: View {
+    let state: AppState
+    let editor: EditorModel
+
+    var body: some View {
+        VStack(spacing: 0) {
+            EditorView(model: editor)
+            FFHairline()
+            HStack(spacing: FieldFramesTheme.cells(2)) {
+                if let status = state.statusLine { Text(status).ffLabel(size: 10) }
+                if let note = state.editorNote { Text(note).ffLabel(size: 10, color: FieldFramesTheme.lichen) }
+                Spacer()
+                if let result = state.resultLine { Text(result).ffLabel(size: 10, color: FieldFramesTheme.lichen) }
+                if state.isDirty { Text("UNSAVED").ffLabel(size: 10, color: FieldFramesTheme.paperMid) }
+            }
+            .padding(.horizontal, FieldFramesTheme.cells(2))
+            .frame(height: FieldFramesTheme.rows(2))
+        }
+        .overlay {
+            if let busy = state.busyText {
+                VStack(spacing: FieldFramesTheme.rows(0.5)) {
+                    Text(busy).font(FieldFramesTheme.display(30, weight: .medium))
+                    if let p = state.busyProgress {
+                        ProgressView(value: p).frame(width: FieldFramesTheme.cells(24))
+                    } else {
+                        ProgressView().controlSize(.small)
+                    }
+                }
+                .padding(FieldFramesTheme.cells(4))
+                .background(FieldFramesTheme.ink)
+                .overlay(Rectangle().strokeBorder(FieldFramesTheme.hair, lineWidth: 1))
+            }
         }
     }
 }

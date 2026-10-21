@@ -4,7 +4,8 @@ import SwiftUI
 
 @main
 struct EmulsionApp: App {
-    @State private var state = AppState()
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @State private var state = AppState.shared
     @Environment(\.openWindow) private var openWindow
 
     init() {
@@ -17,6 +18,7 @@ struct EmulsionApp: App {
                 .frame(minWidth: 900, minHeight: 620)
         }
         .defaultSize(width: 1180, height: 780)
+        .windowToolbarStyle(.unified)
         .commands {
             CommandGroup(replacing: .appInfo) {
                 Button("About Emulsion") { showAbout() }
@@ -24,6 +26,9 @@ struct EmulsionApp: App {
             CommandGroup(replacing: .newItem) {
                 Button("Open\u{2026}") { state.presentOpenPanel() }
                     .keyboardShortcut("o")
+                Button("Save to Photos") { Task { await state.saveToPhotos() } }
+                    .keyboardShortcut("s")
+                    .disabled(!state.canSave)
                 Button("Export\u{2026}") { state.showExportSheet = true }
                     .keyboardShortcut("e")
                     .disabled(!state.hasPhoto)

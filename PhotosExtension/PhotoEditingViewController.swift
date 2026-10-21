@@ -1,6 +1,7 @@
 import AppKit
 import EmulsionCore
 import EmulsionUI
+import ImageIO
 import Photos
 import PhotosUI
 import SwiftUI
@@ -44,16 +45,14 @@ final class PhotoEditingViewController: NSViewController, PHContentEditingContro
     // MARK: PHContentEditingController
 
     func canHandle(_ adjustmentData: PHAdjustmentData) -> Bool {
-        adjustmentData.formatIdentifier == EmulsionFormat.adjustmentFormatIdentifier
-            && adjustmentData.formatVersion == EmulsionFormat.formatVersion
+        EmulsionAdjustment.canHandle(adjustmentData)
     }
 
     func startContentEditing(with contentEditingInput: PHContentEditingInput, placeholderImage: NSImage) {
         input = contentEditingInput
         _ = view // make sure loadView ran
         var recipe = Recipe.neutral
-        if let data = contentEditingInput.adjustmentData, canHandle(data),
-           let decoded = try? Recipe.decode(data.data) {
+        if let data = contentEditingInput.adjustmentData, let decoded = EmulsionAdjustment.recipe(from: data) {
             recipe = decoded
         }
         startRecipe = recipe
@@ -62,7 +61,8 @@ final class PhotoEditingViewController: NSViewController, PHContentEditingContro
 
         // Photos hands us the original when we can handle the adjustment data, so edits stay re-editable.
         // The orientation is applied once, from the file's own metadata (the same way the export reads it).
-        if let url = contentEditingInput.fullSizeImageURL, model.loadSource(url: url) { return }
+        let orientation = CGImagePropertyOrientation(rawValue: UInt32(contentEditingInput.fullSizeImageOrientation))
+        if let url = contentEditingInput.fullSizeImageURL, model.loadSource(url: url, orientation: orientation) { return }
         // Fall back to the display-size image so the editor is never blank.
         if let cg = contentEditingInput.displaySizeImage?.cgImage(forProposedRect: nil, context: nil, hints: nil) {
             model.setSource(CIImage(cgImage: cg))
@@ -80,14 +80,13 @@ final class PhotoEditingViewController: NSViewController, PHContentEditingContro
         let recipe = model.recipe
         let renderer = model.renderer
         let output = PHContentEditingOutput(contentEditingInput: input)
-        guard let data = try? recipe.encoded() else {
+        guard let adjustment = try? EmulsionAdjustment.adjustmentData(for: recipe), let source = model.source else {
             completionHandler(nil)
             return
         }
-        output.adjustmentData = PHAdjustmentData(
-            formatIdentifier: EmulsionFormat.adjustmentFormatIdentifier,
-            formatVersion: EmulsionFormat.formatVersion,
-            data: data)
+        output.adjustmentData = adjustment
+        let colorSpace = ImageSource.outputColorSpace(url: inputURL, image: source)
+        let sourceBox = Unchecked(value: source)
 
         // Use the type Photos prefers when we can write it; JPEG otherwise.
         let writable: [UTType] = [.jpeg, .heic, .tiff]
@@ -106,7 +105,8 @@ final class PhotoEditingViewController: NSViewController, PHContentEditingContro
         exportTask = Task.detached(priority: .userInitiated) {
             var succeeded = false
             do {
-                try renderer.export(recipe, inputURL: inputURL, outputURL: outputURL, type: renderType, quality: 0.92)
+                try renderer.export(recipe, source: sourceBox.value, metadataFrom: inputURL, outputURL: outputURL,
+                                    type: renderType, quality: 0.95, colorSpace: colorSpace)
                 succeeded = !Task.isCancelled
             } catch {
                 succeeded = false
