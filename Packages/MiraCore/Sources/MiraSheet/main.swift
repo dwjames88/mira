@@ -118,7 +118,7 @@ guard let source = ImageSource.load(url: URL(fileURLWithPath: inputPath)) else {
 }
 
 let renderer = Renderer(library: library)
-let context = Renderer.makeContext()
+let context = Renderer.sharedContext
 let srgb = CGColorSpace(name: CGColorSpace.sRGB)!
 
 // Downsize and move the origin to (0, 0).

@@ -80,7 +80,7 @@ enum Bench {
         let lutCache = dir.appendingPathComponent("lut-cache", isDirectory: true)
         try? FileManager.default.removeItem(at: lutCache)
 
-        let context = Renderer.makeContext()
+        let context = Renderer.sharedContext
         let jpeg = try synthetic(from: URL(fileURLWithPath: fixturePath), in: dir, context: context)
         let library = try FilmLibrary(directory: filmsURL, cacheDirectory: lutCache)
         _ = try library.film(id: effectsRecipe.filmID!).map { try library.lut(for: $0) }

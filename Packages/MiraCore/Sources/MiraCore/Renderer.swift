@@ -41,11 +41,17 @@ public struct Renderer: Sendable {
 
     // MARK: Context
 
-    public static func makeContext() -> CIContext {
+    /// The one Core Image context for the whole process: previews, thumbnails, hover renders and
+    /// export all share it, so its shaders, caches and Metal queue are warm. `CIContext` is thread safe.
+    public static let sharedContext: CIContext = makeContext()
+
+    /// Builds a new context (tests and benchmarks that need a specific configuration).
+    public static func makeContext(cacheIntermediates: Bool = false) -> CIContext {
         let options: [CIContextOption: Any] = [
             .workingColorSpace: CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!,
             .workingFormat: NSNumber(value: CIFormat.RGBAh.rawValue),
-            .cacheIntermediates: false,
+            .cacheIntermediates: cacheIntermediates,
+            .name: "Mira",
         ]
         if let device = MTLCreateSystemDefaultDevice() {
             return CIContext(mtlDevice: device, options: options)
@@ -58,7 +64,13 @@ public struct Renderer: Sendable {
     public func apply(_ recipe: Recipe, to source: CIImage) -> CIImage {
         // 0. Crop, rotation, flips and straighten first, so every stage below (and the
         // resolution-independent `scale`) sees the cropped output.
-        let input = CropGeometry.apply(recipe.crop, to: source)
+        grade(recipe, cropped: CropGeometry.apply(recipe.crop, to: source))
+    }
+
+    /// Everything after the crop: film, tone, colour, halation, bloom, grain, vignette and border.
+    /// `input` is already cropped (its crop is `recipe.crop`, applied by the caller). All spatial
+    /// parameters follow the size of `input`, so the look is the same at any resolution.
+    public func grade(_ recipe: Recipe, cropped input: CIImage) -> CIImage {
         let extent = input.extent
         guard !extent.isInfinite, !extent.isEmpty else { return input }
         let scale = min(extent.width, extent.height) / 1000
@@ -182,10 +194,7 @@ public struct Renderer: Sendable {
         clampF.maxComponents = CIVector(x: 1, y: 1, z: 1, w: 1)
         var mask = clampF.outputImage ?? image
 
-        let blur = CIFilter.gaussianBlur()
-        blur.inputImage = mask.clampedToExtent()
-        blur.radius = Float((8 + 40 * radius) * scale)
-        mask = (blur.outputImage ?? mask).cropped(to: extent)
+        mask = Self.softBlur(mask, extent: extent, sigma: (8 + 40 * radius) * scale)
 
         // Tint warm red-orange, scaled by amount.
         let a = CGFloat(amount) * 0.9
@@ -202,6 +211,36 @@ public struct Renderer: Sendable {
         screen.backgroundImage = image
         return (screen.outputImage ?? image).cropped(to: extent)
     }
+
+    /// Gaussian blur that runs on a reduced copy when the radius is large: a wide blur has no
+    /// detail left, so blurring at 1/4 (or 1/2) size and enlarging with bilinear filtering gives the
+    /// same picture for a fraction of the work. Small radii blur at full size.
+    static func softBlur(_ image: CIImage, extent: CGRect, sigma: CGFloat) -> CIImage {
+        let factor: CGFloat = sigma >= blurReductionThreshold ? 4 : (sigma >= blurReductionThreshold / 2 ? 2 : 1)
+        let blur = CIFilter.gaussianBlur()
+        guard factor > 1 else {
+            blur.inputImage = image.clampedToExtent()
+            blur.radius = Float(sigma)
+            return (blur.outputImage ?? image).cropped(to: extent)
+        }
+        let origin = CGAffineTransform(translationX: -extent.minX, y: -extent.minY)
+        let small = CGSize(width: max(1, (extent.width / factor).rounded(.up)),
+                           height: max(1, (extent.height / factor).rounded(.up)))
+        let down = CIFilter.lanczosScaleTransform()
+        down.inputImage = image.transformed(by: origin).clampedToExtent()
+        down.scale = Float(small.height / extent.height)
+        down.aspectRatio = Float((small.width / extent.width) / (small.height / extent.height))
+        let reduced = (down.outputImage ?? image).cropped(to: CGRect(origin: .zero, size: small))
+        blur.inputImage = reduced.clampedToExtent()
+        blur.radius = Float(sigma / factor)
+        let blurred = (blur.outputImage ?? reduced).cropped(to: CGRect(origin: .zero, size: small))
+        let up = CGAffineTransform(scaleX: extent.width / small.width, y: extent.height / small.height)
+            .concatenating(CGAffineTransform(translationX: extent.minX, y: extent.minY))
+        return blurred.transformed(by: up, highQualityDownsample: false).cropped(to: extent)
+    }
+
+    /// Blurs with at least this sigma (pixels) run at reduced size.
+    static let blurReductionThreshold: CGFloat = 8
 
     private func grain(_ image: CIImage, extent: CGRect, amount: Double, size: Double, scale: CGFloat) -> CIImage {
         // Noise lives on a virtual grid whose cell is `scale * (1 + 2 * size)` image pixels,
@@ -310,7 +349,7 @@ public struct Renderer: Sendable {
         defer { Perf.end("export", signpost) }
         let inputURL = metadataFrom
         let space = colorSpace ?? Self.outputColorSpace(for: input.colorSpace)
-        let context = Self.makeContext()
+        let context = Self.sharedContext
         let out = apply(recipe, to: input)
         let format: CIFormat = type == .tiff ? .RGBA16 : .RGBA8
         guard let cg = context.createCGImage(out, from: out.extent, format: format, colorSpace: space) else {

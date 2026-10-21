@@ -34,6 +34,55 @@ public enum ImageSource {
         return loadNonRAW(url: url, orientation: orientation)
     }
 
+    /// Decodes a non-RAW file into memory now (full resolution, upright), so later renders never
+    /// touch the file. RAW files go through `load`, which stays lazy.
+    public static func loadDecoded(url: URL, orientation: CGImagePropertyOrientation? = nil) -> CIImage? {
+        if isRAW(url: url) { return load(url: url, orientation: orientation) }
+        return Perf.interval("source load") {
+            let options = [kCGImageSourceShouldCacheImmediately: true] as CFDictionary
+            guard let src = CGImageSourceCreateWithURL(url as CFURL, nil),
+                  let cg = CGImageSourceCreateImageAtIndex(src, 0, options)
+            else { return loadUntraced(url: url, orientation: orientation) }
+            return CIImage(cgImage: cg).oriented(effectiveOrientation(src, override: orientation))
+        }
+    }
+
+    /// A fast, small, upright decode for the first on-screen frame: ImageIO decodes JPEG and HEIC
+    /// at reduced size, so this is a fraction of a full decode. nil for RAW files and on failure.
+    public static func loadThumbnail(
+        url: URL, orientation: CGImagePropertyOrientation? = nil, maxPixelSize: CGFloat
+    ) -> CIImage? {
+        if isRAW(url: url) { return nil }
+        return Perf.interval("source load") {
+            guard let src = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+            let options: [CFString: Any] = [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceCreateThumbnailWithTransform: false,
+                kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+                kCGImageSourceShouldCacheImmediately: true,
+            ]
+            guard let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, options as CFDictionary) else { return nil }
+            return CIImage(cgImage: cg).oriented(effectiveOrientation(src, override: orientation))
+        }
+    }
+
+    /// Pixel size of the first image after orientation, read from the header only.
+    public static func orientedPixelSize(url: URL, orientation: CGImagePropertyOrientation? = nil) -> CGSize? {
+        guard let src = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any],
+              let w = props[kCGImagePropertyPixelWidth] as? Double,
+              let h = props[kCGImagePropertyPixelHeight] as? Double else { return nil }
+        let o = effectiveOrientation(src, override: orientation)
+        return o.rawValue >= 5 ? CGSize(width: h, height: w) : CGSize(width: w, height: h)
+    }
+
+    private static func effectiveOrientation(_ src: CGImageSource, override: CGImagePropertyOrientation?) -> CGImagePropertyOrientation {
+        if let override { return override }
+        let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any]
+        let raw = (props?[kCGImagePropertyOrientation] as? UInt32) ?? 1
+        return CGImagePropertyOrientation(rawValue: raw) ?? .up
+    }
+
     /// The image together with the colour space to export it in (Display P3 for RAW).
     public static func loadWithColorSpace(
         url: URL, orientation: CGImagePropertyOrientation? = nil

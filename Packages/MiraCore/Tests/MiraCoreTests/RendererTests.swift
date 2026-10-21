@@ -6,7 +6,7 @@ import UniformTypeIdentifiers
 @testable import MiraCore
 
 @Suite struct RendererTests {
-    let context = Renderer.makeContext()
+    let context = Renderer.sharedContext
 
     @Test func neutralReturnsInputUnchanged() throws {
         let r = Renderer(library: try emptyLibrary())
