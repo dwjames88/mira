@@ -14,7 +14,13 @@ let package = Package(
         .target(
             name: "EmulsionUI",
             dependencies: [.product(name: "EmulsionCore", package: "EmulsionCore")],
+            resources: [.copy("Resources/Fonts")],
             swiftSettings: [.swiftLanguageMode(.v6)]
-        )
+        ),
+        .testTarget(
+            name: "EmulsionUITests",
+            dependencies: ["EmulsionUI", .product(name: "EmulsionCore", package: "EmulsionCore")],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
     ]
 )

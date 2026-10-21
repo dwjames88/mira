@@ -19,6 +19,7 @@ final class PhotoEditingViewController: NSViewController, PHContentEditingContro
     private var exportTask: Task<Void, Never>?
 
     override func loadView() {
+        FieldFramesTheme.registerFonts()
         let container = NSView(frame: NSRect(x: 0, y: 0, width: 1100, height: 750))
         container.autoresizingMask = [.width, .height]
         view = container
