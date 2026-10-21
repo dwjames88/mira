@@ -6,7 +6,7 @@ public enum FilmFamily: String, Codable, CaseIterable, Sendable {
 
     public var displayName: String {
         switch self {
-        case .colorNegative: "Colour Negative"
+        case .colorNegative: "Color Negative"
         case .slide: "Slide"
         case .blackAndWhite: "Black & White"
         case .instant: "Instant"

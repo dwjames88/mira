@@ -230,7 +230,7 @@ private struct InspectorView: View {
             SliderSpec("exposure", "Exposure", \.exposure, -2...2, default: 0),
             SliderSpec("contrast", "Contrast", \.contrast, -1...1, default: 0),
         ]),
-        SliderGroup(title: "Colour", specs: [
+        SliderGroup(title: "Color", specs: [
             SliderSpec("saturation", "Saturation", \.saturation, -1...1, default: 0),
             SliderSpec("warmth", "Warmth", \.warmth, -1...1, default: 0),
             SliderSpec("tint", "Tint", \.tint, -1...1, default: 0),

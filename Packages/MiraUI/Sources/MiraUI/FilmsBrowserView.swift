@@ -3,7 +3,7 @@ import SwiftUI
 
 private typealias T = FieldFramesTheme
 
-/// Every bundled film, grouped by family, with the licence credit.
+/// Every bundled film, grouped by family, with the license credit.
 public struct FilmsBrowserView: View {
     private let library: FilmLibrary
 
@@ -88,7 +88,7 @@ private struct FilmRow: View {
     }
 }
 
-/// The licence credit for the bundled film looks.
+/// The license credit for the bundled film looks.
 public struct AttributionFooter: View {
     public init() {}
 
