@@ -4,7 +4,15 @@
 
 Mira is an original film-emulation app for macOS. It ships as a **Photos editing extension**, so you can apply a film look to any picture from inside Photos, plus a **host app** that browses your Photos library and also edits files from disk. There is no watermark, no paywall and no account.
 
-Status: v0.2. See [TESTING.md](TESTING.md) for what has and has not been verified, and [docs/ROADMAP.md](docs/ROADMAP.md) for what comes next.
+Status: v0.2.0. See [CHANGELOG.md](CHANGELOG.md) for what changed. See [TESTING.md](TESTING.md) for what has and has not been verified, and [docs/ROADMAP.md](docs/ROADMAP.md) for what comes next.
+
+## Install
+
+1. Download `Mira-0.2.0.dmg` (or the `.zip`) from the release page and drag **Mira** to Applications.
+2. Mira is signed with a free Personal Team development certificate. There is no Developer ID and it is not notarized, so on other Macs macOS blocks the first launch. Right-click Mira, choose Open, then Open again. Or try to open it once, then go to System Settings ▸ Privacy & Security and click "Open Anyway".
+3. Development-signed builds may refuse to run at all on a Mac that is not registered to the signing team. If so, build from source: `scripts/install.sh` (needs Xcode, XcodeGen and your own team ID in `project.yml`).
+4. Enable the extension in System Settings ▸ General ▸ Login Items & Extensions ▸ Photos Editing ▸ Mira, and grant Photos access on first launch.
+5. The free-team signature expires after 7 days; after that the app and extension may stop loading until you rebuild.
 
 ## Features
 
@@ -124,7 +132,7 @@ The test asset stays in the library; delete it by hand. `--selftest-sidecar` run
 
 ## Licensing
 
-- **Code:** All rights reserved, licence TBD. No licence file exists for the source yet.
+- **Code:** [PolyForm Noncommercial License 1.0.0](LICENSE). Free for noncommercial use; see the file for the exact terms.
 - **Film LUTs:** the files in `Films/HaldCLUT/` are from the RawTherapee Film Simulation Collection (2015-09-20) by Pat David, with Pavlov Dmitry and Michael Ezra credited in the archive, and are licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). Full attribution, the source URL and the mapping from each file to its original name are in [Films/ATTRIBUTION.md](Films/ATTRIBUTION.md). The PNG files are redistributed unmodified, byte for byte, only renamed; Mira resamples them to 64³ at load time in memory only. Derivative works of the LUTs must be shared under the same licence.
 - **Trademarks:** film stock names are used for information only. Mira is not affiliated with, or endorsed by, any film maker or the trademark owners.
 - **Fonts:** Cormorant Garamond and IBM Plex Mono are bundled in `Packages/MiraUI/Sources/MiraUI/Resources/Fonts/` under the SIL Open Font License 1.1. The licence texts are alongside (`OFL-CormorantGaramond.txt`, `OFL-IBMPlexMono.txt`).
