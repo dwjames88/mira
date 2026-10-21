@@ -36,7 +36,7 @@ final class PhotoEditingViewController: NSViewController, PHContentEditingContro
         }
         let model = EditorModel(library: library)
         self.model = model
-        let host = NSHostingView(rootView: EditorView(model: model))
+        let host = NSHostingView(rootView: EditorView(model: model, showsCanvasCropButton: true))
         host.frame = container.bounds
         host.autoresizingMask = [.width, .height]
         container.addSubview(host)

@@ -6,15 +6,19 @@ private typealias T = FieldFramesTheme
 /// The shared editor: preview, film strip and inspector.
 public struct EditorView: View {
     @Bindable private var model: EditorModel
+    private let showsCanvasCropButton: Bool
 
-    public init(model: EditorModel) {
+    /// `showsCanvasCropButton` adds a crop icon over the canvas; the app has a toolbar button instead,
+    /// the Photos extension has no toolbar.
+    public init(model: EditorModel, showsCanvasCropButton: Bool = false) {
         self.model = model
+        self.showsCanvasCropButton = showsCanvasCropButton
     }
 
     public var body: some View {
         HStack(spacing: 0) {
             VStack(spacing: 0) {
-                PreviewPane(model: model)
+                PreviewPane(model: model, showsCropButton: showsCanvasCropButton)
                 if model.isCropping {
                     FFHairline()
                     CropControls(model: model)
@@ -35,6 +39,7 @@ public struct EditorView: View {
 
 private struct PreviewPane: View {
     @Bindable var model: EditorModel
+    var showsCropButton = false
     @Environment(\.ffImageCanvas) private var imageCanvas
     @Environment(\.displayScale) private var displayScale
 
@@ -84,9 +89,10 @@ private struct PreviewPane: View {
             }
         }
         .overlay(alignment: .topTrailing) {
-            if !model.isCropping {
-                Button("Crop") { model.beginCrop() }
-                    .buttonStyle(.ff)
+            if !model.isCropping, showsCropButton {
+                Button { model.beginCrop() } label: { Image(systemName: "crop") }
+                    .buttonStyle(.ffToolbarIcon)
+                    .accessibilityLabel("Crop")
                     .background(T.backdrop)
                     .padding(T.cells(2))
                     .disabled(model.displayedFrame == nil)
