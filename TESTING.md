@@ -169,4 +169,21 @@ Writes `build/contact-sheet.png` (every film) and `build/contact-sheet-effects.p
 
 ## Verification log (2026-10-20)
 
-_To be filled in by the lead._
+Run on macOS 27.0, Xcode 27.0, arm64, against the user's real Photos library (48,873 photos). Screenshots are in `build/` (git-ignored).
+
+**Verified live (as Emulsion, before the rename; same code paths):**
+- Install: `scripts/install.sh` succeeded; `pluginkit` listed the extension.
+- Photos permission prompt shown on first launch and approved by the user.
+- `--selftest-photos`: `SELFTEST PASS` (import into "Emulsion Test", save Velvia + grain, `hasAdjustments=true`, recipe equal on reopen, revert, `hasAdjustments=false`, recipe neutral). The first two runs crashed (PhotoKit change block isolated to the main actor under Swift 6); fixed by `PhotoKitBridge`, no crash since.
+- Library grid with albums, smart albums, counts and EDITED badges; thumbnails sharpen after the opportunistic pass (`v-library.png`, `v-library-edited2.png`).
+- Editor on the test asset through the UI: Velvia 50, Grain 0.40, Halation 0.30, SAVE → "SAVED TO PHOTOS", EDITED badge appears via the change observer, reopening restores every slider (`v-editor-velvia-light.png`, `v-saved.png`, `v-reopen.png`).
+- Hover preview: "PREVIEW · NEOPAN ACROS 100" on a B&W canvas while Velvia stays applied; leaving the strip returns to Velvia (`v-hover-light.png`, `v-hover-exit.png`). The first attempt showed no preview (hover image was not observable); fixed, with a regression test.
+- Reserved description space: the inspector does not shift between Original and a film.
+- Light and dark appearance (`v-editor-dark.png`, `v-films-dark.png`).
+
+**Verified after the rename to Mira:**
+- Old app quit, old extension removed with `pluginkit -r`, `/Applications/Emulsion.app` deleted; `scripts/install.sh` from `~/Developer/Active/Mira` succeeded; `pluginkit -m -p com.apple.photo-editing -v` lists `com.fieldframes.mira.photos` and not `com.dwjames.emulsion.photos`. Bundle id `com.fieldframes.mira`, team VF945J28YU.
+- Mira launches, asks for Photos access again (new bundle id) (`m-launch.png`); Films window with fixed chrome and byline (`m-films.png`).
+- Tests: MiraCore 36, MiraUI 12, all passing.
+
+**Not verified live:** the in-app REVERT button (revert verified through the self-test only), the Photos extension inside Photos, Finder double-click / `open -a` file opening and sidecars from the UI, RAW files, reopening the legacy-edited test asset in Mira (covered by unit tests).
