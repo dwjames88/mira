@@ -42,6 +42,16 @@ enum Current {
             }
         }
 
+        // Straighten drag in the crop tool: every frame has new geometry, so the base is rebuilt each time.
+        var tickSamples: [Double] = []
+        for i in 0..<60 {
+            var r = Bench.effectsRecipe
+            r.crop.straighten = -20 + 40 * Double(i) / 59
+            tickSamples.append(Bench.time { engine.render(r, canvas: canvas) }.1)
+        }
+        let t = Bench.stats(tickSamples)
+        Bench.row("a. crop tool: straighten drag frame", String(format: "median %7.1f ms   p95 %7.1f ms", t.median, t.p95))
+
         // Frame via CGImage readback (the old hand-off) on the same cached base, for comparison.
         if let base = engine.previewBase(crop: .identity, canvas: canvas) {
             var cgSamples: [Double] = []
