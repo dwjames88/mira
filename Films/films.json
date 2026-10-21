@@ -1,0 +1,312 @@
+[
+  {
+    "id": "agfa-ultra-color-100",
+    "displayName": "Ultra Color 100",
+    "brand": "Agfa",
+    "family": "colorNegative",
+    "iso": "100",
+    "description": "Rich, saturated hues with bold, warm reds.",
+    "file": "HaldCLUT/agfa-ultra-color-100.png",
+    "source": "HaldCLUT/Color/Agfa/Agfa Ultra Color 100.png"
+  },
+  {
+    "id": "agfa-vista-200",
+    "displayName": "Vista 200",
+    "brand": "Agfa",
+    "family": "colorNegative",
+    "iso": "200",
+    "description": "Warm reds and golden light with a nostalgic feel.",
+    "file": "HaldCLUT/agfa-vista-200.png",
+    "source": "HaldCLUT/Color/Agfa/Agfa Vista 200.png"
+  },
+  {
+    "id": "fuji-pro-400h",
+    "displayName": "Pro 400H",
+    "brand": "Fujifilm",
+    "family": "colorNegative",
+    "iso": "400",
+    "description": "Cool, airy greens and delicate, luminous skin.",
+    "file": "HaldCLUT/fuji-pro-400h.png",
+    "source": "HaldCLUT/Color/Fuji/Fuji 400H 2.png"
+  },
+  {
+    "id": "fuji-superia-200",
+    "displayName": "Superia 200",
+    "brand": "Fujifilm",
+    "family": "colorNegative",
+    "iso": "200",
+    "description": "Everyday snapshot colour with lively greens and blues.",
+    "file": "HaldCLUT/fuji-superia-200.png",
+    "source": "HaldCLUT/Color/Fuji/Fuji Superia 200.png"
+  },
+  {
+    "id": "fuji-superia-400",
+    "displayName": "Superia 400",
+    "brand": "Fujifilm",
+    "family": "colorNegative",
+    "iso": "400",
+    "description": "Punchy consumer-film colour with a cool green cast.",
+    "file": "HaldCLUT/fuji-superia-400.png",
+    "source": "HaldCLUT/Color/Fuji/Fuji Superia 400 2.png"
+  },
+  {
+    "id": "fuji-superia-reala-100",
+    "displayName": "Superia Reala 100",
+    "brand": "Fujifilm",
+    "family": "colorNegative",
+    "iso": "100",
+    "description": "Clean, accurate colour with neutral, true-to-life tones.",
+    "file": "HaldCLUT/fuji-superia-reala-100.png",
+    "source": "HaldCLUT/Color/Fuji/Fuji Superia Reala 100.png"
+  },
+  {
+    "id": "kodak-ektar-100",
+    "displayName": "Ektar 100",
+    "brand": "Kodak",
+    "family": "colorNegative",
+    "iso": "100",
+    "description": "Vivid, saturated colour with crisp contrast.",
+    "file": "HaldCLUT/kodak-ektar-100.png",
+    "source": "HaldCLUT/Color/Kodak/Kodak Ektar 100.png"
+  },
+  {
+    "id": "kodak-portra-160",
+    "displayName": "Portra 160",
+    "brand": "Kodak",
+    "family": "colorNegative",
+    "iso": "160",
+    "description": "Fine, gentle pastels with natural, muted skin tones.",
+    "file": "HaldCLUT/kodak-portra-160.png",
+    "source": "HaldCLUT/Color/Kodak/Kodak Portra 160 2.png"
+  },
+  {
+    "id": "kodak-portra-400",
+    "displayName": "Portra 400",
+    "brand": "Kodak",
+    "family": "colorNegative",
+    "iso": "400",
+    "description": "Warm, forgiving skin tones with soft pastel highlights.",
+    "file": "HaldCLUT/kodak-portra-400.png",
+    "source": "HaldCLUT/Color/Kodak/Kodak Portra 400 2.png"
+  },
+  {
+    "id": "kodak-portra-800",
+    "displayName": "Portra 800",
+    "brand": "Kodak",
+    "family": "colorNegative",
+    "iso": "800",
+    "description": "Low-light warmth with a touch more grain-era punch.",
+    "file": "HaldCLUT/kodak-portra-800.png",
+    "source": "HaldCLUT/Color/Kodak/Kodak Portra 800 2.png"
+  },
+  {
+    "id": "agfa-precisa-100",
+    "displayName": "Precisa 100",
+    "brand": "Agfa",
+    "family": "slide",
+    "iso": "100",
+    "description": "Neutral, balanced slide colour with gentle contrast.",
+    "file": "HaldCLUT/agfa-precisa-100.png",
+    "source": "HaldCLUT/Color/Agfa/Agfa Precisa 100.png"
+  },
+  {
+    "id": "fuji-astia-100f",
+    "displayName": "Astia 100F",
+    "brand": "Fujifilm",
+    "family": "slide",
+    "iso": "100",
+    "description": "Soft contrast and smooth, natural skin rendering.",
+    "file": "HaldCLUT/fuji-astia-100f.png",
+    "source": "HaldCLUT/Color/Fuji/Fuji Astia 100F.png"
+  },
+  {
+    "id": "fuji-provia-100f",
+    "displayName": "Provia 100F",
+    "brand": "Fujifilm",
+    "family": "slide",
+    "iso": "100",
+    "description": "Neutral, clean slide colour with fine tonal detail.",
+    "file": "HaldCLUT/fuji-provia-100f.png",
+    "source": "HaldCLUT/Color/Fuji/Fuji Provia 100F.png"
+  },
+  {
+    "id": "fuji-velvia-50",
+    "displayName": "Velvia 50",
+    "brand": "Fujifilm",
+    "family": "slide",
+    "iso": "50",
+    "description": "Deeply saturated landscape colour with strong contrast.",
+    "file": "HaldCLUT/fuji-velvia-50.png",
+    "source": "HaldCLUT/Color/Fuji/Fuji Velvia 50.png"
+  },
+  {
+    "id": "kodak-ektachrome-100-vs",
+    "displayName": "Ektachrome 100 VS",
+    "brand": "Kodak",
+    "family": "slide",
+    "iso": "100",
+    "description": "Vibrant, cool-leaning slide colour with a bright snap.",
+    "file": "HaldCLUT/kodak-ektachrome-100-vs.png",
+    "source": "HaldCLUT/Color/Kodak/Kodak Ektachrome 100 VS.png"
+  },
+  {
+    "id": "kodak-kodachrome-64",
+    "displayName": "Kodachrome 64",
+    "brand": "Kodak",
+    "family": "slide",
+    "iso": "64",
+    "description": "Classic rich reds and warm, dense midtones.",
+    "file": "HaldCLUT/kodak-kodachrome-64.png",
+    "source": "HaldCLUT/Color/Kodak/Kodak Kodachrome 64.png"
+  },
+  {
+    "id": "lomography-x-pro-slide-200",
+    "displayName": "X-Pro Slide 200",
+    "brand": "Lomography",
+    "family": "slide",
+    "iso": "200",
+    "description": "Cross-processed slide with shifted colour and high contrast.",
+    "file": "HaldCLUT/lomography-x-pro-slide-200.png",
+    "source": "HaldCLUT/Color/Lomography/Lomography X-Pro Slide 200.png"
+  },
+  {
+    "id": "fuji-neopan-acros-100",
+    "displayName": "Neopan Acros 100",
+    "brand": "Fujifilm",
+    "family": "blackAndWhite",
+    "iso": "100",
+    "description": "Smooth, deep blacks with extremely fine tonal detail.",
+    "file": "HaldCLUT/fuji-neopan-acros-100.png",
+    "source": "HaldCLUT/Black-and-White/Fuji/Fuji Neopan Acros 100.png"
+  },
+  {
+    "id": "ilford-delta-100",
+    "displayName": "Delta 100",
+    "brand": "Ilford",
+    "family": "blackAndWhite",
+    "iso": "100",
+    "description": "Smooth, fine monochrome with delicate gradation.",
+    "file": "HaldCLUT/ilford-delta-100.png",
+    "source": "HaldCLUT/Black-and-White/Ilford/Ilford Delta 100.png"
+  },
+  {
+    "id": "ilford-fp4-plus-125",
+    "displayName": "FP4 Plus 125",
+    "brand": "Ilford",
+    "family": "blackAndWhite",
+    "iso": "125",
+    "description": "Classic soft-toned monochrome with gentle contrast.",
+    "file": "HaldCLUT/ilford-fp4-plus-125.png",
+    "source": "HaldCLUT/Black-and-White/Ilford/Ilford FP4 Plus 125.png"
+  },
+  {
+    "id": "ilford-hp5-plus-400",
+    "displayName": "HP5 Plus 400",
+    "brand": "Ilford",
+    "family": "blackAndWhite",
+    "iso": "400",
+    "description": "Versatile black and white with wide, forgiving tonality.",
+    "file": "HaldCLUT/ilford-hp5-plus-400.png",
+    "source": "HaldCLUT/Black-and-White/Ilford/Ilford HP5 2.png"
+  },
+  {
+    "id": "ilford-pan-f-plus-50",
+    "displayName": "Pan F Plus 50",
+    "brand": "Ilford",
+    "family": "blackAndWhite",
+    "iso": "50",
+    "description": "Ultra-fine, high-detail monochrome with crisp whites.",
+    "file": "HaldCLUT/ilford-pan-f-plus-50.png",
+    "source": "HaldCLUT/Black-and-White/Ilford/Ilford Pan F Plus 50.png"
+  },
+  {
+    "id": "kodak-t-max-100",
+    "displayName": "T-Max 100",
+    "brand": "Kodak",
+    "family": "blackAndWhite",
+    "iso": "100",
+    "description": "Fine-grained, crisp black and white with smooth tones.",
+    "file": "HaldCLUT/kodak-t-max-100.png",
+    "source": "HaldCLUT/Black-and-White/Kodak/Kodak T-Max 100.png"
+  },
+  {
+    "id": "kodak-t-max-400",
+    "displayName": "T-Max 400",
+    "brand": "Kodak",
+    "family": "blackAndWhite",
+    "iso": "400",
+    "description": "Clean, sharp monochrome with a modern tonal curve.",
+    "file": "HaldCLUT/kodak-t-max-400.png",
+    "source": "HaldCLUT/Black-and-White/Kodak/Kodak T-Max 400.png"
+  },
+  {
+    "id": "kodak-tri-x-400",
+    "displayName": "Tri-X 400",
+    "brand": "Kodak",
+    "family": "blackAndWhite",
+    "iso": "400",
+    "description": "Gritty classic reportage black and white, rich contrast.",
+    "file": "HaldCLUT/kodak-tri-x-400.png",
+    "source": "HaldCLUT/Black-and-White/Kodak/Kodak TRI-X 400 2.png"
+  },
+  {
+    "id": "fuji-fp-100c",
+    "displayName": "FP-100C",
+    "brand": "Fujifilm",
+    "family": "instant",
+    "iso": "100",
+    "description": "Peel-apart instant look with soft, natural colour.",
+    "file": "HaldCLUT/fuji-fp-100c.png",
+    "source": "HaldCLUT/Color/Fuji/Fuji FP-100c 3.png"
+  },
+  {
+    "id": "polaroid-669",
+    "displayName": "Polaroid 669",
+    "brand": "Polaroid",
+    "family": "instant",
+    "iso": "80",
+    "description": "Classic peel-apart instant with a gentle cool tint.",
+    "file": "HaldCLUT/polaroid-669.png",
+    "source": "HaldCLUT/Color/Polaroid/Polaroid 669 3.png"
+  },
+  {
+    "id": "polaroid-690",
+    "displayName": "Polaroid 690",
+    "brand": "Polaroid",
+    "family": "instant",
+    "iso": "80",
+    "description": "Faded, slightly warm instant print with lifted blacks.",
+    "file": "HaldCLUT/polaroid-690.png",
+    "source": "HaldCLUT/Color/Polaroid/Polaroid 690 3.png"
+  },
+  {
+    "id": "polaroid-px-680",
+    "displayName": "Polaroid PX-680",
+    "brand": "Polaroid",
+    "family": "instant",
+    "iso": "600",
+    "description": "Bold instant colour with warm, contrasty shadows.",
+    "file": "HaldCLUT/polaroid-px-680.png",
+    "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 3.png"
+  },
+  {
+    "id": "polaroid-px-70",
+    "displayName": "Polaroid PX-70",
+    "brand": "Polaroid",
+    "family": "instant",
+    "iso": "80",
+    "description": "Dreamy, pastel instant colour with a hazy glow.",
+    "file": "HaldCLUT/polaroid-px-70.png",
+    "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 3.png"
+  },
+  {
+    "id": "polaroid-time-zero-expired",
+    "displayName": "Time Zero Expired",
+    "brand": "Polaroid",
+    "family": "instant",
+    "iso": "80",
+    "description": "Expired-film drift with muddy tones and colour shifts.",
+    "file": "HaldCLUT/polaroid-time-zero-expired.png",
+    "source": "HaldCLUT/Color/Polaroid/Polaroid Time Zero (Expired) 4.png"
+  }
+]
