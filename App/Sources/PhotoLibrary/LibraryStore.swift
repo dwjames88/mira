@@ -56,7 +56,9 @@ final class LibraryStore {
         let options = PHImageRequestOptions()
         options.deliveryMode = .opportunistic
         options.resizeMode = .fast
-        options.isNetworkAccessAllowed = false
+        // iCloud-optimised libraries keep many originals and thumbnails off the Mac; opportunistic
+        // delivery still shows any local low-quality image first, then the downloaded one.
+        options.isNetworkAccessAllowed = true
         return options
     }()
     /// The last thumbnail each cell showed, so opening a photo can show it at once.
