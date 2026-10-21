@@ -189,3 +189,15 @@ Run on macOS 27.0, Xcode 27.0, arm64, against the user's real Photos library (48
 - Tests: MiraCore 36, MiraUI 12, all passing.
 
 **Not verified live:** the in-app REVERT button (revert verified through the self-test only), the Photos extension inside Photos, Finder double-click / `open -a` file opening and sidecars from the UI, RAW files, reopening the legacy-edited test asset in Mira (covered by unit tests).
+
+## Verification log (2026-10-21)
+
+Installed with `scripts/install.sh` (Mira already granted Photos access), driven against the real library:
+
+- Sidebar: LIBRARY (Library 48,873, Favourites, Recently Saved), STARS (★★★★★, Flagged, Rejected pulled out of Albums), ALBUMS with real folders (Trips expands to nested albums and sub-folders, sorted like Photos), SHARED ALBUMS, MEDIA TYPES (Selfies … RAW, Animated). No UTILITIES section: PhotoKit returned no non-empty Hidden, Recently Deleted or Imports album for this library. Up/Down moves the selection.
+- Opening the test asset: canvas showed the photo 0.3 s after Return; its recipe saved by Emulsion (`com.dwjames.emulsion`) was restored (legacy read verified live).
+- Crop: toolbar CROP → handles, dimming, controls; SQUARE + 7.0° straighten; corner drag keeps the square; DONE shows the cropped result and `CROP · SQUARE · 7.0°`; film strip thumbnails cropped; SAVE → Photos thumbnail is the cropped image; reopening restores the crop; in-app REVERT (confirmation dialog) returns the uncropped original with neutral sliders. The test asset is left reverted.
+- Grid: scrolling deep into the library, thumbnails (including RAW + EDITED badges) filled within about a second.
+- Benchmarks (`mira-sheet --bench --films Films`, 24 MP synthetic, 1500×1000 canvas, M1 Pro): preview frame 12.0 → 4.7 ms median (p95 13.6 → 6.5); with crop + 6° straighten 6.5 → 3.8 ms; first preview 62 → 53 ms; 32 thumbnails warm ~40–57 ms; 24 MP export ~100–110 ms.
+
+Not measured: SwiftUI-side slider drag latency and grid scroll frame rate (no reliable headless measure); use the `com.fieldframes.mira` / `perf` signposts in Instruments.
