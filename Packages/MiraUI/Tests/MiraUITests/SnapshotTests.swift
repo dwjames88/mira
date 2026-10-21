@@ -66,6 +66,22 @@ struct SnapshotTests {
         }
         model.recipe.filmID = nil
         try Self.writePNG(EditorView(model: model), size: CGSize(width: 1280, height: 800), scheme: .dark, name: "editor-original-dark")
+        model.recipe.filmID = "fuji-velvia-50"
+
+        // Crop mode: 3:2 box, 6 degrees straighten, grid forced on so it can be inspected.
+        model.beginCrop()
+        model.straighten = 6
+        model.setAspect("3:2")
+        let canvas = try #require(model.cropCanvasSize)
+        let boxW = 0.72, boxH = boxW * canvas.width / canvas.height / 1.5
+        model.crop.rect = CropRect(x: 0.16, y: 0.2, w: boxW, h: boxH)
+        let deadline = Date().addingTimeInterval(30)
+        let canvasBefore = model.previewImage
+        while model.previewImage === canvasBefore, Date() < deadline { try await Task.sleep(for: .milliseconds(50)) }
+        try await Task.sleep(for: .milliseconds(300))
+        try Self.writePNG(EditorView(model: model).environment(\.ffCropForceGrid, true),
+                          size: CGSize(width: 1280, height: 800), scheme: .dark, name: "editor-crop-dark")
+        model.cancelCrop()
         model.cancelWork()
     }
 }

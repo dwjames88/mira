@@ -15,6 +15,10 @@ public struct EditorView: View {
         HStack(spacing: 0) {
             VStack(spacing: 0) {
                 PreviewPane(model: model)
+                if model.isCropping {
+                    FFHairline()
+                    CropControls(model: model)
+                }
                 FFHairline()
                 FilmStrip(model: model)
             }
@@ -43,6 +47,10 @@ private struct PreviewPane: View {
                     .aspectRatio(contentMode: .fit)
                     .padding(T.cells(3))
                     .accessibilityLabel(model.showOriginal ? "Original photo" : "Edited photo")
+                if model.isCropping {
+                    CropOverlay(model: model)
+                        .padding(T.cells(3))
+                }
             } else {
                 Text("Developing").ffLabel()
             }
@@ -61,13 +69,33 @@ private struct PreviewPane: View {
             }
         }
         .overlay(alignment: .bottomTrailing) {
-            CompareButton(model: model)
-                .padding(T.cells(2))
+            if !model.isCropping {
+                CompareButton(model: model)
+                    .padding(T.cells(2))
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            if !model.isCropping {
+                Button("Crop") { model.beginCrop() }
+                    .buttonStyle(.ff)
+                    .background(T.backdrop)
+                    .padding(T.cells(2))
+                    .disabled(model.displayedImage == nil)
+                    .help("Crop, rotate and straighten (C)")
+            }
+        }
+        .background {
+            // C toggles the crop tool in both hosts (Done when it is already open).
+            Button("Toggle crop") { model.toggleCrop() }
+                .keyboardShortcut("c", modifiers: [])
+                .opacity(0)
+                .frame(width: 0, height: 0)
+                .accessibilityHidden(true)
         }
         .contentShape(Rectangle())
-        .gesture(holdToCompare(model))
+        .gesture(holdToCompare(model), isEnabled: !model.isCropping)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .help("Press and hold to see the original")
+        .help(model.isCropping ? "" : "Press and hold to see the original")
     }
 }
 
@@ -246,7 +274,7 @@ private struct InspectorView: View {
                 Spacer()
                 Button("Reset") { model.reset() }
                     .buttonStyle(FFButtonStyle())
-                    .disabled(model.recipe == Recipe(filmID: model.recipe.filmID))
+                    .disabled(model.recipe == Recipe(filmID: model.recipe.filmID, crop: model.recipe.crop))
                     .help("Reset all sliders and keep the selected film")
             }
             .padding(.horizontal, T.cells(2))
@@ -269,6 +297,12 @@ private struct InspectorView: View {
                 .ffLabel(color: T.lichen)
                 .lineLimit(1)
                 .frame(height: T.rows(1), alignment: .leading)
+            // Reserved even when the picture is not cropped, so the header never changes height.
+            Text(cropLine ?? " ")
+                .ffLabel(color: T.paperDim)
+                .lineLimit(1)
+                .frame(height: T.rows(1), alignment: .leading)
+                .accessibilityHidden(cropLine == nil)
             Text(descriptionText)
                 .font(.system(size: 12))
                 .lineSpacing(2)
@@ -288,6 +322,20 @@ private struct InspectorView: View {
         guard let film = model.selectedFilm else { return "No film \u{00B7} source image" }
         let iso = film.iso > 0 ? "ISO \(film.iso)" : nil
         return [film.brand, iso, film.family.displayName].compactMap { $0 }.joined(separator: " \u{00B7} ")
+    }
+
+    /// `CROP · 3:2 · 4.2°`, nil when the committed crop is the identity.
+    private var cropLine: String? {
+        let c = model.recipe.crop
+        guard !c.isIdentity else { return nil }
+        var parts = ["Crop"]
+        if !c.rect.isFull { parts.append(c.aspect == CropAspect.free ? "Free" : CropAspect.label(c.aspect)) }
+        if abs(c.straighten) > 1e-9 {
+            parts.append(c.straighten.formatted(.number.precision(.fractionLength(1))) + "\u{00B0}")
+        }
+        if c.normalizedQuarterTurns != 0 { parts.append("\(c.normalizedQuarterTurns * 90)\u{00B0} turn") }
+        if c.flipH || c.flipV { parts.append("Flip " + (c.flipH ? "H" : "") + (c.flipV ? "V" : "")) }
+        return parts.joined(separator: " \u{00B7} ")
     }
 
     private var descriptionText: String {
