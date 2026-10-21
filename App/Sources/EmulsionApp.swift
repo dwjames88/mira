@@ -7,6 +7,10 @@ struct EmulsionApp: App {
     @State private var state = AppState()
     @Environment(\.openWindow) private var openWindow
 
+    init() {
+        FieldFramesTheme.registerFonts()
+    }
+
     var body: some Scene {
         Window("Emulsion", id: "main") {
             ContentView(state: state)

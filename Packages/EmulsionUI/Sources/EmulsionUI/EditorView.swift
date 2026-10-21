@@ -1,6 +1,8 @@
 import EmulsionCore
 import SwiftUI
 
+private typealias T = FieldFramesTheme
+
 /// The shared editor: preview, film strip and inspector.
 public struct EditorView: View {
     @Bindable private var model: EditorModel
@@ -13,13 +15,15 @@ public struct EditorView: View {
         HStack(spacing: 0) {
             VStack(spacing: 0) {
                 PreviewPane(model: model)
+                FFHairline()
                 FilmStrip(model: model)
             }
-            Divider()
+            FFHairline(.vertical)
             InspectorView(model: model)
-                .frame(width: 280)
+                .frame(width: T.cells(36))
         }
         .frame(minWidth: 760, minHeight: 520)
+        .fieldFramesWindow()
     }
 }
 
@@ -29,20 +33,23 @@ private struct PreviewPane: View {
     @Bindable var model: EditorModel
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            Color(white: 0.09)
+        ZStack {
+            // The photograph sits on plain ink: no grain, no veil over it.
+            T.ink
             if let image = model.displayedImage {
                 Image(nsImage: image)
                     .resizable()
                     .interpolation(.high)
                     .aspectRatio(contentMode: .fit)
-                    .padding(16)
+                    .padding(T.cells(3))
                     .accessibilityLabel(model.showOriginal ? "Original photo" : "Edited photo")
             } else {
-                ProgressView()
+                Text("Developing").ffLabel()
             }
+        }
+        .overlay(alignment: .bottomTrailing) {
             CompareButton(model: model)
-                .padding(16)
+                .padding(T.cells(2))
         }
         .contentShape(Rectangle())
         .gesture(holdToCompare(model))
@@ -62,15 +69,15 @@ private struct CompareButton: View {
     @Bindable var model: EditorModel
 
     var body: some View {
-        Label("Compare", systemImage: "square.split.2x1")
-            .font(.callout.weight(.medium))
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .glassEffect(.regular.interactive(), in: .capsule)
-            .contentShape(Capsule())
-            .gesture(holdToCompare(model))
-            .accessibilityAddTraits(.isButton)
-            .accessibilityHint("Press and hold to show the original")
+        FFButtonChrome(pressed: model.showOriginal) {
+            Text("Hold to compare")
+        }
+        .background(T.backdrop)
+        .gesture(holdToCompare(model))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Compare")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Press and hold to show the original")
     }
 }
 
@@ -79,90 +86,42 @@ private struct CompareButton: View {
 private struct FilmStrip: View {
     @Bindable var model: EditorModel
 
+    private var tabs: [(value: FilmFamily?, title: String)] {
+        [(nil, "All")] + FilmFamily.allCases.map { (Optional($0), $0.displayName) }
+    }
+
     var body: some View {
-        VStack(spacing: 8) {
-            Picker("Family", selection: $model.familyFilter) {
-                Text("All").tag(FilmFamily?.none)
-                ForEach(FilmFamily.allCases, id: \.self) { family in
-                    Text(family.displayName).tag(FilmFamily?.some(family))
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(maxWidth: 520)
-            .padding(.top, 10)
+        VStack(alignment: .leading, spacing: 0) {
+            FFTabBar(tabs, selection: $model.familyFilter)
+                .padding(.horizontal, T.cells(2))
+            FFHairline()
+            FFScrollView(.horizontal) {
+                HStack(alignment: .top, spacing: T.cells(1)) {
+                    FilmCard(
+                        title: "Original", caption: "No film",
+                        image: model.thumbnails[EditorModel.originalTileID],
+                        isSelected: model.recipe.filmID == nil
+                    ) { model.selectFilm(nil) }
 
-            ScrollView(.horizontal) {
-                GlassEffectContainer(spacing: 10) {
-                    HStack(spacing: 10) {
-                        FilmTile(
-                            title: "Original", caption: "No film",
-                            image: model.thumbnails[EditorModel.originalTileID],
-                            isSelected: model.recipe.filmID == nil
-                        ) { model.selectFilm(nil) }
-
-                        ForEach(model.visibleFilms) { film in
-                            FilmTile(
-                                title: film.displayName,
-                                caption: caption(for: film),
-                                image: model.thumbnails[film.id],
-                                isSelected: model.recipe.filmID == film.id
-                            ) { model.selectFilm(film.id) }
-                        }
+                    ForEach(model.visibleFilms) { film in
+                        FilmCard(
+                            title: film.displayName,
+                            caption: caption(for: film),
+                            image: model.thumbnails[film.id],
+                            isSelected: model.recipe.filmID == film.id
+                        ) { model.selectFilm(film.id) }
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 4)
                 }
+                .padding(.horizontal, T.cells(2) - 4)
+                .padding(.vertical, T.rows(1) / 2)
             }
-            .scrollIndicators(.automatic)
+            .frame(height: T.rows(9))
         }
-        .padding(.bottom, 10)
-        .background(.bar)
+        .ffPanel()
     }
 
     private func caption(for film: Film) -> String {
-        film.iso > 0 ? "\(film.brand) \(film.iso)" : film.brand
-    }
-}
-
-private struct FilmTile: View {
-    let title: String
-    let caption: String
-    let image: NSImage?
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 4) {
-                ZStack {
-                    Rectangle().fill(.quaternary)
-                    if let image {
-                        Image(nsImage: image)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    }
-                }
-                .frame(width: 104, height: 78)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .strokeBorder(Color.accentColor, lineWidth: isSelected ? 3 : 0)
-                }
-                Text(title)
-                    .font(.caption.weight(.medium))
-                    .lineLimit(1)
-                Text(caption)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            .frame(width: 112)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(title), \(caption)")
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        film.iso > 0 ? "\(film.brand) \u{00B7} \(film.iso)" : film.brand
     }
 }
 
@@ -174,27 +133,47 @@ private struct SliderSpec: Identifiable {
     let keyPath: WritableKeyPath<Recipe, Double>
     let range: ClosedRange<Double>
     let defaultValue: Double
+
+    init(_ id: String, _ label: String, _ keyPath: WritableKeyPath<Recipe, Double>,
+         _ range: ClosedRange<Double>, default defaultValue: Double) {
+        self.id = id
+        self.label = label
+        self.keyPath = keyPath
+        self.range = range
+        self.defaultValue = defaultValue
+    }
+}
+
+private struct SliderGroup: Identifiable {
+    let title: String
+    let specs: [SliderSpec]
+    var id: String { title }
 }
 
 private struct InspectorView: View {
     @Bindable var model: EditorModel
 
-    private var specs: [SliderSpec] {
-        [
-            SliderSpec(id: "strength", label: "Strength", keyPath: \.strength, range: 0...1, defaultValue: 1),
-            SliderSpec(id: "exposure", label: "Exposure", keyPath: \.exposure, range: -2...2, defaultValue: 0),
-            SliderSpec(id: "contrast", label: "Contrast", keyPath: \.contrast, range: -1...1, defaultValue: 0),
-            SliderSpec(id: "saturation", label: "Saturation", keyPath: \.saturation, range: -1...1, defaultValue: 0),
-            SliderSpec(id: "warmth", label: "Warmth", keyPath: \.warmth, range: -1...1, defaultValue: 0),
-            SliderSpec(id: "tint", label: "Tint", keyPath: \.tint, range: -1...1, defaultValue: 0),
-            SliderSpec(id: "grain", label: "Grain", keyPath: \.grainAmount, range: 0...1, defaultValue: 0),
-            SliderSpec(id: "grainSize", label: "Grain Size", keyPath: \.grainSize, range: 0...1, defaultValue: 0.5),
-            SliderSpec(id: "halation", label: "Halation", keyPath: \.halationAmount, range: 0...1, defaultValue: 0),
-            SliderSpec(id: "halationRadius", label: "Halation Radius", keyPath: \.halationRadius, range: 0...1, defaultValue: 0.5),
-            SliderSpec(id: "bloom", label: "Bloom", keyPath: \.bloomAmount, range: 0...1, defaultValue: 0),
-            SliderSpec(id: "vignette", label: "Vignette", keyPath: \.vignetteAmount, range: 0...1, defaultValue: 0),
-        ]
-    }
+    private static let groups: [SliderGroup] = [
+        SliderGroup(title: "Film", specs: [
+            SliderSpec("strength", "Strength", \.strength, 0...1, default: 1),
+        ]),
+        SliderGroup(title: "Tone", specs: [
+            SliderSpec("exposure", "Exposure", \.exposure, -2...2, default: 0),
+            SliderSpec("contrast", "Contrast", \.contrast, -1...1, default: 0),
+        ]),
+        SliderGroup(title: "Colour", specs: [
+            SliderSpec("saturation", "Saturation", \.saturation, -1...1, default: 0),
+            SliderSpec("warmth", "Warmth", \.warmth, -1...1, default: 0),
+            SliderSpec("tint", "Tint", \.tint, -1...1, default: 0),
+        ]),
+        SliderGroup(title: "Texture", specs: [
+            SliderSpec("grain", "Grain", \.grainAmount, 0...1, default: 0),
+            SliderSpec("grainSize", "Grain size", \.grainSize, 0...1, default: 0.5),
+            SliderSpec("halation", "Halation", \.halationAmount, 0...1, default: 0),
+            SliderSpec("halationRadius", "Halation radius", \.halationRadius, 0...1, default: 0.5),
+            SliderSpec("bloom", "Bloom", \.bloomAmount, 0...1, default: 0),
+        ]),
+    ]
 
     private func binding(_ keyPath: WritableKeyPath<Recipe, Double>) -> Binding<Double> {
         Binding(
@@ -202,72 +181,90 @@ private struct InspectorView: View {
             set: { model.recipe[keyPath: keyPath] = $0 })
     }
 
+    private func sliders(_ specs: [SliderSpec]) -> some View {
+        ForEach(specs) { spec in
+            FFSlider(spec.label, value: binding(spec.keyPath), in: spec.range, default: spec.defaultValue)
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    header
-                    ForEach(specs) { spec in
-                        SliderRow(spec: spec, value: binding(spec.keyPath))
+            header
+                .padding(.horizontal, T.cells(2))
+                .padding(.top, T.rows(2))
+                .padding(.bottom, T.rows(1))
+            FFHairline()
+            FFScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Self.groups) { group in
+                        FFSectionLabel(group.title)
+                            .padding(.top, T.rows(1))
+                            .padding(.bottom, 4)
+                        sliders(group.specs)
                     }
-                    Divider()
-                    Toggle("Border", isOn: $model.recipe.borderEnabled)
+                    FFSectionLabel("Frame")
+                        .padding(.top, T.rows(1))
+                        .padding(.bottom, 4)
+                    sliders([SliderSpec("vignette", "Vignette", \.vignetteAmount, 0...1, default: 0)])
+                    FFToggle("Border", isOn: $model.recipe.borderEnabled)
+                        .padding(.bottom, 8)
                     if model.recipe.borderEnabled {
-                        SliderRow(
-                            spec: SliderSpec(id: "borderWidth", label: "Border Width", keyPath: \.borderWidth,
-                                             range: 0...0.3, defaultValue: 0.04),
-                            value: binding(\.borderWidth))
+                        sliders([SliderSpec("borderWidth", "Border width", \.borderWidth, 0...0.3, default: 0.04)])
                     }
                 }
-                .padding(16)
+                .padding(.horizontal, T.cells(2))
+                .padding(.bottom, T.rows(1))
             }
-            Divider()
+            FFHairline()
             HStack {
                 Spacer()
                 Button("Reset") { model.reset() }
-                    .buttonStyle(.glass)
+                    .buttonStyle(FFButtonStyle())
                     .disabled(model.recipe == Recipe(filmID: model.recipe.filmID))
                     .help("Reset all sliders and keep the selected film")
             }
-            .padding(12)
+            .padding(.horizontal, T.cells(2))
+            .padding(.vertical, T.rows(1))
         }
-        .background(.regularMaterial)
+        .ffPanel()
     }
 
+    /// Fixed-height header: name (one line), meta label (one line), description (three lines). The
+    /// height is the same for Original and every film, so the sliders below never shift.
     private var header: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 0) {
             Text(model.selectedFilm?.displayName ?? "Original")
-                .font(.headline)
-            if let film = model.selectedFilm {
-                Text(film.description)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+                .font(T.display(26, weight: .medium))
+                .foregroundStyle(T.paper)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .frame(height: T.rows(2), alignment: .leading)
+            Text(metaLine)
+                .ffLabel(color: T.lichen)
+                .lineLimit(1)
+                .frame(height: T.rows(1), alignment: .leading)
+            Text(descriptionText)
+                .font(.system(size: 12))
+                .lineSpacing(2)
+                .foregroundStyle(T.paperMid)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, minHeight: Self.descriptionHeight, maxHeight: Self.descriptionHeight,
+                       alignment: .topLeading)
+                .padding(.top, 6)
         }
     }
-}
 
-private struct SliderRow: View {
-    let spec: SliderSpec
-    @Binding var value: Double
+    /// Three lines of 12 pt text with 2 pt line spacing.
+    private static let descriptionHeight: CGFloat = T.rows(3) + 4
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                Text(spec.label)
-                    .contentShape(Rectangle())
-                    .onTapGesture(count: 2) { value = spec.defaultValue }
-                    .help("Double-click to reset")
-                Spacer()
-                Text(value, format: .number.precision(.fractionLength(2)))
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-            }
-            .font(.callout)
-            Slider(value: $value, in: spec.range)
-                .labelsHidden()
-                .accessibilityLabel(spec.label)
-        }
+    private var metaLine: String {
+        guard let film = model.selectedFilm else { return "No film \u{00B7} source image" }
+        let iso = film.iso > 0 ? "ISO \(film.iso)" : nil
+        return [film.brand, iso, film.family.displayName].compactMap { $0 }.joined(separator: " \u{00B7} ")
+    }
+
+    private var descriptionText: String {
+        model.selectedFilm?.description ?? "The photograph as it was taken. Choose a film from the strip to grade it."
     }
 }

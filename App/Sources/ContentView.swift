@@ -16,9 +16,9 @@ struct ContentView: View {
         }
         .overlay {
             if isTargeted {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(Color.accentColor, lineWidth: 3)
-                    .padding(8)
+                Rectangle()
+                    .strokeBorder(FieldFramesTheme.lichen, lineWidth: 1)
+                    .padding(FieldFramesTheme.cells(1))
                     .allowsHitTesting(false)
             }
         }
@@ -27,6 +27,7 @@ struct ContentView: View {
             state.open(url: url)
             return true
         } isTargeted: { isTargeted = $0 }
+        .fieldFramesWindow()
         .toolbar {
             ToolbarItemGroup {
                 Button("Open", systemImage: "photo.badge.plus") { state.presentOpenPanel() }
@@ -53,25 +54,12 @@ private struct EmptyState: View {
     let state: AppState
 
     var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "film")
-                .font(.system(size: 56, weight: .light))
-                .foregroundStyle(.secondary)
-            Text("Open a photo")
-                .font(.largeTitle.weight(.semibold))
-            Text("Drop an image here, or choose one to start.")
-                .foregroundStyle(.secondary)
-            Button("Open\u{2026}") { state.presentOpenPanel() }
-                .buttonStyle(.glassProminent)
-                .controlSize(.large)
-            Text("To edit inside Photos, open a picture, click Edit, then choose \u{22EF} \u{25B8} Extensions \u{25B8} Emulsion.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.top, 12)
-        }
-        .padding(40)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        FFEmptyState(
+            title: "Open a photo",
+            subtitle: "Drop an image here, or choose one to start",
+            buttonTitle: "Open\u{2026}",
+            note: "To edit inside Photos, open a picture, click Edit, then choose \u{22EF} \u{25B8} Extensions \u{25B8} Emulsion.",
+            action: { state.presentOpenPanel() })
     }
 }
 
@@ -81,31 +69,29 @@ private struct ExportSheet: View {
     @State private var quality = 0.92
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Export").font(.title2.weight(.semibold))
-            Picker("Format", selection: $format) {
-                ForEach(ExportFormat.allCases) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
+        VStack(alignment: .leading, spacing: FieldFramesTheme.rows(1)) {
+            Text("Export")
+                .font(FieldFramesTheme.display(30, weight: .medium))
+            FFTabBar(ExportFormat.allCases.map { (value: $0, title: $0.rawValue) }, selection: $format)
+            FFHairline()
             if format != .tiff {
-                LabeledContent("Quality") {
-                    Slider(value: $quality, in: 0.5...1)
-                        .frame(width: 180)
-                }
+                FFSlider("Quality", value: $quality, in: 0.5...1, default: 0.92)
             }
-            HStack {
+            HStack(spacing: FieldFramesTheme.cells(1)) {
                 Spacer()
-                Button("Cancel", role: .cancel) { state.showExportSheet = false }
+                Button("Cancel") { state.showExportSheet = false }
                     .keyboardShortcut(.cancelAction)
+                    .buttonStyle(.ff)
                 Button("Export\u{2026}") {
                     state.showExportSheet = false
                     state.export(format: format, quality: quality)
                 }
                 .keyboardShortcut(.defaultAction)
-                .buttonStyle(.glassProminent)
+                .buttonStyle(.ffProminent)
             }
         }
-        .padding(20)
-        .frame(width: 340)
+        .padding(FieldFramesTheme.cells(3))
+        .frame(width: FieldFramesTheme.cells(44))
+        .fieldFramesWindow()
     }
 }

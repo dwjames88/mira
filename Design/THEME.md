@@ -1,0 +1,58 @@
+# Field Frames theme
+
+Emulsion borrows the identity of the Field Frames photo site: a quiet gallery on a dark ink ground, warm paper text, one accent (lichen), Cormorant Garamond display type, IBM Plex Mono for small uppercase tracked labels, hairlines, grain, a character-cell grid, square corners, no glass.
+
+Source: `Field-Frames/styles.css` (tokens at lines 25-45, cell grid 57-91, theme overrides 93-125, grain tiles 1627-1628) and the Theme / Grain sections of its `CLAUDE.md`. Code: `Packages/EmulsionUI/Sources/EmulsionUI/Theme/`.
+
+## Colour tokens
+
+Dark is the identity, light is the CSS `light-dark()` light branch. Colours are dynamic `NSColor`s (appearance provider) wrapped as SwiftUI `Color`, so they follow the system appearance. The raw values are in `FieldFramesTheme.tokens` (`FFToken`).
+
+| CSS token | Dark | Light | Swift colour / token |
+|---|---|---|---|
+| `--ink` | `#15140f` | `#e9e5d9` | `FieldFramesTheme.ink` / `inkToken` |
+| `--ink-soft` | `#1d1b15` | `#ded9cc` | `inkSoft` |
+| `--paper` | `#e9e5d9` | `#15140f` | `paper` |
+| `--paper-soft` | `#d6d1c4` | `#2a2820` | `paperSoft` |
+| `--paper-mid` | `#c9c4b6` | `#4a473e` | `paperMid` |
+| `--paper-dim` | `#9c988b` | `#5c584d` | `paperDim` |
+| `--lichen` | `#93a382` | `#54644a` | `lichen` |
+| `--hair` | paper @ 12% | paper @ 12% | `hair` (`#e9e5d9`/`#15140f` at 0.12) |
+| `--backdrop` | `rgba(12,11,8,.96)` | `rgba(240,237,229,.96)` | `backdrop` |
+| `--on-photo`, `-soft`, `-mid`, `-dim`, `-accent` | `#e9e5d9 #d6d1c4 #c9c4b6 #9c988b #93a382` | same | `onPhoto`, `onPhotoSoft`, `onPhotoMid`, `onPhotoDim`, `onPhotoAccent` |
+| `--on-photo-veil` | `rgba(12,11,8,.58)` | same | `onPhotoVeil` |
+
+`onPhoto*` do not flip: they are for type that sits on a photograph.
+
+## Type roles
+
+| Role | CSS | Swift |
+|---|---|---|
+| Display | `--display` Cormorant Garamond | `FieldFramesTheme.display(_:weight:)`, `displayItalic`, `.ffDisplay(_:)` |
+| Label / readout | `--mono` IBM Plex Mono, 0.462rem, uppercase, 0.14em | `FieldFramesTheme.mono(_:weight:)`, `.ffLabel(size: 10, color:)` (uppercase, 0.1em tracking, paper-dim) |
+| Body / UI text | mono on the site | system font (deliberate: description copy and licence text stay readable) |
+
+Fonts are bundled (OFL, see `Resources/Fonts/`): Cormorant Garamond roman and italic variable fonts (weight axis 300-700, applied per call through the `wght` variation) and IBM Plex Mono Regular / Medium / SemiBold. `FieldFramesTheme.registerFonts()` registers them process-wide with `CTFontManagerRegisterFontURLs`; it is idempotent and called from `EmulsionApp.init` and the extension's `loadView`.
+
+## Cell grid
+
+`--cell-w` / `--cell-h` map to `FieldFramesTheme.cellW = 8`, `cellH = 16`; `cells(n)` is n cell widths, `rows(n)` n cell heights. Gutters are 2 cells (16 pt), control heights 1-2 rows, the film card is 14 cells wide with a 5-row thumbnail, the inspector is 36 cells.
+
+## Grain
+
+`FFGrain` generates a 256 px seeded, tileable noise tile once (SplitMix64, two-sample average, light wrapped blur, alpha = noise^2.4 like the site's feFuncA gamma) and caches it as white specks (dark) and black specks (light). `FFGrainView` / `.ffGrain(opacity:)` tile it at one tile pixel per device pixel, at 60% opacity in light (the site goes 0.16 to 0.10), `allowsHitTesting(false)`. Grain is only used in backgrounds (window ground 0.07, panels 0.07), never over the photograph.
+
+## Components
+
+`FFHairline`, `FFSectionLabel`, `FFSlider`, `FFToggle`, `FFButtonStyle` (`.ff`, `.ffProminent`) and `FFButtonChrome`, `FFTabBar`, `FilmCard`, `FFPanel` / `.ffPanel()` / `FFPanelBackground`, `FFGroundBackground`, `FFEmptyState`, `.fieldFramesWindow()`, `.ffLabel`, `.ffDisplay`, `.ffGrain`.
+
+## What deliberately differs from the site
+
+- The app follows the system appearance; the site defaults to dark and ignores the OS.
+- Grain is a procedural tile, not the SVG `feTurbulence` data URI, and is drawn with an image paint rather than `body::after`.
+- The cell is fixed at 8 x 16 pt; the site derives it from the viewport (`--vu`).
+- Hairlines are 1 pt, not 1 CSS px of a scaled viewport.
+- Body copy is system type; the site sets everything in mono or Cormorant.
+- Cormorant is a variable font here; the site ships three static weights.
+- No theme switch and no block cursor.
+- Headless snapshots (`build/snapshots`) flatten scroll views (`FFScrollView` honours an internal `ffInlineScroll` environment flag) because `ImageRenderer` cannot draw AppKit-backed scroll views.
