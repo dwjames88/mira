@@ -47,20 +47,20 @@ The first launch of the app asks for access to your Photos library (`NSPhotoLibr
 scripts/run.sh
 ```
 
-Check: the app opens; Open (or drag a photo onto the window) loads it; the film strip shows thumbnails and the family picker filters them; selecting a film updates the preview; press and hold on the preview or the Compare button shows the original; the Films window (Shift-Command-L) lists all 31 films and the credit; Export offers JPEG, HEIC and TIFF, and the written files open correctly with orientation and colour intact.
+Check: the app opens; Open (or drag a photo onto the window) loads it; the film strip shows thumbnails and the family picker filters them; selecting a film updates the preview; holding C or the HOLD TO COMPARE button shows the original; the Films window (Shift-Command-L) lists all 31 films and the credit; File ▸ Export… (⌘E) offers JPEG, HEIC and TIFF, and the written files open correctly with orientation and colour intact.
 
 ### Library browser
 
 1. The sidebar lists All Photos, Favourites, your albums and the non-empty smart albums (RAW, Recently Added, Screenshots, Selfies, Portrait, Panoramas, Live Photos); counts match Photos.
 2. The grid scrolls smoothly on a large library, thumbnails sharpen as cells appear, and the arrow keys move the selection.
 3. RAW pictures carry a RAW badge; pictures with adjustments carry EDITED.
-4. Double-click, or Return on the selection, opens the picture in the editor; Library in the toolbar returns to the grid.
+4. Double-click, or Return on the selection, opens the picture in the editor; ← LIBRARY in the editor strip (or File ▸ Back to Library, ⌘←) returns to the grid.
 5. Changes made in Photos while the app is open (a new favourite, a new picture) appear after a moment.
 6. With Limited Access, only the chosen pictures appear and the header says LIMITED ACCESS.
 
 ### Photos round trip
 
-1. Open a picture from the library, pick a film, adjust, and choose Save (Command-S). The footer reports the result and the EDITED badge appears.
+1. Open a picture from the library, pick a film, adjust, and choose SAVE in the editor strip (or File ▸ Save to Photos, ⌘S). The footer reports the result and the EDITED badge appears.
 2. In Photos the picture shows the edit. Edit ▸ ⋯ ▸ Mira reopens it with the film and every slider restored.
 3. Save a change from the extension, then open the same picture in the app: the app restores the extension's recipe. The codec is shared, so it works both ways.
 4. In Photos, choose Revert to Original: the picture returns to the untouched original, and the app shows no EDITED badge.
@@ -90,7 +90,7 @@ Move the pointer over the film cards. After a short pause the canvas shows that 
 
 ### Light and dark
 
-Switch System Settings ▸ Appearance between Light and Dark with the app and the extension open. Text, hairlines, cards and grain stay legible in both, the toolbar stays a mono text bar without a glass capsule, and the film description does not shift the panels as it changes.
+Switch System Settings ▸ Appearance between Light and Dark with the app and the extension open. Text, hairlines, cards and grain stay legible in both, the window toolbar stays just the wordmark and the editor strip stays ink-soft with a lichen tab underline, and the film description does not shift the panels as it changes.
 
 ### Self-test
 
@@ -101,12 +101,49 @@ log show --last 10m --info --predicate 'subsystem == "com.fieldframes.mira"' | g
 
 It imports `App/SelfTest/sample.jpg` into the album "Emulsion Test", saves Velvia with grain through `AssetEditSession`, checks `hasAdjustments` and the recipe round trip, reverts and checks again. It never touches existing photos, but it leaves the test asset in place: delete it by hand.
 
+## Key map and menus
+
+The window toolbar shows only the Mira wordmark. Every command is in the menu bar, and the editor has a strip under the title bar: `← LIBRARY` (app only), the FILMS · DEVELOP · CROP tabs, then the status (UNSAVED / SAVED / REVERTED / READ ONLY) and SAVE (app only; the Photos extension shows the tabs only and uses Photos' own Save).
+
+Menus:
+
+- **File**: Open… (⌘O); Export… (⌘E, photo open, not while the crop tab is open); Save to Photos (⌘S; for a file the same item reads Save Sidecar and writes the sidecar now; disabled when there is nothing to save, read-only or preview-only); Revert to Original… (asks first); Back to Library (⌘←, guarded: asks about unsaved Photos edits).
+- **Edit**: Reset Adjustments (sliders, curves and mixer; keeps film and crop); Reset All (everything except the photo).
+- **View**: Films (1), Develop (2), Crop (3), Toggle Full Screen (F), Zoom In (]), Zoom Out ([), Zoom to Fit (⌘0).
+- Mira ▸ Settings… (⌘,) and About Mira are unchanged.
+
+Keys (single keys work when no text field is being edited, in the app and the extension; the extension has no menus):
+
+| Key / gesture | Does |
+|---|---|
+| 1 / 2 / 3 | FILMS / DEVELOP / CROP tab (3 begins the crop tool; leaving it commits) |
+| F | Full screen: window full screen (app) and every panel hidden, the photo alone on pure ink. Not available while cropping. In the extension F only hides the panels |
+| Esc | Leaves that view (restores panels, leaves full screen). In the crop tab Esc is CANCEL |
+| C (hold) | Shows the original while held; releasing returns to the edit. Mouse: press and hold HOLD TO COMPARE |
+| Click on the photo | Fit → 100% (1 picture pixel = 1 screen pixel) centred on the click; click again → fit. Not in the crop tab, not while the eyedropper is active |
+| Drag, or Space + drag | Pans while zoomed. Space alone does nothing |
+| ] / [ | Zoom in / out through fit, 50%, 100%, 200%, 400% (anchored at the pointer over the photo, else the centre); a readout (100%) shows bottom left for about a second |
+| ⌘0 | Zoom to Fit |
+| ⌘O / ⌘E / ⌘S / ⌘← / ⌘, | Open / Export / Save / Back to Library / Settings |
+| Return, Esc (crop tab) | DONE (commit, back to the previous tab) / CANCEL (put back the crop you had, stay in the tab) |
+
+Check by hand after a change to the editor chrome:
+
+1. Open a photo. The strip shows `← LIBRARY`, FILMS (underlined in lichen), DEVELOP, CROP. FILMS shows the film strip and, on the right, the film name and STRENGTH. DEVELOP shows the histogram, sliders, curves, mixer, TEXTURE and FRAME with RESET at the foot, and no film strip.
+2. Press 3: the crop box appears. Change the ratio, press CANCEL: the box returns to the committed crop and the tab stays. Press DONE: the crop is kept and the previous tab returns. Press 3 then 1: the crop is committed.
+3. Press F: the window goes full screen with only the photo on dark ink. F or Esc returns. In the Photos extension F hides the panels only.
+4. Hold C: the original shows; release: the edit returns. Click the photo: 100% around the click, with `100%` bottom left for about a second; drag pans; hold Space and drag pans; `]` and `[` step; click again or ⌘0 fits. In DEVELOP at 100%, moving a slider updates the zoomed view at once.
+5. File ▸ Save adapts: Save to Photos for a Photos picture, Save Sidecar for a file. The SAVE button in the strip does the same and reads SAVED afterwards.
+6. In Photos, resize the Mira editing window: the editor follows the window; the right panel is 300 to 340 pt wide and scrolls.
+
 ## Automated tests
 
 ```sh
 swift test --package-path Packages/MiraCore
 swift test --package-path Packages/MiraUI
 ```
+
+As of the editor-workflow change the suites hold 170 (MiraCore) and 68 (MiraUI) tests; the lists below are the original groups. New: `ZoomTests` (click, step, pan, clamping, viewport-to-image rect with crop, zoomed render pixels), `EditorTabTests`, `ViewingKeysTests` (key map table, zoom model, compare key, full screen), `ExtensionHostingTests` (editor fills a resizing window), plus the `editor-tab-*.png`, `editor-zoom-100.png` and `editor-immersive.png` snapshots.
 
 MiraCore has 36 tests:
 
@@ -161,7 +198,6 @@ Writes `build/contact-sheet.png` (every film) and `build/contact-sheet-effects.p
 - Adjacent sidecars are rarely possible under the App Sandbox, which grants only the chosen file, so recipes usually go to the Application Support fallback.
 - RAW+JPEG pairs: Photos may hand over the JPEG rather than the RAW.
 - The extension may write HEIC or TIFF when Photos prefers it, while the app always writes JPEG for Photos edits.
-- PhotoKit exposes no per-photo star rating or keywords. Mira groups rating albums (★ to ★★★★★, Flagged, Rejected, as synced from Lightroom/Photomator) into a STARS section, so ratings are only visible through such albums.
 - Counts and grids are pictures only, so video-only albums (Videos, Slo-mo, Time-lapse) count 0 and are hidden from the sidebar.
 - Live Photos and video are unsupported (the extension declares Image only).
 - Bundled films only; there is no custom LUT import.
@@ -194,9 +230,9 @@ Run on macOS 27.0, Xcode 27.0, arm64, against the user's real Photos library (48
 
 Installed with `scripts/install.sh` (Mira already granted Photos access), driven against the real library:
 
-- Sidebar: LIBRARY (Library 48,873, Favourites, Recently Saved), STARS (★★★★★, Flagged, Rejected pulled out of Albums), ALBUMS with real folders (Trips expands to nested albums and sub-folders, sorted like Photos), SHARED ALBUMS, MEDIA TYPES (Selfies … RAW, Animated). No UTILITIES section: PhotoKit returned no non-empty Hidden, Recently Deleted or Imports album for this library. Up/Down moves the selection.
+- Sidebar: LIBRARY (Library 48,873, Favourites, Recently Saved), ALBUMS with real folders (Trips expands to nested albums and sub-folders, sorted like Photos), SHARED ALBUMS, MEDIA TYPES (Selfies … RAW, Animated). No UTILITIES section: PhotoKit returned no non-empty Hidden, Recently Deleted or Imports album for this library. Up/Down moves the selection.
 - Opening the test asset: canvas showed the photo 0.3 s after Return; its recipe saved by Emulsion (`com.dwjames.emulsion`) was restored (legacy read verified live).
-- Crop: toolbar CROP → handles, dimming, controls; SQUARE + 7.0° straighten; corner drag keeps the square; DONE shows the cropped result and `CROP · SQUARE · 7.0°`; film strip thumbnails cropped; SAVE → Photos thumbnail is the cropped image; reopening restores the crop; in-app REVERT (confirmation dialog) returns the uncropped original with neutral sliders. The test asset is left reverted.
+- Crop: CROP tab → handles, dimming, controls; SQUARE + 7.0° straighten; corner drag keeps the square; DONE shows the cropped result and `CROP · SQUARE · 7.0°`; film strip thumbnails cropped; SAVE → Photos thumbnail is the cropped image; reopening restores the crop; in-app REVERT (confirmation dialog) returns the uncropped original with neutral sliders. The test asset is left reverted.
 - Grid: scrolling deep into the library, thumbnails (including RAW + EDITED badges) filled within about a second.
 - Benchmarks (`mira-sheet --bench --films Films`, 24 MP synthetic, 1500×1000 canvas, M1 Pro): preview frame 12.0 → 4.7 ms median (p95 13.6 → 6.5); with crop + 6° straighten 6.5 → 3.8 ms; first preview 62 → 53 ms; 32 thumbnails warm ~40–57 ms; 24 MP export ~100–110 ms.
 
