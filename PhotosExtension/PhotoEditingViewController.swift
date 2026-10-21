@@ -2,6 +2,7 @@ import AppKit
 import MiraCore
 import MiraUI
 import ImageIO
+import os
 import Photos
 import PhotosUI
 import SwiftUI
@@ -24,8 +25,9 @@ final class PhotoEditingViewController: NSViewController, PHContentEditingContro
         let container = NSView(frame: NSRect(x: 0, y: 0, width: 1100, height: 750))
         container.autoresizingMask = [.width, .height]
         view = container
-        // Only a starting size: Photos owns the window, and the editor follows whatever size it gives.
-        preferredContentSize = NSSize(width: 1100, height: 750)
+        // Only a starting hint (large but harmless): Photos owns the window and the root view is
+        // re-fitted to it on appearance and every resize. After appearance this tracks the real size.
+        preferredContentSize = NSSize(width: 1600, height: 1000)
 
         guard let library = FilmLibrary.bundled() else {
             let label = NSTextField(labelWithString: "Mira could not load its film library.")
@@ -38,6 +40,31 @@ final class PhotoEditingViewController: NSViewController, PHContentEditingContro
         let model = EditorModel(library: library)
         self.model = model
         ExtensionHosting.install(model, in: container)
+    }
+
+    // MARK: Fitting to the host
+
+    private lazy var fitter: ExtensionRootFitter = {
+        let fitter = ExtensionRootFitter(view: view)
+        fitter.onFit = { [weak self] size in self?.preferredContentSize = size }
+        return fitter
+    }()
+
+    override func viewWillAppear() {
+        super.viewWillAppear()
+        fitter.fit(reason: "viewWillAppear")
+    }
+
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        fitter.fit(reason: "viewDidAppear")
+        Logger(subsystem: "com.fieldframes.mira", category: "extension")
+            .notice("preferredContentSize=\(NSStringFromSize(self.preferredContentSize), privacy: .public)")
+    }
+
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        fitter.fit(reason: "viewDidLayout")
     }
 
     // MARK: PHContentEditingController

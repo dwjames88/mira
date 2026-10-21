@@ -57,4 +57,36 @@ struct ExtensionHostingTests {
         #expect(bottomLeft.alphaComponent > 0.99)
         model.cancelWork()
     }
+
+    @Test func rootFitterFillsSuperviewAndFollowsResizes() {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1500, height: 1000),
+                              styleMask: [.titled, .resizable], backing: .buffered, defer: true)
+        let superview = NSView(frame: NSRect(x: 0, y: 0, width: 1500, height: 1000))
+        superview.autoresizingMask = [.width, .height]
+        window.contentView = superview
+        let root = NSView(frame: NSRect(x: 0, y: 0, width: 1100, height: 750))
+        superview.addSubview(root)
+        let fitter = ExtensionRootFitter(view: root)
+        var hinted: NSSize?
+        fitter.onFit = { hinted = $0 }
+        fitter.fit(reason: "test")
+        superview.layoutSubtreeIfNeeded()
+        #expect(root.frame == superview.bounds)
+        #expect(hinted == superview.bounds.size)
+
+        window.setContentSize(CGSize(width: 1800, height: 1200))
+        superview.layoutSubtreeIfNeeded()
+        fitter.fit(reason: "test")
+        superview.layoutSubtreeIfNeeded()
+        #expect(root.frame == superview.bounds)
+        #expect(root.frame.size == CGSize(width: 1800, height: 1200))
+    }
+
+    @Test func rootFitterIgnoresAViewWithNoHost() {
+        let root = NSView(frame: NSRect(x: 0, y: 0, width: 1100, height: 750))
+        let fitter = ExtensionRootFitter(view: root)
+        fitter.fit(reason: "test")
+        #expect(root.frame.size == CGSize(width: 1100, height: 750))
+        #expect(root.translatesAutoresizingMaskIntoConstraints)
+    }
 }
