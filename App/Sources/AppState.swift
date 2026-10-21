@@ -59,6 +59,8 @@ final class AppState {
     /// Busy line ("OPENING", "SAVING") shown over the editor; nil when idle.
     private(set) var busyText: String?
     private(set) var busyProgress: Double?
+    /// A Photos picture is showing a stand-in while the editing input and the full-size file load.
+    private(set) var isOpening = false
     /// One-line mono notes under the editor.
     private(set) var statusLine: String?
     private(set) var resultLine: String?
@@ -88,7 +90,7 @@ final class AppState {
     var hasPhoto: Bool { editor != nil }
     var isAssetTarget: Bool { if case .asset = target { true } else { false } }
     var isFileTarget: Bool { if case .file = target { true } else { false } }
-    var isBusy: Bool { busyText != nil }
+    var isBusy: Bool { busyText != nil || isOpening }
     /// The crop tool is open: Save, Export and Revert wait until it is closed with Done or Cancel.
     var isCropping: Bool { editor?.isCropping ?? false }
 
@@ -152,6 +154,7 @@ final class AppState {
         statusLine = nil
         resultLine = nil
         busyText = nil
+        isOpening = false
         scopedURL?.stopAccessingSecurityScopedResource()
         scopedURL = nil
         mode = .library
@@ -215,6 +218,16 @@ final class AppState {
         }
     }
 
+    /// Tracks the stand-in while an asset opens (main-actor only).
+    private final class OpenProgress {
+        var showing = false
+        var finished = false
+    }
+
+    /// Opens an asset in two steps so something is on screen at once. The cached grid thumbnail (and
+    /// then a larger one from Photos) appear in the editor immediately, controls locked; when the
+    /// editing input and the full-size file have loaded, the recipe is restored and the real photo
+    /// replaces the stand-in.
     private func loadAsset(_ session: AssetEditSession) async {
         guard let library else {
             errorMessage = "Mira could not load its film library."
@@ -222,25 +235,61 @@ final class AppState {
         }
         loadGeneration += 1
         let generation = loadGeneration
-        busyText = "Opening"
         busyProgress = nil
-        defer { if generation == loadGeneration { busyText = nil } }
+        let model = EditorModel(library: library)
+        let progress = OpenProgress()
+        let signpost = Perf.begin("asset open")
+        defer { Perf.end("asset open", signpost) }
+
+        func show(standIn image: NSImage?) {
+            guard generation == loadGeneration, !progress.finished,
+                  let cg = image?.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
+            let ci = CIImage(cgImage: cg)
+            if progress.showing {
+                model.replaceSource(ci, isFull: false)
+            } else {
+                progress.showing = true
+                flushSidecar()
+                scopedURL?.stopAccessingSecurityScopedResource()
+                scopedURL = nil
+                model.setSource(ci, isFull: false)
+                editor = model
+                target = .asset(session)
+                loadedRecipe = .neutral
+                canSaveToPhotos = false
+                resultLine = nil
+                editorNote = nil
+                statusLine = "OPENING"
+                isOpening = true
+                mode = .editor
+            }
+        }
+        if let cached = store.cachedThumbnail(for: session.asset) { show(standIn: cached) }
+        let standInID = store.requestStandIn(for: session.asset) { image in show(standIn: image) }
+        defer { store.cancelThumbnail(standInID) }
+
         do {
             let loaded = try await session.load(progress: { [weak self] p in
                 if self?.loadGeneration == generation { self?.busyProgress = p }
             })
+            progress.finished = true
             guard generation == loadGeneration else { return }
-            flushSidecar()
-            scopedURL?.stopAccessingSecurityScopedResource()
-            scopedURL = nil
-            let model = EditorModel(library: library)
-            model.setSource(loaded.source)
-            model.recipe = loaded.recipe
+            if progress.showing {
+                model.recipe = loaded.recipe
+                model.replaceSource(loaded.source, isFull: true)
+            } else {
+                flushSidecar()
+                scopedURL?.stopAccessingSecurityScopedResource()
+                scopedURL = nil
+                model.setSource(loaded.source)
+                model.recipe = loaded.recipe
+            }
             editor = model
             target = .asset(session)
             loadedRecipe = loaded.recipe
             canSaveToPhotos = loaded.isFullSize && !session.isReadOnly
             resultLine = nil
+            isOpening = false
             statusLine = session.isReadOnly
                 ? "RECENTLY DELETED \u{00B7} READ ONLY"
                 : "PHOTOS \u{00B7} ORIGINAL IS KEPT, REVERT IN PHOTOS OR HERE"
@@ -254,7 +303,11 @@ final class AppState {
             mode = .editor
             track()
         } catch {
-            if generation == loadGeneration { errorMessage = "Could not open the picture: \(error)" }
+            progress.finished = true
+            if generation == loadGeneration {
+                errorMessage = "Could not open the picture: \(error)"
+                if progress.showing { closeEditor() }
+            }
         }
     }
 
@@ -321,7 +374,7 @@ final class AppState {
 
     @discardableResult
     func saveToPhotos() async -> Bool {
-        guard case .asset(let session) = target, let editor, let source = editor.source else { return false }
+        guard case .asset(let session) = target, let editor, let source = await editor.fullSource() else { return false }
         let recipe = editor.recipe
         busyText = "Saving"
         busyProgress = nil
@@ -373,7 +426,7 @@ final class AppState {
     // MARK: Export
 
     func export(format: ExportFormat, quality: Double) {
-        guard let editor, let source = editor.source else { return }
+        guard let editor, editor.source != nil else { return }
         let metadataURL: URL?
         let baseName: String
         switch target {
@@ -397,10 +450,16 @@ final class AppState {
         let recipe = editor.recipe
         let renderer = editor.renderer
         let type = format.type
-        let box = Unchecked(value: source)
-        let colorSpace: CGColorSpace? = metadataURL.map { ImageSource.outputColorSpace(url: $0, image: source) }
         isExporting = true
         Task {
+            // A large file may still be decoding in the background; export needs every pixel.
+            guard let source = await editor.fullSource() else {
+                isExporting = false
+                errorMessage = "Export failed: the full-size picture could not be read."
+                return
+            }
+            let box = Unchecked(value: source)
+            let colorSpace: CGColorSpace? = metadataURL.map { ImageSource.outputColorSpace(url: $0, image: source) }
             let result: Result<Void, Error> = await Task.detached(priority: .userInitiated) {
                 Result {
                     try renderer.export(recipe, source: box.value, metadataFrom: metadataURL, outputURL: outputURL,

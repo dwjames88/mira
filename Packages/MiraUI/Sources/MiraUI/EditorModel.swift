@@ -181,10 +181,10 @@ public final class EditorModel {
 
     /// Swaps the stand-in for the real photo (same picture, full resolution). The frame on screen
     /// stays until the sharper one is ready, and the film strip is kept.
-    public func replaceSource(_ image: CIImage) {
+    public func replaceSource(_ image: CIImage, isFull: Bool = true) {
         sourceGeneration += 1
         source = image
-        isSourceFull = true
+        isSourceFull = isFull
         engine.setSource(image)
         originalKey = nil
         hoverCache = [:]

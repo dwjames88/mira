@@ -82,13 +82,11 @@ final class PhotoEditingViewController: NSViewController, PHContentEditingContro
         let recipe = model.recipe
         let renderer = model.renderer
         let output = PHContentEditingOutput(contentEditingInput: input)
-        guard let adjustment = try? MiraAdjustment.adjustmentData(for: recipe), let source = model.source else {
+        guard let adjustment = try? MiraAdjustment.adjustmentData(for: recipe) else {
             completionHandler(nil)
             return
         }
         output.adjustmentData = adjustment
-        let colorSpace = ImageSource.outputColorSpace(url: inputURL, image: source)
-        let sourceBox = Unchecked(value: source)
 
         // Use the type Photos prefers when we can write it; JPEG otherwise.
         let writable: [UTType] = [.jpeg, .heic, .tiff]
@@ -104,19 +102,27 @@ final class PhotoEditingViewController: NSViewController, PHContentEditingContro
 
         let out = Unchecked(value: output)
         let renderType = type
-        exportTask = Task.detached(priority: .userInitiated) {
-            var succeeded = false
-            do {
-                try renderer.export(recipe, source: sourceBox.value, metadataFrom: inputURL, outputURL: outputURL,
-                                    type: renderType, quality: 0.95, colorSpace: colorSpace)
-                succeeded = !Task.isCancelled
-            } catch {
-                succeeded = false
+        // A large file may still be decoding in the background; the export needs the full-size photo.
+        exportTask = Task { @MainActor in
+            guard let source = await model.fullSource(), !Task.isCancelled else {
+                done.value(nil)
+                return
             }
-            let result = succeeded
-            await MainActor.run {
-                done.value(result ? out.value : nil)
+            let colorSpace = ImageSource.outputColorSpace(url: inputURL, image: source)
+            let sourceBox = Unchecked(value: source)
+            let export = Task.detached(priority: .userInitiated) {
+                var succeeded = false
+                do {
+                    try renderer.export(recipe, source: sourceBox.value, metadataFrom: inputURL, outputURL: outputURL,
+                                        type: renderType, quality: 0.95, colorSpace: colorSpace)
+                    succeeded = !Task.isCancelled
+                } catch {
+                    succeeded = false
+                }
+                return succeeded
             }
+            let succeeded = await withTaskCancellationHandler { await export.value } onCancel: { export.cancel() }
+            done.value(succeeded ? out.value : nil)
         }
     }
 

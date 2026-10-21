@@ -58,6 +58,16 @@ private struct LibrarySidebar: View {
     @FocusState private var focused: Bool
 
     var body: some View {
+        ScrollViewReader { proxy in
+            list
+                .onChange(of: store.selectedNodeID) { _, id in
+                    // Keep the selected row on screen when the arrow keys move past the edge.
+                    proxy.scrollTo(id, anchor: nil)
+                }
+        }
+    }
+
+    private var list: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(store.sections.enumerated()), id: \.element.id) { offset, section in
@@ -79,6 +89,7 @@ private struct LibrarySidebar: View {
                             focused = true
                             if row.node.isFolder { store.toggleExpanded(row.node.id) } else { store.select(row.node) }
                         }
+                        .id(row.node.id)
                     }
                 }
             }
@@ -159,6 +170,7 @@ private struct LibraryGridPane: View {
     let state: AppState
     var store: LibraryStore { state.store }
     @FocusState private var focused: Bool
+    @Environment(\.displayScale) private var displayScale
 
     private let minCell: CGFloat = 150
     private let gap = FieldFramesTheme.cellW
@@ -173,7 +185,11 @@ private struct LibraryGridPane: View {
             } else {
                 GeometryReader { geo in
                     let columns = max(1, Int((geo.size.width - gap * 2 + gap) / (minCell + gap)))
+                    // Cell side in points: the width inside the padding, minus the gaps, over the columns.
+                    let side = (geo.size.width - gap * 4 - gap * CGFloat(columns - 1)) / CGFloat(columns)
                     grid(columns: columns)
+                        .onAppear { store.setCellSize(points: side, scale: displayScale) }
+                        .onChange(of: side) { _, new in store.setCellSize(points: new, scale: displayScale) }
                 }
             }
             if let note = state.libraryNote {
@@ -268,6 +284,14 @@ private struct AssetCell: View {
     @State private var requestID: PHImageRequestID?
     @State private var isRAW = false
 
+    /// `Date.formatted` builds a formatter on every call; one shared formatter keeps cell bodies cheap.
+    private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .none
+        return f
+    }()
+
     var body: some View {
         // Reading the revision re-evaluates the cell after library changes.
         let _ = store.revision
@@ -294,7 +318,7 @@ private struct AssetCell: View {
                 if selected { Rectangle().strokeBorder(T.lichen, lineWidth: 1) }
             }
             .contentShape(Rectangle())
-            .accessibilityLabel(asset?.creationDate.map { "Photo, \($0.formatted(date: .abbreviated, time: .omitted))" } ?? "Photo")
+            .accessibilityLabel(asset?.creationDate.map { "Photo, \(Self.dateFormatter.string(from: $0))" } ?? "Photo")
             .onAppear {
                 store.prefetch(around: index)
                 load(asset)

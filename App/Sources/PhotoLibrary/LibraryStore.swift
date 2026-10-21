@@ -10,6 +10,13 @@ private final class ChangeRelay: NSObject, PHPhotoLibraryChangeObserver, @unchec
     nonisolated func photoLibraryDidChange(_ changeInstance: PHChange) { onChange() }
 }
 
+private final class LookupFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var flag = false
+    func cancel() { lock.lock(); flag = true; lock.unlock() }
+    var isCancelled: Bool { lock.lock(); defer { lock.unlock() }; return flag }
+}
+
 private final class WeakStore: @unchecked Sendable {
     weak var store: LibraryStore?
     init(_ store: LibraryStore) { self.store = store }
@@ -39,8 +46,23 @@ final class LibraryStore {
     @ObservationIgnored private var cachedAssets: [PHAsset] = []
     @ObservationIgnored private var cachedRange: Range<Int> = 0..<0
 
-    static let thumbnailPixels: CGFloat = 320
-    static var thumbnailSize: CGSize { CGSize(width: thumbnailPixels, height: thumbnailPixels) }
+    /// Thumbnail size in pixels: the grid cell in points times the backing scale, rounded up to 64 so
+    /// a window resize does not invalidate the caching manager's images for every pixel of movement.
+    private(set) var thumbnailPixels: CGFloat = 320
+    var thumbnailSize: CGSize { CGSize(width: thumbnailPixels, height: thumbnailPixels) }
+
+    /// One options object for requests and for the caching manager, so cached images are hit.
+    @ObservationIgnored private let thumbnailOptions: PHImageRequestOptions = {
+        let options = PHImageRequestOptions()
+        options.deliveryMode = .opportunistic
+        options.resizeMode = .fast
+        options.isNetworkAccessAllowed = false
+        return options
+    }()
+    /// The last thumbnail each cell showed, so opening a photo can show it at once.
+    @ObservationIgnored private var shownThumbnails: [String: NSImage] = [:]
+    @ObservationIgnored private var shownOrder: [String] = []
+    @ObservationIgnored private let rawQueue = DispatchQueue(label: "com.fieldframes.mira.raw-lookup", qos: .utility)
 
     private static let selectionKey = "mira.sidebar.selection"
     private static let expandedKey = "mira.sidebar.expanded"
@@ -203,21 +225,51 @@ final class LibraryStore {
 
     // MARK: Thumbnails
 
+    /// Sets the thumbnail size from the cell's side in points and the window's backing scale.
+    func setCellSize(points: CGFloat, scale: CGFloat) {
+        let pixels = max(64, (points * scale / 64).rounded(.up) * 64)
+        guard pixels != thumbnailPixels else { return }
+        stopAllCaching()
+        thumbnailPixels = pixels
+    }
+
     /// Requests a thumbnail; the handler may run twice (degraded, then final). Returns the request id.
     func requestThumbnail(for asset: PHAsset, handler: @escaping @MainActor (NSImage?) -> Void) -> PHImageRequestID {
+        let id = asset.localIdentifier
+        return PhotoKitBridge.requestImage(
+            manager: imageManager, asset: asset, size: thumbnailSize, options: thumbnailOptions, signpost: true
+        ) { [weak self] image in
+            if let image { self?.remember(image, id: id) }
+            handler(image)
+        }
+    }
+
+    /// A larger image for the editor to show while the editing input loads.
+    func requestStandIn(for asset: PHAsset, handler: @escaping @MainActor (NSImage?) -> Void) -> PHImageRequestID {
         let options = PHImageRequestOptions()
         options.deliveryMode = .opportunistic
         options.resizeMode = .fast
-        options.isNetworkAccessAllowed = true
-        return PhotoKitBridge.requestImage(manager: imageManager, asset: asset, size: Self.thumbnailSize,
-                                           options: options, deliver: handler)
+        options.isNetworkAccessAllowed = false
+        return PhotoKitBridge.requestImage(
+            manager: imageManager, asset: asset, size: CGSize(width: 1600, height: 1600),
+            contentMode: .aspectFit, options: options, deliver: handler)
     }
 
     func cancelThumbnail(_ id: PHImageRequestID) {
         imageManager.cancelImageRequest(id)
     }
 
-    /// Keeps a window of assets around `index` warm in the caching manager.
+    func cachedThumbnail(for asset: PHAsset) -> NSImage? { shownThumbnails[asset.localIdentifier] }
+
+    private func remember(_ image: NSImage, id: String) {
+        if shownThumbnails.updateValue(image, forKey: id) == nil {
+            shownOrder.append(id)
+            if shownOrder.count > 400 { shownThumbnails[shownOrder.removeFirst()] = nil }
+        }
+    }
+
+    /// Keeps a window of assets around `index` warm in the caching manager: the visible cells plus
+    /// a little ahead and behind, nothing more.
     func prefetch(around index: Int) {
         guard let fetchResult, fetchResult.count > 0 else { return }
         if index >= cachedRange.lowerBound + 12, index < cachedRange.upperBound - 24, !cachedAssets.isEmpty { return }
@@ -226,18 +278,14 @@ final class LibraryStore {
         guard lower < upper else { return }
         let range = lower..<upper
         let assets = fetchResult.objects(at: IndexSet(integersIn: range))
-        let options = PHImageRequestOptions()
-        options.deliveryMode = .opportunistic
-        options.resizeMode = .fast
-        options.isNetworkAccessAllowed = false
         if !cachedAssets.isEmpty {
             let keep = Set(assets.map(\.localIdentifier))
             let stale = cachedAssets.filter { !keep.contains($0.localIdentifier) }
             if !stale.isEmpty {
-                imageManager.stopCachingImages(for: stale, targetSize: Self.thumbnailSize, contentMode: .aspectFill, options: options)
+                imageManager.stopCachingImages(for: stale, targetSize: thumbnailSize, contentMode: .aspectFill, options: thumbnailOptions)
             }
         }
-        imageManager.startCachingImages(for: assets, targetSize: Self.thumbnailSize, contentMode: .aspectFill, options: options)
+        imageManager.startCachingImages(for: assets, targetSize: thumbnailSize, contentMode: .aspectFill, options: thumbnailOptions)
         cachedAssets = assets
         cachedRange = range
     }
@@ -250,16 +298,24 @@ final class LibraryStore {
 
     // MARK: RAW
 
-    /// True when the asset has a RAW resource. Computed once per asset, off the main actor.
+    /// True when the asset has a RAW resource. Computed once per asset on one serial background
+    /// queue; a lookup whose cell scrolled away before its turn is skipped.
     func isRAW(_ asset: PHAsset) async -> Bool {
         let id = asset.localIdentifier
         if let cached = rawCache[id] { return cached }
         let box = Unchecked(value: asset)
-        let result = await Task.detached(priority: .utility) {
-            RAWDetection.containsRAW(PhotoKitBridge.resourceTypeIdentifiers(of: box))
-        }.value
-        rawCache[id] = result
-        return result
+        let flag = LookupFlag()
+        let result: Bool? = await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                rawQueue.async {
+                    if flag.isCancelled { continuation.resume(returning: nil); return }
+                    let raw = RAWDetection.containsRAW(PhotoKitBridge.resourceTypeIdentifiers(of: box))
+                    continuation.resume(returning: raw)
+                }
+            }
+        } onCancel: { flag.cancel() }
+        if let result { rawCache[id] = result }
+        return result ?? false
     }
 
     func cachedRAW(_ asset: PHAsset) -> Bool? { rawCache[asset.localIdentifier] }

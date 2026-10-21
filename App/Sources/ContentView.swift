@@ -116,6 +116,7 @@ private struct EditorScreen: View {
     var body: some View {
         VStack(spacing: 0) {
             EditorView(model: editor)
+                .disabled(state.isOpening)
             FFHairline()
             HStack(spacing: FieldFramesTheme.cells(2)) {
                 if let status = state.statusLine { Text(status).ffLabel(size: 10) }

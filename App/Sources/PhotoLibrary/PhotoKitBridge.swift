@@ -72,11 +72,18 @@ enum PhotoKitBridge {
     }
 
     /// Requests an image; `deliver` runs on the main queue, in order (degraded, then final).
+    /// With `signpost` the request is timed (`grid thumbnail request`) until the final image arrives.
     nonisolated static func requestImage(
-        manager: PHImageManager, asset: PHAsset, size: CGSize, options: PHImageRequestOptions,
+        manager: PHImageManager, asset: PHAsset, size: CGSize, contentMode: PHImageContentMode = .aspectFill,
+        options: PHImageRequestOptions, signpost: Bool = false,
         deliver: @escaping @MainActor (NSImage?) -> Void
     ) -> PHImageRequestID {
-        manager.requestImage(for: asset, targetSize: size, contentMode: .aspectFill, options: options) { @Sendable image, _ in
+        let interval = signpost ? Perf.begin("grid thumbnail request") : nil
+        return manager.requestImage(for: asset, targetSize: size, contentMode: contentMode, options: options) { @Sendable image, info in
+            if let interval {
+                let degraded = (info?[PHImageResultIsDegradedKey] as? Bool) ?? false
+                if !degraded || image == nil { Perf.end("grid thumbnail request", interval) }
+            }
             let box = Unchecked(value: image)
             DispatchQueue.main.async {
                 MainActor.assumeIsolated { deliver(box.value) }
@@ -84,7 +91,8 @@ enum PhotoKitBridge {
         }
     }
 
-    /// Detects a RAW resource off the main actor.
+    /// Detects a RAW resource off the main actor. Skips the lookup when `isCancelled` says the cell
+    /// that asked for it has already scrolled away.
     nonisolated static func resourceTypeIdentifiers(of asset: Unchecked<PHAsset>) -> [String] {
         PHAssetResource.assetResources(for: asset.value)
             .filter { $0.type == .photo || $0.type == .alternatePhoto }
