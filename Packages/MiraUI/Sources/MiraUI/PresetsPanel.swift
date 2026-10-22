@@ -8,13 +8,14 @@ private typealias T = FieldFramesTheme
 /// already use (colour inherited), a dim hyphen, the nickname in Cormorant italic lichen.
 enum PresetText {
     static func name(film: String, nickname: String, size: CGFloat = 16) -> Text {
-        Text(film) + nicknamePart(nickname, size: size, leading: " - ")
+        Text("\(Text(film))\(nicknamePart(nickname, size: size, leading: " - "))")
     }
 
     /// "- Last Summer": the second line of a preset card.
     static func nicknamePart(_ nickname: String, size: CGFloat = 16, leading: String = "- ") -> Text {
-        Text(leading).foregroundStyle(T.paperDim)
-            + Text(nickname).font(T.displayItalic(size, weight: .medium)).foregroundStyle(T.lichen)
+        let dash = Text(leading).foregroundStyle(T.paperDim)
+        let name = Text(nickname).font(T.displayItalic(size, weight: .medium)).foregroundStyle(T.lichen)
+        return Text("\(dash)\(name)")
     }
 }
 
