@@ -2,6 +2,12 @@
 
 All notable changes to Mira. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## Unreleased
+
+### Added
+- Develop controls: Highlights, Shadows, Whites, Blacks, Texture, Clarity and Vibrance. The DEVELOP tab is now Light (Exposure, Contrast, Highlights, Shadows, Whites, Blacks), Presence (Texture, Clarity, Vibrance, Saturation) and Color (Temperature, Tint), followed by Effects (formerly Texture) and Frame.
+- Adjustment data format version 2, written only when one of the new controls is used; version 1 and legacy Emulsion data still open.
+
 ## [0.2.0] - 2026-10-21
 
 ### Added
