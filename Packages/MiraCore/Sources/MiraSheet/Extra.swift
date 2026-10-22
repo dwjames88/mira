@@ -53,9 +53,12 @@ enum Extra {
         try? FileManager.default.removeItem(at: cache)
         let (_, initMs) = try Bench.time { _ = try FilmLibrary(directory: filmsURL, cacheDirectory: cache) }
         Bench.row("g. launch: FilmLibrary init (films.json)", String(format: "%8.1f ms", initMs))
-        for label in ["cold disk cache", "warm disk cache"] {
+        for (label, workers, wipe) in [("cold disk cache, 4 workers", 4, true), ("cold disk cache, 10 workers", 10, true),
+                                       ("cold disk cache, 4 workers", 4, true), ("cold disk cache, 10 workers", 10, true),
+                                       ("warm disk cache, 4 workers", 4, false), ("warm disk cache, 10 workers", 10, false)] {
+            if wipe { try? FileManager.default.removeItem(at: cache) }
             let lib = try FilmLibrary(directory: filmsURL, cacheDirectory: cache)
-            let (_, ms) = Bench.time { lib.prewarmSync() }
+            let (_, ms) = Bench.time { lib.prewarmSync(concurrency: workers) }
             Bench.row("g. launch: prewarm all LUTs, \(label)", String(format: "%8.0f ms", ms))
         }
         // First film-strip render on a freshly prewarmed library (shader compile included).
@@ -67,5 +70,21 @@ enum Extra {
         let (_, firstMs) = Bench.time { eng.render(Bench.effectsRecipe, canvas: canvas) }
         Bench.row("g. launch: first frame on a brand-new CIContext", String(format: "%8.1f ms", firstMs))
         print("")
+    }
+
+    /// First preview frame of a brand-new process. `MIRA_BENCH_WARMUP=1` runs the launch warm-up first.
+    static func coldStart(library: FilmLibrary, jpeg: URL) throws {
+        let warm = ProcessInfo.processInfo.environment["MIRA_BENCH_WARMUP"] == "1"
+        library.prewarmSync()
+        let canvas = Bench.canvasPixels
+        let thumb = ImageSource.loadThumbnail(url: jpeg, maxPixelSize: max(canvas.width, canvas.height))!
+        var warmMs = 0.0
+        if warm { warmMs = Bench.time { PreviewEngine.warmUp(library: library) }.1 }
+        let engine = PreviewEngine(renderer: Renderer(library: library), context: Renderer.sharedContext)
+        engine.setSource(thumb)
+        let (_, firstMs) = Bench.time { engine.render(Bench.gradeRecipe, canvas: canvas) }
+        let (_, secondMs) = Bench.time { engine.render(Bench.gradeRecipe, canvas: canvas) }
+        print(String(format: "cold start (warm-up %@, %.0f ms): first frame %.1f ms, second %.1f ms",
+                     warm ? "on" : "off", warmMs, firstMs, secondMs))
     }
 }

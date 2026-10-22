@@ -94,6 +94,10 @@ enum Bench {
         let context = Renderer.sharedContext
         let jpeg = try synthetic(from: URL(fileURLWithPath: fixturePath), in: dir, context: context)
         let library = try FilmLibrary(directory: filmsURL, cacheDirectory: lutCache)
+        if ProcessInfo.processInfo.environment["MIRA_BENCH_COLD"] != nil {
+            try Extra.coldStart(library: library, jpeg: jpeg)
+            return
+        }
         _ = try library.film(id: effectsRecipe.filmID!).map { try library.lut(for: $0) }
         let renderer = Renderer(library: library)
 
