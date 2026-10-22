@@ -18,8 +18,16 @@ enum GradeKernels {
         try? CIKernel(functionName: "miraCurves", fromMetalLibraryData: $0)
     }
 
+    static let tone: CIColorKernel? = library.flatMap {
+        try? CIColorKernel(functionName: "miraTone", fromMetalLibraryData: $0)
+    }
+
+    static let detail: CIColorKernel? = library.flatMap {
+        try? CIColorKernel(functionName: "miraDetail", fromMetalLibraryData: $0)
+    }
+
     /// Whether both kernels loaded (tests check this; a missing kernel makes its stage a no-op).
-    static var isAvailable: Bool { colorMixer != nil && curves != nil }
+    static var isAvailable: Bool { colorMixer != nil && curves != nil && tone != nil && detail != nil }
 
     // MARK: Stages
 
@@ -49,5 +57,22 @@ enum GradeKernels {
             roiCallback: { index, rect in index == 1 ? lutExtent : rect },
             arguments: [image, lut, useLuma])
         return output ?? image
+    }
+
+    /// Highlights, shadows, whites and blacks in one pass. `base` is `image` blurred (the local
+    /// luminance the highlight and shadow masks follow); pass `image` itself when those two are 0.
+    static func applyTone(highlights: Double, shadows: Double, whites: Double, blacks: Double,
+                          to image: CIImage, base: CIImage) -> CIImage {
+        guard let kernel = tone else { return image }
+        func c(_ v: Double) -> Float { Float(min(max(v, -1), 1)) }
+        return kernel.apply(extent: image.extent,
+                            arguments: [image, base, c(highlights), c(shadows), c(whites), c(blacks)]) ?? image
+    }
+
+    /// Local contrast: `amount` of (image - blur) added to luminance.
+    static func applyDetail(amount: Double, midtoneWeighted: Bool, to image: CIImage, blurred: CIImage) -> CIImage {
+        guard let kernel = detail else { return image }
+        return kernel.apply(extent: image.extent,
+                            arguments: [image, blurred, Float(amount), Float(midtoneWeighted ? 1 : 0)]) ?? image
     }
 }
