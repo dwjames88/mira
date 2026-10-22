@@ -90,12 +90,25 @@ Move the pointer over the film cards. After a short pause the canvas shows that 
 
 ### Presets
 
-1. Open a photo in the app, pick a film (say Portra 400), move a few sliders, choose Preset ▸ Save as Preset… (⇧⌘S) (or PRESETS tab ▸ SAVE PRESET…). The sheet shows the film as a fixed prefix; type "Last Summer": the preview reads "Portra 400 - Last Summer", Save is disabled while the field is empty, Return saves, Esc cancels.
-2. Open the PRESETS tab (4): a card with a thumbnail, "Portra 400 - Last Summer" and the film caption appears and is marked as applied. Hover it over a different look: the canvas previews it with a PREVIEW chip; the UNSAVED mark does not change. Change film and sliders, click the card: film and sliders return, the crop stays.
+1. Open a photo in the app, pick a film (say Portra 400), move a few sliders, choose Preset ▸ Save as Preset… (⇧⌘S) (or FILMS tab ▸ SAVE PRESET…). The sheet shows the film as a fixed prefix; type "Last Summer": the preview reads "Portra 400 - Last Summer", Save is disabled while the field is empty, Return saves, Esc cancels.
+2. In the FILMS tab the strip under the canvas starts with a PRESETS group (before any preset exists it shows one SAVE A PRESET slot), then the FILMS group; the family tabs filter only the films. A card with a thumbnail, "Portra 400 - Last Summer" and the film caption appears and is marked as applied. Hover it over a different look: the canvas previews it with a PREVIEW chip; the UNSAVED mark does not change. Change film and sliders, click the card: film and sliders return, the crop stays.
 3. Right-click the card: Rename… (nickname only), Duplicate (adds "… copy"), Delete… (asks first). Rename to an empty name is refused.
-4. In Photos, open any picture and choose Edit ▸ Mira: the PRESETS tab lists the same preset (the extension reads the shared App Group file; it also picks up a preset saved in the app a moment ago). Save one there and check it shows in the app after it becomes active.
+4. In Photos, open any picture and choose Edit ▸ Mira: the FILMS strip lists the same preset (the extension reads the shared App Group file; it also picks up a preset saved in the app a moment ago). Save one there and check it shows in the app after it becomes active.
 5. Delete a film's entry from a copy of `Films/films.json` (or edit `Presets.json` so a preset names an unknown `filmID`): the card shows FILM MISSING and applying it applies the develop settings with a notice.
 6. `codesign -d --entitlements - Mira.app` and `.../PlugIns/MiraPhotos.appex` both list `com.apple.security.application-groups` with `VF945J28YU.com.fieldframes.mira`.
+
+### Sharing presets
+
+1. Right-click a preset card ▸ Share…: the system share sheet opens anchored to the card. Send it by AirDrop to another Mac (or Mail it to yourself): the attachment is named "Portra 400 - Last Summer.mirapreset".
+2. Right-click ▸ Export…: a save panel with the same default name; save to the Desktop and open the file in a text editor: JSON with `"format" : "com.fieldframes.mira.preset"`, `"schemaVersion" : 1`, the recipe and no `crop` settings other than the identity, no image data.
+3. Preset ▸ Export All Presets…: choose a folder; one `.mirapreset` per preset appears (same-named presets get " 2" in the file name). With no presets a notice says so.
+4. On the other Mac (or after deleting the preset): double-click the `.mirapreset` in Finder. Mira opens (also with no photo open), the preset is stored and a notice reads "Imported 1 preset." The FILMS strip shows it; in Photos ▸ Edit ▸ Mira it is listed too.
+5. Preset ▸ Import Presets… (⇧⌘I): select several files at once. Drag a `.mirapreset` file onto the FILMS strip, and onto the library window: both import. Dragging a photo still opens the photo.
+6. Import the same file again: a "Preset Already Exists" dialog offers Replace, Keep Both and Skip (Esc skips). Keep Both saves "Portra 400 - Last Summer 2"; import it again for "… 3". With several duplicate files tick Apply to all and the answer is used for the rest.
+7. Import a text file renamed to `.mirapreset`, and a file with `"schemaVersion": 2`: the notice lists each by file name ("not a Mira preset file", "made by a newer version of Mira"); valid files in the same batch still import.
+8. Import a preset for a film you do not have: its card shows FILM MISSING and applying it applies the develop settings only.
+9. In the Photos extension there is no Share…, Export… or Import… (it has no file access); presets still show, apply and save.
+10. `plutil -p Mira.app/Contents/Info.plist` lists `UTExportedTypeDeclarations` (`com.fieldframes.mira.preset`, extension `mirapreset`) and a Mira Preset document type; Finder shows "Mira Preset" as the kind of a `.mirapreset`.
 
 ### Light and dark
 
@@ -112,14 +125,14 @@ It imports `App/SelfTest/sample.jpg` into the album "Emulsion Test", saves Velvi
 
 ## Key map and menus
 
-The window toolbar shows the Mira wordmark and, at the trailing edge, the appearance toggle. Every command is in the menu bar, and the editor has a strip under the title bar: `← LIBRARY` (app only), the FILMS · PRESETS · DEVELOP · CROP tabs, then the status (UNSAVED / SAVED / REVERTED / READ ONLY) and SAVE (app only; the Photos extension shows the tabs only and uses Photos' own Save).
+The window toolbar shows the Mira wordmark and, at the trailing edge, the appearance toggle. Every command is in the menu bar, and the editor has a strip under the title bar: `← LIBRARY` (app only), the FILMS · DEVELOP · CROP tabs, then the status (UNSAVED / SAVED / REVERTED / READ ONLY) and SAVE (app only; the Photos extension shows the tabs only and uses Photos' own Save).
 
 Menus:
 
 - **File**: Open… (⌘O); Export… (⌘E, photo open, not while the crop tab is open); Save to Photos (⌘S; for a file the same item reads Save Sidecar and writes the sidecar now; disabled when there is nothing to save, read-only or preview-only); Revert to Original… (asks first); Back to Library (⌘←, guarded: asks about unsaved Photos edits).
 - **Edit**: Reset Adjustments (sliders, curves and mixer; keeps film and crop); Reset All (everything except the photo).
-- **Preset**: Save as Preset… (⇧⌘S, photo open, not while the crop tab is open).
-- **View**: Films (1), Presets (4), Develop (2), Crop (3), Toggle Full Screen (F), Zoom In (]), Zoom Out ([), Zoom to Fit (⌘0).
+- **Preset**: Save as Preset… (⇧⌘S, photo open, not while the crop tab is open); Import Presets… (⇧⌘I); Export All Presets….
+- **View**: Films (1), Develop (2), Crop (3), Toggle Full Screen (F), Zoom In (]), Zoom Out ([), Zoom to Fit (⌘0).
 - **View ▸ Appearance**: System / Light / Dark (checkmark on current), the same choice as the sun/moon button at the trailing edge of the window toolbar (click toggles Light/Dark, right-click offers all three; hidden in full screen) and Settings ▸ APPEARANCE; stored in `mira.appearance`.
 - Mira ▸ Settings… (⌘,) and About Mira are unchanged.
 
@@ -127,7 +140,7 @@ Keys (single keys work when no text field is being edited, in the app and the ex
 
 | Key / gesture | Does |
 |---|---|
-| 1 / 2 / 3 / 4 | FILMS / DEVELOP / CROP / PRESETS tab (3 begins the crop tool; leaving it commits) |
+| 1 / 2 / 3 | FILMS / DEVELOP / CROP tab (3 begins the crop tool; leaving it commits) |
 | F | Full screen: window full screen (app) and every panel hidden, the photo alone on pure ink. Not available while cropping. In the extension F only hides the panels |
 | Esc | Leaves that view (restores panels, leaves full screen). In the crop tab Esc is CANCEL |
 | C (hold) | Shows the original while held; releasing returns to the edit. Mouse: press and hold HOLD TO COMPARE |

@@ -2,6 +2,18 @@
 
 All notable changes to Mira. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.1] - 2026-10-22
+
+### Added
+- Preset sharing: each preset is one `.mirapreset` file (JSON, "<Film> - <nickname>.mirapreset", no photo data and no crop). Right-click a preset card for Share… (the system share sheet: AirDrop, Messages, Mail) or Export… (a save panel); Preset ▸ Export All Presets… writes one file per preset into a folder.
+- Preset import: Preset ▸ Import Presets… (⇧⌘I), drag `.mirapreset` files onto the FILMS strip or the window, or double-click one in Finder (Mira opens and imports, with or without a photo open). A preset with the same "<Film> - <nickname>" as a saved one asks Replace, Keep Both (adds " 2", " 3"…) or Skip, with Apply to all for several files. A notice reports the result and lists unreadable files by name. A preset for a film you do not have shows FILM MISSING.
+- The `com.fieldframes.mira.preset` file type (`.mirapreset`, "Mira Preset") is declared by the app, which is its default opener.
+
+### Changed
+- Presets moved into the FILMS tab: the strip under the canvas shows a PRESETS group of your preset cards first, then the FILMS group, in one row (presets are shown whatever the family filter says; a single SAVE A PRESET slot stands in until there are any). The FILMS panel names the preset the look matches and has SAVE PRESET….
+- The separate PRESETS tab and its key 4 are gone; tabs are FILMS, DEVELOP, CROP (keys 1 to 3).
+- Share, Export and Import are in the app only: the Photos extension is sandboxed without file access, so it keeps the preset cards and SAVE PRESET… and shows no share or import controls.
+
 ## [0.3.0] - 2026-10-22
 
 ### Added
