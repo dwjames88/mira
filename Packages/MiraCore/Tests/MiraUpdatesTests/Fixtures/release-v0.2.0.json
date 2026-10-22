@@ -1,0 +1,71 @@
+{
+  "url": "https://api.github.com/repos/dwjames88/mira/releases/419675493",
+  "assets_url": "https://api.github.com/repos/dwjames88/mira/releases/419675493/assets",
+  "upload_url": "https://uploads.github.com/repos/dwjames88/mira/releases/419675493/assets{?name,label}",
+  "html_url": "https://github.com/dwjames88/mira/releases/tag/v0.2.0",
+  "id": 419675493,
+  "author": {
+    "login": "dwjames88",
+    "id": 156497265,
+    "type": "User",
+    "site_admin": false,
+    "html_url": "https://github.com/dwjames88"
+  },
+  "node_id": "RE_kwDOVSV3CM4ZA71l",
+  "tag_name": "v0.2.0",
+  "target_commitish": "main",
+  "name": "Mira 0.2.0",
+  "draft": false,
+  "immutable": false,
+  "prerelease": false,
+  "created_at": "2026-10-21T14:43:02Z",
+  "updated_at": "2026-10-21T14:45:06Z",
+  "published_at": "2026-10-21T14:45:06Z",
+  "assets": [
+    {
+      "url": "https://api.github.com/repos/dwjames88/mira/releases/assets/662814212",
+      "id": 662814212,
+      "node_id": "RA_kwDOVSV3CM4ngb4E",
+      "name": "Mira-0.2.0.dmg",
+      "label": "",
+      "uploader": {
+        "login": "dwjames88",
+        "id": 156497265,
+        "type": "User",
+        "site_admin": false,
+        "html_url": "https://github.com/dwjames88"
+      },
+      "content_type": "application/x-apple-diskimage",
+      "state": "uploaded",
+      "size": 88887663,
+      "digest": "sha256:4f8a8ed866c50f458332837e136523863abbf4fe0cad71f9b560a295f0af8f44",
+      "download_count": 0,
+      "created_at": "2026-10-21T14:43:43Z",
+      "updated_at": "2026-10-21T14:45:05Z",
+      "browser_download_url": "https://github.com/dwjames88/mira/releases/download/v0.2.0/Mira-0.2.0.dmg"
+    },
+    {
+      "url": "https://api.github.com/repos/dwjames88/mira/releases/assets/662814213",
+      "id": 662814213,
+      "node_id": "RA_kwDOVSV3CM4ngb4F",
+      "name": "Mira-0.2.0.zip",
+      "label": "",
+      "uploader": {
+        "login": "dwjames88",
+        "id": 156497265,
+        "type": "User",
+        "site_admin": false,
+        "html_url": "https://github.com/dwjames88"
+      },
+      "content_type": "application/zip",
+      "state": "uploaded",
+      "size": 86304083,
+      "digest": "sha256:9ecca86ca91a29f7a87e631d80b6292a0f3e573d1f1683d0e28548daf8df5696",
+      "download_count": 0,
+      "created_at": "2026-10-21T14:43:43Z",
+      "updated_at": "2026-10-21T14:45:05Z",
+      "browser_download_url": "https://github.com/dwjames88/mira/releases/download/v0.2.0/Mira-0.2.0.zip"
+    }
+  ],
+  "body": "\n### Added\n- Photos library browser in the host app: Photos-order sidebar with collapsible sections, folders, shared albums and media types; thumbnail grid with RAW and EDITED badges; library filter backed by a background EXIF metadata index.\n- Non-destructive edits through PhotoKit with in-app Revert to Original, using one shared adjustment codec (`MiraAdjustment`) in the app and the extension, so an edit made in either reopens in the other.\n- RAW decoding with `CIRAWFilter`, exported in Display P3.\n- Files from disk: sidecar recipes (`<filename>.mira.json`), open at launch (`open -a`, Finder Open With, drag and drop).\n- Field Frames design (ink ground, Cormorant Garamond and IBM Plex Mono, square corners), appearance toggle (System / Light / Dark), About window with the film list, and Settings.\n- Develop workflow: FILMS, DEVELOP and CROP tabs, commands in the menu bar, single-key shortcuts.\n- Crop: non-destructive crop, 90-degree rotation, flips and straighten, with aspect presets.\n- Histogram, curves editor and color mixer.\n- Hover preview of a film on the canvas, in the app and the extension.\n- Zoom: click for 200%, scroll to pan, pinch to zoom, `[` and `]` to step; full screen; hold-to-compare key.\n- Performance harness (`mira-sheet --bench`) and `os_signpost` intervals.\n\n### Changed\n- Renamed Emulsion to Mira (new bundle ids). Photos edited with Emulsion and `.emulsion.json` sidecars are still read.\n- Previews render at canvas resolution from a cached base and IOSurface frames: median preview frame 12 ms to about 5 ms (24 MP source, 1500x1000 canvas, M1 Pro).\n- LUT disk cache and parallel loading: cold load of all 31 films about 2 s to about 0.56 s.\n- Grid thumbnails may use the network so iCloud-only photos are not blank.\n- User-facing text uses US English.\n\n### Fixed\n- PhotoKit actor-isolation crash.\n- Hover preview did not redraw the canvas.\n- Photos extension did not fill the Photos editing window.\n- Scroll-wheel pan over the zoomed canvas.\n\n\n## Install\n\n1. Download the DMG (or zip) and drag **Mira** to Applications.\n2. Mira is signed with a free Personal Team development certificate (no Developer ID, not notarized), so macOS blocks the first launch on other Macs. Right-click Mira, choose Open, then Open again; or go to System Settings \u25b8 Privacy & Security and click \"Open Anyway\".\n3. Development-signed builds may refuse to run at all on a Mac not registered to the team. In that case build from source: `scripts/install.sh` (needs Xcode, XcodeGen and your own team ID in `project.yml`).\n4. Enable the extension in System Settings \u25b8 General \u25b8 Login Items & Extensions \u25b8 Photos Editing \u25b8 Mira, and grant Photos access on first launch.\n5. The free-team signature expires after 7 days.\n"
+}
