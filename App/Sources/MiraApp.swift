@@ -23,6 +23,7 @@ struct MiraApp: App {
         .commands {
             CommandGroup(replacing: .appInfo) {
                 Button("About Mira") { openWindow(id: "about") }
+                Button("Check for Updates\u{2026}") { UpdateController.shared.checkManually() }
             }
             CommandGroup(replacing: .newItem) {
                 Button("Open\u{2026}") { state.presentOpenPanel() }

@@ -50,7 +50,7 @@ Status: v0.2.0. See [CHANGELOG.md](CHANGELOG.md) for what changed. See [TESTING.
 ```
 App/                     Host app (SwiftUI): window, Photos library browser, open/drop, export sheet, films browser; SelfTest/ sample
 PhotosExtension/         Photos editing extension (PHContentEditingController)
-Packages/MiraCore/   Pipeline: Recipe, Film, FilmLibrary, LUT, Renderer, MiraAdjustment, ImageSource, SidecarStore; tests; mira-sheet CLI
+Packages/MiraCore/   Pipeline: Recipe, Film, FilmLibrary, LUT, Renderer, MiraAdjustment, ImageSource, SidecarStore; MiraUpdates (updater logic); tests; mira-sheet CLI
 Packages/MiraUI/     Shared SwiftUI editor (EditorView, EditorModel, FilmsBrowserView) and FieldFramesTheme with bundled fonts
 Films/                   films.json, HaldCLUT/*.png, ATTRIBUTION.md, LICENSE-LUTS
 Fixtures/                sample.jpg (CC0) and SOURCE.md
@@ -91,6 +91,34 @@ project.yml              XcodeGen spec (the .xcodeproj is generated and git-igno
 **PhotosExtension** hosts the same `EditorView`. On start it decodes any existing adjustment data into the recipe and loads `fullSizeImageURL`; on Save it encodes the recipe as adjustment data and renders the full-size image to the type Photos prefers (JPEG, HEIC or TIFF), falling back to JPEG. Cancel asks for confirmation only if the recipe has changed.
 
 The Films folder is bundled in both the app and the extension, since the extension is sandboxed and cannot read the host's bundle.
+
+## Updates
+
+Mira checks for a newer release in the background and can install it itself.
+
+- **Check.** At launch, off the main thread and without delaying it, Mira asks `https://api.github.com/repos/dwjames88/mira/releases/latest` (public repo, no token) for the latest release and compares its tag (`v0.2.1`) with the app's `CFBundleShortVersionString` using semantic versioning. Automatic checks run at most once every 24 hours, can be switched off in Settings ("Check for updates automatically", on by default), and say nothing unless there is something newer: offline, 404, 401/403 (rate limit) and malformed answers are only logged (`os.Logger`, subsystem `com.fieldframes.mira`, category `updates`). **Mira > Check for Updates...** ignores the throttle and the switch and always answers, including "Mira 0.2.0 is the latest version" and errors.
+- **The notice.** A small non-modal Field Frames window shows the version and the release notes (the release body, without the first-install boilerplate), with **Download & Install**, **Later** and **Skip This Version**. A skipped version is not offered again by automatic checks (a newer one is); a manual check still shows it.
+- **Install.** Mira downloads `Mira-<version>.zip` (the `.dmg` only if there is no zip, and then only as a manual hand-off) with progress, checks its size and the SHA-256 GitHub publishes for the asset, unpacks it with `ditto`, and then verifies with the Security framework that the app is `com.fieldframes.mira`, is the release's version and is validly signed (strict, nested code included) by team `VF945J28YU` (`anchor apple generic and identifier "com.fieldframes.mira" and certificate leaf[subject.OU] = "VF945J28YU"`). Anything that fails is deleted. The verified app is copied next to the running one, verified again, and swapped in atomically (`replaceItemAt`); the old copy goes to the Trash. Then Mira relaunches the new one.
+- **Release contract** (`scripts/release.sh` enforces it): tag `v<version>`, assets `Mira-<version>.zip` (one top-level `Mira.app`) and `Mira-<version>.dmg`, release body = the `## [<version>]` section of `CHANGELOG.md`. The script prints the `gh release create` command; it does not publish.
+
+### Under the App Sandbox
+
+Mira stays sandboxed. The updater adds `com.apple.security.network.client` (to the app only, not the Photos extension), `com.apple.security.files.bookmarks.app-scope` and `com.apple.security.files.downloads.read-write`. What was tested, in a sandboxed, development-signed helper (temp directories only):
+
+| Step | Sandboxed result |
+|---|---|
+| GitHub API, 86 MB download | works with `network.client` |
+| `/usr/bin/ditto -x -k` unpack | works |
+| Security-framework signature verification | works |
+| Write outside the container | denied, as expected |
+| Swap inside a folder the app may write | works (`replaceItemAt`, old copy trashed) |
+| Remove `com.apple.quarantine` (`removexattr`, `xattr -d`, `ditto --noqtn`) | **not permitted**: every file a sandboxed app writes is quarantined and cannot be cleaned |
+
+So the first install asks once, with an open panel preset to the folder holding Mira (normally `/Applications`): "Allow Mira to update itself in this folder". The choice is kept as a security-scoped bookmark. If you decline, or the folder is not writable for your account, Mira does not guess: it saves the verified zip to `~/Downloads`, reveals it in Finder and tells you to drag Mira to Applications.
+
+Because the swapped-in app is quarantined and this build is development-signed (not notarized), macOS asks you to approve the new version the first time it opens, exactly as for a manual download: right-click Mira in Applications, choose Open, then Open (or System Settings > Privacy & Security > Open Anyway). Mira therefore installs, then offers **Relaunch Now** with that note instead of quitting on its own. A build that is notarized would not need the approval. An unsandboxed debug build clears the quarantine itself and relaunches directly.
+
+The logic lives in `Packages/MiraCore/Sources/MiraUpdates` (versions, release JSON, throttle and skip, download, verifier, swap; linked by the app only), the window in `Packages/MiraUI/Sources/MiraUI/UpdateNoticeView.swift`, and the controller in `App/Sources/Updates/`. `MIRA_LIVE_UPDATE=1 swift test --package-path Packages/MiraCore --filter LiveUpdateTests` runs the whole check, download, verify and swap against the real release in temp directories.
 
 ## Requirements
 

@@ -6,11 +6,15 @@ private typealias T = FieldFramesTheme
 public enum MiraSettings {
     /// Shows the mono edit-source footer under the editor.
     public static let showEditSourceFooterKey = "mira.showEditSourceFooter"
+    /// Checks GitHub for a newer release at launch (on unless turned off). Same key as `UpdatePreferences.autoCheckKey`.
+    public static let checkForUpdatesKey = "mira.updates.autoCheck"
 }
 
 /// The Settings window (⌘,). Minimal for now; add new sections below GENERAL.
 public struct SettingsView: View {
     @AppStorage(MiraSettings.showEditSourceFooterKey) private var showEditSourceFooter = false
+
+    @AppStorage(MiraSettings.checkForUpdatesKey) private var checkForUpdates = true
 
     @AppStorage(AppearancePreference.key) private var appearance = AppearancePreference.system.rawValue
 
@@ -38,6 +42,12 @@ public struct SettingsView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(T.paperDim)
                         .fixedSize(horizontal: false, vertical: true)
+                    FFHairline()
+                    FFToggle("Check for updates automatically", isOn: $checkForUpdates)
+                    Text("Once a day at launch, Mira asks GitHub for the latest release. You are only told when there is a newer one. Mira \u{25B8} Check for Updates\u{2026} always checks.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(T.paperDim)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(T.cells(2))
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -48,7 +58,7 @@ public struct SettingsView: View {
         }
         .padding(.horizontal, T.cells(4))
         .padding(.bottom, T.rows(2))
-        .frame(width: T.cells(60), height: T.rows(24), alignment: .topLeading)
+        .frame(width: T.cells(60), height: T.rows(30), alignment: .topLeading)
         .fieldFramesSecondaryChrome()
     }
 }

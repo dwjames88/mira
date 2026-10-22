@@ -7,6 +7,8 @@ let package = Package(
     products: [
         .library(name: "MiraCore", targets: ["MiraCore"]),
         .executable(name: "mira-sheet", targets: ["MiraSheet"]),
+        // The in-app updater logic (GitHub releases, versions, verification, swap). Linked by the app only.
+        .library(name: "MiraUpdates", targets: ["MiraUpdates"]),
     ],
     targets: [
         .target(
@@ -18,6 +20,16 @@ let package = Package(
         .executableTarget(
             name: "MiraSheet",
             dependencies: ["MiraCore"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .target(
+            name: "MiraUpdates",
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .testTarget(
+            name: "MiraUpdatesTests",
+            dependencies: ["MiraUpdates"],
+            resources: [.copy("Fixtures")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(
