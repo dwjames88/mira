@@ -29,6 +29,22 @@ The app was already well optimised, so the work was finding what was still left.
 
 Preview frame times at 1500x1000 (effects 3.9 ms, effects+mixer+curves 4.5 ms, crop+6 deg 3.7 ms) are unchanged.
 
+## After merging the new develop controls (main, 2026-10-22)
+
+Re-run of `mira-sheet --bench` on main with Highlights/Shadows/Whites/Blacks, Texture/Clarity and Vibrance in the pipeline (same machine, load average about 13):
+
+| Measure | Result |
+|---|---|
+| Preview frame 1500x1000, effects / effects+mixer+curves / crop+6 deg | 5.1 / 4.6 / 3.5 ms median |
+| Stage: film + tone (highlights, shadows, whites, blacks; one kernel plus a reduced-size blur) | 2.5 ms (film only about 2.1 ms) |
+| Stage: film + clarity, texture, vibrance | 3.3 ms |
+| Film switch, effects recipe, new film every frame | 3.3 ms median |
+| Histogram, 1536x1024 frame | 0.33 ms |
+| LUT prewarm cold, 10 workers / warm | 296 to 306 ms / 7 ms |
+| Thumbnails cold / warm disk / hot (32) | 510 / 71 / 54 ms |
+
+The new stages are skipped when their values are 0, so a recipe that does not use them costs exactly what it did before.
+
 ## What each change was
 
 1. **Narrower observation (`EditorModel.selectedFilmID`).** `FilmStrip.body` read `model.recipe.filmID`, and `recipe` is one observed property, so every slider tick re-evaluated the strip and its 32 cards. The model now keeps a stored `selectedFilmID` that changes only when the film does, and the strip reads that. Result: 0 strip evaluations per tick, SwiftUI cost per tick 4.0 to 2.3 ms.
