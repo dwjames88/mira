@@ -44,10 +44,6 @@ public struct EditorView<Footer: View>: View {
                             FFHairline()
                             FilmStrip(model: model)
                         }
-                        if model.tab == .presets {
-                            FFHairline()
-                            PresetStrip(model: model)
-                        }
                         footer
                     }
                 }
@@ -64,6 +60,7 @@ public struct EditorView<Footer: View>: View {
         .sheet(item: $model.presetSheet) { mode in
             SavePresetSheet(model: model, mode: mode)
         }
+        .presetImportSheet(model.transfer)
         .confirmationDialog(
             "Delete this preset?",
             isPresented: Binding(get: { model.presetPendingDelete != nil },
@@ -85,7 +82,6 @@ public struct EditorView<Footer: View>: View {
     @ViewBuilder private var panel: some View {
         switch model.tab {
         case .films: FilmsPanel(model: model)
-        case .presets: PresetsPanel(model: model)
         case .develop: DevelopPanel(model: model)
         case .crop: CropPanel(model: model)
         }
@@ -293,44 +289,100 @@ private struct CompareButton: View {
 
 // MARK: Film strip
 
+/// The FILMS strip under the canvas: the family tabs and the preset actions on top, then one card row
+/// in two labelled groups, PRESETS (the user's saved looks, always shown whatever the family filter) and
+/// FILMS (Original and the films the filter lets through). It reads `selectedFilmID` and `appliedPresetID`,
+/// never `recipe`, so slider ticks do not re-evaluate it.
 private struct FilmStrip: View {
     @Bindable var model: EditorModel
+    @State private var dropTargeted = false
 
     private var tabs: [(value: FilmFamily?, title: String)] {
         [(nil, "All")] + FilmFamily.allCases.map { (Optional($0), $0.displayName) }
     }
 
+    /// Two-line preset cards, plus a group label and its hairline.
+    static let rowHeight: CGFloat = T.rows(12.5)
+
     var body: some View {
         let _ = PerfCounters.filmStrip += 1
         VStack(alignment: .leading, spacing: 0) {
-            FFTabBar(tabs, selection: $model.familyFilter)
+            header
                 .padding(.horizontal, T.cells(2))
             FFHairline()
             FFScrollView(.horizontal) {
-                HStack(alignment: .top, spacing: T.cells(1)) {
-                    FilmCard(
-                        title: "Original", caption: "No film",
-                        image: model.thumbnails[EditorModel.originalTileID],
-                        isSelected: model.selectedFilmID == nil,
-                        onHoverChange: { hover($0, nil) }
-                    ) { model.selectFilm(nil) }
-
-                    ForEach(model.visibleFilms) { film in
-                        FilmCard(
-                            title: film.displayName,
-                            caption: caption(for: film),
-                            image: model.thumbnails[film.id],
-                            isSelected: model.selectedFilmID == film.id,
-                            onHoverChange: { hover($0, film.id) }
-                        ) { model.selectFilm(film.id) }
-                    }
+                HStack(alignment: .top, spacing: 0) {
+                    PresetGroup(model: model)
+                    Rectangle().fill(T.hair).frame(width: 1)
+                        .padding(.horizontal, T.cells(1))
+                    filmGroup
                 }
                 .padding(.horizontal, T.cells(2) - 4)
                 .padding(.vertical, T.rows(1) / 2)
             }
-            .frame(height: T.rows(9))
+            .frame(height: Self.rowHeight)
         }
         .ffPanel()
+        .overlay { if dropTargeted { Rectangle().strokeBorder(T.lichen, lineWidth: 1).allowsHitTesting(false) } }
+        .dropDestination(for: URL.self) { urls, _ in
+            guard model.transfer.sharingEnabled, urls.contains(where: PresetFile.isPresetFile) else { return false }
+            model.transfer.startImport(urls)
+            return true
+        } isTargeted: { dropTargeted = $0 && model.transfer.sharingEnabled }
+        .onAppear { model.refreshPresets() }
+        // The other process (app or Photos extension) may have saved presets meanwhile.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            model.refreshPresets()
+        }
+        .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) { _ in
+            model.refreshPresets()
+        }
+    }
+
+    private var header: some View {
+        HStack(spacing: T.cells(2)) {
+            FFTabBar(tabs, selection: $model.familyFilter)
+            Spacer(minLength: T.cells(2))
+            if let notice = model.presetNotice ?? model.transfer.notice {
+                Text(notice)
+                    .ffLabel(size: 10, color: T.lichen)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .help(notice)
+                    .accessibilityLabel(notice)
+            }
+            if model.transfer.sharingEnabled {
+                Button("Import\u{2026}") { model.transfer.presentImportPanel() }
+                    .buttonStyle(.ff)
+                    .help("Import .mirapreset files \u{21E7}\u{2318}I")
+            }
+            Button("Save Preset\u{2026}") { model.beginSavePreset() }
+                .buttonStyle(.ff)
+                .disabled(model.source == nil)
+                .help("Save the film and develop settings as a preset \u{21E7}\u{2318}S")
+        }
+        .frame(height: T.rows(2))
+    }
+
+    private var filmGroup: some View {
+        StripGroup(title: "Films", count: model.visibleFilms.count + 1) {
+            FilmCard(
+                title: "Original", caption: "No film",
+                image: model.thumbnails[EditorModel.originalTileID],
+                isSelected: model.selectedFilmID == nil,
+                onHoverChange: { hover($0, nil) }
+            ) { model.selectFilm(nil) }
+
+            ForEach(model.visibleFilms) { film in
+                FilmCard(
+                    title: film.displayName,
+                    caption: caption(for: film),
+                    image: model.thumbnails[film.id],
+                    isSelected: model.selectedFilmID == film.id,
+                    onHoverChange: { hover($0, film.id) }
+                ) { model.selectFilm(film.id) }
+            }
+        }
     }
 
     /// Enter previews the card; exit only ends the hover if no other card has taken over, so the

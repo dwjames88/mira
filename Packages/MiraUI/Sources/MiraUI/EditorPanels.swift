@@ -58,11 +58,38 @@ struct FilmsPanel: View {
             VStack(alignment: .leading, spacing: 0) {
                 SpecSliders(model: model, specs: [SliderSpec("strength", "Strength", \.strength, 0...1, default: 1)])
                     .padding(.top, T.rows(1))
+                presetSection
             }
             .padding(.horizontal, T.cells(2))
             Spacer(minLength: 0)
         }
         .ffPanel()
+    }
+
+    /// The preset the look equals, if any, and SAVE PRESET.
+    private var presetSection: some View {
+        VStack(alignment: .leading, spacing: T.rows(0.5)) {
+            FFSectionLabel("Preset").padding(.top, T.rows(1))
+            Text(appliedPreset.map { "Matches \($0.displayName)" } ?? "Not saved as a preset")
+                .ffLabel(color: T.paperDim)
+                .lineLimit(2)
+            Button("Save Preset\u{2026}") { model.beginSavePreset() }
+                .buttonStyle(.ffProminent)
+                .disabled(model.source == nil)
+                .padding(.top, T.rows(1) / 2)
+                .help("Save the film and develop settings as a preset \u{21E7}\u{2318}S")
+            if let notice = model.presetNotice {
+                Text(notice)
+                    .font(.system(size: 12))
+                    .foregroundStyle(T.lichen)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, T.rows(1) / 2)
+            }
+        }
+    }
+
+    private var appliedPreset: Preset? {
+        model.appliedPresetID.flatMap { id in model.presets.first { $0.id == id } }
     }
 
     /// Fixed-height header: name (one line), meta label (one line), description (three lines). The
@@ -79,6 +106,21 @@ struct FilmsPanel: View {
                 .ffLabel(color: T.lichen)
                 .lineLimit(1)
                 .frame(height: T.rows(1), alignment: .leading)
+            // The preset the look matches, named as on its card; reserved so the header never changes height.
+            Group {
+                if let preset = appliedPreset {
+                    PresetText.name(film: preset.filmName, nickname: preset.nickname, size: 15)
+                        .font(T.display(15, weight: .medium))
+                        .foregroundStyle(T.paperSoft)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .accessibilityLabel("Preset \(preset.displayName)")
+                } else {
+                    Text(" ")
+                        .accessibilityHidden(true)
+                }
+            }
+            .frame(height: T.rows(1.5), alignment: .leading)
             // Reserved even when the picture is not cropped, so the header never changes height.
             Text(cropLine ?? " ")
                 .ffLabel(color: T.paperDim)

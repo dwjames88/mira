@@ -112,11 +112,11 @@ struct PresetModelTests {
         model.cancelWork()
     }
 
-    @Test func thumbnailsRenderOnThePresetsTabAndFollowTheCrop() async throws {
+    @Test func thumbnailsRenderOnTheFilmsTabAndFollowTheCrop() async throws {
         let store = Self.tempStore()
         let model = try await Self.makeModel(store: store)
         let preset = try model.saveCurrentAsPreset(nickname: "A")
-        model.selectTab(.presets)
+        #expect(model.tab == .films)
         try await HoverTests.waitFor { model.presetThumbnails[preset.id] != nil }
         let first = try #require(model.presetThumbnails[preset.id])
 
@@ -140,9 +140,36 @@ struct PresetModelTests {
         model.cancelWork()
     }
 
-    @Test func tabKeyAndOrder() {
-        #expect(EditorTab.presets.key == "4")
-        #expect(EditorTab.forKey("4") == .presets)
-        #expect(EditorTab.allCases.firstIndex(of: .presets) == EditorTab.allCases.firstIndex(of: .films)! + 1)
+    @Test func presetsHaveNoTabOfTheirOwn() {
+        #expect(EditorTab.allCases == [.films, .develop, .crop])
+        #expect(EditorTab.allCases.map(\.key) == ["1", "2", "3"])
+        #expect(EditorTab.forKey("4") == nil)
+    }
+
+    @Test func thumbnailsWaitWhileAnotherTabIsOpenAndResumeOnFilms() async throws {
+        let store = Self.tempStore()
+        let model = try await Self.makeModel(store: store)
+        model.selectTab(.develop)
+        let preset = try model.saveCurrentAsPreset(nickname: "Later")
+        model.refreshPresets()
+        #expect(model.presetThumbnails[preset.id] == nil)
+        model.selectTab(.films)
+        try await HoverTests.waitFor { model.presetThumbnails[preset.id] != nil }
+        model.cancelWork()
+    }
+
+    @Test func filmsStripListsPresetsAndAppliedPresetFollowsTheLook() async throws {
+        let store = Self.tempStore()
+        let model = try await Self.makeModel(store: store)
+        model.recipe.contrast = 0.3
+        let preset = try model.saveCurrentAsPreset(nickname: "Strip")
+        #expect(model.presets.map(\.id) == [preset.id])
+        #expect(model.appliedPresetID == preset.id)
+        // Changing the family filter does not hide presets.
+        model.familyFilter = .blackAndWhite
+        #expect(model.presets.count == 1)
+        model.recipe.contrast = 0.31
+        #expect(model.appliedPresetID == nil)
+        model.cancelWork()
     }
 }

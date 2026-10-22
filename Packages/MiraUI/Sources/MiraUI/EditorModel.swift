@@ -123,7 +123,7 @@ public final class EditorModel {
     /// The tab the right panel and the canvas surroundings show. `.crop` is on exactly while the
     /// crop tool is open (`isCropping`): entering it begins a crop, leaving it commits.
     public private(set) var tab: EditorTab = .films {
-        didSet { if tab == .presets, oldValue != .presets { presetTabOpened() } }
+        didSet { if tab == .films, oldValue != .films { presetTabOpened() } }
     }
     /// The tab to return to when the crop tool closes.
     @ObservationIgnored private var tabBeforeCrop: EditorTab = .films
@@ -178,6 +178,8 @@ public final class EditorModel {
     // Presets (see EditorModel+Presets.swift)
     /// The preset file this editor reads and writes; shared with the app / Photos extension.
     public let presetStore: PresetStore
+    /// Sharing and importing presets (`.mirapreset` files). The app passes one shared with its menus.
+    public let transfer: PresetTransfer
     public internal(set) var presets: [Preset] = []
     public internal(set) var presetThumbnails: [UUID: NSImage] = [:]
     /// A short, non-blocking message about the last preset action; clears itself.
@@ -218,13 +220,17 @@ public final class EditorModel {
     private static let thumbnailCacheLimit = 4
     nonisolated static let hoverDebounce: Duration = .milliseconds(60)
 
-    public init(library: FilmLibrary, recipe: Recipe = .neutral, presetStore: PresetStore? = nil) {
+    public init(library: FilmLibrary, recipe: Recipe = .neutral, presetStore: PresetStore? = nil,
+                transfer: PresetTransfer? = nil) {
         self.library = library
-        self.presetStore = presetStore ?? .shared
+        let store = presetStore ?? transfer?.store ?? .shared
+        self.presetStore = store
+        self.transfer = transfer ?? PresetTransfer(store: store)
         self.renderer = Renderer(library: library)
         self.engine = PreviewEngine(renderer: renderer, context: Renderer.sharedContext)
         self.recipe = recipe
         self.selectedFilmID = recipe.filmID
+        self.transfer.onChange = { [weak self] in self?.refreshPresets() }
     }
 
     public var films: [Film] { library.films }

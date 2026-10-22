@@ -197,11 +197,11 @@ extension EditorModel {
     }
 
     /// Renders one thumbnail per preset from the photo with its current crop, a few at a time. Only
-    /// while the Presets tab is showing; otherwise the work waits (`presetThumbnailsDirty`) until it opens.
+    /// while the FILMS tab is showing; otherwise the work waits (`presetThumbnailsDirty`) until it opens.
     func startPresetThumbnails() {
         presetThumbnailTask?.cancel()
         presetThumbnailCancel?.cancel()
-        guard tab == .presets else { presetThumbnailsDirty = true; return }
+        guard tab == .films else { presetThumbnailsDirty = true; return }
         guard engine.hasSource else { return }
         presetThumbnailsDirty = false
 

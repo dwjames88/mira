@@ -18,7 +18,9 @@ struct EditorKeyMapTests {
         #expect(act(key("1")) == .selectTab(.films))
         #expect(act(key("2")) == .selectTab(.develop))
         #expect(act(key("3")) == .selectTab(.crop))
-        #expect(act(key("4")) == .selectTab(.presets))
+        // Presets live in the FILMS tab: there is no fourth tab or key.
+        #expect(act(key("4")) == nil)
+        #expect(EditorTab.allCases == [.films, .develop, .crop])
         #expect(act(key("2", rep: true)) == .swallow)
         // Tabs are not available with the panels hidden.
         #expect(act(key("2"), EditorKeyContext(isImmersive: true)) == .swallow)
