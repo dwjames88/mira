@@ -4,5 +4,9 @@
 <dict>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>VF945J28YU.com.fieldframes.mira</string>
+	</array>
 </dict>
 </plist>
