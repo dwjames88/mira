@@ -88,6 +88,15 @@ The app opens that file in the editor. Finder ▸ Open With ▸ Mira does the sa
 
 Move the pointer over the film cards. After a short pause the canvas shows that film with the current sliders and a "PREVIEW · FILM" label; moving to another card follows; moving off returns to the applied look. Nothing changes in the recipe (the UNSAVED mark does not appear, and clicking is what applies a film). Repeat in the Photos extension.
 
+### Presets
+
+1. Open a photo in the app, pick a film (say Portra 400), move a few sliders, choose Preset ▸ Save as Preset… (⇧⌘S) (or PRESETS tab ▸ SAVE PRESET…). The sheet shows the film as a fixed prefix; type "Last Summer": the preview reads "Portra 400 - Last Summer", Save is disabled while the field is empty, Return saves, Esc cancels.
+2. Open the PRESETS tab (4): a card with a thumbnail, "Portra 400 - Last Summer" and the film caption appears and is marked as applied. Hover it over a different look: the canvas previews it with a PREVIEW chip; the UNSAVED mark does not change. Change film and sliders, click the card: film and sliders return, the crop stays.
+3. Right-click the card: Rename… (nickname only), Duplicate (adds "… copy"), Delete… (asks first). Rename to an empty name is refused.
+4. In Photos, open any picture and choose Edit ▸ Mira: the PRESETS tab lists the same preset (the extension reads the shared App Group file; it also picks up a preset saved in the app a moment ago). Save one there and check it shows in the app after it becomes active.
+5. Delete a film's entry from a copy of `Films/films.json` (or edit `Presets.json` so a preset names an unknown `filmID`): the card shows FILM MISSING and applying it applies the develop settings with a notice.
+6. `codesign -d --entitlements - Mira.app` and `.../PlugIns/MiraPhotos.appex` both list `com.apple.security.application-groups` with `VF945J28YU.com.fieldframes.mira`.
+
 ### Light and dark
 
 Switch System Settings ▸ Appearance between Light and Dark with the app and the extension open. Text, hairlines, cards and grain stay legible in both, the window toolbar stays just the wordmark and the editor strip stays ink-soft with a lichen tab underline, and the film description does not shift the panels as it changes.
@@ -103,13 +112,14 @@ It imports `App/SelfTest/sample.jpg` into the album "Emulsion Test", saves Velvi
 
 ## Key map and menus
 
-The window toolbar shows the Mira wordmark and, at the trailing edge, the appearance toggle. Every command is in the menu bar, and the editor has a strip under the title bar: `← LIBRARY` (app only), the FILMS · DEVELOP · CROP tabs, then the status (UNSAVED / SAVED / REVERTED / READ ONLY) and SAVE (app only; the Photos extension shows the tabs only and uses Photos' own Save).
+The window toolbar shows the Mira wordmark and, at the trailing edge, the appearance toggle. Every command is in the menu bar, and the editor has a strip under the title bar: `← LIBRARY` (app only), the FILMS · PRESETS · DEVELOP · CROP tabs, then the status (UNSAVED / SAVED / REVERTED / READ ONLY) and SAVE (app only; the Photos extension shows the tabs only and uses Photos' own Save).
 
 Menus:
 
 - **File**: Open… (⌘O); Export… (⌘E, photo open, not while the crop tab is open); Save to Photos (⌘S; for a file the same item reads Save Sidecar and writes the sidecar now; disabled when there is nothing to save, read-only or preview-only); Revert to Original… (asks first); Back to Library (⌘←, guarded: asks about unsaved Photos edits).
 - **Edit**: Reset Adjustments (sliders, curves and mixer; keeps film and crop); Reset All (everything except the photo).
-- **View**: Films (1), Develop (2), Crop (3), Toggle Full Screen (F), Zoom In (]), Zoom Out ([), Zoom to Fit (⌘0).
+- **Preset**: Save as Preset… (⇧⌘S, photo open, not while the crop tab is open).
+- **View**: Films (1), Presets (4), Develop (2), Crop (3), Toggle Full Screen (F), Zoom In (]), Zoom Out ([), Zoom to Fit (⌘0).
 - **View ▸ Appearance**: System / Light / Dark (checkmark on current), the same choice as the sun/moon button at the trailing edge of the window toolbar (click toggles Light/Dark, right-click offers all three; hidden in full screen) and Settings ▸ APPEARANCE; stored in `mira.appearance`.
 - Mira ▸ Settings… (⌘,) and About Mira are unchanged.
 
@@ -117,7 +127,7 @@ Keys (single keys work when no text field is being edited, in the app and the ex
 
 | Key / gesture | Does |
 |---|---|
-| 1 / 2 / 3 | FILMS / DEVELOP / CROP tab (3 begins the crop tool; leaving it commits) |
+| 1 / 2 / 3 / 4 | FILMS / DEVELOP / CROP / PRESETS tab (3 begins the crop tool; leaving it commits) |
 | F | Full screen: window full screen (app) and every panel hidden, the photo alone on pure ink. Not available while cropping. In the extension F only hides the panels |
 | Esc | Leaves that view (restores panels, leaves full screen). In the crop tab Esc is CANCEL |
 | C (hold) | Shows the original while held; releasing returns to the edit. Mouse: press and hold HOLD TO COMPARE |
@@ -144,7 +154,7 @@ swift test --package-path Packages/MiraCore
 swift test --package-path Packages/MiraUI
 ```
 
-As of the editor-workflow change the suites hold 170 (MiraCore) and 68 (MiraUI) tests; the lists below are the original groups. New: `ZoomTests` (click, step, pan, clamping, viewport-to-image rect with crop, zoomed render pixels), `EditorTabTests`, `ViewingKeysTests` (key map table, zoom model, compare key, full screen), `ExtensionHostingTests` (editor fills a resizing window), plus the `editor-tab-*.png`, `editor-zoom-100.png` and `editor-immersive.png` snapshots.
+With presets the suites hold 186 (MiraCore) and 87 (MiraUI) tests (new: `PresetTests`, `PresetStoreTests` incl. two stores on one directory, `PresetModelTests`, `PresetSnapshotTests` writing `presets-tab-*.png` and `save-preset-sheet-*.png`). Before that, as of the editor-workflow change the suites hold 170 (MiraCore) and 68 (MiraUI) tests; the lists below are the original groups. New: `ZoomTests` (click, step, pan, clamping, viewport-to-image rect with crop, zoomed render pixels), `EditorTabTests`, `ViewingKeysTests` (key map table, zoom model, compare key, full screen), `ExtensionHostingTests` (editor fills a resizing window), plus the `editor-tab-*.png`, `editor-zoom-100.png` and `editor-immersive.png` snapshots.
 
 MiraCore has 36 tests:
 

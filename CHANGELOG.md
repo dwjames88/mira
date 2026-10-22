@@ -2,6 +2,12 @@
 
 All notable changes to Mira. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## Unreleased
+
+### Added
+- Presets: save the film and all develop settings as one preset named "<film> - <nickname>" (for example "Portra 400 - Last Summer"). New PRESETS tab (key 4) with thumbnail cards, hover preview and click to apply (the photo's crop is kept), a Save Preset sheet, Rename, Duplicate and Delete, a FILM MISSING mark and notice when a preset's film is not installed, and Preset ▸ Save as Preset… (⇧⌘S).
+- App Group `VF945J28YU.com.fieldframes.mira` on the app and the Photos extension: presets are one shared `Presets.json`, so a preset saved in either shows up in the other.
+
 ## [0.2.0] - 2026-10-21
 
 ### Added
