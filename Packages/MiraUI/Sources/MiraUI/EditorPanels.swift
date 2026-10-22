@@ -22,7 +22,7 @@ struct SliderSpec: Identifiable {
     }
 }
 
-private struct SliderGroup: Identifiable {
+struct SliderGroup: Identifiable {
     let title: String
     let specs: [SliderSpec]
     var id: String { title }
@@ -130,24 +130,33 @@ enum CropSummary {
 
 // MARK: Develop
 
-/// DEVELOP: histogram, tone and colour sliders, curves, colour mixer, then texture and frame, with
+/// DEVELOP: histogram, light, presence and colour sliders, curves, colour mixer, then effects and frame, with
 /// RESET at the foot.
 struct DevelopPanel: View {
     @Bindable var model: EditorModel
 
-    private static let toneColor: [SliderGroup] = [
-        SliderGroup(title: "Tone", specs: [
+    static let toneColor: [SliderGroup] = [
+        SliderGroup(title: "Light", specs: [
             SliderSpec("exposure", "Exposure", \.exposure, -2...2, default: 0),
             SliderSpec("contrast", "Contrast", \.contrast, -1...1, default: 0),
+            SliderSpec("highlights", "Highlights", \.highlights, -1...1, default: 0),
+            SliderSpec("shadows", "Shadows", \.shadows, -1...1, default: 0),
+            SliderSpec("whites", "Whites", \.whites, -1...1, default: 0),
+            SliderSpec("blacks", "Blacks", \.blacks, -1...1, default: 0),
+        ]),
+        SliderGroup(title: "Presence", specs: [
+            SliderSpec("texture", "Texture", \.texture, -1...1, default: 0),
+            SliderSpec("clarity", "Clarity", \.clarity, -1...1, default: 0),
+            SliderSpec("vibrance", "Vibrance", \.vibrance, -1...1, default: 0),
+            SliderSpec("saturation", "Saturation", \.saturation, -1...1, default: 0),
         ]),
         SliderGroup(title: "Color", specs: [
-            SliderSpec("warmth", "Warmth", \.warmth, -1...1, default: 0),
+            SliderSpec("warmth", "Temperature", \.warmth, -1...1, default: 0),
             SliderSpec("tint", "Tint", \.tint, -1...1, default: 0),
-            SliderSpec("saturation", "Saturation", \.saturation, -1...1, default: 0),
         ]),
     ]
 
-    private static let texture = [
+    static let texture = [
         SliderSpec("grain", "Grain", \.grainAmount, 0...1, default: 0),
         SliderSpec("grainSize", "Grain size", \.grainSize, 0...1, default: 0.5),
         SliderSpec("halation", "Halation", \.halationAmount, 0...1, default: 0),
@@ -166,7 +175,7 @@ struct DevelopPanel: View {
                     }
                     CurvesPanel(model: model)
                     ColorMixerPanel(model: model)
-                    FFSectionLabel("Texture").padding(.top, T.rows(1)).padding(.bottom, 4)
+                    FFSectionLabel("Effects").padding(.top, T.rows(1)).padding(.bottom, 4)
                     SpecSliders(model: model, specs: Self.texture)
                     FFSectionLabel("Frame").padding(.top, T.rows(1)).padding(.bottom, 4)
                     SpecSliders(model: model, specs: [SliderSpec("vignette", "Vignette", \.vignetteAmount, 0...1, default: 0)])

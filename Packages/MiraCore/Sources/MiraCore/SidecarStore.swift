@@ -117,7 +117,7 @@ public struct SidecarStore: Sendable {
         let bookmark = (try? imageURL.bookmarkData(options: []))?.base64EncodedString()
         let payload = Payload(
             formatIdentifier: MiraAdjustment.formatIdentifier,
-            formatVersion: MiraAdjustment.formatVersion,
+            formatVersion: MiraAdjustment.formatVersion(for: recipe),
             recipe: recipe,
             sourcePath: imageURL.standardizedFileURL.path,
             bookmark: bookmark,

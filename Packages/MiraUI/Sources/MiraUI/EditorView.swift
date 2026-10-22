@@ -301,6 +301,7 @@ private struct FilmStrip: View {
     }
 
     var body: some View {
+        let _ = PerfCounters.filmStrip += 1
         VStack(alignment: .leading, spacing: 0) {
             FFTabBar(tabs, selection: $model.familyFilter)
                 .padding(.horizontal, T.cells(2))
@@ -310,7 +311,7 @@ private struct FilmStrip: View {
                     FilmCard(
                         title: "Original", caption: "No film",
                         image: model.thumbnails[EditorModel.originalTileID],
-                        isSelected: model.recipe.filmID == nil,
+                        isSelected: model.selectedFilmID == nil,
                         onHoverChange: { hover($0, nil) }
                     ) { model.selectFilm(nil) }
 
@@ -319,7 +320,7 @@ private struct FilmStrip: View {
                             title: film.displayName,
                             caption: caption(for: film),
                             image: model.thumbnails[film.id],
-                            isSelected: model.recipe.filmID == film.id,
+                            isSelected: model.selectedFilmID == film.id,
                             onHoverChange: { hover($0, film.id) }
                         ) { model.selectFilm(film.id) }
                     }

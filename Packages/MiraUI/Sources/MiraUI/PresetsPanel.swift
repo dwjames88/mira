@@ -8,8 +8,12 @@ private typealias T = FieldFramesTheme
 /// already use (colour inherited), a dim hyphen, the nickname in Cormorant italic lichen.
 enum PresetText {
     static func name(film: String, nickname: String, size: CGFloat = 16) -> Text {
-        Text(film)
-            + Text(" - ").foregroundStyle(T.paperDim)
+        Text(film) + nicknamePart(nickname, size: size, leading: " - ")
+    }
+
+    /// "- Last Summer": the second line of a preset card.
+    static func nicknamePart(_ nickname: String, size: CGFloat = 16, leading: String = "- ") -> Text {
+        Text(leading).foregroundStyle(T.paperDim)
             + Text(nickname).font(T.displayItalic(size, weight: .medium)).foregroundStyle(T.lichen)
     }
 }
@@ -96,13 +100,13 @@ private struct PresetCardView: View {
     var body: some View {
         let missing = model.isFilmMissing(preset)
         FilmCard(
-            styledTitle: PresetText.name(film: preset.filmName, nickname: preset.nickname),
+            title: Text(preset.filmName),
+            secondLine: PresetText.nicknamePart(preset.nickname),
             accessibilityTitle: preset.displayName,
-            titleLines: 2,
             caption: missing ? "Film missing" : (model.library.film(id: preset.filmID ?? "")?.brandCaption ?? "No film"),
             captionTint: missing ? T.paper : nil,
             image: model.presetThumbnails[preset.id],
-            isSelected: model.isApplied(preset),
+            isSelected: model.appliedPresetID == preset.id,
             onHoverChange: { inside in
                 if inside {
                     model.hoverPreset(preset.id)
@@ -111,6 +115,7 @@ private struct PresetCardView: View {
                 }
             }
         ) { model.applyPreset(preset.id) }
+        .help(preset.displayName)
         .contextMenu {
             Button("Rename\u{2026}") { model.presetSheet = .rename(preset.id) }
             Button("Duplicate") { model.duplicatePreset(preset.id) }
@@ -156,7 +161,7 @@ struct PresetsPanel: View {
                     .font(T.display(21, weight: .medium))
                     .foregroundStyle(T.paper)
                     .lineLimit(1)
-                Text(model.presets.first(where: { model.isApplied($0) })?.displayName ?? "Not saved as a preset")
+                Text(model.appliedPresetID.flatMap { id in model.presets.first { $0.id == id } }?.displayName ?? "Not saved as a preset")
                     .ffLabel(color: T.paperDim)
                     .lineLimit(2)
                 Button("Save Preset\u{2026}") { model.beginSavePreset() }

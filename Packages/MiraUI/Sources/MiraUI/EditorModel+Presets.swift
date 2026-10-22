@@ -43,6 +43,7 @@ extension EditorModel {
         if all != presets {
             presets = all
             presetThumbnailsDirty = true
+            updateAppliedPreset()
         }
         if presetThumbnailsDirty { startPresetThumbnails() }
     }
@@ -64,6 +65,13 @@ extension EditorModel {
     /// True when the current look is exactly this preset (the card shows as selected).
     public func isApplied(_ preset: Preset) -> Bool {
         !isFilmMissing(preset) && recipe(applying: preset) == recipe
+    }
+
+    /// Keeps `appliedPresetID` in step with `recipe` and `presets`; writes only on change.
+    func updateAppliedPreset() {
+        guard !presets.isEmpty || appliedPresetID != nil else { return }
+        let id = presets.first(where: { isApplied($0) })?.id
+        if id != appliedPresetID { appliedPresetID = id }
     }
 
     var currentFilmName: String { selectedFilm?.displayName ?? Preset.originalName }
@@ -212,6 +220,7 @@ extension EditorModel {
         }
         presetThumbnails = shown
         guard !todo.isEmpty else { return }
+        let flushInterval = EditorModel.thumbnailFlushInterval
 
         let cancel = PresetCancelFlag()
         presetThumbnailCancel = cancel
@@ -227,16 +236,28 @@ extension EditorModel {
                     }
                     continuation.finish()
                 }
+                // Published in 60 ms batches like the film thumbnails: every write re-evaluates the strip.
+                var batch: [UUID: NSImage] = [:]
+                var lastFlush = ContinuousClock.now
                 for await item in stream {
                     guard let self, !cancel.isCancelled, let (uuid, key) = keys[item.id] else {
                         cancel.cancel()
+                        batch = [:]
                         break
                     }
                     let image = NSImage(cgImage: item.image,
                                         size: NSSize(width: item.image.width, height: item.image.height))
-                    self.presetThumbnails[uuid] = image
+                    batch[uuid] = image
                     if self.presetThumbnailCache.count > 64 { self.presetThumbnailCache = [:] }
                     self.presetThumbnailCache[key] = image
+                    if lastFlush.duration(to: .now) >= flushInterval {
+                        self.presetThumbnails.merge(batch) { $1 }
+                        batch = [:]
+                        lastFlush = .now
+                    }
+                }
+                if !batch.isEmpty, let self, !cancel.isCancelled {
+                    self.presetThumbnails.merge(batch) { $1 }
                 }
             } onCancel: {
                 cancel.cancel()

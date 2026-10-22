@@ -39,12 +39,18 @@ public final class EditorModel {
     public var recipe: Recipe {
         didSet {
             guard recipe != oldValue else { return }
+            // Views that only care which film is applied (the film strip) read this instead of
+            // `recipe`, so a slider tick does not re-evaluate them.
+            if recipe.filmID != selectedFilmID { selectedFilmID = recipe.filmID }
+            updateAppliedPreset()
             if recipe.crop != oldValue.crop { resetZoom() } else { revalidateZoom() }
             schedulePreview()
             recipeChangedWhileHovering()
             if recipe.crop != oldValue.crop { startThumbnails(); startPresetThumbnails() }
         }
     }
+    /// `recipe.filmID`, but only changes when the film does.
+    public private(set) var selectedFilmID: String?
     public var showOriginal = false {
         didSet {
             // A zoomed original is rendered on demand, so ask for it as soon as compare starts.
@@ -182,6 +188,8 @@ public final class EditorModel {
     @ObservationIgnored var presetThumbnailCancel: PresetCancelFlag?
     @ObservationIgnored var presetThumbnailCache: [PresetThumbnailKey: NSImage] = [:]
     @ObservationIgnored var presetThumbnailsDirty = true
+    /// The preset the current look equals, if any. Narrow on purpose: the strip reads this, not `recipe`.
+    public internal(set) var appliedPresetID: UUID?
     @ObservationIgnored var presetNoticeTask: Task<Void, Never>?
 
     private struct HoverKey: Hashable {
@@ -216,6 +224,7 @@ public final class EditorModel {
         self.renderer = Renderer(library: library)
         self.engine = PreviewEngine(renderer: renderer, context: Renderer.sharedContext)
         self.recipe = recipe
+        self.selectedFilmID = recipe.filmID
     }
 
     public var films: [Film] { library.films }
@@ -766,6 +775,8 @@ public final class EditorModel {
     /// Renders the film strip: one small bitmap made from the full-size source (with the current
     /// crop applied, so the strip matches the canvas), graded once per film, a few at a time.
     /// Results are cached per crop, so going back to a crop already seen is instant.
+    nonisolated static let thumbnailFlushInterval: Duration = .milliseconds(60)
+
     private func startThumbnails() {
         thumbnailTask?.cancel()
         thumbnailCancel?.cancel()
@@ -790,16 +801,29 @@ public final class EditorModel {
                     }
                     continuation.finish()
                 }
+                // Thumbnails are published in small batches: every write to `thumbnails`
+                // re-evaluates the whole film strip.
+                var batch: [String: NSImage] = [:]
+                var lastFlush = ContinuousClock.now
                 for await item in stream {
                     guard let self, self.contentGeneration == generation, !cancel.isCancelled else {
                         cancel.cancel()
+                        batch = [:]
                         break
                     }
                     let image = NSImage(cgImage: item.image,
                                         size: NSSize(width: item.image.width, height: item.image.height))
                     let key = item.id ?? Self.originalTileID
-                    self.thumbnails[key] = image
+                    batch[key] = image
                     self.cacheThumbnail(image, key: key, crop: crop)
+                    if lastFlush.duration(to: .now) >= Self.thumbnailFlushInterval {
+                        self.thumbnails.merge(batch) { $1 }
+                        batch = [:]
+                        lastFlush = .now
+                    }
+                }
+                if !batch.isEmpty, let self, self.contentGeneration == generation, !cancel.isCancelled {
+                    self.thumbnails.merge(batch) { $1 }
                 }
             } onCancel: {
                 cancel.cancel()

@@ -53,10 +53,12 @@ struct PresetModelTests {
         #expect(model.recipe.exposure == 0.5)
         #expect(model.presetNotice == nil)
         #expect(model.isApplied(preset))
+        #expect(model.appliedPresetID == preset.id)
 
         // Then it is ordinary recipe state: tweak freely.
         model.recipe.exposure = 0.1
         #expect(!model.isApplied(preset))
+        #expect(model.appliedPresetID == nil)
         model.cancelWork()
     }
 

@@ -7,6 +7,13 @@ All notable changes to Mira. Format follows [Keep a Changelog](https://keepachan
 ### Added
 - Presets: save the film and all develop settings as one preset named "<film> - <nickname>" (for example "Portra 400 - Last Summer"). New PRESETS tab (key 4) with thumbnail cards, hover preview and click to apply (the photo's crop is kept), a Save Preset sheet, Rename, Duplicate and Delete, a FILM MISSING mark and notice when a preset's film is not installed, and Preset ▸ Save as Preset… (⇧⌘S).
 - App Group `VF945J28YU.com.fieldframes.mira` on the app and the Photos extension: presets are one shared `Presets.json`, so a preset saved in either shows up in the other.
+- Develop controls: Highlights, Shadows, Whites, Blacks, Texture, Clarity and Vibrance. The DEVELOP tab is now Light (Exposure, Contrast, Highlights, Shadows, Whites, Blacks), Presence (Texture, Clarity, Vibrance, Saturation) and Color (Temperature, Tint), followed by Effects (formerly Texture) and Frame.
+- Adjustment data format version 2, written only when one of the new controls is used; version 1 and legacy Emulsion data still open.
+
+### Performance
+- Film strip no longer re-evaluates on every slider tick (SwiftUI cost per tick 4.0 to 2.3 ms) and thumbnails are published in batches (strip refill after a crop 150 to 250 ms down to about 60 ms).
+- Core Image kernels are warmed in the background at launch (first preview frame 24 to 36 ms down to 12 to 15 ms) and LUTs prewarm with more workers on first launch.
+- New measurements in `mira-sheet --bench` and an opt-in UI timing test; see [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
 
 ## [0.2.0] - 2026-10-21
 

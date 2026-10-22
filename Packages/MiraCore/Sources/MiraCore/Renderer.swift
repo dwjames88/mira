@@ -116,14 +116,51 @@ public struct Renderer: Sendable {
             }
         }
 
-        // 3. Contrast / saturation (in sRGB-encoded space)
-        if abs(recipe.contrast) > eps || abs(recipe.saturation) > eps {
+        // 3. Contrast, then the tone stage (highlights, shadows, whites, blacks), then texture and
+        // clarity, then saturation and vibrance (in sRGB-encoded space where it matters). With none
+        // of the tone, texture or clarity values set, contrast and saturation share one pass exactly
+        // as before.
+        let toneActive = abs(recipe.highlights) > eps || abs(recipe.shadows) > eps
+            || abs(recipe.whites) > eps || abs(recipe.blacks) > eps
+        let detailActive = abs(recipe.texture) > eps || abs(recipe.clarity) > eps
+        let separate = toneActive || detailActive
+        if abs(recipe.contrast) > eps || (!separate && abs(recipe.saturation) > eps) {
             let encoded = toGamma(image)
             let f = CIFilter.colorControls()
             f.inputImage = encoded
             f.contrast = Float(1 + 0.5 * clamp(recipe.contrast, -1, 1))
-            f.saturation = Float(1 + clamp(recipe.saturation, -1, 1))
+            f.saturation = separate ? 1 : Float(1 + clamp(recipe.saturation, -1, 1))
             f.brightness = 0
+            image = fromGamma(f.outputImage ?? encoded)
+        }
+        if toneActive {
+            let local = abs(recipe.highlights) > eps || abs(recipe.shadows) > eps
+            let base = local ? Self.softBlur(image, extent: extent, sigma: 30 * scale) : image
+            image = GradeKernels.applyTone(highlights: recipe.highlights, shadows: recipe.shadows,
+                                           whites: recipe.whites, blacks: recipe.blacks, to: image, base: base)
+        }
+        if abs(recipe.texture) > eps {
+            let blurred = Self.softBlur(image, extent: extent, sigma: 2.5 * scale)
+            image = GradeKernels.applyDetail(amount: clamp(recipe.texture, -1, 1) * 1.2, midtoneWeighted: false,
+                                             to: image, blurred: blurred)
+        }
+        if abs(recipe.clarity) > eps {
+            let blurred = Self.softBlur(image, extent: extent, sigma: 20 * scale)
+            image = GradeKernels.applyDetail(amount: clamp(recipe.clarity, -1, 1) * 1.0, midtoneWeighted: true,
+                                             to: image, blurred: blurred)
+        }
+        if separate && abs(recipe.saturation) > eps {
+            let encoded = toGamma(image)
+            let f = CIFilter.colorControls()
+            f.inputImage = encoded
+            f.saturation = Float(1 + clamp(recipe.saturation, -1, 1))
+            image = fromGamma(f.outputImage ?? encoded)
+        }
+        if abs(recipe.vibrance) > eps {
+            let encoded = toGamma(image)
+            let f = CIFilter.vibrance()
+            f.inputImage = encoded
+            f.amount = Float(clamp(recipe.vibrance, -1, 1))
             image = fromGamma(f.outputImage ?? encoded)
         }
 

@@ -112,6 +112,8 @@ enum Current {
             ("no film, exposure only", Recipe(exposure: 0.3)),
             ("film only", Recipe(filmID: film)),
             ("film + exposure/contrast/sat/warmth", Recipe(filmID: film, exposure: 0.3, contrast: 0.2, saturation: 0.2, warmth: 0.2)),
+            ("film + tone (hl/sh/wh/bl)", Recipe(filmID: film, highlights: -0.4, shadows: 0.4, whites: 0.2, blacks: -0.2)),
+            ("film + clarity/texture/vibrance", Recipe(filmID: film, vibrance: 0.3, clarity: 0.3, texture: 0.3)),
             ("film + grain 0.4", Recipe(filmID: film, grainAmount: 0.4)),
             ("film + halation 0.3", Recipe(filmID: film, halationAmount: 0.3)),
             ("film + bloom 0.2", Recipe(filmID: film, bloomAmount: 0.2)),

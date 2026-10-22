@@ -168,3 +168,58 @@ float4 miraColorMixer(coreimage::sample_t s, float4 hue0, float4 hue1, float4 sa
 
 } // namespace coreimage
 } // extern "C"
+
+// MARK: Tone (highlights, shadows, whites, blacks)
+
+static inline float miraLuma(float3 c) { return dot(c, float3(0.2126, 0.7152, 0.0722)); }
+
+// Applies a new luminance to an sRGB-encoded colour by scaling it (keeps hue and chroma ratio).
+static inline float3 miraRelight(float3 e, float y, float y2) {
+    if (y > 1.0e-4) { return e * (y2 / y); }
+    return e + (y2 - y);
+}
+
+extern "C" {
+namespace coreimage {
+
+// `s` is the image, `b` the same image blurred (the local base the highlight/shadow masks follow).
+// hl, sh, wh, bl are -1...1. Everything happens on sRGB-encoded luminance:
+//   highlights / shadows: smooth masks on the blurred luminance, so they act locally;
+//   whites / blacks: end-point curves y + 0.33 w y^3 and y + 0.2 b (1-y)^4 (monotonic for |w|,|b| <= 1).
+float4 miraTone(coreimage::sample_t s, coreimage::sample_t b, float hl, float sh, float wh, float bl) {
+    if (s.a <= 0.0) { return s; }
+    float3 e = miraEncode(miraUnpremultiply(s));
+    float y = miraLuma(e);
+    float yb = miraLuma(miraEncode(miraUnpremultiply(b)));
+    float y2 = y;
+    float wS = 1.0 - smoothstep(0.05, 0.65, yb);
+    float wH = smoothstep(0.35, 0.95, yb);
+    if (sh > 0.0) { y2 += sh * wS * 0.3 * (1.0 - clamp(y2, 0.0, 1.0)); }
+    else          { y2 += sh * wS * 0.6 * y2; }
+    if (hl > 0.0) { y2 += hl * wH * 0.3 * (1.0 - clamp(y2, 0.0, 1.0)); }
+    else          { y2 += hl * wH * 0.45 * y2; }
+    float yc = clamp(y2, 0.0, 1.0);
+    y2 += 0.33 * wh * yc * yc * yc;
+    float ic = 1.0 - clamp(y2, 0.0, 1.0);
+    y2 += 0.2 * bl * ic * ic * ic * ic;
+    y2 = max(y2, 0.0);
+    e = miraRelight(e, y, y2);
+    return float4(miraDecode(e) * s.a, s.a);
+}
+
+// Local contrast: adds `amount` of the difference between the image and its blur to the
+// luminance, weighted toward the midtones when `midtones` > 0.5 (clarity) or flat (texture).
+float4 miraDetail(coreimage::sample_t s, coreimage::sample_t b, float amount, float midtones) {
+    if (s.a <= 0.0) { return s; }
+    float3 e = miraEncode(miraUnpremultiply(s));
+    float y = miraLuma(e);
+    float yb = miraLuma(miraEncode(miraUnpremultiply(b)));
+    float t = 2.0 * clamp(y, 0.0, 1.0) - 1.0;
+    float w = midtones > 0.5 ? 1.0 - t * t : 1.0;
+    float y2 = max(y + amount * w * (y - yb), 0.0);
+    e = miraRelight(e, y, y2);
+    return float4(miraDecode(e) * s.a, s.a);
+}
+
+} // namespace coreimage
+} // extern "C"

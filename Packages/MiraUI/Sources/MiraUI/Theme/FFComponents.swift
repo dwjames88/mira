@@ -363,8 +363,8 @@ public struct FilmCard: View {
     public static let thumbnailHeight: CGFloat = T.rows(5)
 
     private let title: Text
+    private let secondLine: Text?
     private let accessibilityTitle: String
-    private let titleLines: Int
     private let caption: String
     private let captionTint: Color?
     private let image: NSImage?
@@ -375,19 +375,19 @@ public struct FilmCard: View {
 
     public init(title: String, caption: String, image: NSImage?, isSelected: Bool,
                 onHoverChange: ((Bool) -> Void)? = nil, action: @escaping () -> Void) {
-        self.init(styledTitle: Text(title), accessibilityTitle: title, titleLines: 1, caption: caption,
+        self.init(title: Text(title), secondLine: nil, accessibilityTitle: title, caption: caption,
                   captionTint: nil, image: image, isSelected: isSelected, onHoverChange: onHoverChange, action: action)
     }
 
-    /// A card whose title is a styled `Text` (segments may set their own colour or font) over up to
-    /// `titleLines` lines, with an optional caption colour (a warning mark). Everything else is the film card.
-    public init(styledTitle: Text, accessibilityTitle: String, titleLines: Int, caption: String,
+    /// A card with a second title line (a preset's "- nickname") under the film-name line, each on one
+    /// line and tail-truncated, with an optional caption colour (a warning mark). Everything else is the film card.
+    public init(title: Text, secondLine: Text?, accessibilityTitle: String, caption: String,
                 captionTint: Color?, image: NSImage?, isSelected: Bool,
                 onHoverChange: ((Bool) -> Void)? = nil, action: @escaping () -> Void) {
         self.onHoverChange = onHoverChange
-        self.title = styledTitle
+        self.title = title
+        self.secondLine = secondLine
         self.accessibilityTitle = accessibilityTitle
-        self.titleLines = titleLines
         self.caption = caption
         self.captionTint = captionTint
         self.image = image
@@ -396,6 +396,7 @@ public struct FilmCard: View {
     }
 
     public var body: some View {
+        let _ = PerfCounters.filmCard += 1
         Button(action: action) {
             VStack(alignment: .leading, spacing: 0) {
                 ZStack {
@@ -411,11 +412,16 @@ public struct FilmCard: View {
                 title
                     .font(T.display(16, weight: .medium))
                     .foregroundStyle(isSelected ? T.paper : T.paperSoft)
-                    .lineLimit(titleLines)
-                    .multilineTextAlignment(.leading)
+                    .lineLimit(1)
                     .padding(.top, 6)
                     .frame(width: Self.width, alignment: .leading)
-                    .frame(minHeight: titleLines > 1 ? T.rows(2.5) : nil, alignment: .topLeading)
+                if let secondLine {
+                    secondLine
+                        .font(T.display(16, weight: .medium))
+                        .foregroundStyle(isSelected ? T.paper : T.paperSoft)
+                        .lineLimit(1)
+                        .frame(width: Self.width, alignment: .leading)
+                }
                 Text(caption)
                     .ffLabel(size: 9, color: captionTint ?? (isSelected ? T.lichen : T.paperDim))
                     .lineLimit(1)
