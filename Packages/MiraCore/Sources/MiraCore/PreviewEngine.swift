@@ -395,6 +395,34 @@ public final class PreviewEngine: @unchecked Sendable {
         }
     }
 
+    /// Like `renderThumbnails(ids:...)`, but each tile has its own whole recipe (presets). The recipe's
+    /// crop is ignored: the base already carries `crop`.
+    public func renderThumbnails(
+        recipes: [(id: String, recipe: Recipe)], crop: CropSettings, longSide: CGFloat,
+        workers: Int = PreviewEngine.defaultThumbnailWorkers,
+        isCancelled: @Sendable () -> Bool = { false },
+        deliver: @Sendable (String, CGImage) -> Void
+    ) {
+        guard let base = thumbnailBase(crop: crop, longSide: longSide), !recipes.isEmpty else { return }
+        let renderer = renderer, context = context
+        let box = UncheckedBox(base)
+        let next = NSLock()
+        nonisolated(unsafe) var cursor = 0
+        DispatchQueue.concurrentPerform(iterations: max(1, min(workers, recipes.count))) { _ in
+            while true {
+                next.lock()
+                let i = cursor; cursor += 1
+                next.unlock()
+                if i >= recipes.count || isCancelled() { return }
+                var recipe = recipes[i].recipe
+                recipe.crop = .identity
+                if let cg = renderer.render(recipe, input: box.value, context: context) {
+                    deliver(recipes[i].id, cg)
+                }
+            }
+        }
+    }
+
     // MARK: Buffers
 
     private func makeBuffer(width: Int, height: Int, format: OSType) -> CVPixelBuffer? {

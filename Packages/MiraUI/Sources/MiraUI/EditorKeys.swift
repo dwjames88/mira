@@ -66,7 +66,7 @@ public struct EditorKeyContext: Equatable, Sendable {
 ///
 /// | Key | Action |
 /// |---|---|
-/// | 1 / 2 / 3 | Films / Develop / Crop tab |
+/// | 1 / 2 / 3 / 4 | Films / Develop / Crop / Presets tab |
 /// | F | full screen, panels hidden (not while cropping) |
 /// | Esc | leave that view |
 /// | C (hold) | compare with the original |
@@ -92,7 +92,7 @@ public enum EditorKeyMap {
         guard !context.isTextInputFocused, !event.hasShift else { return nil }
 
         switch key {
-        case "1", "2", "3":
+        case "1", "2", "3", "4":
             guard let tab = EditorTab.forKey(key), !context.isImmersive else { return .swallow }
             return event.isRepeat ? .swallow : .selectTab(tab)
         case "f":

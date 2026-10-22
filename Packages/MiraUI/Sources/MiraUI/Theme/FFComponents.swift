@@ -362,8 +362,11 @@ public struct FilmCard: View {
     public static let width: CGFloat = T.cells(14)
     public static let thumbnailHeight: CGFloat = T.rows(5)
 
-    private let title: String
+    private let title: Text
+    private let accessibilityTitle: String
+    private let titleLines: Int
     private let caption: String
+    private let captionTint: Color?
     private let image: NSImage?
     private let isSelected: Bool
     private let action: () -> Void
@@ -372,9 +375,21 @@ public struct FilmCard: View {
 
     public init(title: String, caption: String, image: NSImage?, isSelected: Bool,
                 onHoverChange: ((Bool) -> Void)? = nil, action: @escaping () -> Void) {
+        self.init(styledTitle: Text(title), accessibilityTitle: title, titleLines: 1, caption: caption,
+                  captionTint: nil, image: image, isSelected: isSelected, onHoverChange: onHoverChange, action: action)
+    }
+
+    /// A card whose title is a styled `Text` (segments may set their own colour or font) over up to
+    /// `titleLines` lines, with an optional caption colour (a warning mark). Everything else is the film card.
+    public init(styledTitle: Text, accessibilityTitle: String, titleLines: Int, caption: String,
+                captionTint: Color?, image: NSImage?, isSelected: Bool,
+                onHoverChange: ((Bool) -> Void)? = nil, action: @escaping () -> Void) {
         self.onHoverChange = onHoverChange
-        self.title = title
+        self.title = styledTitle
+        self.accessibilityTitle = accessibilityTitle
+        self.titleLines = titleLines
         self.caption = caption
+        self.captionTint = captionTint
         self.image = image
         self.isSelected = isSelected
         self.action = action
@@ -393,14 +408,16 @@ public struct FilmCard: View {
                 }
                 .frame(width: Self.width, height: Self.thumbnailHeight)
                 .clipped()
-                Text(title)
+                title
                     .font(T.display(16, weight: .medium))
                     .foregroundStyle(isSelected ? T.paper : T.paperSoft)
-                    .lineLimit(1)
+                    .lineLimit(titleLines)
+                    .multilineTextAlignment(.leading)
                     .padding(.top, 6)
                     .frame(width: Self.width, alignment: .leading)
+                    .frame(minHeight: titleLines > 1 ? T.rows(2.5) : nil, alignment: .topLeading)
                 Text(caption)
-                    .ffLabel(size: 9, color: isSelected ? T.lichen : T.paperDim)
+                    .ffLabel(size: 9, color: captionTint ?? (isSelected ? T.lichen : T.paperDim))
                     .lineLimit(1)
                     .frame(width: Self.width, height: T.rows(1), alignment: .leading)
             }
@@ -410,7 +427,7 @@ public struct FilmCard: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0; onHoverChange?($0) }
-        .accessibilityLabel("\(title), \(caption)")
+        .accessibilityLabel("\(accessibilityTitle), \(caption)")
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 }

@@ -44,6 +44,10 @@ public struct EditorView<Footer: View>: View {
                             FFHairline()
                             FilmStrip(model: model)
                         }
+                        if model.tab == .presets {
+                            FFHairline()
+                            PresetStrip(model: model)
+                        }
                         footer
                     }
                 }
@@ -57,6 +61,20 @@ public struct EditorView<Footer: View>: View {
         .frame(minWidth: 760, minHeight: 520)
         .background { if model.isImmersive { T.inkAlways } }
         .fieldFramesWindow()
+        .sheet(item: $model.presetSheet) { mode in
+            SavePresetSheet(model: model, mode: mode)
+        }
+        .confirmationDialog(
+            "Delete this preset?",
+            isPresented: Binding(get: { model.presetPendingDelete != nil },
+                                 set: { if !$0 { model.presetPendingDelete = nil } }),
+            titleVisibility: .visible, presenting: model.presetPendingDelete
+        ) { preset in
+            Button("Delete \(preset.displayName)", role: .destructive) { model.deletePreset(preset.id) }
+            Button("Cancel", role: .cancel) { model.presetPendingDelete = nil }
+        } message: { _ in
+            Text("The preset is removed. Photos you already edited with it keep their look.")
+        }
         .background {
             if !imageCanvas { EditorKeyHost(model: model, windowFullScreen: windowFullScreen)
                 .frame(width: 0, height: 0)
@@ -67,6 +85,7 @@ public struct EditorView<Footer: View>: View {
     @ViewBuilder private var panel: some View {
         switch model.tab {
         case .films: FilmsPanel(model: model)
+        case .presets: PresetsPanel(model: model)
         case .develop: DevelopPanel(model: model)
         case .crop: CropPanel(model: model)
         }

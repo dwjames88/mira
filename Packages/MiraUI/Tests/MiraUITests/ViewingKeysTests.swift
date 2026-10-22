@@ -18,6 +18,7 @@ struct EditorKeyMapTests {
         #expect(act(key("1")) == .selectTab(.films))
         #expect(act(key("2")) == .selectTab(.develop))
         #expect(act(key("3")) == .selectTab(.crop))
+        #expect(act(key("4")) == .selectTab(.presets))
         #expect(act(key("2", rep: true)) == .swallow)
         // Tabs are not available with the panels hidden.
         #expect(act(key("2"), EditorKeyContext(isImmersive: true)) == .swallow)
@@ -25,7 +26,7 @@ struct EditorKeyMapTests {
 
     @Test func textFieldsKeepTheirKeys() {
         let typing = EditorKeyContext(isTextInputFocused: true)
-        for c in ["1", "2", "3", "f", "c", "[", "]", " "] { #expect(act(key(c), typing) == nil, "\(c)") }
+        for c in ["1", "2", "3", "4", "f", "c", "[", "]", " "] { #expect(act(key(c), typing) == nil, "\(c)") }
     }
 
     @Test func modifiersBelongToMenus() {
@@ -71,7 +72,7 @@ struct EditorKeyMapTests {
 
     @Test func otherKeysPassThrough() {
         #expect(act(key("x")) == nil)
-        #expect(act(key("4")) == nil)
+        #expect(act(key("5")) == nil)
     }
 }
 

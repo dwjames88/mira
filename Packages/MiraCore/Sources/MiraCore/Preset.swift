@@ -47,7 +47,9 @@ public struct Preset: Codable, Identifiable, Hashable, Sendable {
     }
 
     /// "Portra 400 - Last Summer".
-    public var displayName: String { "\(filmName) - \(nickname)" }
+    public var displayName: String { Preset.displayName(filmName: filmName, nickname: nickname) }
+
+    public static func displayName(filmName: String, nickname: String) -> String { "\(filmName) - \(nickname)" }
 
     /// The recipe to apply to a photo: the preset's film and develop settings, the photo's crop.
     public func recipe(keeping crop: CropSettings) -> Recipe {

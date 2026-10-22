@@ -42,7 +42,7 @@ public final class EditorModel {
             if recipe.crop != oldValue.crop { resetZoom() } else { revalidateZoom() }
             schedulePreview()
             recipeChangedWhileHovering()
-            if recipe.crop != oldValue.crop { startThumbnails() }
+            if recipe.crop != oldValue.crop { startThumbnails(); startPresetThumbnails() }
         }
     }
     public var showOriginal = false {
@@ -116,7 +116,9 @@ public final class EditorModel {
 
     /// The tab the right panel and the canvas surroundings show. `.crop` is on exactly while the
     /// crop tool is open (`isCropping`): entering it begins a crop, leaving it commits.
-    public private(set) var tab: EditorTab = .films
+    public private(set) var tab: EditorTab = .films {
+        didSet { if tab == .presets, oldValue != .presets { presetTabOpened() } }
+    }
     /// The tab to return to when the crop tool closes.
     @ObservationIgnored private var tabBeforeCrop: EditorTab = .films
 
@@ -129,6 +131,7 @@ public final class EditorModel {
     public enum HoverTarget: Hashable, Sendable {
         case original
         case film(String)
+        case preset(UUID)
 
         var filmID: String? {
             if case .film(let id) = self { return id }
@@ -166,6 +169,21 @@ public final class EditorModel {
     @ObservationIgnored private var hoverCacheOrder: [HoverKey] = []
     @ObservationIgnored private var imageCache: [Int: NSImage] = [:]
 
+    // Presets (see EditorModel+Presets.swift)
+    /// The preset file this editor reads and writes; shared with the app / Photos extension.
+    public let presetStore: PresetStore
+    public internal(set) var presets: [Preset] = []
+    public internal(set) var presetThumbnails: [UUID: NSImage] = [:]
+    /// A short, non-blocking message about the last preset action; clears itself.
+    public internal(set) var presetNotice: String?
+    public var presetSheet: PresetSheetMode?
+    public var presetPendingDelete: Preset?
+    @ObservationIgnored var presetThumbnailTask: Task<Void, Never>?
+    @ObservationIgnored var presetThumbnailCancel: PresetCancelFlag?
+    @ObservationIgnored var presetThumbnailCache: [PresetThumbnailKey: NSImage] = [:]
+    @ObservationIgnored var presetThumbnailsDirty = true
+    @ObservationIgnored var presetNoticeTask: Task<Void, Never>?
+
     private struct HoverKey: Hashable {
         let filmID: String?
         let recipe: Recipe
@@ -192,8 +210,9 @@ public final class EditorModel {
     private static let thumbnailCacheLimit = 4
     nonisolated static let hoverDebounce: Duration = .milliseconds(60)
 
-    public init(library: FilmLibrary, recipe: Recipe = .neutral) {
+    public init(library: FilmLibrary, recipe: Recipe = .neutral, presetStore: PresetStore? = nil) {
         self.library = library
+        self.presetStore = presetStore ?? .shared
         self.renderer = Renderer(library: library)
         self.engine = PreviewEngine(renderer: renderer, context: Renderer.sharedContext)
         self.recipe = recipe
@@ -246,6 +265,7 @@ public final class EditorModel {
         if let target = hoveredTarget { startHover(target, keepImage: false) }
         schedulePreview()
         startThumbnails()
+        presetSourceChanged()
     }
 
     /// Swaps the stand-in for the real photo (same picture, full resolution). The frame on screen
@@ -670,6 +690,7 @@ public final class EditorModel {
     public var hoverPreviewName: String? {
         guard !showOriginal, visibleHoverFrame != nil, let target = hoveredTarget else { return nil }
         if case .original = target { return "Original" }
+        if case .preset(let id) = target { return presetStore.preset(id: id)?.displayName }
         return hoverPreviewFilm?.displayName
     }
 
@@ -696,7 +717,7 @@ public final class EditorModel {
         if let target = hoveredTarget { startHover(target, keepImage: true) }
     }
 
-    private func startHover(_ target: HoverTarget, keepImage: Bool) {
+    func startHover(_ target: HoverTarget, keepImage: Bool) {
         hoverGeneration += 1
         let generation = hoverGeneration
         hoverTask?.cancel()
@@ -705,9 +726,7 @@ public final class EditorModel {
         if !keepImage { hoverFrame = nil }
         guard engine.hasSource else { return }
 
-        var swapped = recipe
-        swapped.filmID = target.filmID
-        let graded = swapped
+        let graded = hoverRecipe(for: target)
         let canvas = canvasPixels
         let zoom = zoomRegion
         let key = HoverKey(filmID: target.filmID, recipe: graded, canvas: canvas, zoom: zoom)
@@ -856,5 +875,6 @@ public final class EditorModel {
         thumbnailCancel?.cancel()
         hoverTask?.cancel()
         fullDecodeTask?.cancel()
+        cancelPresetWork()
     }
 }

@@ -71,6 +71,11 @@ struct MiraApp: App {
                     .pickerStyle(.inline)
                 }
             }
+            CommandMenu("Preset") {
+                Button("Save as Preset\u{2026}") { state.editor?.beginSavePreset() }
+                    .keyboardShortcut("s", modifiers: [.command, .shift])
+                    .disabled(!state.canUseEditorView || state.isCropping)
+            }
             CommandGroup(after: .undoRedo) {
                 Divider()
                 Button("Reset Adjustments") { state.resetAdjustments() }
