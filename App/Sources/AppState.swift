@@ -83,7 +83,11 @@ final class AppState {
     init() {
         library = FilmLibrary.bundled()
         if let library {
-            Task(priority: .utility) { await library.prewarm() }
+            Task(priority: .utility) {
+                await library.prewarm()
+                // Compile the Core Image / Metal kernels now, so the first photo's first frame is warm.
+                await Task.detached(priority: .utility) { PreviewEngine.warmUp(library: library) }.value
+            }
         }
     }
 

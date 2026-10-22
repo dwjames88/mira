@@ -381,6 +381,7 @@ public struct FilmCard: View {
     }
 
     public var body: some View {
+        let _ = PerfCounters.filmCard += 1
         Button(action: action) {
             VStack(alignment: .leading, spacing: 0) {
                 ZStack {

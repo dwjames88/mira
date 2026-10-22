@@ -8,6 +8,11 @@ All notable changes to Mira. Format follows [Keep a Changelog](https://keepachan
 - Develop controls: Highlights, Shadows, Whites, Blacks, Texture, Clarity and Vibrance. The DEVELOP tab is now Light (Exposure, Contrast, Highlights, Shadows, Whites, Blacks), Presence (Texture, Clarity, Vibrance, Saturation) and Color (Temperature, Tint), followed by Effects (formerly Texture) and Frame.
 - Adjustment data format version 2, written only when one of the new controls is used; version 1 and legacy Emulsion data still open.
 
+### Performance
+- Film strip no longer re-evaluates on every slider tick (SwiftUI cost per tick 4.0 to 2.3 ms) and thumbnails are published in batches (strip refill after a crop 150 to 250 ms down to about 60 ms).
+- Core Image kernels are warmed in the background at launch (first preview frame 24 to 36 ms down to 12 to 15 ms) and LUTs prewarm with more workers on first launch.
+- New measurements in `mira-sheet --bench` and an opt-in UI timing test; see [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
+
 ## [0.2.0] - 2026-10-21
 
 ### Added
