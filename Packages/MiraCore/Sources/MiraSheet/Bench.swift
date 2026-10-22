@@ -103,6 +103,9 @@ enum Bench {
                        filmsURL: filmsURL, benchDir: dir)
         try Current.run(renderer: renderer, library: library, context: context, jpeg: jpeg,
                         filmsURL: filmsURL, benchDir: dir)
+        if let full = ImageSource.loadDecoded(url: jpeg) {
+            try Extra.run(library: library, full: full, filmsURL: filmsURL, benchDir: dir)
+        }
     }
 }
 
