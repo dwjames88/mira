@@ -121,6 +121,24 @@ public final class PresetStore {
         return p
     }
 
+    /// Puts `preset`'s film, develop settings and nickname into the saved preset `id`, keeping its id,
+    /// creation date and place in the list.
+    @discardableResult
+    public func replace(id: UUID, with preset: Preset) throws -> Preset {
+        let name = try Self.validated(preset.nickname)
+        reloadIfChanged()
+        guard let index = items.firstIndex(where: { $0.id == id }) else { throw PresetError.notFound }
+        var updated = preset
+        updated.id = id
+        updated.nickname = name
+        updated.created = items[index].created
+        updated.modified = Preset.millisecond(Date())
+        var next = items
+        next[index] = updated
+        try commit(next)
+        return updated
+    }
+
     /// Saves a new preset from the current look.
     @discardableResult
     public func add(nickname: String, recipe: Recipe, filmName: String?) throws -> Preset {
