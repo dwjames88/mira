@@ -57,7 +57,7 @@ struct SnapshotTests {
         }
         try Self.writePNG(AboutView(library: model.library, version: "VERSION 0.1.0 (1)"),
                           size: CGSize(width: 560, height: 2500), scheme: .dark, name: "about-dark")
-        try Self.writePNG(SettingsView(), size: CGSize(width: 480, height: 384), scheme: .light, name: "settings-light")
+        try Self.writePNG(SettingsView(), size: CGSize(width: 480, height: 480), scheme: .light, name: "settings-light")
         if let bw = model.films.first(where: { $0.family == .blackAndWhite }) {
             model.hoverFilm(bw.id)
             let deadline = Date().addingTimeInterval(30)

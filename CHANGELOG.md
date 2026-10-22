@@ -5,6 +5,7 @@ All notable changes to Mira. Format follows [Keep a Changelog](https://keepachan
 ## Unreleased
 
 ### Added
+- Updates: Mira checks GitHub for a newer release in the background at launch (at most once a day; Settings > "Check for updates automatically"), and Mira > Check for Updates... always checks. A newer release opens a Field Frames notice with the release notes and Download & Install, Later and Skip This Version. The download is checked against GitHub's SHA-256, unpacked, and verified (bundle id, version, signature, team) before it replaces the app; a sandbox folder grant is asked for once. Adds the network client, bookmarks and Downloads entitlements to the app. `scripts/release.sh` now checks the release layout the updater expects and prints the `gh release create` command.
 - Develop controls: Highlights, Shadows, Whites, Blacks, Texture, Clarity and Vibrance. The DEVELOP tab is now Light (Exposure, Contrast, Highlights, Shadows, Whites, Blacks), Presence (Texture, Clarity, Vibrance, Saturation) and Color (Temperature, Tint), followed by Effects (formerly Texture) and Frame.
 - Adjustment data format version 2, written only when one of the new controls is used; version 1 and legacy Emulsion data still open.
 
