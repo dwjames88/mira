@@ -4,11 +4,11 @@
 
 Mira is an original film-emulation app for macOS. It ships as a **Photos editing extension**, so you can apply a film look to any picture from inside Photos, plus a **host app** that browses your Photos library and also edits files from disk. There is no watermark, no paywall and no account.
 
-Status: v0.2.0. See [CHANGELOG.md](CHANGELOG.md) for what changed. See [TESTING.md](TESTING.md) for what has and has not been verified, and [docs/ROADMAP.md](docs/ROADMAP.md) for what comes next.
+Status: v0.3.0. See [CHANGELOG.md](CHANGELOG.md) for what changed. See [TESTING.md](TESTING.md) for what has and has not been verified, and [docs/ROADMAP.md](docs/ROADMAP.md) for what comes next.
 
 ## Install
 
-1. Download `Mira-0.2.0.dmg` (or the `.zip`) from the release page and drag **Mira** to Applications.
+1. Download `Mira-0.3.0.dmg` (or the `.zip`) from the release page and drag **Mira** to Applications.
 2. Mira is signed with a free Personal Team development certificate. There is no Developer ID and it is not notarized, so on other Macs macOS blocks the first launch. Right-click Mira, choose Open, then Open again. Or try to open it once, then go to System Settings ▸ Privacy & Security and click "Open Anyway".
 3. Development-signed builds may refuse to run at all on a Mac that is not registered to the signing team. If so, build from source: `scripts/install.sh` (needs Xcode, XcodeGen and your own team ID in `project.yml`).
 4. Enable the extension in System Settings ▸ General ▸ Login Items & Extensions ▸ Photos Editing ▸ Mira, and grant Photos access on first launch.
@@ -140,8 +140,8 @@ scripts/contact-sheet.sh     # renders build/contact-sheet.png and build/contact
 ## Tests
 
 ```sh
-swift test --package-path Packages/MiraCore   # 36 tests
-swift test --package-path Packages/MiraUI     # 12 tests
+swift test --package-path Packages/MiraCore   # 238 tests (MiraCore 203 + MiraUpdates 35)
+swift test --package-path Packages/MiraUI     # 95 tests
 ```
 
 MiraUI also writes headless snapshots to `build/snapshots`. The test list is in [TESTING.md](TESTING.md).
