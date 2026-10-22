@@ -233,7 +233,7 @@ private struct LibraryGridPane: View {
                         .onChange(of: side) { _, new in store.setCellSize(points: new, scale: displayScale) }
                 }
             }
-            if let note = state.libraryNote {
+            if let note = state.libraryNote ?? state.presetTransfer.notice {
                 FFHairline()
                 Text(note).ffLabel(size: 10)
                     .padding(.horizontal, T.cells(2))

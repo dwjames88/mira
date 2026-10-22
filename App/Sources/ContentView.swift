@@ -1,3 +1,4 @@
+import MiraCore
 import MiraUI
 import SwiftUI
 
@@ -32,7 +33,9 @@ struct ContentView: View {
             }
         }
         .dropDestination(for: URL.self) { urls, _ in
-            guard let url = urls.first else { return false }
+            let presets = urls.filter(PresetFile.isPresetFile)
+            if !presets.isEmpty { state.presetTransfer.startImport(presets) }
+            guard let url = urls.first(where: { !PresetFile.isPresetFile($0) }) else { return !presets.isEmpty }
             state.open(url: url)
             return true
         } isTargeted: { isTargeted = $0 }
@@ -60,6 +63,8 @@ struct ContentView: View {
         .toolbarBackground(FieldFramesTheme.ink, for: .windowToolbar)
         .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
         .toolbar(isImmersive ? .hidden : .visible, for: .windowToolbar)
+        // In the editor the editor presents it; here it covers the library and the empty state.
+        .presetImportSheet(state.presetTransfer, active: state.mode == .library || state.editor == nil)
         .sheet(isPresented: $state.showExportSheet) {
             ExportSheet(state: state)
         }

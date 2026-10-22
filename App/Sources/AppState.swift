@@ -49,6 +49,9 @@ final class AppState {
 
     let library: FilmLibrary?
     let store = LibraryStore()
+    /// Presets as `.mirapreset` files: Share, Export, Import. Shared by every editor and the menus, so
+    /// importing works with no photo open.
+    let presetTransfer = PresetTransfer(store: .shared, sharingEnabled: true)
     var mode: Mode = .library
     private(set) var editor: EditorModel?
     private(set) var target: Target?
@@ -247,7 +250,13 @@ final class AppState {
 
     /// Files passed at launch or by Finder.
     func handleOpen(_ urls: [URL]) {
-        guard let url = urls.first(where: { $0.isFileURL }) else { return }
+        // Preset files import (the presets are stored whether or not a photo is open); images open.
+        let presets = urls.filter(PresetFile.isPresetFile)
+        if !presets.isEmpty {
+            presetTransfer.startImport(presets)
+            NSApp.activate()
+        }
+        guard let url = urls.first(where: { $0.isFileURL && !PresetFile.isPresetFile($0) }) else { return }
         if case .file(let file) = target, file.url == url, mode == .editor { return }
         open(url: url)
         NSApp.activate()
@@ -266,7 +275,7 @@ final class AppState {
         scopedURL?.stopAccessingSecurityScopedResource()
         _ = url.startAccessingSecurityScopedResource()
         scopedURL = url
-        let model = EditorModel(library: library)
+        let model = EditorModel(library: library, transfer: presetTransfer)
         guard model.loadSource(url: url) else {
             errorMessage = "\(url.lastPathComponent) could not be opened as an image."
             return
@@ -310,7 +319,7 @@ final class AppState {
         loadGeneration += 1
         let generation = loadGeneration
         busyProgress = nil
-        let model = EditorModel(library: library)
+        let model = EditorModel(library: library, transfer: presetTransfer)
         let progress = OpenProgress()
         let signpost = Perf.begin("asset open")
         defer { Perf.end("asset open", signpost) }

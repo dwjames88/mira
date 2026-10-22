@@ -76,6 +76,10 @@ struct MiraApp: App {
                 Button("Save as Preset\u{2026}") { state.editor?.beginSavePreset() }
                     .keyboardShortcut("s", modifiers: [.command, .shift])
                     .disabled(!state.canUseEditorView || state.isCropping)
+                Divider()
+                Button("Import Presets\u{2026}") { state.presetTransfer.presentImportPanel() }
+                    .keyboardShortcut("i", modifiers: [.command, .shift])
+                Button("Export All Presets\u{2026}") { state.presetTransfer.exportAll() }
             }
             CommandGroup(after: .undoRedo) {
                 Divider()

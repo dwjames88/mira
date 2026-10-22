@@ -26,6 +26,18 @@
 				<string>public.image</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Mira Preset</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.fieldframes.mira.preset</string>
+			</array>
+		</dict>
 	</array>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
@@ -49,5 +61,26 @@
 	<string>Copyright 2026 FieldFrames. Film looks: Pat David, CC BY-SA 4.0.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Mira shows your Photos library so you can apply film looks. Edits are saved non-destructively; Revert to Original in Photos restores your picture.</string>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.json</string>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Mira Preset</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.fieldframes.mira.preset</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>mirapreset</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
 </dict>
 </plist>
