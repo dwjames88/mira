@@ -185,7 +185,7 @@ namespace coreimage {
 // `s` is the image, `b` the same image blurred (the local base the highlight/shadow masks follow).
 // hl, sh, wh, bl are -1...1. Everything happens on sRGB-encoded luminance:
 //   highlights / shadows: smooth masks on the blurred luminance, so they act locally;
-//   whites / blacks: end-point curves y + 0.35 w y^3 and y + 0.2 b (1-y)^4 (monotonic for |w|,|b| <= 1).
+//   whites / blacks: end-point curves y + 0.33 w y^3 and y + 0.2 b (1-y)^4 (monotonic for |w|,|b| <= 1).
 float4 miraTone(coreimage::sample_t s, coreimage::sample_t b, float hl, float sh, float wh, float bl) {
     if (s.a <= 0.0) { return s; }
     float3 e = miraEncode(miraUnpremultiply(s));
@@ -199,7 +199,7 @@ float4 miraTone(coreimage::sample_t s, coreimage::sample_t b, float hl, float sh
     if (hl > 0.0) { y2 += hl * wH * 0.3 * (1.0 - clamp(y2, 0.0, 1.0)); }
     else          { y2 += hl * wH * 0.45 * y2; }
     float yc = clamp(y2, 0.0, 1.0);
-    y2 += 0.35 * wh * yc * yc * yc;
+    y2 += 0.33 * wh * yc * yc * yc;
     float ic = 1.0 - clamp(y2, 0.0, 1.0);
     y2 += 0.2 * bl * ic * ic * ic * ic;
     y2 = max(y2, 0.0);
