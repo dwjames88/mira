@@ -34,6 +34,8 @@ public enum RendererError: Error, CustomStringConvertible {
 /// is the same at any resolution.
 public struct Renderer: Sendable {
     public let library: FilmLibrary
+    /// Rasterised dodge and burn masks, shared by every copy of this renderer.
+    let maskCache = DodgeBurnMaskCache()
 
     public init(library: FilmLibrary) {
         self.library = library
@@ -64,13 +66,19 @@ public struct Renderer: Sendable {
     public func apply(_ recipe: Recipe, to source: CIImage) -> CIImage {
         // 0. Crop, rotation, flips and straighten first, so every stage below (and the
         // resolution-independent `scale`) sees the cropped output.
-        grade(recipe, cropped: CropGeometry.apply(recipe.crop, to: source))
+        grade(recipe, cropped: CropGeometry.apply(recipe.crop, to: source), sourceSize: source.extent.size)
     }
 
     /// Everything after the crop: film, tone, colour, halation, bloom, grain, vignette and border.
     /// `input` is already cropped (its crop is `recipe.crop`, applied by the caller). All spatial
     /// parameters follow the size of `input`, so the look is the same at any resolution.
-    public func grade(_ recipe: Recipe, cropped input: CIImage) -> CIImage {
+    ///
+    /// `sourceSize` is the size of the uncropped, upright source the crop was applied to; dodge and
+    /// burn strokes need it to find their place (nil is fine for an uncropped `input`). `maskRegion`
+    /// limits the dodge and burn masks to the part of `input` (Core Image pixels) about to be
+    /// rendered, which keeps a zoomed-in render of a huge picture cheap.
+    public func grade(_ recipe: Recipe, cropped input: CIImage, sourceSize: CGSize? = nil,
+                      maskRegion: CGRect? = nil) -> CIImage {
         let extent = input.extent
         guard !extent.isInfinite, !extent.isEmpty else { return input }
         let scale = min(extent.width, extent.height) / 1000
@@ -82,6 +90,14 @@ public struct Renderer: Sendable {
             f.inputImage = image
             f.ev = Float(clamp(recipe.exposure, -2, 2))
             image = f.outputImage ?? image
+        }
+
+        // 1a. Dodge and burn, right after exposure: painted light, before the colour and film stages,
+        // so the film responds to it like a print made from a dodged and burned negative.
+        if recipe.dodgeBurn.hasVisibleEffect,
+           let source = sourceSize ?? (recipe.crop.isIdentity ? extent.size : nil) {
+            image = applyDodgeBurn(recipe.dodgeBurn, to: image, crop: recipe.crop, sourceSize: source,
+                                   region: maskRegion)
         }
 
         // 1b. Colour mixer, then curves: the user's own colour and tone corrections, applied

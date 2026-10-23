@@ -163,7 +163,7 @@ public final class PreviewEngine: @unchecked Sendable {
     public func render(_ recipe: Recipe, canvas: CGSize?) -> PreviewFrame? {
         Perf.interval("preview render") {
             guard let base = previewBase(crop: recipe.crop, canvas: canvas) else { return nil }
-            let graded = renderer.grade(recipe, cropped: base)
+            let graded = renderer.grade(recipe, cropped: base, sourceSize: sourceSize)
             return renderFrame(graded)
         }
     }
@@ -305,14 +305,18 @@ public final class PreviewEngine: @unchecked Sendable {
     public func renderZoomed(_ recipe: Recipe, region: ZoomRegion) -> PreviewFrame? {
         Perf.interval("preview render zoomed") {
             guard region.scale > 0, let base = zoomBase(crop: recipe.crop, scale: region.scale) else { return nil }
-            let graded = renderer.grade(recipe, cropped: base)
-            let extent = graded.extent
-            guard !extent.isInfinite, !extent.isEmpty else { return nil }
-            let whole = CGRect(x: 0, y: 0, width: extent.width, height: extent.height)
+            let baseExtent = base.extent
+            guard !baseExtent.isInfinite, !baseExtent.isEmpty else { return nil }
+            let whole = CGRect(x: 0, y: 0, width: baseExtent.width, height: baseExtent.height)
             let r = region.rect.intersection(whole)
             guard !r.isNull, r.width >= 1, r.height >= 1 else { return nil }
             // Core Image's origin is bottom left; the region's is top left.
-            let ci = CGRect(x: extent.minX + r.minX, y: extent.maxY - r.maxY, width: r.width, height: r.height)
+            let ci = CGRect(x: baseExtent.minX + r.minX, y: baseExtent.maxY - r.maxY, width: r.width, height: r.height)
+            // Dodge and burn masks are built for the region only (a zoomed 24 MP picture is huge).
+            let graded = renderer.grade(recipe, cropped: base, sourceSize: sourceSize,
+                                        maskRegion: recipe.dodgeBurn.hasVisibleEffect ? ci.insetBy(dx: -2, dy: -2) : nil)
+            let extent = graded.extent
+            guard !extent.isInfinite, !extent.isEmpty else { return nil }
             return renderFrame(graded, from: ci,
                                placement: ZoomPlacement(scale: region.scale, origin: r.origin))
         }

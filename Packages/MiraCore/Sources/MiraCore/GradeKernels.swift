@@ -26,8 +26,14 @@ enum GradeKernels {
         try? CIColorKernel(functionName: "miraDetail", fromMetalLibraryData: $0)
     }
 
-    /// Whether both kernels loaded (tests check this; a missing kernel makes its stage a no-op).
-    static var isAvailable: Bool { colorMixer != nil && curves != nil && tone != nil && detail != nil }
+    static let dodgeBurn: CIColorKernel? = library.flatMap {
+        try? CIColorKernel(functionName: "miraDodgeBurn", fromMetalLibraryData: $0)
+    }
+
+    /// Whether all kernels loaded (tests check this; a missing kernel makes its stage a no-op).
+    static var isAvailable: Bool {
+        colorMixer != nil && curves != nil && tone != nil && detail != nil && dodgeBurn != nil
+    }
 
     // MARK: Stages
 
@@ -74,5 +80,22 @@ enum GradeKernels {
         guard let kernel = detail else { return image }
         return kernel.apply(extent: image.extent,
                             arguments: [image, blurred, Float(amount), Float(midtoneWeighted ? 1 : 0)]) ?? image
+    }
+
+    /// Stops of exposure a fully painted, fully in-range pixel moves by.
+    static let dodgeBurnStops: Float = 2
+
+    /// One dodge or burn mask: `mask` is 0...1 where painted (strength already folded in).
+    static func applyDodgeBurn(key: DodgeBurnLayerKey, mask: CIImage, to image: CIImage) -> CIImage {
+        guard let kernel = dodgeBurn else { return image }
+        let range: Float = switch key.range {
+        case .shadows: 0
+        case .midtones: 1
+        case .highlights: 2
+        }
+        let luma = key.luma.map { $0.map { Float($0) / 1000 } }
+        let args: [Any] = [image, mask, key.dodge ? dodgeBurnStops : -dodgeBurnStops, range, key.protect ? 1 : 0,
+                           luma == nil ? 0 : 1, luma?[0] ?? 0, luma?[1] ?? 1, luma?[2] ?? 0]
+        return kernel.apply(extent: image.extent, arguments: args) ?? image
     }
 }
