@@ -160,10 +160,11 @@ public final class PreviewEngine: @unchecked Sendable {
     // MARK: Frames
 
     /// Renders `recipe` at canvas resolution (`canvas` in pixels, nil for the fallback size).
-    public func render(_ recipe: Recipe, canvas: CGSize?) -> PreviewFrame? {
+    /// `maskOverlay` washes the dodge and burn masks red over the frame (the editor's mask view).
+    public func render(_ recipe: Recipe, canvas: CGSize?, maskOverlay: Bool = false) -> PreviewFrame? {
         Perf.interval("preview render") {
             guard let base = previewBase(crop: recipe.crop, canvas: canvas) else { return nil }
-            let graded = renderer.grade(recipe, cropped: base, sourceSize: sourceSize)
+            let graded = renderer.grade(recipe, cropped: base, sourceSize: sourceSize, maskOverlay: maskOverlay)
             return renderFrame(graded)
         }
     }
@@ -302,7 +303,7 @@ public final class PreviewEngine: @unchecked Sendable {
     /// picture's size, as in the export), and Core Image renders just the region of interest.
     /// The frame carries its `placement` so the view can position it, and move it while a newer
     /// frame is being made.
-    public func renderZoomed(_ recipe: Recipe, region: ZoomRegion) -> PreviewFrame? {
+    public func renderZoomed(_ recipe: Recipe, region: ZoomRegion, maskOverlay: Bool = false) -> PreviewFrame? {
         Perf.interval("preview render zoomed") {
             guard region.scale > 0, let base = zoomBase(crop: recipe.crop, scale: region.scale) else { return nil }
             let baseExtent = base.extent
@@ -314,7 +315,8 @@ public final class PreviewEngine: @unchecked Sendable {
             let ci = CGRect(x: baseExtent.minX + r.minX, y: baseExtent.maxY - r.maxY, width: r.width, height: r.height)
             // Dodge and burn masks are built for the region only (a zoomed 24 MP picture is huge).
             let graded = renderer.grade(recipe, cropped: base, sourceSize: sourceSize,
-                                        maskRegion: recipe.dodgeBurn.hasVisibleEffect ? ci.insetBy(dx: -2, dy: -2) : nil)
+                                        maskRegion: recipe.dodgeBurn.hasVisibleEffect ? ci.insetBy(dx: -2, dy: -2) : nil,
+                                        maskOverlay: maskOverlay)
             let extent = graded.extent
             guard !extent.isInfinite, !extent.isEmpty else { return nil }
             return renderFrame(graded, from: ci,

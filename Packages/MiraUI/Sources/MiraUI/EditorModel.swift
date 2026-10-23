@@ -29,6 +29,8 @@ private final class CancelFlag: @unchecked Sendable {
 public final class EditorModel {
     public let library: FilmLibrary
     public let renderer: Renderer
+    /// The dodge and burn brush tool (see EditorModel+DodgeBurn.swift).
+    public let dodgeBurnTool = DodgeBurnToolState()
 
     /// Full-size source, orientation already applied. While a large file is still being decoded this
     /// is a small stand-in (`isSourceFull` is false); use `fullSource()` for saving and exporting.
@@ -114,6 +116,9 @@ public final class EditorModel {
         case .space(let held): isSpaceHeld = held
         case .zoomIn: zoomStep(1)
         case .zoomOut: zoomStep(-1)
+        case .brushSize(let direction): stepBrushSize(direction)
+        case .toggleMaskOverlay: setMaskOverlay(!dodgeBurnTool.maskOverlay)
+        case .exitDodgeBurn: setDodgeBurnTool(false)
         case .swallow: break
         }
     }
@@ -214,6 +219,8 @@ public final class EditorModel {
         let generation: Int
         /// The part of the picture to render at the zoom scale, nil to render the whole picture.
         let zoom: ZoomRegion?
+        /// Wash the dodge and burn masks red (the tool's mask view).
+        let maskOverlay: Bool
     }
 
     private static let hoverCacheLimit = 6
@@ -265,6 +272,7 @@ public final class EditorModel {
         isCropping = false
         leaveCropTab()
         resetZoom()
+        resetDodgeBurnTool()
         source = image
         isSourceFull = isFull
         engine.setSource(image)
@@ -346,8 +354,9 @@ public final class EditorModel {
     }
 
     /// Resets every slider to its default and keeps the selected film.
+    /// The dodge and burn strokes stay: they have their own CLEAR ALL.
     public func reset() {
-        recipe = Recipe(filmID: recipe.filmID, crop: recipe.crop)
+        recipe = Recipe(filmID: recipe.filmID, crop: recipe.crop, dodgeBurn: recipe.dodgeBurn)
     }
 
     /// Back to a neutral recipe: no film, sliders, curves, mixer or crop. Only the source stays.
@@ -358,7 +367,7 @@ public final class EditorModel {
 
     /// True when `reset()` would change something (any adjustment differs from neutral).
     public var canReset: Bool {
-        recipe != Recipe(filmID: recipe.filmID, crop: recipe.crop)
+        recipe != Recipe(filmID: recipe.filmID, crop: recipe.crop, dodgeBurn: recipe.dodgeBurn)
     }
 
     /// True when `resetAll()` would change something.
@@ -370,6 +379,7 @@ public final class EditorModel {
     /// (rotated, flipped and straightened) so the box can reach anything.
     public func beginCrop() {
         guard !isCropping, source != nil else { return }
+        setDodgeBurnTool(false)
         endHover()
         showOriginal = false
         setImmersive(false)
@@ -417,6 +427,7 @@ public final class EditorModel {
     /// Switches tab. Entering CROP begins the crop tool; leaving it commits (the same as DONE).
     public func selectTab(_ new: EditorTab) {
         guard new != tab else { return }
+        if new != .develop { setDodgeBurnTool(false) }
         if tab == .crop { commitCrop() }
         if new == .crop {
             beginCrop()
@@ -483,8 +494,8 @@ public final class EditorModel {
     public private(set) var zoomReadout: String?
     /// The pane under the pointer in device pixels, nil when the pointer is elsewhere (anchors `[` and `]`).
     @ObservationIgnored public var pointerInPane: CGPoint?
-    @ObservationIgnored private var paneSize = CGSize.zero
-    @ObservationIgnored private var fitAreaSize = CGSize.zero
+    @ObservationIgnored private(set) var paneSize = CGSize.zero
+    @ObservationIgnored private(set) var fitAreaSize = CGSize.zero
     @ObservationIgnored private var readoutTask: Task<Void, Never>?
     /// How long the zoom readout stays on screen.
     nonisolated static let readoutDuration: Duration = .milliseconds(1200)
@@ -611,18 +622,21 @@ public final class EditorModel {
 
     /// The recipe the canvas renders: while cropping, the whole canvas instead of the cropped box.
     private var previewRecipe: Recipe {
-        guard isCropping else { return recipe }
         var r = recipe
-        r.crop = crop.withFullRect
+        if isCropping { r.crop = crop.withFullRect }
+        // The stroke under the pointer is drawn but is not in the recipe until it is finished.
+        if let live = dodgeBurnTool.liveStroke, !r.dodgeBurn.strokes.contains(where: { $0.id == live.id }) {
+            r.dodgeBurn.strokes.append(live)
+        }
         return r
     }
 
     /// Queues a render of the current state. At most one render runs; a newer request replaces any
     /// waiting one, so a fast slider drag renders only the frames it can keep up with.
-    private func schedulePreview() {
+    func schedulePreview() {
         guard engine.hasSource else { return }
         let request = PreviewRequest(recipe: previewRecipe, canvas: canvasPixels, generation: sourceGeneration,
-                                     zoom: zoomRegion)
+                                     zoom: zoomRegion, maskOverlay: showsMaskOverlay)
         if let start = gate.submit(request) { run(start) }
     }
 
@@ -637,10 +651,10 @@ public final class EditorModel {
                 let graded: PreviewFrame?
                 var original: PreviewFrame?
                 if let region = request.zoom {
-                    graded = engine.renderZoomed(request.recipe, region: region)
+                    graded = engine.renderZoomed(request.recipe, region: region, maskOverlay: request.maskOverlay)
                     original = needsOriginal ? engine.renderZoomed(Recipe(crop: request.recipe.crop), region: region) : nil
                 } else {
-                    graded = engine.render(request.recipe, canvas: request.canvas)
+                    graded = engine.render(request.recipe, canvas: request.canvas, maskOverlay: request.maskOverlay)
                     original = needsOriginal ? engine.renderOriginal(crop: request.recipe.crop, canvas: request.canvas) : nil
                 }
                 return (graded, original)

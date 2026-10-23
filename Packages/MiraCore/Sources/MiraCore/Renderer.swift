@@ -77,8 +77,11 @@ public struct Renderer: Sendable {
     /// burn strokes need it to find their place (nil is fine for an uncropped `input`). `maskRegion`
     /// limits the dodge and burn masks to the part of `input` (Core Image pixels) about to be
     /// rendered, which keeps a zoomed-in render of a huge picture cheap.
+    ///
+    /// `maskOverlay` paints the dodge and burn masks as a translucent red wash over the result (the
+    /// editor's mask view); it is never part of an export.
     public func grade(_ recipe: Recipe, cropped input: CIImage, sourceSize: CGSize? = nil,
-                      maskRegion: CGRect? = nil) -> CIImage {
+                      maskRegion: CGRect? = nil, maskOverlay: Bool = false) -> CIImage {
         let extent = input.extent
         guard !extent.isInfinite, !extent.isEmpty else { return input }
         let scale = min(extent.width, extent.height) / 1000
@@ -222,6 +225,13 @@ public struct Renderer: Sendable {
             f.intensity = Float(clamp(recipe.vignetteAmount, 0, 1))
             f.falloff = 0.5
             image = (f.outputImage ?? image).cropped(to: extent)
+        }
+
+        // 8b. Mask overlay (editor only).
+        if maskOverlay, recipe.dodgeBurn.hasVisibleEffect,
+           let source = sourceSize ?? (recipe.crop.isIdentity ? extent.size : nil) {
+            image = dodgeBurnOverlay(recipe.dodgeBurn, over: image, extent: extent, crop: recipe.crop,
+                                     sourceSize: source, region: maskRegion)
         }
 
         // 9. Border

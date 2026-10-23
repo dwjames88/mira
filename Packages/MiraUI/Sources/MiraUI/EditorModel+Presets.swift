@@ -57,7 +57,7 @@ extension EditorModel {
     /// The recipe applying `preset` would give right now: its film (none if missing) and develop
     /// settings, this photo's crop.
     public func recipe(applying preset: Preset) -> Recipe {
-        var r = preset.recipe(keeping: recipe.crop)
+        var r = preset.recipe(keeping: recipe.crop, dodgeBurn: recipe.dodgeBurn)
         if isFilmMissing(preset) { r.filmID = nil }
         return r
     }
@@ -193,6 +193,7 @@ extension EditorModel {
     private func thumbnailKey(_ preset: Preset) -> PresetThumbnailKey {
         var r = recipe(applying: preset)
         r.crop = .identity
+        r.dodgeBurn = .identity   // thumbnails are made from the cropped base; strokes are not part of a look
         return PresetThumbnailKey(recipe: r, crop: recipe.crop)
     }
 

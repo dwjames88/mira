@@ -10,6 +10,12 @@ public enum EditorKeyAction: Equatable, Sendable {
     case compare(Bool)
     case zoomIn
     case zoomOut
+    /// Dodge and burn tool: the brush one step bigger (+1) or smaller (-1).
+    case brushSize(Int)
+    /// Dodge and burn tool: show or hide the mask overlay.
+    case toggleMaskOverlay
+    /// Dodge and burn tool: close it.
+    case exitDodgeBurn
     /// Space held: drag pans, and Space alone scrolls nothing.
     case space(Bool)
     /// Consume the event (auto-repeat of a handled key) without doing anything.
@@ -26,15 +32,18 @@ public struct EditorKeyEvent: Equatable, Sendable {
     /// Command, Option or Control is held: those belong to menus and the system.
     public var hasCommandOptionControl: Bool
     public var hasShift: Bool
+    /// Command is held without Option or Control (the dodge and burn tool takes ⌘= and ⌘- for zoom).
+    public var hasCommandOnly: Bool
 
     public init(characters: String, keyCode: UInt16 = 0, isDown: Bool = true, isRepeat: Bool = false,
-                hasCommandOptionControl: Bool = false, hasShift: Bool = false) {
+                hasCommandOptionControl: Bool = false, hasShift: Bool = false, hasCommandOnly: Bool = false) {
         self.characters = characters
         self.keyCode = keyCode
         self.isDown = isDown
         self.isRepeat = isRepeat
         self.hasCommandOptionControl = hasCommandOptionControl
         self.hasShift = hasShift
+        self.hasCommandOnly = hasCommandOnly
     }
 
     public static let escapeKeyCode: UInt16 = 53
@@ -49,15 +58,19 @@ public struct EditorKeyContext: Equatable, Sendable {
     public var isCropping = false
     public var isComparing = false
     public var isSpaceHeld = false
+    /// The dodge and burn brush tool is open.
+    public var isDodgeBurn = false
 
     public init(hasPhoto: Bool = true, isTextInputFocused: Bool = false, isImmersive: Bool = false,
-                isCropping: Bool = false, isComparing: Bool = false, isSpaceHeld: Bool = false) {
+                isCropping: Bool = false, isComparing: Bool = false, isSpaceHeld: Bool = false,
+                isDodgeBurn: Bool = false) {
         self.hasPhoto = hasPhoto
         self.isTextInputFocused = isTextInputFocused
         self.isImmersive = isImmersive
         self.isCropping = isCropping
         self.isComparing = isComparing
         self.isSpaceHeld = isSpaceHeld
+        self.isDodgeBurn = isDodgeBurn
     }
 }
 
@@ -72,15 +85,36 @@ public struct EditorKeyContext: Equatable, Sendable {
 /// | C (hold) | compare with the original |
 /// | ] / [ | zoom in / out one step |
 /// | Space (hold) | drag pans |
+///
+/// While the dodge and burn tool is open:
+///
+/// | Key | Action |
+/// |---|---|
+/// | ] / [ | brush bigger / smaller (zoom moves to ⌘= / ⌘-) |
+/// | O | mask overlay on / off |
+/// | Esc | leave the tool (Esc leaves full screen only when the tool is closed) |
+/// | ⌥ (hold, as a stroke starts) | flip dodge and burn for that stroke |
 public enum EditorKeyMap {
     public static func action(for event: EditorKeyEvent, context: EditorKeyContext) -> EditorKeyAction? {
-        guard context.hasPhoto, !event.hasCommandOptionControl else { return nil }
+        guard context.hasPhoto else { return nil }
+        let key = event.characters.lowercased()
+
+        // The tool takes [ and ] for the brush, so zoom steps move to Command with = and -.
+        if context.isDodgeBurn, event.isDown, event.hasCommandOnly, !context.isTextInputFocused {
+            switch key {
+            case "=", "+": return event.isRepeat ? .swallow : .zoomIn
+            case "-", "_": return event.isRepeat ? .swallow : .zoomOut
+            default: break
+            }
+        }
+        guard !event.hasCommandOptionControl else { return nil }
 
         if event.keyCode == EditorKeyEvent.escapeKeyCode {
-            return event.isDown && context.isImmersive ? .exitImmersive : nil
+            guard event.isDown else { return nil }
+            if context.isDodgeBurn { return .exitDodgeBurn }
+            return context.isImmersive ? .exitImmersive : nil
         }
 
-        let key = event.characters.lowercased()
         // Releases always finish a hold that began here, even if focus moved meanwhile.
         if !event.isDown {
             switch key {
@@ -102,8 +136,12 @@ public enum EditorKeyMap {
             if event.isRepeat || context.isCropping { return .swallow }
             return .compare(true)
         case "]", "[":
+            if context.isDodgeBurn { return .brushSize(key == "]" ? 1 : -1) }
             if event.isRepeat || context.isCropping { return .swallow }
             return key == "]" ? .zoomIn : .zoomOut
+        case "o":
+            guard context.isDodgeBurn else { return nil }
+            return event.isRepeat ? .swallow : .toggleMaskOverlay
         case " ":
             return event.isRepeat ? .swallow : .space(true)
         default:
@@ -217,10 +255,12 @@ struct EditorKeyHost: NSViewRepresentable {
                 isDown: event.type == .keyDown,
                 isRepeat: event.type == .keyDown && event.isARepeat,
                 hasCommandOptionControl: !flags.isDisjoint(with: [.command, .option, .control]),
-                hasShift: flags.contains(.shift))
+                hasShift: flags.contains(.shift),
+                hasCommandOnly: flags.contains(.command) && flags.isDisjoint(with: [.option, .control]))
             let ctx = EditorKeyContext(
                 hasPhoto: model.source != nil, isTextInputFocused: editing, isImmersive: model.isImmersive,
-                isCropping: model.isCropping, isComparing: model.showOriginal, isSpaceHeld: model.isSpaceHeld)
+                isCropping: model.isCropping, isComparing: model.showOriginal, isSpaceHeld: model.isSpaceHeld,
+                isDodgeBurn: model.dodgeBurnTool.isActive)
             guard let action = EditorKeyMap.action(for: key, context: ctx) else { return false }
             model.perform(action)
             return true
