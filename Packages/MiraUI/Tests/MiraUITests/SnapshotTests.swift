@@ -87,6 +87,29 @@ struct SnapshotTests {
         model.cancelWork()
     }
 
+    /// The editor strip with the Share button: enabled and disabled (the busy spinner is a
+    /// ProgressView, which ImageRenderer cannot draw).
+    @Test func renderShareButton() async throws {
+        FieldFramesTheme.registerFonts()
+        let model = try await Self.makeModel()
+        let size = CGSize(width: 1280, height: 120)
+        func strip(_ share: EditorHostBar.Share) -> some View {
+            EditorSubToolbar(model: model, host: EditorHostBar(
+                onLibrary: {}, status: "UNSAVED",
+                save: .init(isEnabled: true, isSaved: false, action: {}), share: share))
+                .frame(maxHeight: .infinity, alignment: .top)
+        }
+        for (scheme, tag) in [(ColorScheme.dark, "dark"), (.light, "light")] {
+            try Self.writePNG(strip(.init(isEnabled: true, action: { _ in })), size: size, scheme: scheme, name: "share-strip-\(tag)")
+        }
+        try Self.writePNG(strip(.init(isEnabled: false, action: { _ in })), size: size, scheme: .dark, name: "share-strip-disabled-dark")
+        try Self.writePNG(EditorView(model: model, host: EditorHostBar(
+            onLibrary: {}, status: "UNSAVED", save: .init(isEnabled: true, isSaved: false, action: {}),
+            share: .init(isEnabled: true, action: { _ in }))),
+            size: CGSize(width: 1280, height: 800), scheme: .dark, name: "editor-share-dark")
+        model.cancelWork()
+    }
+
     /// The sub-toolbar and each tab: `editor-tab-films.png`, `editor-tab-develop.png`, `editor-tab-crop.png`.
     @Test func renderTabs() async throws {
         FieldFramesTheme.registerFonts()

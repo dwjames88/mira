@@ -132,4 +132,24 @@ struct EditorTabTests {
             onLibrary: {}, status: "UNSAVED", save: .init(isEnabled: true, isSaved: false, action: {})))
         #expect(app.library && app.save && app.status)
     }
+
+    // MARK: Share button
+
+    @Test func shareControlExistsInTheAppAndNotInTheExtension() {
+        #expect(!EditorSubToolbar.Items(host: nil).share)
+        let app = EditorSubToolbar.Items(host: EditorHostBar(
+            onLibrary: {}, save: .init(isEnabled: true, isSaved: false, action: {}),
+            share: .init(isEnabled: true, action: { _ in })))
+        #expect(app.share)
+        #expect(!EditorSubToolbar.Items(host: EditorHostBar(onLibrary: {})).share)
+    }
+
+    @Test func shareIsEnabledOnlyWithAPhotoAndNothingElseRunning() {
+        typealias S = EditorHostBar.Share
+        #expect(S.isAvailable(hasPhoto: true, isBusy: false, isCropping: false, isSharing: false))
+        #expect(!S.isAvailable(hasPhoto: false, isBusy: false, isCropping: false, isSharing: false))
+        #expect(!S.isAvailable(hasPhoto: true, isBusy: true, isCropping: false, isSharing: false))
+        #expect(!S.isAvailable(hasPhoto: true, isBusy: false, isCropping: true, isSharing: false))
+        #expect(!S.isAvailable(hasPhoto: true, isBusy: false, isCropping: false, isSharing: true))
+    }
 }

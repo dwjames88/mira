@@ -118,7 +118,7 @@ private struct EditorScreen: View {
         }
         .disabled(state.isOpening)
         .overlay {
-            if let busy = state.busyText {
+            if let busy = state.busyText ?? state.shareBusyText {
                 VStack(spacing: FieldFramesTheme.rows(0.5)) {
                     Text(busy).font(FieldFramesTheme.display(30, weight: .medium))
                     if let p = state.busyProgress {
@@ -173,8 +173,8 @@ private struct EmptyState: View {
 
 private struct ExportSheet: View {
     @Bindable var state: AppState
-    @State private var format = ExportFormat.jpeg
-    @State private var quality = 0.92
+    @State private var format = ExportSettings.current().format
+    @State private var quality = ExportSettings.current().quality
 
     var body: some View {
         VStack(alignment: .leading, spacing: FieldFramesTheme.rows(1)) {

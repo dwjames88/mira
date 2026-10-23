@@ -58,6 +58,9 @@ final class AppState {
     var errorMessage: String?
     var showExportSheet = false
     private(set) var isExporting = false
+    /// A share render is running (Share button spinner); `shareBusyText` is the overlay line once it runs long.
+    var isSharing = false
+    var shareBusyText: String?
 
     /// Busy line ("OPENING", "SAVING") shown over the editor; nil when idle.
     private(set) var busyText: String?
@@ -85,6 +88,7 @@ final class AppState {
 
     init() {
         library = FilmLibrary.bundled()
+        Task.detached(priority: .utility) { Self.cleanShareStaging() }
         if let library {
             Task(priority: .utility) {
                 await library.prewarm()
@@ -533,6 +537,7 @@ final class AppState {
         let recipe = editor.recipe
         let renderer = editor.renderer
         let type = format.type
+        ExportSettings.remember(format: format, quality: quality)
         isExporting = true
         Task {
             // A large file may still be decoding in the background; export needs every pixel.

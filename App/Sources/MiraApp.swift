@@ -32,6 +32,9 @@ struct MiraApp: App {
                 Button("Export\u{2026}") { state.showExportSheet = true }
                     .keyboardShortcut("e")
                     .disabled(!state.canExport)
+                Button("Share\u{2026}") { state.share(anchorFrame: nil) }
+                    .keyboardShortcut("s", modifiers: [.command, .option])
+                    .disabled(!state.canShare)
                 Button(state.saveTitle) { Task { await state.saveNow() } }
                     .keyboardShortcut("s")
                     .disabled(!state.canSaveNow)

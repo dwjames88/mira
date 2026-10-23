@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 private typealias T = FieldFramesTheme
@@ -16,11 +17,13 @@ struct EditorSubToolbar: View {
         var library: Bool
         var status: Bool
         var save: Bool
+        var share: Bool
 
         init(host: EditorHostBar?) {
             library = host?.onLibrary != nil
             status = host?.status != nil
             save = host?.save != nil
+            share = host?.share != nil
         }
     }
 
@@ -55,6 +58,10 @@ struct EditorSubToolbar: View {
                             .padding(.trailing, T.cells(2))
                             .help(host.statusHelp ?? "")
                     }
+                    if let share = host.share {
+                        ShareButton(share: share)
+                            .padding(.trailing, T.cells(1))
+                    }
                     if let save = host.save {
                         Button(save.isSaved ? "Saved" : "Save", action: save.action)
                             .buttonStyle(FFButtonStyle(prominent: true))
@@ -68,6 +75,32 @@ struct EditorSubToolbar: View {
             .background(alignment: .bottom) { FFHairline() }
         }
         .ffPanel()
+    }
+
+    /// Share sits left of SAVE, a quiet strip button with the system "share" glyph. While the picture
+    /// renders it swaps the glyph for a small spinner and ignores clicks.
+    private struct ShareButton: View {
+        let share: EditorHostBar.Share
+        @State private var anchor = ShareButtonAnchor()
+
+        var body: some View {
+            Button {
+                guard share.isEnabled, !share.isBusy else { return }
+                share.action(anchor.rect)
+            } label: {
+                ZStack {
+                    Image(systemName: "square.and.arrow.up").font(.system(size: 13, weight: .regular)).opacity(share.isBusy ? 0 : 1)
+                    if share.isBusy { ProgressView().controlSize(.small).scaleEffect(0.7) }
+                }
+                .frame(width: T.cells(2.5), height: T.rows(1.25))
+            }
+            .buttonStyle(FFButtonStyle())
+            .disabled(!share.isEnabled && !share.isBusy)
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { anchor.rect = $0 }
+            .help("Share\u{2026} \u{2325}\u{2318}S")
+            .accessibilityLabel("Share")
+            .accessibilityIdentifier("share-button")
+        }
     }
 
     private struct TabButton: View {
@@ -95,4 +128,11 @@ struct EditorSubToolbar: View {
             .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
         }
     }
+}
+
+/// The Share button's frame in window coordinates (top-left origin), which the share sheet hangs
+/// from. Measured with SwiftUI geometry, not an AppKit view, so the strip still renders headless.
+@MainActor
+final class ShareButtonAnchor {
+    var rect: CGRect?
 }
