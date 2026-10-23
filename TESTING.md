@@ -97,6 +97,17 @@ Move the pointer over the film cards. After a short pause the canvas shows that 
 5. Delete a film's entry from a copy of `Films/films.json` (or edit `Presets.json` so a preset names an unknown `filmID`): the card shows FILM MISSING and applying it applies the develop settings with a notice.
 6. `codesign -d --entitlements - Mira.app` and `.../PlugIns/MiraPhotos.appex` both list `com.apple.security.application-groups` with `VF945J28YU.com.fieldframes.mira`.
 
+### Dodge & burn
+
+1. Open a photo, press 2, scroll to DODGE & BURN and switch PAINT on. The cursor becomes a ring; drag across a dark face: it lightens (DODGE, MIDTONES). Release: UNSAVED appears and one row is added to STROKES. `[` and `]` change the ring, the Size slider follows. Hold ⌥, start a stroke: it burns instead (the ring's centre mark changes while ⌥ is held); the brush stays on DODGE.
+2. Press O: a red wash shows exactly where the strokes are; O again hides it. Click a stroke row: the sliders now edit that stroke (header reads STROKE 02); change Strength and the picture follows. Eye hides it, the cross deletes it, CLEAR ALL empties the list. Esc leaves the tool; 1 or 3 does too.
+3. Zoom with ⌘= to 200% (then ⌘-); pinch and Space-drag also work; paint zoomed in and fit again: the strokes are where you painted them. Crop the photo, rotate it a quarter turn and straighten it: the strokes stay on the same part of the picture.
+4. With PROTECT TONES on, dodge a bright sky with HIGHLIGHTS: it brightens without clipping to flat white; turn it off and it does. Switch on LUMINOSITY RANGE and move Low/High: only that band of tones changes.
+5. Save to Photos, close the picture and reopen it in the app and in Photos ▸ Edit ▸ Mira: every stroke is back and editable. Save a preset on that photo, apply it to another: the film and sliders come over, the strokes do not; applying it back on the first keeps its strokes. The Save Preset sheet carries the note about strokes.
+6. Tablet pressure: with a Wacom or similar pen, press lightly then firmly in one stroke: the line builds from faint to strong (Flow low makes it easy to see). With a mouse or trackpad pressure is constant.
+7. Photos extension: Edit ▸ Mira, DEVELOP, PAINT; paint, Done, reopen: strokes persist (format version 3). Check with an older build that a version 3 edit is refused rather than shown without strokes.
+8. Painting stays smooth on a 24 MP photo at full window size; see docs/PERFORMANCE.md for the numbers.
+
 ### Sharing presets
 
 1. Right-click a preset card ▸ Share…: the system share sheet opens anchored to the card. Send it by AirDrop to another Mac (or Mail it to yourself): the attachment is named "Portra 400 - Last Summer.mirapreset".
@@ -146,6 +157,7 @@ Keys (single keys work when no text field is being edited, in the app and the ex
 | C (hold) | Shows the original while held; releasing returns to the edit. Mouse: press and hold HOLD TO COMPARE |
 | Click on the photo | Fit → 200% centred on the click; click again → fit. Not in the crop tab, not while the eyedropper is active |
 | Drag, Space + drag, two-finger scroll or wheel | Pans while zoomed (scroll follows the fingers, momentum included; at fit scroll passes through). Space alone does nothing. Pinch zooms between fit and 400% at the pointer |
+| ] / [ (dodge & burn tool open) | Brush bigger / smaller; zoom moves to ⌘= / ⌘-. O toggles the mask overlay, Esc leaves the tool, ⌥ at the start of a stroke flips dodge and burn |
 | ] / [ | Zoom in / out through fit, 50%, 100%, 200%, 400% (anchored at the pointer over the photo, else the centre); a readout (100%) shows bottom left for about a second |
 | ⌘0 | Zoom to Fit |
 | ⌘O / ⌘E / ⌘S / ⌘← / ⌘, | Open / Export / Save / Back to Library / Settings |
@@ -161,6 +173,8 @@ Check by hand after a change to the editor chrome:
 6. In Photos, resize the Mira editing window: the editor follows the window; the right panel is 300 to 340 pt wide and scrolls.
 
 ## Automated tests
+
+Dodge & burn adds `DodgeBurnModelTests`, `DodgeBurnMaskTests`, `DodgeBurnRenderTests` (MiraCore, 28) and `DodgeBurnUITests` (MiraUI, 12, writing `dodgeburn-*.png` snapshots), plus the opt-in `DodgeBurnPerf`.
 
 ```sh
 swift test --package-path Packages/MiraCore

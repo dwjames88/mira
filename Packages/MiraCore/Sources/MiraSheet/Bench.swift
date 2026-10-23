@@ -12,6 +12,7 @@ import UniformTypeIdentifiers
 // b. open a 24 MP JPEG: first displayable preview and full-res source ready
 // c. fill all 32 film-strip thumbnails (cold LUT cache, warm disk cache, hot)
 // d. full-resolution 24 MP export
+// h. dodge and burn: mask rasterisation, live-stroke updates, graded frames
 // z. zoomed frames (50%, 100%, 200%): only the visible region of the 24 MP picture is rendered
 
 enum Bench {
@@ -107,6 +108,7 @@ enum Bench {
                        filmsURL: filmsURL, benchDir: dir)
         try Current.run(renderer: renderer, library: library, context: context, jpeg: jpeg,
                         filmsURL: filmsURL, benchDir: dir)
+        try DodgeBurnBench.run(renderer: renderer, context: context, jpeg: jpeg)
         if let full = ImageSource.loadDecoded(url: jpeg) {
             try Extra.run(library: library, full: full, filmsURL: filmsURL, benchDir: dir)
         }

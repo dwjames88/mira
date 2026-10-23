@@ -452,7 +452,9 @@ final class DodgeBurnMaskCache: @unchecked Sendable {
     private func updateLive(_ entry: Entry, stroke: DodgeBurnStroke, state: inout DodgeBurnState) {
         let geometry = entry.geometry
         var live: Live
-        if var current = entry.live, current.stroke.id == stroke.id,
+        // Take the live state out of the entry first, so its coverage buffer is uniquely referenced and
+        // growing it does not copy the whole bitmap.
+        if var current = entry.live.take(), current.stroke.id == stroke.id,
            sameSettings(current.stroke, stroke), stroke.points.count >= current.fed,
            Array(stroke.points.prefix(current.fed)) == Array(current.stroke.points.prefix(current.fed)) {
             for p in stroke.points[current.fed...] { current.coverage.feed(geometry.map(p), pressure: p.pressure) }

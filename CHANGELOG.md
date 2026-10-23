@@ -2,6 +2,15 @@
 
 All notable changes to Mira. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.0] - 2026-10-23
+
+### Added
+- Dodge & Burn. A DODGE & BURN group in the DEVELOP tab with a PAINT switch that opens a brush tool on the canvas. Paint light on (dodge), take it off (burn) or erase earlier strokes, with Size, Feather, Flow and Strength sliders, a tone Range (shadows, midtones, highlights), Protect Tones (dodge never clips highlights, burn never crushes to black) and an optional Luminosity Range (low, high, softness) that limits a stroke to a band of tones. The brush ring shows the brush on screen with the feather as an inner ring; tablet pressure is used when the pen reports it. Each stroke is one edit and is listed with its mode, an eye (hide), its strength and a delete button; selecting a row edits that stroke's settings; CLEAR ALL removes them all. MASK OVERLAY (key O) washes the painted area red.
+- Keys in the tool: `[` and `]` change the brush size (zoom moves to ⌘= and ⌘-), hold ⌥ at the start of a stroke to flip dodge and burn, O toggles the mask overlay, Esc leaves the tool.
+- Strokes are saved with the photo: part of the recipe (`Recipe.dodgeBurn`), in sidecars and in Photos adjustment data, which is written as format version 3 only when a photo has strokes (versions 1 and 2 and older data still open). Strokes are stored relative to the uncropped source, so they stay on the picture when you change the crop, rotation or straighten.
+- Presets and `.mirapreset` files do not carry strokes, and applying a preset keeps the photo's strokes. The Save Preset sheet says so.
+- New benchmark rows and a UI timing test for painting; see [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
+
 ## [0.3.1] - 2026-10-22
 
 ### Added

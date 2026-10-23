@@ -62,6 +62,22 @@ extension Renderer {
     }
 
     static let overlayOpacity: CGFloat = 0.55
+
+    /// Builds (or updates in the cache) the masks for `settings` on a picture of `size` pixels and returns
+    /// how many there are. For benchmarks and warm-ups; rendering does this itself.
+    @discardableResult
+    public func prepareDodgeBurnMasks(_ settings: DodgeBurnSettings, crop: CropSettings, sourceSize: CGSize,
+                                      size: CGSize) -> Int {
+        let g = Self.dodgeBurnGeometry(crop: crop, sourceSize: sourceSize, size: size, region: nil)
+        return maskCache.layers(for: settings.activeStrokes, geometry: g).count
+    }
+
+    /// Rasterises `settings` from scratch without touching the cache (benchmarks).
+    public static func rasterizeDodgeBurnMasks(_ settings: DodgeBurnSettings, crop: CropSettings, sourceSize: CGSize,
+                                               size: CGSize) -> Int {
+        let g = dodgeBurnGeometry(crop: crop, sourceSize: sourceSize, size: size, region: nil)
+        return DodgeBurnRaster.rasterize(settings.activeStrokes, geometry: g).order.count
+    }
 }
 
 /// Where a point of the picture as shown lands on the source, and how big a brush is on it. The
