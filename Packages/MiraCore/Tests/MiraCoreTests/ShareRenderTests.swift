@@ -36,7 +36,7 @@ struct ShareRenderTests {
             let url = try ShareRender.render(Recipe(exposure: 0.2), source: loaded.image, metadataFrom: src,
                                              baseName: "in", type: type, quality: 0.9, colorSpace: loaded.colorSpace,
                                              renderer: r, directory: dir.appendingPathComponent(type.identifier))
-            #expect(url.lastPathComponent == "in - Mira." + type.preferredFilenameExtension!)
+            #expect(url.lastPathComponent == "in - Mira." + ShareRender.fileExtension(for: type))
             let p = props(url)
             #expect(p[kCGImagePropertyPixelWidth] as? Int == 80)
             #expect(p[kCGImagePropertyPixelHeight] as? Int == 120)
