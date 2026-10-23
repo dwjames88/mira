@@ -45,6 +45,22 @@ Re-run of `mira-sheet --bench` on main with Highlights/Shadows/Whites/Blacks, Te
 
 The new stages are skipped when their values are 0, so a recipe that does not use them costs exactly what it did before.
 
+## Dodge & Burn (feature/dodgeburn, 2026-10-23)
+
+Painting must fit in a 16 ms frame at preview size. Measured with `mira-sheet --bench` (section h: 24 MP source, mask and canvas 1500x1000, release build) and the opt-in `DodgeBurnPerf` UI test (a 60-point drag on a 24 MP photo, one point per frame, pointer move to published frame).
+
+| Measurement | Result |
+|---|---|
+| Mask rasterisation from scratch, 1 stroke (40 points, brush 10% of the short side) | 0.8 ms |
+| ... 10 strokes | 7.3 ms |
+| ... 50 strokes | 37 ms |
+| Live stroke, +1 point with 10 strokes cached (mask only) | 0.7 ms |
+| Graded frame, effects recipe, no strokes / 10 / 50 strokes (cached masks) | 14.2 / 15.1 / 14.8 ms |
+| Painting frame in the bench (10 cached + live stroke, whole graph, CGImage read back) | 17.0 ms median, 18.9 ms p95 |
+| Painting frame in the editor model (`DodgeBurnPerf`), empty photo / 10 strokes painted | 6.8 / 6.9 ms median, 7.6 / 7.7 ms p95 |
+
+How it stays fast: strokes are stamped as dabs into a float bitmap at the size of the graded image; the cache keeps the committed strokes' masks, a checkpoint one stroke back and the live stroke's coverage, so a new point only stamps its new dabs and a finished stroke only the one stroke on top. Strokes that share their settings share one mask, and each mask is one kernel pass (`miraDodgeBurn`). A picture longer than 4096 px gets its masks at reduced size (export) or for the visible region only (zoomed preview). With no active strokes the stage is skipped, so a recipe without strokes costs exactly what it did before. Editing an earlier stroke (its strength, hiding it) rebuilds the masks once, about 7 ms per 10 strokes at preview size.
+
 ## What each change was
 
 1. **Narrower observation (`EditorModel.selectedFilmID`).** `FilmStrip.body` read `model.recipe.filmID`, and `recipe` is one observed property, so every slider tick re-evaluated the strip and its 32 cards. The model now keeps a stored `selectedFilmID` that changes only when the film does, and the strip reads that. Result: 0 strip evaluations per tick, SwiftUI cost per tick 4.0 to 2.3 ms.
@@ -73,6 +89,14 @@ First frame in a brand-new process, without and with the launch warm-up:
 ```
 for w in 0 1; do MIRA_BENCH_COLD=1 MIRA_BENCH_WARMUP=$w Packages/MiraCore/.build/release/mira-sheet --bench --films Films; done
 ```
+
+The dodge & burn rows are in the same bench run (section h). The painting drag timing:
+
+```
+cd Packages/MiraUI && MIRA_PERF=1 swift test -c release -Xswiftc -enable-testing --filter DodgeBurnPerf
+```
+
+(writes `build/perf-dodgeburn.txt`).
 
 Model level and SwiftUI (drives a real `EditorModel`, hosts `EditorView` in an `NSHostingView`, counts film strip and card `body` evaluations; also writes `build/perf-ui.txt`):
 

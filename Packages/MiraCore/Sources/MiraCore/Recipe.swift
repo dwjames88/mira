@@ -33,6 +33,8 @@ public struct Recipe: Codable, Hashable, Sendable {
     public var curves: CurvesSettings
     /// Per-hue-range hue, saturation and luminance; identity by default.
     public var colorMixer: ColorMixerSettings
+    /// Dodge and burn strokes; identity (none) by default. Belongs to the photo, not to a look.
+    public var dodgeBurn: DodgeBurnSettings
 
     public static let neutral = Recipe()
 
@@ -62,7 +64,8 @@ public struct Recipe: Codable, Hashable, Sendable {
         version: Int = 1,
         crop: CropSettings = .identity,
         curves: CurvesSettings = .identity,
-        colorMixer: ColorMixerSettings = .identity
+        colorMixer: ColorMixerSettings = .identity,
+        dodgeBurn: DodgeBurnSettings = .identity
     ) {
         self.filmID = filmID
         self.strength = strength
@@ -90,12 +93,13 @@ public struct Recipe: Codable, Hashable, Sendable {
         self.crop = crop
         self.curves = curves
         self.colorMixer = colorMixer
+        self.dodgeBurn = dodgeBurn
     }
 
     private enum CodingKeys: String, CodingKey {
         case filmID, strength, exposure, contrast, saturation, warmth, tint
         case grainAmount, grainSize, halationAmount, halationRadius, bloomAmount
-        case vignetteAmount, borderEnabled, borderWidth, version, crop, curves, colorMixer
+        case vignetteAmount, borderEnabled, borderWidth, version, crop, curves, colorMixer, dodgeBurn
         case highlights, shadows, whites, blacks, vibrance, clarity, texture
     }
 
@@ -128,6 +132,7 @@ public struct Recipe: Codable, Hashable, Sendable {
         crop = try c.decodeIfPresent(CropSettings.self, forKey: .crop) ?? .identity
         curves = try c.decodeIfPresent(CurvesSettings.self, forKey: .curves) ?? .identity
         colorMixer = try c.decodeIfPresent(ColorMixerSettings.self, forKey: .colorMixer) ?? .identity
+        dodgeBurn = try c.decodeIfPresent(DodgeBurnSettings.self, forKey: .dodgeBurn) ?? .identity
     }
 
     /// Curves, the colour mixer and the tone controls are written only when they change something, so recipes
@@ -153,6 +158,7 @@ public struct Recipe: Codable, Hashable, Sendable {
         try c.encode(crop, forKey: .crop)
         if !curves.isIdentity { try c.encode(curves, forKey: .curves) }
         if !colorMixer.isIdentity { try c.encode(colorMixer, forKey: .colorMixer) }
+        if !dodgeBurn.isIdentity { try c.encode(dodgeBurn, forKey: .dodgeBurn) }
         if highlights != 0 { try c.encode(highlights, forKey: .highlights) }
         if shadows != 0 { try c.encode(shadows, forKey: .shadows) }
         if whites != 0 { try c.encode(whites, forKey: .whites) }
@@ -167,6 +173,9 @@ public struct Recipe: Codable, Hashable, Sendable {
         highlights != 0 || shadows != 0 || whites != 0 || blacks != 0
             || vibrance != 0 || clarity != 0 || texture != 0
     }
+
+    /// True when the recipe has dodge and burn strokes (adjustment-data format version 3).
+    public var usesDodgeBurn: Bool { !dodgeBurn.isIdentity }
 
     /// JSON with sorted keys, so equal recipes produce equal bytes.
     public func encoded() throws -> Data {

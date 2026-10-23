@@ -34,7 +34,7 @@ public enum PresetFileError: Error, Equatable, Sendable, CustomStringConvertible
 ///  "schemaVersion":1}
 /// ```
 ///
-/// No photo data is stored, and the recipe carries no crop (a crop belongs to a photo). Reading is
+/// No photo data is stored, and the recipe carries no crop and no dodge and burn strokes (they belong to a photo). Reading is
 /// tolerant: unknown keys are ignored and the recipe uses `Recipe`'s tolerant decoder.
 public enum PresetFile {
     public static let typeIdentifier = "com.fieldframes.mira.preset"
@@ -88,6 +88,7 @@ public enum PresetFile {
     public static func encode(_ preset: Preset, appVersion: String, exported: Date = Date()) throws -> Data {
         var recipe = preset.recipe
         recipe.crop = .identity
+        recipe.dodgeBurn = .identity
         let file = FileModel(
             format: format, schemaVersion: schemaVersion, appVersion: appVersion, exported: dateText(exported),
             preset: Body(nickname: preset.nickname, filmID: preset.filmID, filmName: preset.filmName,
@@ -133,6 +134,7 @@ public enum PresetFile {
         guard !nickname.isEmpty else { throw PresetFileError.missingNickname }
         var recipe = body.recipe ?? .neutral
         recipe.crop = .identity
+        recipe.dodgeBurn = .identity
         if let film = body.filmID, !film.isEmpty { recipe.filmID = film }
         let created = body.created.flatMap(parseDate) ?? Date()
         return Preset(nickname: nickname, recipe: recipe, filmName: body.filmName, created: created, modified: Date())

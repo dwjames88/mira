@@ -10,17 +10,20 @@ public enum MiraAdjustment {
     /// Written when the recipe uses the tone controls. Older builds refuse it, so they never
     /// open an edit they would render without those controls.
     public static let toneFormatVersion = "2"
+    /// Written when the recipe has dodge and burn strokes. Builds that do not know them refuse it.
+    public static let dodgeBurnFormatVersion = "3"
     /// The version written for a recipe that has no tone controls (kept for source compatibility).
     public static let formatVersion = baseFormatVersion
 
     public static func formatVersion(for recipe: Recipe) -> String {
-        recipe.usesToneControls ? toneFormatVersion : baseFormatVersion
+        if recipe.usesDodgeBurn { return dodgeBurnFormatVersion }
+        return recipe.usesToneControls ? toneFormatVersion : baseFormatVersion
     }
     /// Identifiers written by the app's earlier name (Emulsion). Still readable so photos edited
     /// before the rename reopen with their recipe; never written.
     public static let legacyFormatIdentifiers: [String] = ["com.dwjames.emulsion"]
     /// Versions this build can read. Add to this set when the payload format changes compatibly.
-    public static let supportedVersions: Set<String> = ["1", "2"]
+    public static let supportedVersions: Set<String> = ["1", "2", "3"]
 
     public static func canHandle(formatIdentifier: String, formatVersion: String) -> Bool {
         (formatIdentifier == Self.formatIdentifier || legacyFormatIdentifiers.contains(formatIdentifier))

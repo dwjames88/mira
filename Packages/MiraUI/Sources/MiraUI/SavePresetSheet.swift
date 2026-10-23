@@ -30,6 +30,9 @@ struct SavePresetSheet: View {
         return model.currentFilmName
     }
 
+    /// Shown under the name so nobody expects a preset to carry the photo's brushwork.
+    static let keepsNote = "Presets keep the film and develop settings; dodge & burn strokes stay with the photo."
+
     private var trimmed: String { nickname.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var canSave: Bool { !trimmed.isEmpty }
 
@@ -59,6 +62,10 @@ struct SavePresetSheet: View {
             .lineLimit(2)
             .frame(maxWidth: .infinity, minHeight: T.rows(2), alignment: .leading)
             .accessibilityLabel(canSave ? Preset.displayName(filmName: filmName, nickname: trimmed) : "No name yet")
+            Text(Self.keepsNote)
+                .ffLabel(size: 9, color: T.paperDim)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
             if let error {
                 Text(error).ffLabel(size: 10, color: T.lichen)
             }

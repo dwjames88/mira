@@ -147,6 +147,10 @@ private struct PreviewPane: View {
                     CropOverlay(model: model)
                         .padding(T.cells(3))
                 }
+                if model.dodgeBurnTool.isActive, !imageCanvas {
+                    DodgeBurnPaintLayer(model: model, scale: displayScale)
+                        .pointerVisibility(.hidden)
+                }
             } else {
                 Text("Developing").ffLabel()
             }
@@ -202,7 +206,7 @@ private struct PreviewPane: View {
             }
         }
         .contentShape(Rectangle())
-        .gesture(navigation, isEnabled: model.canZoom && !model.eyedropperActive)
+        .gesture(navigation, isEnabled: model.canZoom && !model.eyedropperActive && !model.dodgeBurnTool.isActive)
         .gesture(
             SpatialTapGesture().onEnded { tap in
                 let pane = CGPoint(x: tap.location.x * displayScale, y: tap.location.y * displayScale)
@@ -232,6 +236,7 @@ private struct PreviewPane: View {
 
     private var pointer: PointerStyle {
         if model.eyedropperActive { return .rectSelection }
+        if model.dodgeBurnTool.isActive { return .default }
         guard model.canZoom else { return .default }
         return model.zoom.isFit ? .zoomIn : (panning ? .grabActive : .grabIdle)
     }

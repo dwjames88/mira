@@ -217,6 +217,7 @@ struct DevelopPanel: View {
                     }
                     CurvesPanel(model: model)
                     ColorMixerPanel(model: model)
+                    DodgeBurnPanel(model: model)
                     FFSectionLabel("Effects").padding(.top, T.rows(1)).padding(.bottom, 4)
                     SpecSliders(model: model, specs: Self.texture)
                     FFSectionLabel("Frame").padding(.top, T.rows(1)).padding(.bottom, 4)

@@ -54,7 +54,7 @@ import Testing
     }
 
     @Test func versionTwoAndLegacyAreReadable() throws {
-        #expect(MiraAdjustment.supportedVersions == ["1", "2"])
+        #expect(MiraAdjustment.supportedVersions == ["1", "2", "3"])
         let adj = try MiraAdjustment.adjustmentData(for: Self.toned)
         #expect(MiraAdjustment.canHandle(adj))
         #expect(MiraAdjustment.recipe(from: adj) == Self.toned)

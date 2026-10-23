@@ -223,3 +223,57 @@ float4 miraDetail(coreimage::sample_t s, coreimage::sample_t b, float amount, fl
 
 } // namespace coreimage
 } // extern "C"
+
+// MARK: Dodge and burn
+
+extern "C" {
+namespace coreimage {
+
+// `m.r` is the painted mask (0...1, already multiplied by the stroke strength). `ev` is the signed
+// stops at full mask (+ dodge, - burn). The change is a gain on linear light (like exposure), scaled
+// by the tone-range weight (range 0 shadows, 1 midtones, 2 highlights) and an optional luminosity
+// band [lo, hi] widened by `soft`, both measured on the sRGB-encoded luminance of the incoming pixel.
+// The result is applied to RGB as a luma ratio, so hue and chroma ratios are kept. With `protect`,
+// the change is compressed in the encoded domain (1 - exp) so dodge approaches but never reaches
+// white and burn approaches but never reaches black, and no channel is pushed past 1.
+float4 miraDodgeBurn(coreimage::sample_t s, coreimage::sample_t m, float ev, float range, float protect,
+                     float lumaOn, float lo, float hi, float soft) {
+    float amt = m.r;
+    if (s.a <= 0.0 || amt <= 0.0005) { return s; }
+    float3 c = miraUnpremultiply(s);
+    float yl = max(miraLuma(c), 0.0);
+    float ye = clamp(miraEncode1(yl), 0.0, 1.0);
+
+    float w;
+    if (range < 0.5)      { w = 1.0 - smoothstep(0.12, 0.62, ye); }
+    else if (range < 1.5) { w = 1.0 - smoothstep(0.0, 0.55, fabs(ye - 0.5)); }
+    else                  { w = smoothstep(0.38, 0.9, ye); }
+    if (lumaOn > 0.5) {
+        float a = soft > 0.0001 ? smoothstep(lo - soft, lo, ye) : (ye >= lo ? 1.0 : 0.0);
+        float b = soft > 0.0001 ? 1.0 - smoothstep(hi, hi + soft, ye) : (ye <= hi ? 1.0 : 0.0);
+        w *= a * b;
+    }
+    float k = amt * w;
+    if (k <= 0.0001 || yl <= 1.0e-5) { return s; }
+
+    float g = exp2(ev * k);
+    float ratio = g;
+    if (protect > 0.5) {
+        float ye2 = miraEncode1(yl * g);
+        float d = ye2 - ye;
+        if (d > 0.0) {
+            float h = max(1.0 - ye, 1.0e-4);
+            d = h * (1.0 - exp(-d / h));
+        } else {
+            float l = max(ye, 1.0e-4);
+            d = -l * (1.0 - exp(d / l));
+        }
+        ratio = miraDecode1(clamp(ye + d, 0.0, 1.0)) / yl;
+        float mx = max(c.r, max(c.g, c.b));
+        if (ratio > 1.0 && mx > 0.0) { ratio = min(ratio, max(1.0 / mx, 1.0)); }
+    }
+    return float4(c * ratio * s.a, s.a);
+}
+
+} // namespace coreimage
+} // extern "C"

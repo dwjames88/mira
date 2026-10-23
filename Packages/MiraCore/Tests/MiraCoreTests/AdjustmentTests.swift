@@ -17,7 +17,7 @@ import Testing
         #expect(MiraAdjustment.decode(formatIdentifier: "com.other", formatVersion: "1", data: data) == nil)
         #expect(MiraAdjustment.decode(formatIdentifier: "com.fieldframes.mira", formatVersion: "9", data: data) == nil)
         #expect(MiraAdjustment.decode(formatIdentifier: "com.fieldframes.mira", formatVersion: "1", data: Data("nope".utf8)) == nil)
-        #expect(!MiraAdjustment.canHandle(formatIdentifier: "com.fieldframes.mira", formatVersion: "3"))
+        #expect(!MiraAdjustment.canHandle(formatIdentifier: "com.fieldframes.mira", formatVersion: "4"))
         #expect(!MiraAdjustment.canHandle(formatIdentifier: "com.fieldframes.mira.x", formatVersion: "1"))
         #expect(MiraAdjustment.canHandle(formatIdentifier: "com.fieldframes.mira", formatVersion: "1"))
     }
@@ -26,7 +26,7 @@ import Testing
         let data = try MiraAdjustment.encode(Self.recipe)
         #expect(MiraAdjustment.legacyFormatIdentifiers.contains("com.dwjames.emulsion"))
         #expect(MiraAdjustment.canHandle(formatIdentifier: "com.dwjames.emulsion", formatVersion: "1"))
-        #expect(!MiraAdjustment.canHandle(formatIdentifier: "com.dwjames.emulsion", formatVersion: "3"))
+        #expect(!MiraAdjustment.canHandle(formatIdentifier: "com.dwjames.emulsion", formatVersion: "4"))
         #expect(MiraAdjustment.decode(formatIdentifier: "com.dwjames.emulsion", formatVersion: "1", data: data) == Self.recipe)
         let legacy = PHAdjustmentData(formatIdentifier: "com.dwjames.emulsion", formatVersion: "1", data: data)
         #expect(MiraAdjustment.canHandle(legacy))
