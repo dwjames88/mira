@@ -2,6 +2,12 @@
 
 All notable changes to Mira. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.0] - 2026-10-23
+
+### Added
+- Share: a share button in the editor strip (left of SAVE) and File ▸ Share… (⌥⌘S) open the system share sheet (AirDrop, Messages, Mail, Photos, Notes) with the current look rendered at full size as "<name> - Mira.jpg" (or HEIC/TIFF, following the last File ▸ Export format and quality). The render goes through the same code as Export, off the main thread, with a spinner on the button and a "Preparing to share" overlay when it takes longer than about 300 ms. Temporary files are removed on the next share and at launch. App only; the Photos extension has no Share.
+- File ▸ Export now remembers its last format and quality.
+
 ## [0.3.1] - 2026-10-22
 
 ### Added

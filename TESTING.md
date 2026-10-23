@@ -110,6 +110,15 @@ Move the pointer over the film cards. After a short pause the canvas shows that 
 9. In the Photos extension there is no Share…, Export… or Import… (it has no file access); presets still show, apply and save.
 10. `plutil -p Mira.app/Contents/Info.plist` lists `UTExportedTypeDeclarations` (`com.fieldframes.mira.preset`, extension `mirapreset`) and a Mira Preset document type; Finder shows "Mira Preset" as the kind of a `.mirapreset`.
 
+### Sharing a photo
+
+1. Open a photo, click the share icon left of SAVE (or File ▸ Share…, ⌥⌘S): the icon becomes a spinner, then the system share sheet opens anchored to the button (from the menu: window centre).
+2. Choose AirDrop to another Mac or iPhone, Mail (compose a message to yourself), Messages, Notes and Photos in turn: the attachment is "<name> - Mira.jpg", full resolution, with the look applied, upright (orientation 1) and the camera EXIF kept. Compare it with File ▸ Export of the same photo: same pixels and format.
+3. File ▸ Export… with HEIC once, then Share: the file is now "<name> - Mira.heic" (Share uses the last Export format and quality).
+4. With a large photo (24 MP) the button spins and a "Preparing to share" overlay shows if it takes longer than about 300 ms; clicking the button again meanwhile does nothing. Share is greyed out with no photo open (library view and empty window), while the crop tab is open, and while saving or loading.
+5. Share twice: only the latest file remains in `$TMPDIR/MiraShareImage-*`; after quitting and relaunching those folders are gone.
+6. The Photos extension shows no Share button.
+
 ### Light and dark
 
 Switch System Settings ▸ Appearance between Light and Dark with the app and the extension open. Text, hairlines, cards and grain stay legible in both, the window toolbar stays just the wordmark and the editor strip stays ink-soft with a lichen tab underline, and the film description does not shift the panels as it changes.
@@ -125,11 +134,11 @@ It imports `App/SelfTest/sample.jpg` into the album "Emulsion Test", saves Velvi
 
 ## Key map and menus
 
-The window toolbar shows the Mira wordmark and, at the trailing edge, the appearance toggle. Every command is in the menu bar, and the editor has a strip under the title bar: `← LIBRARY` (app only), the FILMS · DEVELOP · CROP tabs, then the status (UNSAVED / SAVED / REVERTED / READ ONLY) and SAVE (app only; the Photos extension shows the tabs only and uses Photos' own Save).
+The window toolbar shows the Mira wordmark and, at the trailing edge, the appearance toggle. Every command is in the menu bar, and the editor has a strip under the title bar: `← LIBRARY` (app only), the FILMS · DEVELOP · CROP tabs, then the status (UNSAVED / SAVED / REVERTED / READ ONLY), Share and SAVE (app only; the Photos extension shows the tabs only and uses Photos' own Save).
 
 Menus:
 
-- **File**: Open… (⌘O); Export… (⌘E, photo open, not while the crop tab is open); Save to Photos (⌘S; for a file the same item reads Save Sidecar and writes the sidecar now; disabled when there is nothing to save, read-only or preview-only); Revert to Original… (asks first); Back to Library (⌘←, guarded: asks about unsaved Photos edits).
+- **File**: Open… (⌘O); Export… (⌘E, photo open, not while the crop tab is open); Share… (⌥⌘S, photo open); Save to Photos (⌘S; for a file the same item reads Save Sidecar and writes the sidecar now; disabled when there is nothing to save, read-only or preview-only); Revert to Original… (asks first); Back to Library (⌘←, guarded: asks about unsaved Photos edits).
 - **Edit**: Reset Adjustments (sliders, curves and mixer; keeps film and crop); Reset All (everything except the photo).
 - **Preset**: Save as Preset… (⇧⌘S, photo open, not while the crop tab is open); Import Presets… (⇧⌘I); Export All Presets….
 - **View**: Films (1), Develop (2), Crop (3), Toggle Full Screen (F), Zoom In (]), Zoom Out ([), Zoom to Fit (⌘0).
