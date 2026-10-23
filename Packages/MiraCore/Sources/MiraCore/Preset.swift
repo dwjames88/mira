@@ -2,8 +2,9 @@ import Foundation
 
 /// A named, saved look: a film plus every develop setting, stored as one `Recipe`.
 ///
-/// The crop belongs to a photo, not to a look, so a preset always stores `CropSettings.identity`
-/// and applying one never touches the photo's crop. Decoding is tolerant: any missing key falls
+/// The crop and the dodge and burn strokes belong to a photo, not to a look, so a preset always
+/// stores `CropSettings.identity` and `DodgeBurnSettings.identity`, and applying one never touches
+/// the photo's crop or strokes. Decoding is tolerant: any missing key falls
 /// back to a default, so files written by other versions stay readable.
 public struct Preset: Codable, Identifiable, Hashable, Sendable {
     public static let currentVersion = 1
@@ -51,10 +52,12 @@ public struct Preset: Codable, Identifiable, Hashable, Sendable {
 
     public static func displayName(filmName: String, nickname: String) -> String { "\(filmName) - \(nickname)" }
 
-    /// The recipe to apply to a photo: the preset's film and develop settings, the photo's crop.
-    public func recipe(keeping crop: CropSettings) -> Recipe {
+    /// The recipe to apply to a photo: the preset's film and develop settings, the photo's crop
+    /// (and, when given, its dodge and burn strokes).
+    public func recipe(keeping crop: CropSettings, dodgeBurn: DodgeBurnSettings = .identity) -> Recipe {
         var r = recipe
         r.crop = crop
+        r.dodgeBurn = dodgeBurn
         return r
     }
 
@@ -67,6 +70,7 @@ public struct Preset: Codable, Identifiable, Hashable, Sendable {
     private static func normalized(_ recipe: Recipe) -> Recipe {
         var r = recipe
         r.crop = .identity
+        r.dodgeBurn = .identity
         return r
     }
 
