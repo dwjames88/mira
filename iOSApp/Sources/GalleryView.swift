@@ -80,7 +80,7 @@ struct GalleryView: View {
                 FFEmptyState(title: "No photos", subtitle: gallery.status == .limited
                              ? "NO PHOTOS IN YOUR SELECTION" : "YOUR LIBRARY HAS NO PICTURES")
             } else {
-                AlbumListView(sections: gallery.sections)
+                AlbumListView(gallery: gallery, sections: gallery.sections)
             }
         case .denied, .restricted:
             FFEmptyState(title: "Photos access is off",
@@ -96,56 +96,201 @@ struct GalleryView: View {
 }
 
 /// Sections in Photos' order (LIBRARY, ALBUMS, SHARED ALBUMS, MEDIA TYPES, UTILITIES) from `SidebarModel`.
+/// LIBRARY leads with a wide hero cover; ALBUMS / SHARED ALBUMS are 2-column cover grids;
+/// MEDIA TYPES / UTILITIES (many, mostly small) are compact rows with a thumbnail.
 private struct AlbumListView: View {
+    let gallery: GalleryModel
     let sections: [SidebarSection]
+    private let margin = FieldFramesTheme.cells(2)
+    private let gap: CGFloat = 14
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                ForEach(sections) { section in
-                    Text(section.title.uppercased()).ffLabel(size: 9, color: FieldFramesTheme.paperDim)
-                        .padding(.horizontal, FieldFramesTheme.cells(2))
-                        .padding(.top, FieldFramesTheme.cells(3)).padding(.bottom, FieldFramesTheme.cells(1))
-                    FFHairline()
-                    ForEach(SidebarModel.visible(section.nodes)) { node in
-                        NodeRow(node: node)
-                        FFHairline()
+        GeometryReader { geo in
+            let side = floor((geo.size.width - margin * 2 - gap) / 2)
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(sections) { section in
+                        sectionHeader(section.title)
+                        let nodes = SidebarModel.visible(section.nodes)
+                        switch section.id {
+                        case "library": library(nodes, side: side, width: geo.size.width - margin * 2)
+                        case "media", "utilities": rows(nodes)
+                        default: grid(nodes, side: side)
+                        }
                     }
                 }
+                .padding(.bottom, FieldFramesTheme.rows(3))
+            }
+        }
+    }
+
+    private func sectionHeader(_ title: String) -> some View {
+        VStack(alignment: .leading, spacing: FieldFramesTheme.cells(1)) {
+            Text(title.uppercased()).ffLabel(size: 10, color: FieldFramesTheme.paperMid)
+            FFHairline()
+        }
+        .padding(.horizontal, margin)
+        .padding(.top, FieldFramesTheme.rows(2)).padding(.bottom, FieldFramesTheme.cells(1.5))
+    }
+
+    private func library(_ nodes: [SidebarNode], side: CGFloat, width: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: gap) {
+            if let hero = nodes.first {
+                NavigationLink(value: AlbumRoute.album(id: hero.id, title: hero.title)) {
+                    CoverTile(gallery: gallery, node: hero, size: CGSize(width: width, height: floor(width * 0.62)),
+                              titleSize: 26)
+                }
+                .buttonStyle(.plain)
+            }
+            if nodes.count > 1 { grid(Array(nodes.dropFirst()), side: side, padded: false) }
+        }
+        .padding(.horizontal, margin)
+    }
+
+    private func grid(_ nodes: [SidebarNode], side: CGFloat, padded: Bool = true) -> some View {
+        LazyVGrid(columns: [GridItem(.fixed(side), spacing: gap, alignment: .top),
+                            GridItem(.fixed(side), spacing: 0, alignment: .top)],
+                  alignment: .leading, spacing: gap + 4) {
+            ForEach(nodes) { node in
+                NavigationLink(value: route(node)) {
+                    CoverTile(gallery: gallery, node: node, size: CGSize(width: side, height: side), titleSize: 17)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, padded ? margin : 0)
+    }
+
+    private func rows(_ nodes: [SidebarNode]) -> some View {
+        VStack(spacing: 0) {
+            ForEach(nodes) { node in
+                NodeRow(gallery: gallery, node: node)
+                FFHairline().padding(.leading, margin)
             }
         }
     }
 }
 
+private func route(_ node: SidebarNode) -> AlbumRoute {
+    node.isFolder ? .folder(id: node.id, title: node.title) : .album(id: node.id, title: node.title)
+}
+
+/// The id whose pictures best represent a node: itself for an album, the first non-empty child for a folder.
+private func coverNodeID(_ node: SidebarNode) -> String? {
+    guard node.isFolder else { return node.id }
+    for child in SidebarModel.visible(node.children) { if let id = coverNodeID(child) { return id } }
+    return nil
+}
+
+private func subtitle(_ node: SidebarNode) -> String {
+    if node.isFolder {
+        let n = SidebarModel.visible(node.children).count
+        return "\(n) \(n == 1 ? "ITEM" : "ITEMS")"
+    }
+    return node.count.map { "\($0)" } ?? ""
+}
+
+/// Square (or wide) cover with a 1pt hairline, a Cormorant title and a mono count beneath.
+private struct CoverTile: View {
+    let gallery: GalleryModel
+    let node: SidebarNode
+    let size: CGSize
+    let titleSize: CGFloat
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            CoverImage(gallery: gallery, nodeID: coverNodeID(node), size: size)
+                .frame(width: size.width, height: size.height)
+                .overlay(alignment: .topTrailing) {
+                    if node.isFolder {
+                        Image(systemName: "folder").font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(FieldFramesTheme.paper)
+                            .padding(6).background(Color.black.opacity(0.55)).padding(6)
+                    }
+                }
+                .overlay(Rectangle().strokeBorder(FieldFramesTheme.hair, lineWidth: 1))
+            Text(node.title).font(FieldFramesTheme.display(titleSize, weight: .regular)).lineLimit(1)
+            Text(subtitle(node)).ffLabel(size: 9, color: FieldFramesTheme.paperDim)
+        }
+        .frame(width: size.width, alignment: .leading)
+        .contentShape(Rectangle())
+    }
+}
+
+/// Lazy cover thumbnail: finds the cover asset off the main actor, then loads it through the shared
+/// caching manager at size x display scale. Cancels its request when scrolled away.
+private struct CoverImage: View {
+    let gallery: GalleryModel
+    let nodeID: String?
+    let size: CGSize
+    @Environment(\.displayScale) private var displayScale
+    @State private var image: UIImage?
+    @State private var requestID: PHImageRequestID?
+
+    var body: some View {
+        Color(white: 0.09)
+            .overlay {
+                if let image { Image(uiImage: image).resizable().scaledToFill() }
+                else if nodeID == nil {
+                    Image(systemName: "photo").font(.system(size: 18, weight: .light))
+                        .foregroundStyle(FieldFramesTheme.paperDim.opacity(0.5))
+                }
+            }
+            .clipped()
+            .task(id: "\(nodeID ?? "-")|\(gallery.revision)|\(Int(size.width))") { await load() }
+            .onDisappear {
+                if let id = requestID { gallery.covers.manager.cancelImageRequest(id) }
+                requestID = nil
+            }
+    }
+
+    private func load() async {
+        guard let nodeID else { image = nil; return }
+        let store = gallery.covers
+        let pixels = CGSize(width: size.width * displayScale, height: size.height * displayScale)
+        let key = store.key(nodeID, pixels)
+        if let hit = store.image(for: key) { image = hit; return }
+        let found = await Task.detached(priority: .userInitiated) { GalleryKit.coverAsset(nodeID: nodeID) }.value
+        guard let found, !Task.isCancelled else { return }
+        requestID = GalleryKit.requestThumbnail(
+            manager: store.manager, asset: found, size: pixels, options: Unchecked(value: store.options)
+        ) { box in
+            MainActor.assumeIsolated {
+                guard let img = box.value else { return }
+                image = img
+                store.store(img, for: key)
+            }
+        }
+    }
+}
+
+/// Compact row: small cover, title, mono count, chevron.
 private struct NodeRow: View {
+    let gallery: GalleryModel
     let node: SidebarNode
 
     var body: some View {
-        NavigationLink(value: route) {
-            HStack(spacing: FieldFramesTheme.cells(1)) {
-                Text(node.title).font(.system(size: 16)).lineLimit(1)
+        NavigationLink(value: route(node)) {
+            HStack(spacing: FieldFramesTheme.cells(1.5)) {
+                CoverImage(gallery: gallery, nodeID: coverNodeID(node), size: CGSize(width: 52, height: 52))
+                    .frame(width: 52, height: 52)
+                    .overlay(Rectangle().strokeBorder(FieldFramesTheme.hair, lineWidth: 1))
+                Text(node.title).font(FieldFramesTheme.display(18, weight: .regular)).lineLimit(1)
                 Spacer(minLength: 0)
-                if let count = node.count, !node.isFolder {
-                    Text("\(count)").ffLabel(size: 10, color: FieldFramesTheme.paperDim)
-                }
-                if node.isFolder {
-                    Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(FieldFramesTheme.paperDim)
-                }
+                Text(subtitle(node)).ffLabel(size: 10, color: FieldFramesTheme.paperDim)
+                Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(FieldFramesTheme.paperDim)
             }
             .padding(.horizontal, FieldFramesTheme.cells(2))
-            .frame(minHeight: 48)
+            .padding(.vertical, 6)
+            .frame(minHeight: 64)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
-
-    private var route: AlbumRoute {
-        node.isFolder ? .folder(id: node.id, title: node.title) : .album(id: node.id, title: node.title)
-    }
 }
 
-/// A folder's children, in Photos' manual order (never re-sorted).
+/// A folder's children as a cover grid, in Photos' manual order (never re-sorted).
 private struct FolderListView: View {
     let gallery: GalleryModel
     let folderID: String
@@ -154,17 +299,26 @@ private struct FolderListView: View {
     var body: some View {
         ZStack {
             FFGroundBackground(grain: 0.07).ignoresSafeArea()
-            let children = SidebarModel.node(withID: folderID, in: gallery.sections)?.children ?? []
+            let children = SidebarModel.visible(SidebarModel.node(withID: folderID, in: gallery.sections)?.children ?? [])
             if children.isEmpty {
                 FFEmptyState(title: "Empty folder", subtitle: "NO ALBUMS IN THIS FOLDER")
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        FFHairline()
-                        ForEach(SidebarModel.visible(children)) { node in
-                            NodeRow(node: node)
-                            FFHairline()
+                GeometryReader { geo in
+                    let margin = FieldFramesTheme.cells(2), gap: CGFloat = 14
+                    let side = floor((geo.size.width - margin * 2 - gap) / 2)
+                    ScrollView {
+                        LazyVGrid(columns: [GridItem(.fixed(side), spacing: gap, alignment: .top),
+                                            GridItem(.fixed(side), spacing: 0, alignment: .top)],
+                                  alignment: .leading, spacing: gap + 4) {
+                            ForEach(children) { node in
+                                NavigationLink(value: route(node)) {
+                                    CoverTile(gallery: gallery, node: node, size: CGSize(width: side, height: side),
+                                              titleSize: 17)
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
+                        .padding(.horizontal, margin).padding(.vertical, gap)
                     }
                 }
             }

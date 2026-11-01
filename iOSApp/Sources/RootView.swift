@@ -13,7 +13,7 @@ struct RootView: View {
 
     var body: some View {
         if snapshotMode {
-            if model.hasPhoto { editor } else { FFGroundBackground(grain: 0.07).ignoresSafeArea() }
+            editor
         } else {
             // The gallery stays alive under the editor so the NavigationStack path (the user's place
             // in the album list) survives opening and closing a photo.
@@ -36,9 +36,7 @@ struct RootView: View {
                 FFHairline()
                 canvas
                 FFHairline()
-                FFTabBar([(value: EditorTab.films, title: "FILMS"),
-                          (value: .develop, title: "DEVELOP"),
-                          (value: .crop, title: "CROP")], selection: $tab)
+                tabBar
                 FFHairline()
                 controls
             }
@@ -66,26 +64,80 @@ struct RootView: View {
         }
     }
 
+    @State private var confirmClose = false
+
+    /// Back affordance (chevron + LIBRARY) on the left, status in the middle, Save state on the right.
     private var header: some View {
         HStack(spacing: FieldFramesTheme.cells(1)) {
-            Text("Mira").font(FieldFramesTheme.display(22, weight: .regular))
-            Text(model.status).ffLabel(size: 9, color: FieldFramesTheme.paperDim).lineLimit(1)
+            Button {
+                if model.hasUnsavedEdits { confirmClose = true } else { close() }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "chevron.left").font(.system(size: 13, weight: .semibold))
+                    Text("LIBRARY").ffLabel(size: 11)
+                }
+                .foregroundStyle(FieldFramesTheme.paper)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Back to library")
             Spacer(minLength: 0)
-            Button { tab = .films; model.closePhoto() } label: {
-                Text("LIBRARY").ffLabel(size: 11).frame(minWidth: 44, minHeight: 44)
-            }
-            .buttonStyle(.plain)
-            Button { Task { await model.save() } } label: {
-                Text(model.isSaving ? "SAVING" : "SAVE")
-                    .ffLabel(size: 11, color: model.hasPhoto && !model.isSaving ? FieldFramesTheme.lichen
-                             : FieldFramesTheme.paperDim.opacity(0.5))
-                    .frame(minWidth: 44, minHeight: 44)
-            }
-            .buttonStyle(.plain)
-            .disabled(!model.hasPhoto || model.isSaving)
+            Text(model.status).ffLabel(size: 9, color: FieldFramesTheme.paperDim).lineLimit(1)
+            saveButton
         }
         .padding(.horizontal, FieldFramesTheme.cells(2))
-        .frame(height: 44)
+        .frame(height: 48)
+        .confirmationDialog("Discard unsaved edits?", isPresented: $confirmClose, titleVisibility: .visible) {
+            Button("Discard and go back", role: .destructive) { close() }
+            Button("Keep editing", role: .cancel) {}
+        }
+    }
+
+    private func close() { tab = .films; model.closePhoto() }
+
+    /// UNSAVED = prominent lichen SAVE; SAVING = inert; SAVED = dim, inert.
+    @ViewBuilder private var saveButton: some View {
+        switch model.saveState {
+        case .unsaved:
+            Button { Task { await model.save() } } label: {
+                Text(model.saveTitle).padding(.vertical, 6).frame(minWidth: 44)
+            }
+            .buttonStyle(.ffProminent)
+            .disabled(!model.hasPhoto)
+        case .saving:
+            Text(model.saveTitle).ffLabel(size: 10, color: FieldFramesTheme.paperMid, weight: .medium)
+                .padding(.horizontal, FieldFramesTheme.cells(2)).frame(minHeight: 44)
+        case .saved:
+            HStack(spacing: 4) {
+                Image(systemName: "checkmark").font(.system(size: 10, weight: .semibold))
+                Text(model.saveTitle).ffLabel(size: 10, color: FieldFramesTheme.paperDim)
+            }
+            .foregroundStyle(FieldFramesTheme.paperDim)
+            .padding(.horizontal, FieldFramesTheme.cells(1)).frame(minHeight: 44)
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    /// Equal-width 48pt tabs, hairline-underlined; the photo keeps the rest of the screen.
+    private var tabBar: some View {
+        HStack(spacing: 0) {
+            ForEach([(EditorTab.films, "FILMS"), (.develop, "DEVELOP"), (.crop, "CROP")], id: \.0) { item in
+                let selected = tab == item.0
+                Button { tab = item.0 } label: {
+                    Text(item.1)
+                        .ffLabel(size: 11, color: selected ? FieldFramesTheme.paper : FieldFramesTheme.paperDim,
+                                 weight: selected ? .medium : .regular)
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .overlay(alignment: .bottom) {
+                            Rectangle().fill(selected ? FieldFramesTheme.lichen : .clear).frame(height: 2)
+                        }
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+        }
     }
 
     @GestureState private var holding = false
@@ -103,7 +155,7 @@ struct RootView: View {
                         .contentShape(Rectangle())
                         .gesture(model.isCropping ? nil : canvasGestures(size: geo.size))
                 }
-                .padding(FieldFramesTheme.cells(0.5))
+                .padding(.horizontal, 2)
                 .onChange(of: holding) { _, now in model.showingOriginal = now && !model.isCropping }
             } else {
                 FFEmptyState(title: "Mira", subtitle: "CHOOSE A PHOTO TO BEGIN")

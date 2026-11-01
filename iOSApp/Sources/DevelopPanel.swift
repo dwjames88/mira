@@ -99,17 +99,14 @@ struct DevelopPanel: View {
                     }
                 }
             }
-            VStack(spacing: 0) {
-                toolButton(showHistogram ? "HIST \u{2212}" : "HIST +", enabled: true) { showHistogram.toggle() }
-                toolButton("RESET", enabled: model.canResetDevelop) { model.resetDevelop() }
-            }
+            toolButton(showHistogram ? "HIST \u{2212}" : "HIST +", enabled: true) { showHistogram.toggle() }
         }
     }
 
     private func toolButton(_ title: String, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(title).ffLabel(size: 9, color: enabled ? T.paperMid : T.paperDim.opacity(0.4))
-                .frame(minWidth: 52, minHeight: 28)
+            Text(title).ffLabel(size: 9, color: enabled ? T.paperMid : T.paperDim.opacity(0.4)).multilineTextAlignment(.center)
+                .frame(minWidth: 48, minHeight: 44)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -119,19 +116,24 @@ struct DevelopPanel: View {
     // MARK: Chip strip
 
     private var chipStrip: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 0) {
-                    ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
-                        if idx > 0, items[idx - 1].group != item.group {
-                            Rectangle().fill(T.hair).frame(width: 1, height: 20).padding(.horizontal, 4)
+        HStack(spacing: 0) {
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: 0) {
+                        ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
+                            if idx > 0, items[idx - 1].group != item.group {
+                                Rectangle().fill(T.hair).frame(width: 1, height: 20).padding(.horizontal, 4)
+                            }
+                            chip(item).id(item.id)
                         }
-                        chip(item).id(item.id)
                     }
+                    .padding(.horizontal, T.cells(1))
                 }
-                .padding(.horizontal, T.cells(1))
+                .onChange(of: focus) { _, id in withAnimation { proxy.scrollTo(id, anchor: .center) } }
             }
-            .onChange(of: focus) { _, id in withAnimation { proxy.scrollTo(id, anchor: .center) } }
+            Rectangle().fill(T.hair).frame(width: 1, height: 24)
+            toolButton("RESET ALL", enabled: model.canResetDevelop) { model.resetDevelop() }
+                .frame(minWidth: 64)
         }
         .frame(height: 48)
     }
@@ -147,6 +149,7 @@ struct DevelopPanel: View {
                 .ffLabel(size: 10, color: selected ? T.paper : T.paperMid)
                 .padding(.horizontal, T.cells(1.5))
                 .frame(minWidth: 44, minHeight: 48)
+                .background(selected ? T.paper.opacity(0.08) : Color.clear)
                 .overlay(alignment: .bottom) {
                     Rectangle().fill(selected ? T.lichen : .clear).frame(height: 2).padding(.horizontal, T.cells(1))
                 }

@@ -36,6 +36,21 @@ enum GalleryKit {
         }
     }
 
+    /// Cover for a sidebar node: the user album's key asset when it has one, else its most recent picture.
+    /// Runs off the main actor.
+    nonisolated static func coverAsset(nodeID id: String) -> Unchecked<PHAsset>? {
+        let isUserAlbum = !(id == "all" || id == "fav" || id == "recent" || id.hasPrefix("smart:"))
+        if isUserAlbum,
+           let collection = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [id], options: nil).firstObject,
+           let key = PHAsset.fetchKeyAssets(in: collection, options: nil)?.firstObject,
+           key.mediaType == .image {
+            return Unchecked(value: key)
+        }
+        let result = SidebarLoader.fetchAssets(nodeID: id)
+        guard let first = result.firstObject else { return nil }
+        return Unchecked(value: first)
+    }
+
     /// (isRAW, isEdited) from the asset's resources; runs off the main actor.
     nonisolated static func badges(of asset: Unchecked<PHAsset>) -> (raw: Bool, edited: Bool) {
         let resources = PHAssetResource.assetResources(for: asset.value)
@@ -60,6 +75,8 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
     private(set) var isOpening = false
 
     @ObservationIgnored private var observing = false
+    /// Shared by every cover tile: one caching manager and an in-memory cover cache.
+    @ObservationIgnored let covers = CoverStore()
 
     var hasAccess: Bool { status == .authorized || status == .limited }
 
@@ -90,6 +107,7 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
                 self.status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
                 if self.hasAccess {
                     self.revision += 1
+                    self.covers.removeAll()
                     Task { await self.reloadSections() }
                 } else {
                     self.sections = []
@@ -186,4 +204,28 @@ final class AlbumModel {
         }
         cachedRange = window
     }
+}
+
+
+/// Cover thumbnails for the album browser: one `PHCachingImageManager` and an `NSCache` keyed by node id + size.
+@MainActor
+final class CoverStore {
+    let manager = PHCachingImageManager()
+    let options: PHImageRequestOptions = {
+        let o = PHImageRequestOptions()
+        o.deliveryMode = .opportunistic
+        o.resizeMode = .fast
+        o.isNetworkAccessAllowed = true
+        return o
+    }()
+    private let cache: NSCache<NSString, UIImage> = {
+        let c = NSCache<NSString, UIImage>()
+        c.countLimit = 120
+        return c
+    }()
+
+    func key(_ nodeID: String, _ size: CGSize) -> String { "\(nodeID)@\(Int(size.width))x\(Int(size.height))" }
+    func image(for key: String) -> UIImage? { cache.object(forKey: key as NSString) }
+    func store(_ image: UIImage, for key: String) { cache.setObject(image, forKey: key as NSString) }
+    func removeAll() { cache.removeAllObjects() }
 }
