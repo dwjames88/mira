@@ -85,6 +85,37 @@ func render(pixels: Int, dot: Bool) -> CGImage {
     return ctx.makeImage()!
 }
 
+/// Full-bleed, opaque iOS variant: iOS applies its own corner mask, so no body, rounding or shadow.
+/// The frame is inset 175 px (clear of the ~180 px superellipse corners); the M is 620 pt, no dot.
+func renderIOS(pixels: Int) -> CGImage {
+    let s = CGFloat(pixels) / 1024
+    let cs = CGColorSpace(name: CGColorSpace.sRGB)!
+    let ctx = CGContext(data: nil, width: pixels, height: pixels, bitsPerComponent: 8, bytesPerRow: 0, space: cs,
+                        bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+    ctx.scaleBy(x: s, y: s)
+    ctx.interpolationQuality = .high
+    let full = CGRect(x: 0, y: 0, width: 1024, height: 1024)
+    ctx.setFillColor(ink)
+    ctx.fill(full)
+
+    ctx.setStrokeColor(paper.copy(alpha: 0.22)!)
+    ctx.setLineWidth(3)
+    ctx.stroke(full.insetBy(dx: 175, dy: 175))
+
+    let font = makeFont(size: 620)
+    let glyph = CTFontGetGlyphWithName(font, "M" as CFString)
+    if let path = CTFontCreatePathForGlyph(font, glyph, nil) {
+        let b = path.boundingBoxOfPath
+        ctx.saveGState()
+        ctx.translateBy(x: full.midX - b.midX, y: full.midY - b.midY)
+        ctx.setFillColor(lichen)
+        ctx.addPath(path)
+        ctx.fillPath()
+        ctx.restoreGState()
+    }
+    return ctx.makeImage()!
+}
+
 func write(_ image: CGImage, to url: URL) {
     let dest = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)!
     CGImageDestinationAddImage(dest, image, nil)
@@ -122,4 +153,12 @@ for (set, name) in [(appSet, "mira-icon-app.png"), (extSet, "mira-icon-ext.png")
     try? FileManager.default.removeItem(at: dst)
     try? FileManager.default.moveItem(at: set.appendingPathComponent("preview-1024.png"), to: dst)
 }
+
+// iOS: single 1024 full-bleed icon in the MiraiOS catalog.
+let iosCatalog = root.appendingPathComponent("iOSApp/Resources/Assets.xcassets")
+let iosSet = iosCatalog.appendingPathComponent("AppIcon.appiconset")
+try FileManager.default.createDirectory(at: iosSet, withIntermediateDirectories: true)
+write(renderIOS(pixels: 1024), to: iosSet.appendingPathComponent("icon_ios_1024.png"))
+try Data(#"{"images":[{"filename":"icon_ios_1024.png","idiom":"universal","platform":"ios","size":"1024x1024"}],"info":{"author":"xcode","version":1}}"#.utf8).write(to: iosSet.appendingPathComponent("Contents.json"))
+try Data(#"{"info":{"author":"xcode","version":1}}"#.utf8).write(to: iosCatalog.appendingPathComponent("Contents.json"))
 print("Icons written. Previews in \(NSTemporaryDirectory())")

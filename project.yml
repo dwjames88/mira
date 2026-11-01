@@ -146,6 +146,7 @@ targets:
     platform: iOS
     sources:
       - path: iOSApp/Sources
+      - path: iOSApp/Resources
       - path: Films
         type: folder
     dependencies:
