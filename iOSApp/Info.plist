@@ -25,7 +25,7 @@
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Mira saves your edited pictures to your Photos library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Mira shows your Photos library so you can apply film looks to a picture you choose.</string>
+	<string>Mira shows your photo library so you can browse your pictures and apply film looks.</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>

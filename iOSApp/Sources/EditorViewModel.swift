@@ -106,6 +106,25 @@ final class EditorViewModel {
         }
     }
 
+    /// Opens full image data from the gallery in the editor.
+    func openData(_ data: Data) async {
+        status = "LOADING"
+        do { try await ingest(data) } catch { status = "ERROR · \(error.localizedDescription.uppercased())" }
+    }
+
+    func fail(_ message: String) { status = message }
+
+    /// Returns to the gallery, discarding the open photo's edit state.
+    func closePhoto() {
+        commitCrop()
+        hasPhoto = false
+        isCropping = false
+        zoom = 1; offset = .zero; showingOriginal = false
+        recipe = Recipe()
+        thumbnails = [:]
+        status = ""
+    }
+
     private func ingest(_ data: Data) async throws {
         let loaded = try await engine.load(data: data)
         live.setSource(loaded.image, colorSpace: loaded.colorSpace, size: loaded.size)

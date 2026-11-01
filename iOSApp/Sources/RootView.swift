@@ -9,8 +9,21 @@ struct RootView: View {
     @State private var model = EditorViewModel()
     @State private var tab: EditorTab = .films
     @State private var pickerItem: PhotosPickerItem?
+    private let snapshotMode = ProcessInfo.processInfo.environment["MIRA_SNAPSHOT"] == "1"
 
     var body: some View {
+        if model.hasPhoto {
+            editor
+        } else if snapshotMode {
+            FFGroundBackground(grain: 0.07).ignoresSafeArea()
+        } else {
+            GalleryView(editor: model)
+                .foregroundStyle(FieldFramesTheme.paper)
+                .tint(FieldFramesTheme.lichen)
+        }
+    }
+
+    private var editor: some View {
         ZStack {
             FFGroundBackground(grain: 0.07).ignoresSafeArea()
             VStack(spacing: 0) {
@@ -53,9 +66,10 @@ struct RootView: View {
             Text("Mira").font(FieldFramesTheme.display(22, weight: .regular))
             Text(model.status).ffLabel(size: 9, color: FieldFramesTheme.paperDim).lineLimit(1)
             Spacer(minLength: 0)
-            PhotosPicker(selection: $pickerItem, matching: .images) {
-                ChooseLabel().frame(minWidth: 44, minHeight: 44)
+            Button { tab = .films; model.closePhoto() } label: {
+                Text("LIBRARY").ffLabel(size: 11).frame(minWidth: 44, minHeight: 44)
             }
+            .buttonStyle(.plain)
             Button { Task { await model.save() } } label: {
                 Text(model.isSaving ? "SAVING" : "SAVE")
                     .ffLabel(size: 11, color: model.hasPhoto && !model.isSaving ? FieldFramesTheme.lichen

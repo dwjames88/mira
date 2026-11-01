@@ -40,6 +40,17 @@ shoot() { # name [tab]
   echo "$OUT/$1.png ($(stat -f%z "$OUT/$1.png") bytes)"
 }
 
+# Gallery: grant Photos headlessly (no taps), launch normally, let thumbnails load.
+# photos-add first, then full photos last: the later grant wins (the reverse leaves add-only + a prompt).
+xcrun simctl privacy "$UDID" reset photos "$BUNDLE_ID" 2>/dev/null || true
+xcrun simctl privacy "$UDID" grant photos-add "$BUNDLE_ID" 2>/dev/null || true
+xcrun simctl privacy "$UDID" grant photos "$BUNDLE_ID" 2>/dev/null || true
+xcrun simctl terminate "$UDID" "$BUNDLE_ID" 2>/dev/null || true
+xcrun simctl launch "$UDID" "$BUNDLE_ID" >/dev/null
+sleep "${GALLERY_SETTLE:-6}"
+xcrun simctl io "$UDID" screenshot "$OUT/gallery.png" >/dev/null 2>&1
+echo "$OUT/gallery.png ($(stat -f%z "$OUT/gallery.png") bytes)"
+
 shoot editor-develop develop
 shoot editor-films films
 
