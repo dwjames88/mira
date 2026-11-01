@@ -60,6 +60,18 @@ actor PhotoEngine {
         return LoadedSource(image: loaded.image, colorSpace: space, size: loaded.image.extent.size)
     }
 
+    /// Adopts an already-decoded original (library asset) for histogram and film thumbnails.
+    /// Export of library assets goes through `AssetEditSession`, not this engine.
+    func adopt(_ loaded: LoadedSource) throws {
+        guard let renderer else { throw PhotoEngineError.noLibrary }
+        if let old = sourceURL { try? FileManager.default.removeItem(at: old) }
+        sourceURL = nil
+        source = loaded.image
+        colorSpace = loaded.colorSpace
+        histogramSource = renderer.previewImage(from: loaded.image, maxPixelSize: 480)
+        thumb = renderer.previewImage(from: loaded.image, maxPixelSize: 220)
+    }
+
     /// Histogram of the graded small preview. Called throttled, never per frame.
     func histogram(for recipe: Recipe) throws -> HistogramData {
         guard let renderer, let histogramSource else { throw PhotoEngineError.cannotLoad }

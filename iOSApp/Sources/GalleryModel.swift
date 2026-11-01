@@ -3,7 +3,7 @@ import Photos
 import SwiftUI
 import UIKit
 
-/// PhotoKit types are not Sendable; this box carries them across the few hops that need it.
+/// PhotoKit and Core Image types are not Sendable; this box carries them across the few hops that need it.
 struct Unchecked<Value>: @unchecked Sendable {
     let value: Value
 }
@@ -98,14 +98,13 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
         }
     }
 
-    /// Fetches the full-resolution data for an asset and hands it to the editor.
+    /// Opens the asset non-destructively: the editor loads the ORIGINAL pixels and restores any
+    /// Mira recipe stored in the asset's adjustment data.
     func open(_ asset: PHAsset, in editor: EditorViewModel) async {
         guard !isOpening else { return }
         isOpening = true
         defer { isOpening = false }
-        let data = await GalleryKit.requestFullData(asset: Unchecked(value: asset))
-        guard let data else { editor.fail("THAT PHOTO COULD NOT BE LOADED"); return }
-        await editor.openData(data)
+        await editor.openAsset(asset)
     }
 
     func presentLimitedPicker() {

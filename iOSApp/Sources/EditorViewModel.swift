@@ -1,4 +1,5 @@
 import MiraCore
+import Photos
 import PhotosUI
 import SwiftUI
 import UIKit
@@ -21,7 +22,40 @@ final class EditorViewModel {
     var workingCrop = CropSettings.identity
 
     /// Single source of truth for every edit.
-    var recipe: Recipe { didSet { if recipe != oldValue { scheduleHistogram() } } }
+    var recipe: Recipe {
+        didSet {
+            guard recipe != oldValue else { return }
+            if !isRestoring, saveState != .saving { saveState = .unsaved }
+            scheduleHistogram()
+        }
+    }
+
+    /// Where Save writes: back to the library asset (non-destructive) or a new asset (imports).
+    enum EditTarget {
+        case asset(AssetEditSession)
+        case imported
+    }
+
+    /// Edit state of the open photo; flips to `.unsaved` whenever `recipe` changes.
+    enum SaveState {
+        case unsaved, saving, saved
+        var title: String {
+            switch self {
+            case .unsaved: "SAVE"
+            case .saving: "SAVING"
+            case .saved: "SAVED"
+            }
+        }
+    }
+
+    private(set) var editTarget: EditTarget = .imported
+    /// Starts `.saved`: a freshly opened photo has nothing to write.
+    private(set) var saveState: SaveState = .saved
+    var saveTitle: String { saveState.title }
+    var hasUnsavedEdits: Bool { saveState == .unsaved }
+    private(set) var isLibraryAsset = false
+    /// Suppresses the unsaved flag while the recipe is set from stored adjustments / reset on open.
+    @ObservationIgnored private var isRestoring = false
 
     /// Recipe handed to the Metal view; while cropping it carries the working crop.
     var liveRecipe: Recipe {
@@ -112,6 +146,41 @@ final class EditorViewModel {
         do { try await ingest(data) } catch { status = "ERROR · \(error.localizedDescription.uppercased())" }
     }
 
+    /// Opens a library asset non-destructively: the ORIGINAL pixels become the base and any stored
+    /// Mira recipe is restored on top, so a saved edit reopens exactly and stays adjustable.
+    func openAsset(_ asset: PHAsset) async {
+        status = "LOADING"
+        let session = AssetEditSession(asset: asset)
+        do {
+            let loaded = try await session.load()
+            let adopted = LoadedSource(image: loaded.source, colorSpace: loaded.colorSpace, size: loaded.size)
+            try await engine.adopt(adopted)
+            live.setSource(loaded.source, colorSpace: loaded.colorSpace, size: loaded.size)
+            sourcePixelSize = loaded.size
+            zoom = 1; offset = .zero; showingOriginal = false
+            hasPhoto = true
+            isCropping = false
+            isRestoring = true
+            recipe = loaded.recipe
+            isRestoring = false
+            editTarget = .asset(session)
+            isLibraryAsset = true
+            saveState = .saved
+            thumbnails = [:]
+            if !loaded.isFullSize {
+                status = "PREVIEW ONLY · FULL SIZE UNAVAILABLE"
+            } else if let foreign = loaded.foreignFormat {
+                status = "EDITED IN ANOTHER APP (\(foreign)) · STARTING FROM ORIGINAL"
+            } else {
+                status = ""
+            }
+            scheduleHistogram()
+            startThumbnails()
+        } catch {
+            status = "ERROR · \(error.localizedDescription.uppercased())"
+        }
+    }
+
     func fail(_ message: String) { status = message }
 
     /// Returns to the gallery, discarding the open photo's edit state.
@@ -120,7 +189,12 @@ final class EditorViewModel {
         hasPhoto = false
         isCropping = false
         zoom = 1; offset = .zero; showingOriginal = false
+        isRestoring = true
         recipe = Recipe()
+        isRestoring = false
+        editTarget = .imported
+        isLibraryAsset = false
+        saveState = .saved
         thumbnails = [:]
         status = ""
     }
@@ -132,7 +206,12 @@ final class EditorViewModel {
         zoom = 1; offset = .zero; showingOriginal = false
         hasPhoto = true
         isCropping = false
+        isRestoring = true
         recipe = Recipe()
+        isRestoring = false
+        editTarget = .imported
+        isLibraryAsset = false
+        saveState = .saved
         thumbnails = [:]
         status = ""
         scheduleHistogram()
@@ -164,16 +243,30 @@ final class EditorViewModel {
         }
     }
 
+    /// Writes only when Save is tapped. Library assets get a non-destructive edit (adjustment data +
+    /// rendered JPEG over the original); imports are saved as a new photo.
     func save() async {
-        guard hasPhoto, !isSaving else { return }
+        guard hasPhoto, saveState != .saving else { return }
+        commitCrop()
+        let previous = saveState
+        saveState = .saving
         isSaving = true
         status = "SAVING"
         defer { isSaving = false }
         do {
-            let url = try await engine.exportFull(recipe)
-            try await PhotoEngine.saveToLibrary(url)
-            status = "SAVED TO PHOTOS"
+            switch editTarget {
+            case .asset(let session):
+                guard let renderer = live.renderer else { throw AssetEditError.noRenderer }
+                try await session.save(recipe: recipe, renderer: renderer)
+                status = "SAVED TO PHOTOS"
+            case .imported:
+                let url = try await engine.exportFull(recipe)
+                try await PhotoEngine.saveToLibrary(url)
+                status = "SAVED TO PHOTOS"
+            }
+            saveState = .saved
         } catch {
+            saveState = previous == .saved ? .unsaved : previous
             status = "SAVE FAILED · \(error.localizedDescription.uppercased())"
         }
     }
