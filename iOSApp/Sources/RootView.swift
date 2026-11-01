@@ -11,7 +11,19 @@ struct RootView: View {
     @State private var pickerItem: PhotosPickerItem?
     private let snapshotMode = ProcessInfo.processInfo.environment["MIRA_SNAPSHOT"] == "1"
 
+    private let hub = PresetHub.shared
+
     var body: some View {
+        content
+            .presetPresentations(hub: hub, model: model)
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { _ = hub.store.reloadIfChanged(); hub.refresh() }
+            }
+    }
+
+    @Environment(\.scenePhase) private var scenePhase
+
+    @ViewBuilder private var content: some View {
         if snapshotMode {
             editor
         } else {
@@ -54,6 +66,11 @@ struct RootView: View {
             if env["MIRA_SNAPSHOT_TAB"] == "films" {
                 model.select(PhotoEngine.filmList.first?.id)
                 tab = .films
+                // Seed one preset so the PRESETS group has a card (headless; no taps).
+                if hub.presets.isEmpty {
+                    _ = try? hub.save(nickname: "Last Summer", recipe: model.recipe, filmName: model.currentFilmName)
+                }
+                if env["MIRA_SNAPSHOT_SHEET"] == "savepreset" { hub.sheet = .save }
             } else {
                 tab = .develop
             }
@@ -216,23 +233,36 @@ struct RootView: View {
 
 struct FilmsPanel: View {
     @Bindable var model: EditorViewModel
+    private let hub = PresetHub.shared
 
     var body: some View {
         VStack(spacing: 0) {
             ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: FieldFramesTheme.cells(1)) {
-                    FilmCard(title: "Original", caption: "NO LOOK", image: model.thumbnails["__original"],
-                             isSelected: model.filmID == nil) { model.select(nil) }
-                    ForEach(PhotoEngine.filmList) { film in
-                        FilmCard(title: film.displayName, caption: "\(film.brand.uppercased()) · ISO \(film.iso)",
-                                 image: model.thumbnails[film.id], isSelected: model.filmID == film.id) {
-                            model.select(film.id)
+                LazyHStack(alignment: .top, spacing: FieldFramesTheme.cells(3)) {
+                    PresetGroup(model: model, hub: hub)
+                    StripGroup(title: "FILMS", count: PhotoEngine.filmList.count + 1) {
+                        FilmCard(title: "Original", caption: "NO LOOK", image: model.thumbnails["__original"],
+                                 isSelected: model.filmID == nil) { model.select(nil) }
+                        ForEach(PhotoEngine.filmList) { film in
+                            FilmCard(title: film.displayName, caption: "\(film.brand.uppercased()) · ISO \(film.iso)",
+                                     image: model.thumbnails[film.id], isSelected: model.filmID == film.id) {
+                                model.select(film.id)
+                            }
                         }
                     }
                 }
                 .padding(.horizontal, FieldFramesTheme.cells(2))
                 .padding(.vertical, FieldFramesTheme.rows(0.5))
             }
+            HStack(spacing: FieldFramesTheme.cells(1)) {
+                Spacer(minLength: 0)
+                Button { hub.importerShown = true } label: { Text("IMPORT").padding(.vertical, 4) }
+                    .buttonStyle(.ff)
+                Button { hub.sheet = .save } label: { Text("SAVE PRESET").padding(.vertical, 4) }
+                    .buttonStyle(.ff)
+                    .disabled(!model.hasPhoto)
+            }
+            .padding(.horizontal, FieldFramesTheme.cells(2))
             // STRENGTH is the one slider in focus; double-tap resets it to full strength.
             FFSlider("STRENGTH", value: $model.strength, in: 0...1, default: 1)
                 .frame(minHeight: 56)

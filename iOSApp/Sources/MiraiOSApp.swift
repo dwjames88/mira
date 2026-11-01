@@ -11,6 +11,7 @@ struct MiraiOSApp: App {
         WindowGroup {
             RootView()
                 .preferredColorScheme(.dark)
+                .onOpenURL { url in PresetHub.shared.startImport([url]) }
         }
     }
 }

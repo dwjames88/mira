@@ -177,6 +177,21 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         NSPhotoLibraryUsageDescription: "Mira shows your photo library so you can browse your pictures and apply film looks."
         NSPhotoLibraryAddUsageDescription: "Mira saves your edited pictures to your Photos library."
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Mira Preset
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Owner
+            LSItemContentTypes:
+              - com.fieldframes.mira.preset
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: com.fieldframes.mira.preset
+            UTTypeDescription: Mira Preset
+            UTTypeConformsTo:
+              - public.json
+              - public.data
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - mirapreset
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.fieldframes.mira.ios
