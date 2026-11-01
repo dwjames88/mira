@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 import MiraCore
 import SwiftUI
@@ -57,3 +58,5 @@ final class FrameLayerView: NSView {
         layer.contents = surface
     }
 }
+
+#endif

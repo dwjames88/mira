@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 import MiraCore
 import Observation
@@ -267,3 +268,5 @@ extension EditorModel {
         }
     }
 }
+
+#endif

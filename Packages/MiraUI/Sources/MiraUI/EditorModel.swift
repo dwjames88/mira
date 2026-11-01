@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 import CoreImage
 import MiraCore
@@ -922,3 +923,5 @@ public final class EditorModel {
         cancelPresetWork()
     }
 }
+
+#endif

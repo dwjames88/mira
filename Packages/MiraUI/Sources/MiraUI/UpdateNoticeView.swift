@@ -1,3 +1,4 @@
+#if os(macOS)
 import SwiftUI
 
 private typealias T = FieldFramesTheme
@@ -266,3 +267,5 @@ private extension Text {
         font(.system(size: 12)).foregroundStyle(color).fixedSize(horizontal: false, vertical: true)
     }
 }
+
+#endif

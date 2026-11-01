@@ -1,3 +1,4 @@
+#if os(macOS)
 import MiraCore
 import SwiftUI
 
@@ -268,3 +269,5 @@ struct CurveEditorView: View {
         return p
     }
 }
+
+#endif

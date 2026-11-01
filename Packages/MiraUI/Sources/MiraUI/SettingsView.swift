@@ -1,3 +1,4 @@
+#if os(macOS)
 import SwiftUI
 
 private typealias T = FieldFramesTheme
@@ -62,3 +63,5 @@ public struct SettingsView: View {
         .fieldFramesSecondaryChrome()
     }
 }
+
+#endif

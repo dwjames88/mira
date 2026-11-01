@@ -1,3 +1,4 @@
+#if os(macOS)
 import MiraCore
 import OSLog
 import SwiftUI
@@ -519,3 +520,5 @@ final class TrackpadMonitorView: NSView {
         return true
     }
 }
+
+#endif

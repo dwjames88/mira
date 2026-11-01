@@ -1,3 +1,4 @@
+#if os(macOS)
 import CoreGraphics
 import Foundation
 import MiraCore
@@ -214,3 +215,5 @@ extension EditorModel {
         return dodgeBurnTool.isFlipping ? mode.flipped : mode
     }
 }
+
+#endif

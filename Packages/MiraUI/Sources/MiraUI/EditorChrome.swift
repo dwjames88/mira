@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 import SwiftUI
 
@@ -86,3 +87,5 @@ public struct EditorHostBar {
         self.save = save
     }
 }
+
+#endif

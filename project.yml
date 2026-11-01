@@ -3,6 +3,7 @@ options:
   bundleIdPrefix: com.fieldframes
   deploymentTarget:
     macOS: "26.0"
+    iOS: "18.0"
   createIntermediateGroups: true
   developmentLanguage: en
 settings:
@@ -140,11 +141,59 @@ targets:
         PRODUCT_NAME: MiraPhotos
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         APPLICATION_EXTENSION_API_ONLY: YES
+  MiraiOS:
+    type: application
+    platform: iOS
+    sources:
+      - path: iOSApp/Sources
+      - path: Films
+        type: folder
+    dependencies:
+      - package: MiraCore
+        product: MiraCore
+      - package: MiraUI
+        product: MiraUI
+      - sdk: Photos.framework
+      - sdk: PhotosUI.framework
+    info:
+      path: iOSApp/Info.plist
+      properties:
+        CFBundleDisplayName: Mira
+        CFBundleName: Mira
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSApplicationCategoryType: public.app-category.photography
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        NSPhotoLibraryUsageDescription: "Mira shows your Photos library so you can apply film looks to a picture you choose."
+        NSPhotoLibraryAddUsageDescription: "Mira saves your edited pictures to your Photos library."
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.fieldframes.mira.ios
+        PRODUCT_NAME: Mira
+        TARGETED_DEVICE_FAMILY: "1,2"
+        IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+        SWIFT_VERSION: "6.0"
+        GENERATE_INFOPLIST_FILE: NO
 schemes:
   Mira:
     build:
       targets:
         Mira: all
         MiraPhotos: all
+    run:
+      config: Debug
+  MiraiOS:
+    build:
+      targets:
+        MiraiOS: all
     run:
       config: Debug

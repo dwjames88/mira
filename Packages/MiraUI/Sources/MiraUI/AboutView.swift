@@ -1,3 +1,4 @@
+#if os(macOS)
 import MiraCore
 import SwiftUI
 
@@ -70,3 +71,5 @@ public struct AboutView: View {
         .fieldFramesSecondaryChrome()
     }
 }
+
+#endif

@@ -1,4 +1,3 @@
-import AppKit
 import CoreText
 import SwiftUI
 
@@ -19,9 +18,13 @@ public struct FFRGBA: Equatable, Sendable {
         return (Double((v >> 16) & 0xFF) / 255, Double((v >> 8) & 0xFF) / 255, Double(v & 0xFF) / 255)
     }
 
-    var nsColor: NSColor {
+    var platformColor: PlatformColor {
         let c = components
+        #if canImport(AppKit)
         return NSColor(srgbRed: c.r, green: c.g, blue: c.b, alpha: alpha)
+        #else
+        return UIColor(red: c.r, green: c.g, blue: c.b, alpha: alpha)
+        #endif
     }
 }
 
@@ -36,14 +39,28 @@ public struct FFToken: Sendable {
     public let light: FFRGBA
 
     /// Dynamic colour following the appearance of the view or window it is drawn in.
-    public var nsColor: NSColor {
-        let dark = dark.nsColor, light = light.nsColor
+    public var platformColor: PlatformColor {
+        let dark = dark.platformColor, light = light.platformColor
+        #if canImport(AppKit)
         return NSColor(name: nil) { appearance in
             appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light
         }
+        #else
+        return UIColor { traits in traits.userInterfaceStyle == .dark ? dark : light }
+        #endif
     }
 
-    public var color: Color { Color(nsColor: nsColor) }
+    #if canImport(AppKit)
+    public var nsColor: NSColor { platformColor }
+    #endif
+
+    public var color: Color {
+        #if canImport(AppKit)
+        Color(nsColor: platformColor)
+        #else
+        Color(uiColor: platformColor)
+        #endif
+    }
 
     public func value(dark isDark: Bool) -> FFRGBA { isDark ? dark : light }
 }
@@ -85,7 +102,13 @@ public enum FieldFramesTheme {
     // Colours (dynamic: they follow the system appearance).
     public static var ink: Color { inkToken.color }
     /// The dark ink in both appearances: the ground behind a photograph shown alone (full screen).
-    public static var inkAlways: Color { Color(nsColor: inkToken.dark.nsColor) }
+    public static var inkAlways: Color {
+        #if canImport(AppKit)
+        Color(nsColor: inkToken.dark.platformColor)
+        #else
+        Color(uiColor: inkToken.dark.platformColor)
+        #endif
+    }
     public static var inkSoft: Color { inkSoftToken.color }
     public static var paper: Color { paperToken.color }
     public static var paperSoft: Color { paperSoftToken.color }
@@ -141,11 +164,12 @@ public enum FieldFramesTheme {
     public static func registerFonts() -> Bool { fontsRegistered }
 
     /// Cormorant Garamond at an exact weight (the font is a variable font).
-    public static func displayNSFont(_ size: CGFloat, weight: Font.Weight = .regular, italic: Bool = false) -> NSFont {
+    public static func displayNSFont(_ size: CGFloat, weight: Font.Weight = .regular, italic: Bool = false) -> PlatformFont {
         registerFonts()
         let axis = 0x7767_6874 // 'wght'
         let wght = variationWeight(weight)
         let name = italic ? displayItalicName : displayRegularName
+        #if canImport(AppKit)
         let descriptor = NSFontDescriptor(fontAttributes: [
             .name: name,
             .size: size,
@@ -155,10 +179,18 @@ public enum FieldFramesTheme {
             ?? NSFont(name: name, size: size)
             ?? NSFont(name: "Georgia", size: size)
             ?? .systemFont(ofSize: size)
+        #else
+        let descriptor = UIFontDescriptor(fontAttributes: [
+            .name: name,
+            .size: size,
+            UIFontDescriptor.AttributeName(rawValue: kCTFontVariationAttribute as String): [axis: wght],
+        ])
+        return UIFont(descriptor: descriptor, size: size)
+        #endif
     }
 
     /// IBM Plex Mono at Regular, Medium or SemiBold (other weights snap to the nearest).
-    public static func monoNSFont(_ size: CGFloat, weight: Font.Weight = .regular) -> NSFont {
+    public static func monoNSFont(_ size: CGFloat, weight: Font.Weight = .regular) -> PlatformFont {
         registerFonts()
         let name: String
         switch variationWeight(weight) {
@@ -166,26 +198,34 @@ public enum FieldFramesTheme {
         case ..<550: name = monoMediumName
         default: name = monoSemiBoldName
         }
-        return NSFont(name: name, size: size) ?? .monospacedSystemFont(ofSize: size, weight: .regular)
+        return PlatformFont(name: name, size: size) ?? .monospacedSystemFont(ofSize: size, weight: .regular)
     }
 
     /// Cormorant Garamond display type.
     public static func display(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        Font(displayNSFont(size, weight: weight))
+        platformFont(displayNSFont(size, weight: weight))
     }
 
     /// Cormorant Garamond italic.
     public static func displayItalic(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        Font(displayNSFont(size, weight: weight, italic: true))
+        platformFont(displayNSFont(size, weight: weight, italic: true))
     }
 
     /// IBM Plex Mono.
     public static func mono(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        Font(monoNSFont(size, weight: weight))
+        platformFont(monoNSFont(size, weight: weight))
     }
 
     /// Letter spacing of the house label, in em (`styles.css`: 0.08em to 0.14em).
     public static let labelTracking: CGFloat = 0.1
+
+    private static func platformFont(_ f: PlatformFont) -> Font {
+        #if canImport(AppKit)
+        Font(f)
+        #else
+        Font(f as CTFont)
+        #endif
+    }
 
     private static func variationWeight(_ weight: Font.Weight) -> Double {
         switch weight {

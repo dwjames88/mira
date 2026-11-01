@@ -1,3 +1,4 @@
+#if os(macOS)
 import MiraCore
 import SwiftUI
 
@@ -118,3 +119,5 @@ public struct ColorMixerPanel: View {
         return parts.isEmpty ? "All ranges at zero" : parts.joined(separator: " \u{00B7} ")
     }
 }
+
+#endif

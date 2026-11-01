@@ -1,3 +1,4 @@
+#if os(macOS)
 import MiraCore
 import SwiftUI
 
@@ -227,3 +228,5 @@ private struct StrokeRow: View {
         .accessibilityLabel(help)
     }
 }
+
+#endif

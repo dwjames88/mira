@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 import MiraCore
 import Observation
@@ -27,3 +28,5 @@ public final class DodgeBurnToolState {
     /// Smallest and largest brush the size keys reach (fraction of the short side).
     public static let sizeLimits = DodgeBurnStroke.sizeRange
 }
+
+#endif

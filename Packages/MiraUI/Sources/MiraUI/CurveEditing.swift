@@ -1,3 +1,4 @@
+#if os(macOS)
 import CoreGraphics
 import MiraCore
 
@@ -90,3 +91,5 @@ enum PreviewHitMapping {
         return p
     }
 }
+
+#endif

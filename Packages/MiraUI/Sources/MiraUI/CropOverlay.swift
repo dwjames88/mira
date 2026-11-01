@@ -1,3 +1,4 @@
+#if os(macOS)
 import MiraCore
 import SwiftUI
 
@@ -235,3 +236,5 @@ struct CropControls: View {
         endButtons
     }
 }
+
+#endif

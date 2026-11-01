@@ -1,3 +1,4 @@
+#if os(macOS)
 import SwiftUI
 
 private typealias T = FieldFramesTheme
@@ -60,3 +61,5 @@ struct InspectorGroup<Content: View>: View {
         }
     }
 }
+
+#endif

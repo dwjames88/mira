@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "MiraCore",
-    platforms: [.macOS(.v26)],
+    platforms: [.macOS(.v26), .iOS(.v18)],
     products: [
         .library(name: "MiraCore", targets: ["MiraCore"]),
         .executable(name: "mira-sheet", targets: ["MiraSheet"]),
