@@ -5,7 +5,11 @@ import UIKit
 
 @MainActor @Observable
 final class EditorViewModel {
-    private(set) var previewImage: UIImage?
+    let live = LivePreview()
+    /// Realtime view state driven by canvas gestures.
+    var zoom: CGFloat = 1
+    var offset: CGSize = .zero
+    var showingOriginal = false
     private(set) var thumbnails: [String: UIImage] = [:]
     private(set) var hasPhoto = false
     private(set) var isSaving = false
@@ -14,22 +18,17 @@ final class EditorViewModel {
     private(set) var sourcePixelSize: CGSize = .zero
     private(set) var isCropping = false
     /// Crop being edited while `isCropping`; committed to `recipe.crop` by `commitCrop()`.
-    var workingCrop = CropSettings.identity {
-        didSet {
-            // Re-render the uncropped preview only when the orientation changes (rotate / flip /
-            // straighten); dragging the rect leaves the underlying full-frame image unchanged.
-            guard isCropping else { return }
-            if workingCrop.normalizedQuarterTurns != oldValue.normalizedQuarterTurns
-                || workingCrop.flipH != oldValue.flipH
-                || workingCrop.flipV != oldValue.flipV
-                || workingCrop.straighten != oldValue.straighten {
-                requestRender()
-            }
-        }
-    }
+    var workingCrop = CropSettings.identity
 
     /// Single source of truth for every edit.
-    var recipe: Recipe { didSet { if recipe != oldValue { requestRender() } } }
+    var recipe: Recipe { didSet { if recipe != oldValue { scheduleHistogram() } } }
+
+    /// Recipe handed to the Metal view; while cropping it carries the working crop.
+    var liveRecipe: Recipe {
+        var r = recipe
+        if isCropping { r.crop = workingCrop }
+        return r
+    }
 
     var strength: Double {
         get { recipe.strength }
@@ -41,8 +40,7 @@ final class EditorViewModel {
     }
 
     private let engine = PhotoEngine()
-    private var rendering = false
-    private var dirty = false
+    private var histogramTask: Task<Void, Never>?
     private var thumbTask: Task<Void, Never>?
 
     init() { recipe = Recipe() }
@@ -67,21 +65,18 @@ final class EditorViewModel {
         guard hasPhoto, !isCropping else { return }
         workingCrop = recipe.crop
         isCropping = true
-        requestRender()
+        zoom = 1; offset = .zero
     }
 
     func commitCrop() {
         guard isCropping else { return }
         isCropping = false
-        let changed = recipe.crop != workingCrop
         recipe.crop = workingCrop
-        if !changed { requestRender() }
     }
 
     func cancelCrop() {
         guard isCropping else { return }
         isCropping = false
-        requestRender()
     }
 
     func pick(_ item: PhotosPickerItem) async {
@@ -90,36 +85,50 @@ final class EditorViewModel {
             guard let data = try await item.loadTransferable(type: Data.self) else {
                 status = "THAT PHOTO COULD NOT BE LOADED"; return
             }
-            sourcePixelSize = try await engine.load(data: data)
-            hasPhoto = true
-            isCropping = false
-            recipe = Recipe()
-            thumbnails = [:]
-            status = ""
-            requestRender()
-            startThumbnails()
+            try await ingest(data)
         } catch {
             status = "ERROR · \(error.localizedDescription.uppercased())"
         }
     }
 
-    /// Coalescing render loop: always renders the latest recipe, one at a time.
-    private func requestRender() {
-        guard hasPhoto else { return }
-        dirty = true
-        guard !rendering else { return }
-        rendering = true
-        Task {
-            while dirty {
-                dirty = false
-                var r = recipe
-                if isCropping { r.crop = workingCrop.withFullRect }
-                if let result = try? await engine.renderPreview(r), let img = UIImage(data: result.jpeg) {
-                    previewImage = img
-                    histogram = result.histogram
-                }
-            }
-            rendering = false
+    /// Snapshot harness: loads the bundled fixture through the same path as a picked photo.
+    /// No PhotosPicker, no user input. Applies a small exposure lift so the editor shows an edit.
+    func loadSnapshotFixture() async {
+        guard let url = Bundle.main.url(forResource: "sample", withExtension: "jpg"),
+              let data = try? Data(contentsOf: url) else {
+            status = "SNAPSHOT FIXTURE MISSING"; return
+        }
+        do {
+            try await ingest(data)
+            recipe.exposure = 0.35
+        } catch {
+            status = "ERROR · \(error.localizedDescription.uppercased())"
+        }
+    }
+
+    private func ingest(_ data: Data) async throws {
+        let loaded = try await engine.load(data: data)
+        live.setSource(loaded.image, colorSpace: loaded.colorSpace, size: loaded.size)
+        sourcePixelSize = loaded.size
+        zoom = 1; offset = .zero; showingOriginal = false
+        hasPhoto = true
+        isCropping = false
+        recipe = Recipe()
+        thumbnails = [:]
+        status = ""
+        scheduleHistogram()
+        startThumbnails()
+    }
+
+    /// Throttled (at most ~10 Hz, trailing) histogram off the render path; never gates the live view.
+    private func scheduleHistogram() {
+        guard hasPhoto, histogramTask == nil else { return }
+        histogramTask = Task {
+            try? await Task.sleep(for: .milliseconds(100))
+            let r = recipe
+            if let h = try? await engine.histogram(for: r) { histogram = h }
+            histogramTask = nil
+            if r != recipe { scheduleHistogram() }
         }
     }
 

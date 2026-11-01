@@ -17,9 +17,12 @@ enum PhotoEngineError: Error, LocalizedError {
     }
 }
 
-struct PreviewResult: Sendable {
-    let jpeg: Data
-    let histogram: HistogramData
+/// Hand-off of the decoded source to the main-actor live view. `CIImage` is immutable here and is
+/// never mutated after decode, so crossing the actor boundary is safe.
+struct LoadedSource: @unchecked Sendable {
+    let image: CIImage
+    let colorSpace: CGColorSpace
+    let size: CGSize
 }
 
 /// Owns the non-Sendable CoreImage source and renders off the main actor.
@@ -30,7 +33,7 @@ actor PhotoEngine {
     private var sourceURL: URL?
     private var source: CIImage?
     private var colorSpace: CGColorSpace?
-    private var preview: CIImage?
+    private var histogramSource: CIImage?
     private var thumb: CIImage?
 
     init() {
@@ -41,8 +44,8 @@ actor PhotoEngine {
 
     nonisolated static let filmList: [Film] = FilmLibrary.bundled(in: .main)?.films ?? []
 
-    /// Loads an upright image from `data`; returns its pixel size.
-    func load(data: Data) throws -> CGSize {
+    /// Loads an upright image from `data`; returns the source for the live view.
+    func load(data: Data) throws -> LoadedSource {
         guard let renderer else { throw PhotoEngineError.noLibrary }
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("mira-source-\(UUID().uuidString)")
         try data.write(to: url)
@@ -51,17 +54,16 @@ actor PhotoEngine {
         sourceURL = url
         source = loaded.image
         colorSpace = loaded.colorSpace
-        preview = renderer.previewImage(from: loaded.image, maxPixelSize: 1200)
+        histogramSource = renderer.previewImage(from: loaded.image, maxPixelSize: 480)
         thumb = renderer.previewImage(from: loaded.image, maxPixelSize: 220)
-        return loaded.image.extent.size
+        let space = loaded.colorSpace
+        return LoadedSource(image: loaded.image, colorSpace: space, size: loaded.image.extent.size)
     }
 
-    /// JPEG bytes of the live preview for `recipe`.
-    func renderPreview(_ recipe: Recipe) throws -> PreviewResult {
-        guard let renderer, let preview else { throw PhotoEngineError.cannotLoad }
-        let graded = renderer.apply(recipe, to: preview)
-        let jpeg = try Self.encode(graded, colorSpace: colorSpace)
-        return PreviewResult(jpeg: jpeg, histogram: Self.histogram(of: graded))
+    /// Histogram of the graded small preview. Called throttled, never per frame.
+    func histogram(for recipe: Recipe) throws -> HistogramData {
+        guard let renderer, let histogramSource else { throw PhotoEngineError.cannotLoad }
+        return Self.histogram(of: renderer.apply(recipe, to: histogramSource))
     }
 
     private static func histogram(of image: CIImage) -> HistogramData {

@@ -30,43 +30,36 @@ struct CropTab: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                FFSlider("Straighten", value: $model.workingCrop.straighten, in: -45...45, default: 0, decimals: 1)
-                    .padding(.top, T.rows(0.5))
-                HStack(spacing: T.cells(2)) {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        FFTabBar(aspectTabs, selection: aspectSelection)
-                    }
+        VStack(alignment: .leading, spacing: 0) {
+            FFSlider("Straighten", value: $model.workingCrop.straighten, in: -45...45, default: 0, decimals: 1)
+                .frame(minHeight: 56)
+                .contentShape(Rectangle())
+                .simultaneousGesture(TapGesture(count: 2).onEnded { model.workingCrop.straighten = 0 })
+            ScrollView(.horizontal, showsIndicators: false) {
+                FFTabBar(aspectTabs, selection: aspectSelection)
+                    .frame(minHeight: 44)
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: T.cells(1)) {
                     Button(CropAspect.isPortrait(model.workingCrop.aspect) ? "Landscape" : "Portrait") {
                         setAspect(CropAspect.swapped(model.workingCrop.aspect))
                     }
-                    .buttonStyle(.ff)
                     .disabled(!canSwapOrientation)
+                    Button("Rotate 90\u{00B0}") { model.workingCrop = CropGeometry.rotatedClockwise(model.workingCrop) }
+                    Button("Flip H") { model.workingCrop = CropGeometry.flippedHorizontally(model.workingCrop) }
+                    Button("Flip V") { model.workingCrop = CropGeometry.flippedVertically(model.workingCrop) }
+                    Button("Reset") { model.workingCrop = .identity }
+                        .disabled(model.workingCrop.isIdentity && model.workingCrop.aspect == CropAspect.original)
+                    Button("Cancel") { model.cancelCrop() }
                 }
-                .padding(.bottom, T.rows(0.5))
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: T.cells(1)) {
-                        Button("Rotate 90\u{00B0}") { model.workingCrop = CropGeometry.rotatedClockwise(model.workingCrop) }
-                        Button("Flip H") { model.workingCrop = CropGeometry.flippedHorizontally(model.workingCrop) }
-                        Button("Flip V") { model.workingCrop = CropGeometry.flippedVertically(model.workingCrop) }
-                        Button("Reset") { model.workingCrop = .identity }
-                            .disabled(model.workingCrop.isIdentity && model.workingCrop.aspect == CropAspect.original)
-                        Button("Cancel") { model.cancelCrop() }
-                    }
-                    .buttonStyle(.ff)
-                }
-                .padding(.bottom, T.rows(0.5))
-                readout("Ratio", model.workingCrop.aspect == CropAspect.free ? "Free" : CropAspect.label(model.workingCrop.aspect))
-                readout("Straighten", model.workingCrop.straighten.formatted(.number.precision(.fractionLength(1))) + "\u{00B0}")
-                readout("Rotation", "\(model.workingCrop.normalizedQuarterTurns * 90)\u{00B0}")
-                readout("Flip", flipText)
-                readout("Size", sizeText)
+                .buttonStyle(.ff)
+                .frame(minHeight: 44)
             }
-            .padding(.horizontal, T.cells(2))
-            .padding(.bottom, T.rows(1))
-            .frame(maxWidth: .infinity, alignment: .leading)
+            Text(sizeText).ffLabel(color: T.paperDim)
+                .frame(maxWidth: .infinity, minHeight: T.rows(1.5), alignment: .leading)
         }
+        .padding(.horizontal, T.cells(2))
+        .padding(.bottom, T.rows(0.5))
         .ffPanel()
     }
 
@@ -81,22 +74,6 @@ struct CropTab: View {
         let f = CropGeometry.constrain(rect: px, toAspect: ratio, within: CGRect(origin: .zero, size: c))
         model.workingCrop.rect = CropRect(x: f.minX / c.width, y: f.minY / c.height,
                                           w: f.width / c.width, h: f.height / c.height)
-    }
-
-    private func readout(_ label: String, _ value: String) -> some View {
-        HStack {
-            Text(label).ffLabel()
-            Spacer()
-            Text(value).ffLabel(color: T.paperMid)
-        }
-        .frame(height: T.rows(1.5))
-        .accessibilityElement(children: .combine)
-    }
-
-    private var flipText: String {
-        let c = model.workingCrop
-        if c.flipH && c.flipV { return "H + V" }
-        return c.flipH ? "H" : (c.flipV ? "V" : "None")
     }
 
     private var sizeText: String {
