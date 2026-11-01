@@ -42,6 +42,11 @@ shoot() { # name [tab]
 
 # Gallery: grant Photos headlessly (no taps), launch normally, let thumbnails load.
 # photos-add first, then full photos last: the later grant wins (the reverse leaves add-only + a prompt).
+# Seed a few pictures so the album list / grid have content (headless; no taps).
+SEED_DIR="$(mktemp -d "${TMPDIR:-/tmp}/mira-seed.XXXXXX")"
+for f in "$ROOT"/Fixtures/*.jpg; do [ -f "$f" ] && cp "$f" "$SEED_DIR/" || true; done
+if [ -n "$(ls -A "$SEED_DIR")" ]; then xcrun simctl addmedia "$UDID" "$SEED_DIR"/* 2>/dev/null || true; fi
+
 xcrun simctl privacy "$UDID" reset photos "$BUNDLE_ID" 2>/dev/null || true
 xcrun simctl privacy "$UDID" grant photos-add "$BUNDLE_ID" 2>/dev/null || true
 xcrun simctl privacy "$UDID" grant photos "$BUNDLE_ID" 2>/dev/null || true
@@ -50,6 +55,10 @@ xcrun simctl launch "$UDID" "$BUNDLE_ID" >/dev/null
 sleep "${GALLERY_SETTLE:-6}"
 xcrun simctl io "$UDID" screenshot "$OUT/gallery.png" >/dev/null 2>&1
 echo "$OUT/gallery.png ($(stat -f%z "$OUT/gallery.png") bytes)"
+# The root screen is the album list (a pushed grid needs a tap, which this script never does).
+# If the sim honors the grant it shows the album list; otherwise the system permission prompt over the chrome.
+cp "$OUT/gallery.png" "$OUT/albums.png"
+echo "$OUT/albums.png"
 
 shoot editor-develop develop
 shoot editor-films films

@@ -12,14 +12,19 @@ struct RootView: View {
     private let snapshotMode = ProcessInfo.processInfo.environment["MIRA_SNAPSHOT"] == "1"
 
     var body: some View {
-        if model.hasPhoto {
-            editor
-        } else if snapshotMode {
-            FFGroundBackground(grain: 0.07).ignoresSafeArea()
+        if snapshotMode {
+            if model.hasPhoto { editor } else { FFGroundBackground(grain: 0.07).ignoresSafeArea() }
         } else {
-            GalleryView(editor: model)
-                .foregroundStyle(FieldFramesTheme.paper)
-                .tint(FieldFramesTheme.lichen)
+            // The gallery stays alive under the editor so the NavigationStack path (the user's place
+            // in the album list) survives opening and closing a photo.
+            ZStack {
+                GalleryView(editor: model)
+                    .foregroundStyle(FieldFramesTheme.paper)
+                    .tint(FieldFramesTheme.lichen)
+                    .allowsHitTesting(!model.hasPhoto)
+                    .accessibilityHidden(model.hasPhoto)
+                if model.hasPhoto { editor.transition(.identity) }
+            }
         }
     }
 

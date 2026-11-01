@@ -1,3 +1,4 @@
+import MiraCore
 import Photos
 import SwiftUI
 import UIKit
@@ -47,45 +48,39 @@ enum GalleryKit {
     }
 }
 
+/// Root gallery state: authorization, the album tree (shared `SidebarLoader` + MiraCore `SidebarModel`),
+/// and the change signal that tells open grids to refetch.
 @MainActor @Observable
 final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
     private(set) var status: PHAuthorizationStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-    private(set) var result: PHFetchResult<PHAsset>?
-    private(set) var count = 0
+    private(set) var sections: [SidebarSection] = []
+    private(set) var loadedSections = false
+    /// Bumps whenever the library changes; grids refetch on it.
+    private(set) var revision = 0
     private(set) var isOpening = false
 
-    @ObservationIgnored let caching = PHCachingImageManager()
-    @ObservationIgnored let thumbOptions: PHImageRequestOptions = {
-        let o = PHImageRequestOptions()
-        o.deliveryMode = .opportunistic
-        o.resizeMode = .fast
-        o.isNetworkAccessAllowed = true
-        return o
-    }()
-    @ObservationIgnored private var cachedRange: Range<Int> = 0..<0
     @ObservationIgnored private var observing = false
-    @ObservationIgnored private(set) var thumbSize: CGSize = .zero
 
     var hasAccess: Bool { status == .authorized || status == .limited }
+
+    /// Picture count of the whole library ("all" node), once sections are loaded.
+    var libraryCount: Int? { SidebarModel.node(withID: "all", in: sections)?.count }
 
     func start() async {
         if !observing { PHPhotoLibrary.shared().register(self); observing = true }
         if status == .notDetermined {
             status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
         }
-        if hasAccess { reload() }
+        if hasAccess { await reloadSections() }
     }
 
     deinit { PHPhotoLibrary.shared().unregisterChangeObserver(self) }
 
-    private func reload() {
-        let options = PHFetchOptions()
-        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
-        let fetched = PHAsset.fetchAssets(with: .image, options: options)
-        result = fetched
-        count = fetched.count
-        caching.stopCachingImagesForAllAssets()
-        cachedRange = 0..<0
+    /// `SidebarLoader` is `nonisolated`; run it off the main actor and hop back with Sendable values.
+    func reloadSections() async {
+        let loaded = await Task.detached(priority: .userInitiated) { SidebarLoader.load() }.value
+        sections = loaded
+        loadedSections = true
     }
 
     nonisolated func photoLibraryDidChange(_ changeInstance: PHChange) {
@@ -93,35 +88,14 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 self.status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-                if self.hasAccess { self.reload() } else { self.result = nil; self.count = 0 }
+                if self.hasAccess {
+                    self.revision += 1
+                    Task { await self.reloadSections() }
+                } else {
+                    self.sections = []
+                }
             }
         }
-    }
-
-    func asset(at index: Int) -> PHAsset? {
-        guard let result, index >= 0, index < result.count else { return nil }
-        return result.object(at: index)
-    }
-
-    func setThumbSize(_ size: CGSize) { thumbSize = size }
-
-    /// Keeps a window of ±36 around the visible index warm in the caching manager.
-    func updateCaching(around index: Int) {
-        guard let result, thumbSize != .zero else { return }
-        let window = max(0, index - 36)..<min(result.count, index + 36)
-        guard window != cachedRange else { return }
-        func assets(_ r: Range<Int>) -> [PHAsset] { r.map { result.object(at: $0) } }
-        let old = Set(cachedRange), new = Set(window)
-        let add = new.subtracting(old).sorted(), drop = old.subtracting(new).sorted()
-        if !add.isEmpty {
-            caching.startCachingImages(for: add.map { result.object(at: $0) }, targetSize: thumbSize,
-                                       contentMode: .aspectFill, options: thumbOptions)
-        }
-        if !drop.isEmpty, let last = result.count as Int? {
-            caching.stopCachingImages(for: drop.filter { $0 < last }.map { result.object(at: $0) },
-                                      targetSize: thumbSize, contentMode: .aspectFill, options: thumbOptions)
-        }
-        cachedRange = window
     }
 
     /// Fetches the full-resolution data for an asset and hands it to the editor.
@@ -130,7 +104,7 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
         isOpening = true
         defer { isOpening = false }
         let data = await GalleryKit.requestFullData(asset: Unchecked(value: asset))
-        guard let data else { await editor.fail("THAT PHOTO COULD NOT BE LOADED"); return }
+        guard let data else { editor.fail("THAT PHOTO COULD NOT BE LOADED"); return }
         await editor.openData(data)
     }
 
@@ -148,5 +122,69 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
 
     static func openSettings() {
         if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+    }
+}
+
+/// One album's pictures: the fetch result for a sidebar node plus the thumbnail caching window.
+@MainActor @Observable
+final class AlbumModel {
+    let nodeID: String
+    private(set) var result: PHFetchResult<PHAsset>?
+    private(set) var count = 0
+    private(set) var loaded = false
+
+    @ObservationIgnored let caching = PHCachingImageManager()
+    @ObservationIgnored let thumbOptions: PHImageRequestOptions = {
+        let o = PHImageRequestOptions()
+        o.deliveryMode = .opportunistic
+        o.resizeMode = .fast
+        o.isNetworkAccessAllowed = true
+        return o
+    }()
+    @ObservationIgnored private var cachedRange: Range<Int> = 0..<0
+    @ObservationIgnored private(set) var thumbSize: CGSize = .zero
+
+    init(nodeID: String) { self.nodeID = nodeID }
+
+    func reload() async {
+        let id = nodeID
+        let box = await Task.detached(priority: .userInitiated) {
+            Unchecked(value: SidebarLoader.fetchAssets(nodeID: id))
+        }.value
+        result = box.value
+        count = box.value.count
+        loaded = true
+        caching.stopCachingImagesForAllAssets()
+        cachedRange = 0..<0
+    }
+
+    func stopCaching() {
+        caching.stopCachingImagesForAllAssets()
+        cachedRange = 0..<0
+    }
+
+    func asset(at index: Int) -> PHAsset? {
+        guard let result, index >= 0, index < result.count else { return nil }
+        return result.object(at: index)
+    }
+
+    func setThumbSize(_ size: CGSize) { thumbSize = size }
+
+    /// Keeps a window of ±36 around the visible index warm in the caching manager.
+    func updateCaching(around index: Int) {
+        guard let result, thumbSize != .zero else { return }
+        let window = max(0, index - 36)..<min(result.count, index + 36)
+        guard window != cachedRange else { return }
+        let old = Set(cachedRange), new = Set(window)
+        let add = new.subtracting(old).sorted(), drop = old.subtracting(new).sorted()
+        if !add.isEmpty {
+            caching.startCachingImages(for: add.map { result.object(at: $0) }, targetSize: thumbSize,
+                                       contentMode: .aspectFill, options: thumbOptions)
+        }
+        if !drop.isEmpty {
+            caching.stopCachingImages(for: drop.filter { $0 < result.count }.map { result.object(at: $0) },
+                                      targetSize: thumbSize, contentMode: .aspectFill, options: thumbOptions)
+        }
+        cachedRange = window
     }
 }
