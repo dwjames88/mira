@@ -9,6 +9,7 @@ import UniformTypeIdentifiers
 /// One column of a contact sheet: a named variation of the film look (everything else neutral).
 public enum ContactSheetState: String, CaseIterable, Sendable {
     case original, film, grain, halation
+    case halationMax = "halation-max"
     case pushFrontier = "push-frontier"
     case paperCinema = "paper-cinema"
     case paperColor = "paper-color"
@@ -29,6 +30,7 @@ public enum ContactSheetState: String, CaseIterable, Sendable {
         case .original, .film: break
         case .grain: r.grainAmount = 0.5
         case .halation: r.halationAmount = 0.5
+        case .halationMax: r.halationAmount = 1.0; r.halationRadius = 0.5
         case .pushFrontier: r.push = 1; r.scanProfile = .frontier
         case .paperCinema: r.paper = .cinemaPrint
         case .paperColor: r.paper = .colorPaper
@@ -82,7 +84,7 @@ public enum ContactSheet {
         public var cropSize: Int
         public var outDir: URL
         public init(films: [String] = ContactSheetState.defaultFilmIDs, states: [ContactSheetState] = ContactSheetState.defaults,
-                    tileWidth: Int = 900, cropOnly: Bool = false, cropSize: Int = 400, outDir: URL) {
+                    tileWidth: Int = 900, cropOnly: Bool = false, cropSize: Int = 300, outDir: URL) {
             self.films = films; self.states = states; self.tileWidth = tileWidth
             self.cropOnly = cropOnly; self.cropSize = cropSize; self.outDir = outDir
         }
@@ -91,7 +93,7 @@ public enum ContactSheet {
     public enum SheetError: Error { case renderFailed(String), noFilms, writeFailed(URL) }
 
     static let srgb = CGColorSpace(name: CGColorSpace.sRGB)!
-    static let cropStates: [ContactSheetState] = [.grain, .halation]
+    static let cropStates: [ContactSheetState] = [.grain, .halation, .halationMax]
 
     /// Renders the sheets. `source` supplies the developed source for a recipe (RAW needs a different
     /// decode with a film than without); it is called once per film/state and should cache.
@@ -150,11 +152,9 @@ public enum ContactSheet {
                     }
                 }
             }
-            for state in Self.cropStates { crops += cropByState[state] ?? [] }
-            // Order: highlight grain, highlight halation, midtone grain, midtone halation.
-            if let g = cropByState[.grain], let h = cropByState[.halation], g.count == h.count {
-                crops = zip(g, h).flatMap { [$0, $1] }
-            }
+            // Order: highlight (grain, halation, halation-max), then midtone (same).
+            let present = Self.cropStates.filter { cropByState[$0] != nil && (config.cropOnly || $0 != .halationMax || config.states.contains($0)) }
+            for wi in 0..<(windows?.count ?? 0) { for st in present { if let c = cropByState[st], wi < c.count { crops.append(c[wi]) } } }
             cropRows.append(crops)
 
             if !config.cropOnly {
@@ -208,25 +208,49 @@ public enum ContactSheet {
             luma[i] = (0.2126 * Double(px[i * 4]) + 0.7152 * Double(px[i * 4 + 1]) + 0.0722 * Double(px[i * 4 + 2])) / 255
         }
         let cw = max(1, min(gw, side / f)), ch = max(1, min(gh, side / f))
-        var bestHi = (score: -1.0, x: 0, y: 0), bestMid = (score: Double.infinity, x: 0, y: 0)
-        let step = max(1, cw / 4)
+        // Integral images of "linear luma > 0.9" and of luma, so any window is O(1).
+        let iw = gw + 1
+        var hiI = [Int32](repeating: 0, count: iw * (gh + 1)), lumI = [Double](repeating: 0, count: iw * (gh + 1))
+        for y in 0..<gh { for x in 0..<gw {
+            let v = luma[y * gw + x]
+            let lin = v <= 0.04045 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4)
+            let i = (y + 1) * iw + x + 1
+            hiI[i] = hiI[i - 1] + hiI[i - iw] - hiI[i - iw - 1] + (lin > 0.9 ? 1 : 0)
+            lumI[i] = lumI[i - 1] + lumI[i - iw] - lumI[i - iw - 1] + v
+        } }
+        func box<T: AdditiveArithmetic>(_ a: [T], _ x: Int, _ y: Int) -> T {
+            a[(y + ch) * iw + x + cw] - a[y * iw + x + cw] - a[(y + ch) * iw + x] + a[y * iw + x]
+        }
+        var bestHi = (hi: Int32(-1), mean: Double.infinity, x: 0, y: 0), bestMid = (score: Double.infinity, x: 0, y: 0)
+        let step = max(1, cw / 8)
         for y in stride(from: 0, through: gh - ch, by: step) {
             for x in stride(from: 0, through: gw - cw, by: step) {
-                var sum = 0.0, sq = 0.0, hi = 0.0
-                for yy in y..<(y + ch) { for xx in x..<(x + cw) {
-                    let v = luma[yy * gw + xx]; sum += v; sq += v * v; if v > 0.55 { hi += 1 }
-                } }
-                let n = Double(cw * ch), mean = sum / n, sd = (max(0, sq / n - mean * mean)).squareRoot()
-                let hiScore = hi / n * (1 - mean)  // bright points on a dark ground: where halation shows
-                if hiScore > bestHi.score { bestHi = (hiScore, x, y) }
-                let midScore = abs(mean - 0.45) + sd
+                let n = Double(cw * ch)
+                let hi = box(hiI, x, y), mean = box(lumI, x, y) / n
+                // Highlight window: centre inside the central 60% of the frame.
+                let cx = Double(x + cw / 2) / Double(gw), cy = Double(y + ch / 2) / Double(gh)
+                if (0.2...0.8).contains(cx) && (0.2...0.8).contains(cy),
+                   hi > bestHi.hi || (hi == bestHi.hi && mean < bestHi.mean) { bestHi = (hi, mean, x, y) }
+                let midScore = abs(mean - 0.45)
                 if midScore < bestMid.score { bestMid = (midScore, x, y) }
             }
         }
-        func rect(_ p: (score: Double, x: Int, y: Int)) -> CGRect {
+        // Re-centre the highlight window on the centroid of its bright pixels.
+        do {
+            var sx = 0.0, sy = 0.0, n = 0.0
+            for y in bestHi.y..<(bestHi.y + ch) { for x in bestHi.x..<(bestHi.x + cw) {
+                let i = (y + 1) * iw + x + 1
+                if hiI[i] - hiI[i - 1] - hiI[i - iw] + hiI[i - iw - 1] > 0 { sx += Double(x); sy += Double(y); n += 1 }
+            } }
+            if n > 0 {
+                bestHi.x = min(max(0, Int(sx / n) - cw / 2), gw - cw)
+                bestHi.y = min(max(0, Int(sy / n) - ch / 2), gh - ch)
+            }
+        }
+        func rect(_ p: (x: Int, y: Int)) -> CGRect {
             CGRect(x: min(p.x * f, w - side), y: min(p.y * f, h - side), width: side, height: side)
         }
-        return [rect(bestHi), rect(bestMid)]
+        return [rect((bestHi.x, bestHi.y)), rect((bestMid.x, bestMid.y))]
     }
 
     // MARK: Drawing
