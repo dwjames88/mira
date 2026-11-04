@@ -7,7 +7,7 @@ import Testing
 @Suite("User-facing copy")
 struct CopyTests {
     @Test func familyNamesAreUSEnglish() {
-        #expect(FilmFamily.allCases.map(\.displayName) == ["Color Negative", "Slide", "Black & White", "Instant"])
+        #expect(FilmFamily.displayOrder.map(\.displayName) == ["Color Negative", "Slide", "Kodachrome", "Motion Picture", "Black & White", "Instant", "Print"])
     }
 
     @Test func filmCatalogUsesUSSpelling() throws {

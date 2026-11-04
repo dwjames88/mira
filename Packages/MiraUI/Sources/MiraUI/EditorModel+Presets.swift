@@ -167,6 +167,7 @@ extension EditorModel {
         }
         var swapped = recipe
         swapped.filmID = target.filmID
+        swapped.pipeline = Recipe.currentPipeline   // as selectFilm would
         return swapped
     }
 

@@ -303,7 +303,7 @@ private struct FilmStrip: View {
     @State private var dropTargeted = false
 
     private var tabs: [(value: FilmFamily?, title: String)] {
-        [(nil, "All")] + FilmFamily.allCases.map { (Optional($0), $0.displayName) }
+        [(nil, "All")] + model.availableFamilies.map { (Optional($0), $0.displayName) }
     }
 
     /// Two-line preset cards, plus a group label and its hairline.
@@ -346,7 +346,13 @@ private struct FilmStrip: View {
 
     private var header: some View {
         HStack(spacing: T.cells(2)) {
-            FFTabBar(tabs, selection: $model.familyFilter)
+            // Up to 8 tabs: tighter spacing past six, and the row scrolls sideways rather than overflow.
+            FFScrollView(.horizontal) {
+                FFTabBar(tabs, selection: $model.familyFilter,
+                         spacing: tabs.count > 6 ? T.cells(2) : T.cells(3))
+            }
+            .scrollIndicators(.hidden)
+            .frame(height: T.rows(2))
             Spacer(minLength: T.cells(2))
             if let notice = model.presetNotice ?? model.transfer.notice {
                 Text(notice)
@@ -383,7 +389,7 @@ private struct FilmStrip: View {
                     title: film.displayName,
                     caption: caption(for: film),
                     image: model.thumbnails[film.id],
-                    isSelected: model.selectedFilmID == film.id,
+                    isSelected: model.selectedStockID == film.id,
                     onHoverChange: { hover($0, film.id) }
                 ) { model.selectFilm(film.id) }
             }
