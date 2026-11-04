@@ -18,6 +18,27 @@ public enum ScanProfile: String, Codable, CaseIterable, Sendable {
     }
 }
 
+/// Printing the developed film onto a print stock: Mira's own parametric transforms (curves and
+/// hue/saturation matrices) inspired by the published characteristic behavior of cinema print film and
+/// colour photographic paper; not copies of any manufacturer's data, no affiliation. Pipeline 2, applied
+/// right after the film in place of the scan (Scan and Paper are mutually exclusive: when `paper` is not
+/// `.none` the renderer ignores `scanProfile`).
+public enum PaperProfile: String, Codable, CaseIterable, Sendable {
+    case none
+    /// Cinema release print film (2383-style): deep contrast, rich saturation, cool-neutral blacks.
+    case cinemaPrint
+    /// Colour photographic paper (Crystal Archive-style): clean whites, moderate contrast, gentle warmth.
+    case colorPaper
+
+    public var displayName: String {
+        switch self {
+        case .none: "None"
+        case .cinemaPrint: "Cinema Print"
+        case .colorPaper: "Color Paper"
+        }
+    }
+}
+
 /// Black-and-white print toning (split-toned tint after the film; pipeline 2, monochrome films).
 public enum Toning: String, Codable, CaseIterable, Sendable {
     case none, selenium, sepia, cyanotype, copper

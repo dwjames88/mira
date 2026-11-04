@@ -56,6 +56,15 @@ public struct Film: Codable, Identifiable, Hashable, Sendable {
     public var character: FilmCharacter.Override?
 
     /// True for black-and-white emulsions: monochrome grain, untinted halation.
+    /// Prefix of `file` for looks Mira generates in code instead of loading a LUT file, e.g.
+    /// `procedural:vision3-500t` (see `ProceduralLooks`). Such films have no file on disk.
+    public static let proceduralPrefix = "procedural:"
+
+    /// The procedural look id when this film is generated in code, else nil.
+    public var proceduralID: String? {
+        file.hasPrefix(Self.proceduralPrefix) ? String(file.dropFirst(Self.proceduralPrefix.count)) : nil
+    }
+
     public var isMonochrome: Bool { monochrome ?? (family == .blackAndWhite) }
 
     /// True when this entry is a variant of another stock.
