@@ -201,9 +201,13 @@ public struct Renderer: Sendable {
             }
         }
 
-        // 2b. Pipeline 2: scan profile, push / pull contrast and base fog, then B&W toning.
+        // 2b. Pipeline 2: print stock (replaces the scan), push / pull contrast and base fog, then B&W toning.
         if filmScience {
-            var scan = ScanParameters.profile(recipe.scanProfile)
+            if let paperID = ProceduralLooks.id(for: recipe.paper), let paperLUT = try? ProceduralLooks.lut(paperID) {
+                image = applyPaper(paperLUT, to: image, strength: clamp(recipe.strength, 0, 1), extent: extent)
+            }
+            // With a paper set the scan profile is ignored; push / pull contrast and base fog still apply.
+            var scan = ScanParameters.profile(recipe.paper == .none ? recipe.scanProfile : .neutral)
             scan.contrast += push * character.pushContrastPerStop
             if push > 0, let family, family == .colorNegative || family == .motionPicture || family == .blackAndWhite {
                 scan.blackLift += 0.012 * push
@@ -472,6 +476,24 @@ public struct Renderer: Sendable {
     }
 
     // MARK: Helpers
+
+    /// The Paper stage: the print look's cube (the same one the print cards use) applied in sRGB, blended
+    /// with the unprinted image by film strength.
+    private func applyPaper(_ lut: LUT, to image: CIImage, strength: Double, extent: CGRect) -> CIImage {
+        guard strength > 1e-4 else { return image }
+        let f = CIFilter.colorCubeWithColorSpace()
+        f.inputImage = image
+        f.cubeDimension = Float(lut.dimension)
+        f.cubeData = lut.data
+        f.colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
+        guard let printed = f.outputImage else { return image }
+        guard strength < 1 - 1e-4 else { return printed.cropped(to: extent) }
+        let mix = CIFilter.dissolveTransition()
+        mix.inputImage = image
+        mix.targetImage = printed
+        mix.time = Float(strength)
+        return (mix.outputImage ?? printed).cropped(to: extent)
+    }
 
     private func toGamma(_ image: CIImage) -> CIImage {
         let f = CIFilter.linearToSRGBToneCurve()
