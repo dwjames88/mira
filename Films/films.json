@@ -994,7 +994,7 @@
     "id": "kodak-kodachrome-200",
     "displayName": "Kodachrome 200",
     "brand": "Kodak",
-    "family": "slide",
+    "family": "kodachrome",
     "iso": 200,
     "description": "Punchy, warm slide with bold reds and visible grain.",
     "file": "HaldCLUT/kodak-kodachrome-200.png",
@@ -1004,42 +1004,33 @@
     "id": "kodak-kodachrome-25",
     "displayName": "Kodachrome 25",
     "brand": "Kodak",
-    "family": "slide",
+    "family": "kodachrome",
     "iso": 25,
     "description": "Ultra-fine slide with dense, warm color and rich reds.",
     "file": "HaldCLUT/kodak-kodachrome-25.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Kodachrome 25.png",
-    "character": {
-      "grainStrength": 0.22
-    }
+    "source": "HaldCLUT/Color/Kodak/Kodak Kodachrome 25.png"
   },
   {
     "id": "kodak-kodachrome-64",
     "displayName": "Kodachrome 64",
     "brand": "Kodak",
-    "family": "slide",
+    "family": "kodachrome",
     "iso": "64",
     "description": "Classic rich reds and warm, dense midtones.",
     "file": "HaldCLUT/kodak-kodachrome-64.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Kodachrome 64.png",
-    "character": {
-      "grainStrength": 0.26
-    }
+    "source": "HaldCLUT/Color/Kodak/Kodak Kodachrome 64.png"
   },
   {
     "id": "kodak-kodachrome-64-generic",
     "displayName": "Kodachrome 64 Generic",
     "brand": "Kodak",
-    "family": "slide",
+    "family": "kodachrome",
     "iso": 64,
     "description": "A neutral, generic rendering of Kodachrome 64.",
     "file": "HaldCLUT/kodak-kodachrome-64-generic.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Kodachrome 64 Generic.png",
     "parent": "kodak-kodachrome-64",
-    "variant": "Generic",
-    "character": {
-      "grainStrength": 0.26
-    }
+    "variant": "Generic"
   },
   {
     "id": "lomography-x-pro-slide-200",

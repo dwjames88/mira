@@ -115,6 +115,23 @@ import Testing
         #expect(slide.latitude < neg.latitude)
     }
 
+    @Test func newFamiliesHaveTheirOwnDefaults() throws {
+        let slide = FilmCharacter.defaults(family: .slide, iso: 100, monochrome: false)
+        let kodachrome = FilmCharacter.defaults(family: .kodachrome, iso: 100, monochrome: false)
+        #expect(kodachrome.grainStrength < slide.grainStrength)
+        let motion = FilmCharacter.defaults(family: .motionPicture, iso: 500, monochrome: false)
+        #expect(motion.remJet)
+        #expect(!FilmCharacter.defaults(family: .colorNegative, iso: 500, monochrome: false).remJet)
+        let print = FilmCharacter.defaults(family: .print, iso: 100, monochrome: false)
+        #expect(print.grainStrength > 0)
+        #expect(FilmFamily.allCases.contains(.print))
+
+        let lib = try Self.library()
+        for f in lib.films where f.id.hasPrefix("kodak-kodachrome") {
+            #expect(f.family == .kodachrome, "\(f.id)")
+        }
+    }
+
     @Test func catalogCharacterOverridesAreApplied() throws {
         let lib = try Self.library()
         let ektar = try #require(lib.film(id: "kodak-ektar-100"))
