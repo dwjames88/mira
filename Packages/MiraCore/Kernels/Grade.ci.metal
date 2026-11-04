@@ -388,3 +388,54 @@ float4 miraGrain(coreimage::sample_t s, float4 geo, float4 par, coreimage::desti
 
 } // namespace coreimage
 } // extern "C"
+
+// MARK: Scan profile and push / pull (pipeline 2)
+
+extern "C" {
+namespace coreimage {
+
+// Works on sRGB-encoded values, right after the film LUT. `shift` = (red, blue) added in the midtones
+// (weighted 4 e (1 - e) per channel); `p` = (contrast around mid-gray, saturation, black lift,
+// highlight softness above 0.85). Order: colour shift, contrast, saturation, black lift, shoulder.
+// Black lift (after clipping negatives) raises black to `lift` and leaves white alone. Shoulder: above 0.85 the value is
+// compressed by softness * d^2 / (2 (1 - 0.85)), d the excess over 0.85 (monotonic for softness < 1).
+float4 miraScan(coreimage::sample_t s, float4 shift, float4 p) {
+    if (s.a <= 0.0) { return s; }
+    float3 e = miraUnpremultiply(s);
+    float3 mid = clamp(4.0 * e * (1.0 - e), 0.0, 1.0);
+    e.r += shift.x * mid.r;
+    e.b += shift.y * mid.b;
+    e = 0.5 + (e - 0.5) * (1.0 + p.x);
+    float y = miraLuma(e);
+    e = y + (e - y) * (1.0 + p.y);
+    if (p.z > 0.0) { e = p.z + max(e, float3(0.0)) * (1.0 - p.z); }
+    if (p.w > 0.0) {
+        float3 d = max(e - 0.85, float3(0.0));
+        e -= p.w * d * d / (2.0 * 0.15);
+    }
+    return float4(e * s.a, s.a);
+}
+
+} // namespace coreimage
+} // extern "C"
+
+// MARK: Toning (pipeline 2, monochrome films)
+
+extern "C" {
+namespace coreimage {
+
+// Luminance-preserving split toning on sRGB-encoded values: out = L * tint(L), the tint running from
+// `shadow` to `highlight` (smoothstep 0.2 ... 0.8 of L), each normalised to unit Rec.709 luma, blended
+// by `amount`. Because both tints have unit luma, the luma of the result equals L.
+float4 miraToning(coreimage::sample_t s, float4 shadow, float4 highlight, float amount) {
+    if (s.a <= 0.0) { return s; }
+    float3 e = miraUnpremultiply(s);
+    float l = miraLuma(e);
+    float3 ts = shadow.rgb / max(miraLuma(shadow.rgb), 1.0e-6);
+    float3 th = highlight.rgb / max(miraLuma(highlight.rgb), 1.0e-6);
+    float3 toned = l * mix(ts, th, smoothstep(0.2, 0.8, l));
+    return float4(mix(e, toned, amount) * s.a, s.a);
+}
+
+} // namespace coreimage
+} // extern "C"
