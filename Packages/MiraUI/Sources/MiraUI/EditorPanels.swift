@@ -106,6 +106,7 @@ struct FilmsPanel: View {
                      in: PushFormat.range, default: 0, snap: PushFormat.step, format: PushFormat.label)
                 .padding(.top, T.rows(1))
                 .help("Shoot the film at a different speed and develop to compensate, in stops")
+            LatitudeCompact(model: model)
             chipSection("Scan", ScanProfile.allCases.map { ($0.displayName, $0 == model.recipe.scanProfile, $0) }) {
                 model.recipe.scanProfile = $0
             }
@@ -341,6 +342,8 @@ struct DevelopPanel: View {
             FFScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     HistogramView(model: model)
+                    LatitudeReadout(model: model)
+                    RawGroup(model: model)
                     ForEach(Self.toneColor) { group in
                         FFSectionLabel(group.title).padding(.top, T.rows(1)).padding(.bottom, 4)
                         SpecSliders(model: model, specs: group.specs)

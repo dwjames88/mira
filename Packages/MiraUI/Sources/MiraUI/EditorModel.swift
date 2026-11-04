@@ -39,6 +39,8 @@ public final class EditorModel {
     public private(set) var isSourceFull = true
     /// RAW development state for the open photo (see EditorModel+Raw.swift).
     public let rawSession = RawSession()
+    /// The film's latitude reading (see EditorModel+Latitude.swift).
+    public let latitudeSession = LatitudeSession()
 
     public var recipe: Recipe {
         didSet {
@@ -48,6 +50,7 @@ public final class EditorModel {
             if recipe.filmID != selectedFilmID { selectedFilmID = recipe.filmID }
             updateAppliedPreset()
             rawRecipeChanged(from: oldValue)
+            scheduleLatitude()
             if recipe.crop != oldValue.crop { resetZoom() } else { revalidateZoom() }
             schedulePreview()
             recipeChangedWhileHovering()
@@ -134,7 +137,10 @@ public final class EditorModel {
     /// The tab the right panel and the canvas surroundings show. `.crop` is on exactly while the
     /// crop tool is open (`isCropping`): entering it begins a crop, leaving it commits.
     public private(set) var tab: EditorTab = .films {
-        didSet { if tab == .films, oldValue != .films { presetTabOpened() } }
+        didSet {
+            if tab == .films, oldValue != .films { presetTabOpened() }
+            if tab != oldValue { scheduleLatitude() }
+        }
     }
     /// The tab to return to when the crop tool closes.
     @ObservationIgnored private var tabBeforeCrop: EditorTab = .films
@@ -173,8 +179,8 @@ public final class EditorModel {
     @ObservationIgnored private(set) var publishedFrames = 0
     @ObservationIgnored private var thumbnailTask: Task<Void, Never>?
     @ObservationIgnored private var thumbnailCancel: CancelFlag?
-    @ObservationIgnored private var thumbnailCache: [CropSettings: [String: NSImage]] = [:]
-    @ObservationIgnored private var thumbnailCacheOrder: [CropSettings] = []
+    @ObservationIgnored var thumbnailCache: [CropSettings: [String: NSImage]] = [:]
+    @ObservationIgnored var thumbnailCacheOrder: [CropSettings] = []
     @ObservationIgnored private var originalFrame: PreviewFrame?
     @ObservationIgnored private var originalKey: OriginalKey?
     @ObservationIgnored private var sourceGeneration = 0
@@ -330,6 +336,7 @@ public final class EditorModel {
         schedulePreview()
         startThumbnails()
         presetSourceChanged()
+        scheduleLatitude()
     }
 
     /// Swaps the stand-in for the real photo (same picture, full resolution). The frame on screen
@@ -345,6 +352,7 @@ public final class EditorModel {
         hoverCacheOrder = []
         if let target = hoveredTarget { startHover(target, keepImage: true) }
         schedulePreview()
+        scheduleLatitude()
     }
 
     /// The full-size source, waiting for a background decode to finish. nil if it could not be decoded.
@@ -845,17 +853,20 @@ public final class EditorModel {
     /// Results are cached per crop, so going back to a crop already seen is instant.
     nonisolated static let thumbnailFlushInterval: Duration = .milliseconds(60)
 
-    private func startThumbnails() {
+    func startThumbnails(keepShown: Bool = false) {
         thumbnailTask?.cancel()
         thumbnailCancel?.cancel()
         guard engine.hasSource else { return }
         let crop = recipe.crop
         let generation = contentGeneration
         // Original and the visible stock cards only; variants never get a thumbnail.
-        let wanted: [String?] = [nil] + visibleFilms.map { Optional($0.id) }
+        // The applied card first, then left to right (the strip opens at its left edge).
+        var cards = visibleFilms.map(\.id)
+        if let stock = selectedStockID, let i = cards.firstIndex(of: stock) { cards.insert(cards.remove(at: i), at: 0) }
+        let wanted: [String?] = [nil] + cards.map { Optional($0) }
         let cached = thumbnailCache[crop] ?? [:]
         let ids = wanted.filter { cached[$0 ?? Self.originalTileID] == nil }
-        thumbnails = cached
+        if !keepShown { thumbnails = cached }
         if ids.isEmpty { return }
         let cancel = CancelFlag()
         thumbnailCancel = cancel
