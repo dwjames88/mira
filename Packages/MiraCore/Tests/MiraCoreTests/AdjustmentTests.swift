@@ -4,7 +4,7 @@ import Testing
 @testable import MiraCore
 
 @Suite struct AdjustmentTests {
-    static let recipe = Recipe(filmID: "kodak-portra-400", strength: 0.7, exposure: 0.3, grainAmount: 0.4, borderEnabled: true)
+    static let recipe = Recipe(filmID: "kodak-portra-400", strength: 0.7, exposure: 0.3, grainAmount: 0.4, borderEnabled: true, pipeline: Recipe.legacyPipeline)
 
     @Test func encodeDecodeRoundTrip() throws {
         let data = try MiraAdjustment.encode(Self.recipe)
@@ -17,7 +17,7 @@ import Testing
         #expect(MiraAdjustment.decode(formatIdentifier: "com.other", formatVersion: "1", data: data) == nil)
         #expect(MiraAdjustment.decode(formatIdentifier: "com.fieldframes.mira", formatVersion: "9", data: data) == nil)
         #expect(MiraAdjustment.decode(formatIdentifier: "com.fieldframes.mira", formatVersion: "1", data: Data("nope".utf8)) == nil)
-        #expect(!MiraAdjustment.canHandle(formatIdentifier: "com.fieldframes.mira", formatVersion: "4"))
+        #expect(!MiraAdjustment.canHandle(formatIdentifier: "com.fieldframes.mira", formatVersion: "5"))
         #expect(!MiraAdjustment.canHandle(formatIdentifier: "com.fieldframes.mira.x", formatVersion: "1"))
         #expect(MiraAdjustment.canHandle(formatIdentifier: "com.fieldframes.mira", formatVersion: "1"))
     }
@@ -26,7 +26,7 @@ import Testing
         let data = try MiraAdjustment.encode(Self.recipe)
         #expect(MiraAdjustment.legacyFormatIdentifiers.contains("com.dwjames.emulsion"))
         #expect(MiraAdjustment.canHandle(formatIdentifier: "com.dwjames.emulsion", formatVersion: "1"))
-        #expect(!MiraAdjustment.canHandle(formatIdentifier: "com.dwjames.emulsion", formatVersion: "4"))
+        #expect(!MiraAdjustment.canHandle(formatIdentifier: "com.dwjames.emulsion", formatVersion: "5"))
         #expect(MiraAdjustment.decode(formatIdentifier: "com.dwjames.emulsion", formatVersion: "1", data: data) == Self.recipe)
         let legacy = PHAdjustmentData(formatIdentifier: "com.dwjames.emulsion", formatVersion: "1", data: data)
         #expect(MiraAdjustment.canHandle(legacy))
@@ -200,12 +200,12 @@ import Testing
         #expect(try fourth.lut(for: film).data == a.data)
     }
 
-    @Test func prewarmLoadsEverything() throws {
+    @Test func prewarmLoadsEveryStock() throws {
         let cache = FileManager.default.temporaryDirectory.appendingPathComponent("mira-luts-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: cache) }
         let lib = try FilmLibrary(directory: FilmTests.filmsDirectory(), cacheDirectory: cache)
         lib.prewarmSync(concurrency: 4)
         let files = try FileManager.default.contentsOfDirectory(atPath: cache.path).filter { $0.hasSuffix(".lut") }
-        #expect(files.count == lib.films.count)
+        #expect(files.count == lib.stocks.count)
     }
 }

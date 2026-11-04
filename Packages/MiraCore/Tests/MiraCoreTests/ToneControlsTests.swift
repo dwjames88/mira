@@ -6,7 +6,7 @@ import Testing
 
 @Suite struct ToneControlsPersistenceTests {
     static let toned = Recipe(filmID: "kodak-portra-400", exposure: 0.2, highlights: -0.4, shadows: 0.5,
-                              whites: 0.1, blacks: -0.2, vibrance: 0.3, clarity: 0.25, texture: -0.15)
+                              whites: 0.1, blacks: -0.2, vibrance: 0.3, clarity: 0.25, texture: -0.15, pipeline: Recipe.legacyPipeline)
 
     @Test func roundTripKeepsNewFields() throws {
         let back = try Recipe.decode(Self.toned.encoded())
@@ -25,17 +25,22 @@ import Testing
     }
 
     @Test func neutralBytesUnchanged() throws {
-        let text = String(decoding: try Recipe.neutral.encoded(), as: UTF8.self)
+        let legacy = Recipe(pipeline: Recipe.legacyPipeline)
+        let text = String(decoding: try legacy.encoded(), as: UTF8.self)
         for key in ["highlights", "shadows", "whites", "blacks", "vibrance", "clarity", "texture"] {
             #expect(!text.contains(key), "\(key) must not be written when 0")
         }
         // Exactly the keys older builds wrote.
         let expected = #"{"borderEnabled":false,"borderWidth":0.04,"bloomAmount":0,"contrast":0,"crop":"#
         _ = expected
-        let obj = try #require(JSONSerialization.jsonObject(with: Recipe.neutral.encoded()) as? [String: Any])
-        #expect(Set(obj.keys) == ["strength", "exposure", "contrast", "saturation", "warmth", "tint", "grainAmount",
+        let obj = try #require(JSONSerialization.jsonObject(with: legacy.encoded()) as? [String: Any])
+        let oldKeys: Set<String> = ["strength", "exposure", "contrast", "saturation", "warmth", "tint", "grainAmount",
                                   "grainSize", "halationAmount", "halationRadius", "bloomAmount", "vignetteAmount",
-                                  "borderEnabled", "borderWidth", "version", "crop"])
+                                  "borderEnabled", "borderWidth", "version", "crop"]
+        #expect(Set(obj.keys) == oldKeys)
+        // A current recipe additionally writes its pipeline.
+        let current = try #require(JSONSerialization.jsonObject(with: Recipe.neutral.encoded()) as? [String: Any])
+        #expect(Set(current.keys) == oldKeys.union(["pipeline"]))
     }
 
     @Test func nonZeroValuesAreWrittenOnlyWhenSet() throws {
@@ -45,16 +50,16 @@ import Testing
     }
 
     @Test func formatVersionSelection() throws {
-        #expect(try MiraAdjustment.adjustmentData(for: .neutral).formatVersion == "1")
-        #expect(try MiraAdjustment.adjustmentData(for: Recipe(exposure: 0.3)).formatVersion == "1")
-        for r in [Recipe(highlights: 0.1), Recipe(shadows: 0.1), Recipe(whites: 0.1), Recipe(blacks: 0.1),
-                  Recipe(vibrance: 0.1), Recipe(clarity: 0.1), Recipe(texture: 0.1)] {
+        #expect(try MiraAdjustment.adjustmentData(for: Recipe(pipeline: Recipe.legacyPipeline)).formatVersion == "1")
+        #expect(try MiraAdjustment.adjustmentData(for: Recipe(exposure: 0.3, pipeline: Recipe.legacyPipeline)).formatVersion == "1")
+        for r in [Recipe(highlights: 0.1, pipeline: Recipe.legacyPipeline), Recipe(shadows: 0.1, pipeline: Recipe.legacyPipeline), Recipe(whites: 0.1, pipeline: Recipe.legacyPipeline), Recipe(blacks: 0.1, pipeline: Recipe.legacyPipeline),
+                  Recipe(vibrance: 0.1, pipeline: Recipe.legacyPipeline), Recipe(clarity: 0.1, pipeline: Recipe.legacyPipeline), Recipe(texture: 0.1, pipeline: Recipe.legacyPipeline)] {
             #expect(try MiraAdjustment.adjustmentData(for: r).formatVersion == "2")
         }
     }
 
     @Test func versionTwoAndLegacyAreReadable() throws {
-        #expect(MiraAdjustment.supportedVersions == ["1", "2", "3"])
+        #expect(MiraAdjustment.supportedVersions == ["1", "2", "3", "4"])
         let adj = try MiraAdjustment.adjustmentData(for: Self.toned)
         #expect(MiraAdjustment.canHandle(adj))
         #expect(MiraAdjustment.recipe(from: adj) == Self.toned)

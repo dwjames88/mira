@@ -30,9 +30,26 @@ enum GradeKernels {
         try? CIColorKernel(functionName: "miraDodgeBurn", fromMetalLibraryData: $0)
     }
 
+    static let filmExposure: CIColorKernel? = library.flatMap {
+        try? CIColorKernel(functionName: "miraFilmExposure", fromMetalLibraryData: $0)
+    }
+
+    static let highlights: CIColorKernel? = library.flatMap {
+        try? CIColorKernel(functionName: "miraHighlights", fromMetalLibraryData: $0)
+    }
+
+    static let halationCombine: CIColorKernel? = library.flatMap {
+        try? CIColorKernel(functionName: "miraHalationCombine", fromMetalLibraryData: $0)
+    }
+
+    static let grain: CIColorKernel? = library.flatMap {
+        try? CIColorKernel(functionName: "miraGrain", fromMetalLibraryData: $0)
+    }
+
     /// Whether all kernels loaded (tests check this; a missing kernel makes its stage a no-op).
     static var isAvailable: Bool {
         colorMixer != nil && curves != nil && tone != nil && detail != nil && dodgeBurn != nil
+            && filmExposure != nil && highlights != nil && halationCombine != nil && grain != nil
     }
 
     // MARK: Stages
@@ -97,5 +114,38 @@ enum GradeKernels {
         let args: [Any] = [image, mask, key.dodge ? dodgeBurnStops : -dodgeBurnStops, range, key.protect ? 1 : 0,
                            luma == nil ? 0 : 1, luma?[0] ?? 0, luma?[1] ?? 1, luma?[2] ?? 0]
         return kernel.apply(extent: image.extent, arguments: args) ?? image
+    }
+
+    // MARK: Film science stages (pipeline 2)
+
+    /// Exposure gain `gain` (linear) with the film's highlight latitude.
+    static func applyFilmExposure(gain: Double, latitude: Double, to image: CIImage) -> CIImage {
+        guard let kernel = filmExposure else { return image }
+        return kernel.apply(extent: image.extent, arguments: [image, Float(gain), Float(latitude)]) ?? image
+    }
+
+    /// The part of the image that halation scatters (blur this).
+    static func halationHighlights(of image: CIImage) -> CIImage {
+        guard let kernel = highlights else { return image }
+        return kernel.apply(extent: image.extent, arguments: [image]) ?? image
+    }
+
+    /// Removes `amount` of the highlights from `image` and adds the same luminance back from `blurred`
+    /// (the blurred highlights), coloured by `tint` (linear RGB, normalised to unit luminance here).
+    static func applyHalation(amount: Double, tint: [Double], to image: CIImage, blurred: CIImage) -> CIImage {
+        guard let kernel = halationCombine, tint.count == 3 else { return image }
+        let t = CIVector(x: tint[0], y: tint[1], z: tint[2], w: 0)
+        return kernel.apply(extent: image.extent, arguments: [image, blurred, Float(amount), t]) ?? image
+    }
+
+    /// Film grain on an sRGB-encoded `image`. `cell` is the grain cell as a fraction of `diagonal`; `std`
+    /// the noise standard deviation (encoded units, before the tonal weight).
+    static func applyGrain(std: Double, cell: Double, chroma: Double, tonalCenter: Double,
+                           diagonal: Double, to image: CIImage) -> CIImage {
+        guard let kernel = grain else { return image }
+        let e = image.extent
+        let geo = CIVector(x: e.minX, y: e.minY, z: diagonal, w: cell)
+        let par = CIVector(x: std, y: chroma, z: tonalCenter, w: 0)
+        return kernel.apply(extent: e, arguments: [image, geo, par]) ?? image
     }
 }
