@@ -13,7 +13,7 @@ import Testing
     }
 
     @Test func emptyObjectGivesDefaults() throws {
-        #expect(try Recipe.decode(Data("{}".utf8)) == Recipe.neutral)
+        #expect(try Recipe.decode(Data("{}".utf8)) == Recipe(pipeline: Recipe.legacyPipeline))
     }
 
     @Test func unknownKeysAreIgnored() throws {

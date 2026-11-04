@@ -37,6 +37,10 @@ public final class EditorModel {
     public private(set) var source: CIImage?
     /// False while `source` is only a quick low-resolution stand-in for the real photo.
     public private(set) var isSourceFull = true
+    /// RAW development state for the open photo (see EditorModel+Raw.swift).
+    public let rawSession = RawSession()
+    /// The film's latitude reading (see EditorModel+Latitude.swift).
+    public let latitudeSession = LatitudeSession()
 
     public var recipe: Recipe {
         didSet {
@@ -45,6 +49,8 @@ public final class EditorModel {
             // `recipe`, so a slider tick does not re-evaluate them.
             if recipe.filmID != selectedFilmID { selectedFilmID = recipe.filmID }
             updateAppliedPreset()
+            rawRecipeChanged(from: oldValue)
+            scheduleLatitude()
             if recipe.crop != oldValue.crop { resetZoom() } else { revalidateZoom() }
             schedulePreview()
             recipeChangedWhileHovering()
@@ -83,7 +89,10 @@ public final class EditorModel {
             schedulePreview()
         }
     }
-    public var familyFilter: FilmFamily?
+    public var familyFilter: FilmFamily? {
+        // The strip draws only the cards the filter lets through, so only those are rendered.
+        didSet { if familyFilter != oldValue { startThumbnails() } }
+    }
 
     // MARK: Chrome
 
@@ -128,7 +137,10 @@ public final class EditorModel {
     /// The tab the right panel and the canvas surroundings show. `.crop` is on exactly while the
     /// crop tool is open (`isCropping`): entering it begins a crop, leaving it commits.
     public private(set) var tab: EditorTab = .films {
-        didSet { if tab == .films, oldValue != .films { presetTabOpened() } }
+        didSet {
+            if tab == .films, oldValue != .films { presetTabOpened() }
+            if tab != oldValue { scheduleLatitude() }
+        }
     }
     /// The tab to return to when the crop tool closes.
     @ObservationIgnored private var tabBeforeCrop: EditorTab = .films
@@ -167,8 +179,8 @@ public final class EditorModel {
     @ObservationIgnored private(set) var publishedFrames = 0
     @ObservationIgnored private var thumbnailTask: Task<Void, Never>?
     @ObservationIgnored private var thumbnailCancel: CancelFlag?
-    @ObservationIgnored private var thumbnailCache: [CropSettings: [String: NSImage]] = [:]
-    @ObservationIgnored private var thumbnailCacheOrder: [CropSettings] = []
+    @ObservationIgnored var thumbnailCache: [CropSettings: [String: NSImage]] = [:]
+    @ObservationIgnored var thumbnailCacheOrder: [CropSettings] = []
     @ObservationIgnored private var originalFrame: PreviewFrame?
     @ObservationIgnored private var originalKey: OriginalKey?
     @ObservationIgnored private var sourceGeneration = 0
@@ -242,9 +254,35 @@ public final class EditorModel {
 
     public var films: [Film] { library.films }
 
+    /// The cards of the film strip: stocks only (variants live in the FILMS panel's picker), narrowed
+    /// by the family filter.
     public var visibleFilms: [Film] {
-        guard let familyFilter else { return library.films }
-        return library.films.filter { $0.family == familyFilter }
+        let stocks = library.stocks
+        guard let familyFilter else { return stocks }
+        return stocks.filter { $0.family == familyFilter }
+    }
+
+    /// Push / Pull, Scan and the other film controls apply once a film is chosen.
+    public var showsFilmControls: Bool { selectedFilm != nil }
+    /// Toning is for black-and-white (monochrome) films.
+    public var showsToning: Bool { selectedFilm?.isMonochrome == true }
+    /// The rem-jet toggle appears only for films that carry a rem-jet backing.
+    public var showsRemJetToggle: Bool { selectedFilm?.resolvedCharacter.remJet == true }
+
+    /// The families that have at least one stock, in UI order; the strip's tabs.
+    public var availableFamilies: [FilmFamily] {
+        let present = Set(library.stocks.map(\.family))
+        return FilmFamily.displayOrder.filter { present.contains($0) }
+    }
+
+    /// The stock the applied film belongs to (the film itself for a stock); nil for Original.
+    public var selectedStockID: String? {
+        selectedFilmID.map { library.film(id: $0)?.stockID ?? $0 }
+    }
+
+    /// The Variant picker's choices for the applied film; empty when its stock has one entry.
+    public var variantChoices: [FilmVariantChoice] {
+        FilmVariantChoice.choices(for: selectedFilmID, in: library)
     }
 
     public var selectedFilm: Film? {
@@ -253,7 +291,15 @@ public final class EditorModel {
 
     /// Whether leaving now would discard work.
     public var hasEdits: Bool {
-        recipe != .neutral
+        recipe != neutralKeepingPipeline
+    }
+
+    /// A neutral recipe on the same pipeline as the current one: `pipeline` alone is not an edit, so a
+    /// legacy recipe with nothing else set does not count as changed.
+    private var neutralKeepingPipeline: Recipe {
+        var r = Recipe.neutral
+        r.pipeline = recipe.pipeline
+        return r
     }
 
     // MARK: Source
@@ -265,6 +311,7 @@ public final class EditorModel {
     /// Sets the photo to edit. `image` must already be upright. `isFull` is false for a quick
     /// stand-in that `replaceSource(_:)` swaps for the real photo later.
     public func setSource(_ image: CIImage, isFull: Bool = true) {
+        endRawSession()
         fullDecodeTask?.cancel()
         fullDecodeTask = nil
         sourceGeneration += 1
@@ -289,13 +336,14 @@ public final class EditorModel {
         schedulePreview()
         startThumbnails()
         presetSourceChanged()
+        scheduleLatitude()
     }
 
     /// Swaps the stand-in for the real photo (same picture, full resolution). The frame on screen
     /// stays until the sharper one is ready, and the film strip is kept.
-    public func replaceSource(_ image: CIImage, isFull: Bool = true) {
+    public func replaceSource(_ image: CIImage, isFull: Bool = true, keepZoom: Bool = false) {
         sourceGeneration += 1
-        resetZoom()
+        if !keepZoom { resetZoom() }
         source = image
         isSourceFull = isFull
         engine.setSource(image)
@@ -304,6 +352,7 @@ public final class EditorModel {
         hoverCacheOrder = []
         if let target = hoveredTarget { startHover(target, keepImage: true) }
         schedulePreview()
+        scheduleLatitude()
     }
 
     /// The full-size source, waiting for a background decode to finish. nil if it could not be decoded.
@@ -325,8 +374,8 @@ public final class EditorModel {
     /// `isSourceFull` and `fullSource()` tell when the real photo is in.
     @discardableResult
     public func loadSource(url: URL, orientation: CGImagePropertyOrientation?) -> Bool {
-        if !ImageSource.isRAW(url: url),
-           let size = ImageSource.orientedPixelSize(url: url, orientation: orientation),
+        if ImageSource.isRAW(url: url) { return loadRawSource(url: url, orientation: orientation) }
+        if let size = ImageSource.orientedPixelSize(url: url, orientation: orientation),
            max(size.width, size.height) > Self.standInThreshold,
            let stand = ImageSource.loadThumbnail(url: url, orientation: orientation, maxPixelSize: Self.standInLongSide) {
             setSource(stand, isFull: false)
@@ -348,15 +397,21 @@ public final class EditorModel {
 
     // MARK: Editing
 
+    /// Choosing a film also opts the recipe into the current rendering pipeline; a recipe reopened
+    /// without a film change keeps the pipeline it was made with.
     public func selectFilm(_ id: String?) {
         endHover()
-        recipe.filmID = id
+        var r = recipe
+        r.filmID = id
+        r.pipeline = Recipe.currentPipeline
+        recipe = r
     }
 
-    /// Resets every slider to its default and keeps the selected film.
-    /// The dodge and burn strokes stay: they have their own CLEAR ALL.
+    /// Resets every slider to its default (including push, rem-jet, scan and toning) and keeps the selected
+    /// film. The dodge and burn strokes, the crop and the RAW settings stay: they belong to the photo.
     public func reset() {
-        recipe = Recipe(filmID: recipe.filmID, crop: recipe.crop, dodgeBurn: recipe.dodgeBurn)
+        recipe = Recipe(filmID: recipe.filmID, pipeline: recipe.pipeline, raw: recipe.raw, crop: recipe.crop,
+                        dodgeBurn: recipe.dodgeBurn)
     }
 
     /// Back to a neutral recipe: no film, sliders, curves, mixer or crop. Only the source stays.
@@ -367,11 +422,12 @@ public final class EditorModel {
 
     /// True when `reset()` would change something (any adjustment differs from neutral).
     public var canReset: Bool {
-        recipe != Recipe(filmID: recipe.filmID, crop: recipe.crop, dodgeBurn: recipe.dodgeBurn)
+        recipe != Recipe(filmID: recipe.filmID, pipeline: recipe.pipeline, raw: recipe.raw, crop: recipe.crop,
+                         dodgeBurn: recipe.dodgeBurn)
     }
 
     /// True when `resetAll()` would change something.
-    public var canResetAll: Bool { recipe != .neutral }
+    public var canResetAll: Bool { hasEdits }
 
     // MARK: Crop
 
@@ -797,17 +853,21 @@ public final class EditorModel {
     /// Results are cached per crop, so going back to a crop already seen is instant.
     nonisolated static let thumbnailFlushInterval: Duration = .milliseconds(60)
 
-    private func startThumbnails() {
+    func startThumbnails(keepShown: Bool = false) {
         thumbnailTask?.cancel()
         thumbnailCancel?.cancel()
         guard engine.hasSource else { return }
         let crop = recipe.crop
         let generation = contentGeneration
-        let ids: [String?] = [nil] + library.films.map { Optional($0.id) }
-        if let cached = thumbnailCache[crop], cached.count == ids.count {
-            thumbnails = cached
-            return
-        }
+        // Original and the visible stock cards only; variants never get a thumbnail.
+        // The applied card first, then left to right (the strip opens at its left edge).
+        var cards = visibleFilms.map(\.id)
+        if let stock = selectedStockID, let i = cards.firstIndex(of: stock) { cards.insert(cards.remove(at: i), at: 0) }
+        let wanted: [String?] = [nil] + cards.map { Optional($0) }
+        let cached = thumbnailCache[crop] ?? [:]
+        let ids = wanted.filter { cached[$0 ?? Self.originalTileID] == nil }
+        if !keepShown { thumbnails = cached }
+        if ids.isEmpty { return }
         let cancel = CancelFlag()
         thumbnailCancel = cancel
         let engine = engine
@@ -919,6 +979,45 @@ public final class EditorModel {
         thumbnailCancel?.cancel()
         hoverTask?.cancel()
         fullDecodeTask?.cancel()
+        cancelRawWork()
         cancelPresetWork()
+    }
+}
+
+/// One entry of the FILMS panel's Variant picker: the stock itself ("Base") or one of its variants.
+public struct FilmVariantChoice: Identifiable, Hashable, Sendable {
+    public let id: String
+    public let label: String
+    public let isBase: Bool
+
+    /// The stock's entries for the film `filmID` (a stock or a variant), stock first. Empty when the
+    /// film is unknown or its stock has no variants, so the picker is hidden.
+    public static func choices(for filmID: String?, in library: FilmLibrary) -> [FilmVariantChoice] {
+        guard let filmID else { return [] }
+        let entries = library.variants(of: filmID)
+        guard entries.count > 1 else { return [] }
+        return entries.map { film in
+            FilmVariantChoice(id: film.id, label: film.isVariant ? (film.variant ?? film.displayName) : "Base",
+                              isBase: !film.isVariant)
+        }
+    }
+}
+
+/// Push / Pull stops: snapped to thirds, shown as "+1\u{2153}", "\u{2212}\u{2154}" or "0".
+public enum PushFormat {
+    public static let range: ClosedRange<Double> = -2...2
+    public static let step = 1.0 / 3.0
+
+    public static func snapped(_ v: Double) -> Double {
+        let n = (min(range.upperBound, max(range.lowerBound, v)) / step).rounded()
+        return n == 0 ? 0 : n * step
+    }
+
+    public static func label(_ v: Double) -> String {
+        let n = Int((v / step).rounded())
+        if n == 0 { return "0" }
+        let whole = abs(n) / 3, rem = abs(n) % 3
+        let fraction = rem == 1 ? "\u{2153}" : rem == 2 ? "\u{2154}" : ""
+        return (n < 0 ? "\u{2212}" : "+") + (whole > 0 ? "\(whole)" : "") + fraction
     }
 }

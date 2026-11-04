@@ -11,9 +11,12 @@ struct SliderSpec: Identifiable {
     let keyPath: WritableKeyPath<Recipe, Double>
     let range: ClosedRange<Double>
     let defaultValue: Double
+    /// Tooltip shown over the slider.
+    let help: String?
 
     init(_ id: String, _ label: String, _ keyPath: WritableKeyPath<Recipe, Double>,
-         _ range: ClosedRange<Double>, default defaultValue: Double) {
+         _ range: ClosedRange<Double>, default defaultValue: Double, help: String? = nil) {
+        self.help = help
         self.id = id
         self.label = label
         self.keyPath = keyPath
@@ -38,6 +41,7 @@ private struct SpecSliders: View {
                      value: Binding(get: { model.recipe[keyPath: spec.keyPath] },
                                     set: { model.recipe[keyPath: spec.keyPath] = $0 }),
                      in: spec.range, default: spec.defaultValue)
+            .help(spec.help ?? "")
         }
     }
 }
@@ -55,15 +59,79 @@ struct FilmsPanel: View {
                 .padding(.top, T.rows(2))
                 .padding(.bottom, T.rows(1))
             FFHairline()
-            VStack(alignment: .leading, spacing: 0) {
-                SpecSliders(model: model, specs: [SliderSpec("strength", "Strength", \.strength, 0...1, default: 1)])
-                    .padding(.top, T.rows(1))
-                presetSection
+            FFScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    SpecSliders(model: model, specs: [SliderSpec("strength", "Strength", \.strength, 0...1, default: 1)])
+                        .padding(.top, T.rows(1))
+                    variantSection
+                    filmControls
+                    presetSection
+                }
+                .padding(.horizontal, T.cells(2))
+                .padding(.bottom, T.rows(1))
             }
-            .padding(.horizontal, T.cells(2))
-            Spacer(minLength: 0)
+            .scrollIndicators(.hidden)
         }
         .ffPanel()
+    }
+
+    /// VARIANT: one chip per entry of the selected film's stock (Base, then each variant), wrapping onto
+    /// several lines; absent for a stock with no variants.
+    @ViewBuilder private var variantSection: some View {
+        let choices = model.variantChoices
+        if !choices.isEmpty {
+            VStack(alignment: .leading, spacing: T.rows(0.5)) {
+                FFSectionLabel("Variant").padding(.top, T.rows(1))
+                FFWrapLayout(spacing: T.cells(2), lineSpacing: 0) {
+                    ForEach(choices) { choice in
+                        VariantChip(title: choice.label, selected: choice.id == model.selectedFilmID,
+                                    onHover: { inside in
+                            if inside {
+                                model.hoverFilm(choice.id)
+                            } else if model.hoveredTarget == .film(choice.id) {
+                                model.endHover()
+                            }
+                        }) { model.selectFilm(choice.id) }
+                    }
+                }
+            }
+        }
+    }
+
+    /// PUSH / PULL, SCAN and (monochrome films) TONING.
+    @ViewBuilder private var filmControls: some View {
+        if model.showsFilmControls {
+            FFSlider("Push / Pull", value: Binding(get: { model.recipe.push },
+                                                   set: { model.recipe.push = PushFormat.snapped($0) }),
+                     in: PushFormat.range, default: 0, snap: PushFormat.step, format: PushFormat.label)
+                .padding(.top, T.rows(1))
+                .help("Shoot the film at a different speed and develop to compensate, in stops")
+            LatitudeCompact(model: model)
+            chipSection("Scan", ScanProfile.allCases.map { ($0.displayName, $0 == model.recipe.scanProfile, $0) }) {
+                model.recipe.scanProfile = $0
+            }
+            if model.showsToning {
+                chipSection("Toning", Toning.allCases.map { ($0.displayName, $0 == model.recipe.toning, $0) }) {
+                    model.recipe.toning = $0
+                }
+                if model.recipe.toning != .none {
+                    FFSlider("Toning", value: $model.recipe.toningStrength, in: 0...1, default: 0.5)
+                        .padding(.top, T.rows(0.5))
+                }
+            }
+        }
+    }
+
+    private func chipSection<V>(_ title: String, _ items: [(String, Bool, V)],
+                                choose: @escaping (V) -> Void) -> some View {
+        VStack(alignment: .leading, spacing: T.rows(0.5)) {
+            FFSectionLabel(title).padding(.top, T.rows(1))
+            FFWrapLayout(spacing: T.cells(2), lineSpacing: 0) {
+                ForEach(items.indices, id: \.self) { i in
+                    VariantChip(title: items[i].0, selected: items[i].1, onHover: { _ in }) { choose(items[i].2) }
+                }
+            }
+        }
     }
 
     /// The preset the look equals, if any, and SAVE PRESET.
@@ -156,6 +224,65 @@ struct FilmsPanel: View {
     }
 }
 
+/// A tab-bar-style choice: mono label, paper and medium with a lichen underline when selected.
+private struct VariantChip: View {
+    let title: String
+    let selected: Bool
+    let onHover: (Bool) -> Void
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .ffLabel(color: selected ? T.paper : T.paperDim, weight: selected ? .medium : .regular)
+                .lineLimit(1)
+                .frame(height: T.rows(1.5))
+                .overlay(alignment: .bottom) {
+                    Rectangle().fill(selected ? T.lichen : Color.clear).frame(height: 1)
+                }
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover(perform: onHover)
+        .accessibilityLabel("Variant \(title)")
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+}
+
+/// Lays children out left to right and wraps onto a new line when the row is full.
+struct FFWrapLayout: Layout {
+    var spacing: CGFloat
+    var lineSpacing: CGFloat
+
+    private func rows(_ subviews: Subviews, width: CGFloat) -> (frames: [CGRect], size: CGSize) {
+        var frames: [CGRect] = []
+        var x: CGFloat = 0, y: CGFloat = 0, lineHeight: CGFloat = 0, maxX: CGFloat = 0
+        for sub in subviews {
+            let size = sub.sizeThatFits(.unspecified)
+            if x > 0, x + size.width > width {
+                x = 0; y += lineHeight + lineSpacing; lineHeight = 0
+            }
+            frames.append(CGRect(origin: CGPoint(x: x, y: y), size: size))
+            x += size.width + spacing
+            maxX = max(maxX, x - spacing)
+            lineHeight = max(lineHeight, size.height)
+        }
+        return (frames, CGSize(width: maxX, height: y + lineHeight))
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        rows(subviews, width: proposal.width ?? .infinity).size
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let laid = rows(subviews, width: bounds.width)
+        for (sub, frame) in zip(subviews, laid.frames) {
+            sub.place(at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY),
+                      proposal: ProposedViewSize(frame.size))
+        }
+    }
+}
+
 enum CropSummary {
     static func line(for c: CropSettings, label: Bool = true) -> String? {
         guard !c.isIdentity else { return nil }
@@ -199,10 +326,14 @@ struct DevelopPanel: View {
     ]
 
     static let texture = [
-        SliderSpec("grain", "Grain", \.grainAmount, 0...1, default: 0),
-        SliderSpec("grainSize", "Grain size", \.grainSize, 0...1, default: 0.5),
-        SliderSpec("halation", "Halation", \.halationAmount, 0...1, default: 0),
-        SliderSpec("halationRadius", "Halation radius", \.halationRadius, 0...1, default: 0.5),
+        SliderSpec("grain", "Grain", \.grainAmount, 0...1, default: 0,
+                   help: "50% is the film's own grain"),
+        SliderSpec("grainSize", "Grain size", \.grainSize, 0...1, default: 0.5,
+                   help: "50% is the film's own grain size"),
+        SliderSpec("halation", "Halation", \.halationAmount, 0...1, default: 0,
+                   help: "50% is the film's own halation"),
+        SliderSpec("halationRadius", "Halation radius", \.halationRadius, 0...1, default: 0.5,
+                   help: "50% is the film's own spread"),
         SliderSpec("bloom", "Bloom", \.bloomAmount, 0...1, default: 0),
     ]
 
@@ -211,6 +342,8 @@ struct DevelopPanel: View {
             FFScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     HistogramView(model: model)
+                    LatitudeReadout(model: model)
+                    RawGroup(model: model)
                     ForEach(Self.toneColor) { group in
                         FFSectionLabel(group.title).padding(.top, T.rows(1)).padding(.bottom, 4)
                         SpecSliders(model: model, specs: group.specs)
@@ -220,6 +353,11 @@ struct DevelopPanel: View {
                     DodgeBurnPanel(model: model)
                     FFSectionLabel("Effects").padding(.top, T.rows(1)).padding(.bottom, 4)
                     SpecSliders(model: model, specs: Self.texture)
+                    if model.showsRemJetToggle {
+                        FFToggle("Remove rem-jet", isOn: $model.recipe.remJetRemoved)
+                            .padding(.bottom, 8)
+                            .help("Removing the anti-halation backing lets highlights bleed red")
+                    }
                     FFSectionLabel("Frame").padding(.top, T.rows(1)).padding(.bottom, 4)
                     SpecSliders(model: model, specs: [SliderSpec("vignette", "Vignette", \.vignetteAmount, 0...1, default: 0)])
                     FFToggle("Border", isOn: $model.recipe.borderEnabled)

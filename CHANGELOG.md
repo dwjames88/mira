@@ -2,6 +2,23 @@
 
 All notable changes to Mira. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- 260 film looks (from 31): the full RawTherapee Film Simulation Collection (Pat David et al., CC BY-SA 4.0), shown as 82 stock cards (Color Negative 26, Slide 15, Kodachrome 3, Black & White 22, Instant 16). The 178 push/pull, tone and alternate variants are chosen with a Variant picker in the FILMS panel. Motion Picture (ECN-2) and Print families exist but have no stocks (no freely licensed data), so their tabs are hidden.
+- Film science (pipeline 2): exposure with film latitude, white balance before the film, energy-conserving halation in the exposure (rem-jet for motion-picture stocks), per-film grain (density dependent, chroma for colour films, frame-relative and band-limited so previews match exports), per-film character from family and ISO. Grain and Halation sliders read 50% as the film's own amount.
+- FILMS panel: Push/Pull (±2 stops in thirds), Scan (Neutral, Frontier-like, Noritsu-like), Toning for monochrome films, and a rem-jet toggle for motion-picture stocks. A Latitude readout under the histogram and in FILMS.
+- RAW development: a RAW group in DEVELOP (white balance as shot or kelvin/tint, boost, highlight recovery, local tone map, noise reduction, sharpness, lens correction) through `CIRAWFilter`, with draft previews and full-quality export. An ALL / RAW toggle beside Filter in the Mac library.
+
+### Changed
+- Choosing a film opts a recipe into pipeline 2 and saves Photos adjustment data as format version 4, which older builds refuse; versions 1 to 3 still read. Legacy recipes (no `pipeline` key) render exactly as before.
+- Presets keep only boost, tone map and highlight recovery from the RAW settings, not white balance or per-camera values.
+- Kodak Elite Color 200 and 400 are classed as color negative, not slide; Kodachrome stocks have their own family.
+- The in-memory LUT cache is an LRU of 64 cubes; the launch prewarm loads stock cards only.
+
+### Notes
+- Known issue: `Films/HaldCLUT` grew from 38 MB to about 361 MB and is copied into both the app and the Photos extension, so the app is much larger.
+
 ## [0.4.0] - 2026-10-23
 
 ### Added

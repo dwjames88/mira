@@ -13,16 +13,16 @@ public struct FilmsList: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("\(library.films.count) looks \u{00B7} \(familyCount) families")
+            Text("\(library.stocks.count) stocks \u{00B7} \(library.films.count) looks \u{00B7} \(familyCount) families")
                 .ffLabel(color: T.paperDim)
                 .frame(height: T.rows(1))
-            ForEach(FilmFamily.allCases, id: \.self) { family in
-                let films = library.films.filter { $0.family == family }
+            ForEach(FilmFamily.displayOrder, id: \.self) { family in
+                let films = library.stocks.filter { $0.family == family }
                 if !films.isEmpty {
                     FFSectionLabel(family.displayName, trailing: String(format: "%03d", films.count))
                         .padding(.top, T.rows(2))
                     ForEach(films) { film in
-                        FilmRow(film: film)
+                        FilmRow(film: film, variants: library.variants(of: film.id).dropFirst().compactMap(\.variant))
                         FFHairline()
                     }
                 }
@@ -31,12 +31,14 @@ public struct FilmsList: View {
     }
 
     private var familyCount: Int {
-        FilmFamily.allCases.filter { family in library.films.contains { $0.family == family } }.count
+        FilmFamily.displayOrder.filter { family in library.stocks.contains { $0.family == family } }.count
     }
 }
 
 private struct FilmRow: View {
     let film: Film
+    /// Labels of the stock's variants, in library order.
+    var variants: [String] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -47,6 +49,11 @@ private struct FilmRow: View {
                 Spacer(minLength: T.cells(2))
                 Text(film.iso > 0 ? "\(film.brand) \u{00B7} ISO \(film.iso)" : film.brand)
                     .ffLabel()
+            }
+            if !variants.isEmpty {
+                Text("Variants \u{00B7} " + variants.joined(separator: " \u{00B7} "))
+                    .ffLabel(color: T.lichen)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             if !film.description.isEmpty {
                 Text(film.description)

@@ -16,23 +16,30 @@ Status: v0.4.0. See [CHANGELOG.md](CHANGELOG.md) for what changed. See [TESTING.
 
 ## Features
 
-- 31 bundled film looks from the RawTherapee Film Simulation Collection by Pat David, Pavlov Dmitry and Michael Ezra (CC BY-SA 4.0), grouped by family:
+- 260 bundled film looks from the RawTherapee Film Simulation Collection by Pat David and contributors (CC BY-SA 4.0), shown as 82 stock cards. The other 178 looks are push/pull and tone variants of a stock (for example Pro 160C −1 or Portra 400 NC) and are chosen with the Variant picker in the FILMS panel. Families (stocks, variants): Color Negative 26 (46), Slide 15 (3), Kodachrome 3 (1), Black & White 22 (18), Instant 16 (110). Motion Picture (ECN-2) and Print have no stocks yet, so their tabs are hidden: no freely licensed data exists (the print and picturefx folders of the cyangraphics/NatronGitHub clut repository and G'MIC's Fuji X-Trans III set carry no redistribution licence, and the Pat David material there duplicates the RawTherapee set). Stocks only:
 
-| Family | Brand | Films (ISO) |
-|--------|-------|-------------|
-| Colour negative | Agfa | Ultra Color 100 (100), Vista 200 (200) |
-| | Fujifilm | Pro 400H (400), Superia 200 (200), Superia 400 (400), Superia Reala 100 (100) |
-| | Kodak | Ektar 100 (100), Portra 160 (160), Portra 400 (400), Portra 800 (800) |
-| Slide | Agfa | Precisa 100 (100) |
-| | Fujifilm | Astia 100F (100), Provia 100F (100), Velvia 50 (50) |
-| | Kodak | Ektachrome 100 VS (100), Kodachrome 64 (64) |
-| | Lomography | X-Pro Slide 200 (200) |
-| Black and white | Fujifilm | Neopan Acros 100 (100) |
-| | Ilford | Delta 100 (100), FP4 Plus 125 (125), HP5 Plus 400 (400), Pan F Plus 50 (50) |
-| | Kodak | T-Max 100 (100), T-Max 400 (400), Tri-X 400 (400) |
-| Instant | Fujifilm | FP-100C (100) |
-| | Polaroid | 669 (80), 690 (80), PX-680 (600), PX-70 (80), Time Zero Expired (80) |
+| Family | Brand | Stocks (ISO) |
+|--------|-------|--------------|
+| Color Negative (C-41): 26 stocks, 46 variants | Agfa | Ultra Color 100 (100), Vista 200 (200) |
+|  | Fujifilm | Pro 160C (160), Pro 400H (400), Pro 800Z (800), Superia 100 (100), Superia 1600 (1600), Superia 200 (200), Superia 400 (400), Superia 800 (800), Superia HG 1600 (1600), Superia Reala 100 (100), Superia X-Tra 800 (800) |
+|  | Kodak | Ektar 100 (100), Elite 100 XPRO (100), Elite Color 200 (200), Elite Color 400 (400), Portra 160 (160), Portra 160 NC (160), Portra 160 VC (160), Portra 400 (400), Portra 400 NC (400), Portra 400 UC (400), Portra 400 VC (400), Portra 800 (800) |
+|  | Lomography | Redscale 100 (100) |
+| Slide (E-6): 15 stocks, 3 variants | Agfa | Precisa 100 (100) |
+|  | Fujifilm | Astia 100F (100), Provia 100F (100), Provia 400F (400), Provia 400X (400), Sensia 100 (100), Superia 200 XPRO (200), Velvia 100 (100), Velvia 50 (50) |
+|  | Kodak | E100GX (100), Ektachrome 100 VS (100), Elite Chrome 200 (200), Elite Chrome 400 (400), Elite ExtraColor 100 (100) |
+|  | Lomography | X-Pro Slide 200 (200) |
+| Kodachrome (K-14): 3 stocks, 1 variants | Kodak | Kodachrome 200 (200), Kodachrome 25 (25), Kodachrome 64 (64) |
+| Black & White: 22 stocks, 18 variants | Agfa | APX 100 (100), APX 25 (25) |
+|  | Fujifilm | Neopan 1600 (1600), Neopan Acros 100 (100) |
+|  | Ilford | Delta 100 (100), Delta 3200 (3200), Delta 400 (400), FP4 Plus 125 (125), HP5 Plus 400 (400), HPS 800 (800), Pan F Plus 50 (50), XP2 400 (400) |
+|  | Kodak | BW 400 CN (400), HIE (HS Infra) (400), T-Max 100 (100), T-Max 3200 (3200), T-Max 400 (400), Tri-X 400 (400) |
+|  | Rollei | IR 400 (400), Ortho 25 (25), Retro 100 Tonal (100), Retro 80s (80) |
+| Instant: 16 stocks, 110 variants | Fujifilm | FP-100C (100), FP-100C Negative (100), FP-3000B (3000), FP-3000B Negative (3000) |
+|  | Polaroid | 664 (100), 665 (80), 665 Negative (80), 667 (3000), 669 (80), 672 (3000), 690 (80), PX-100UV+ (100), PX-680 (600), PX-70 (80), Polachrome (40), Time Zero Expired (80) |
+| Motion Picture (ECN-2), Print | | No stocks yet; their tabs are hidden |
 
+- **Film science (pipeline 2).** Choosing a film opts a recipe into `Recipe.pipeline` 2, where the order follows the light: crop, exposure (with the film's latitude, so highlights roll off like a negative's shoulder, and the push/pull gain), white balance, dodge & burn, mixer, curves, halation (energy-conserving: highlights are blurred and put back in the exposure, so luminance is redistributed, not added; rem-jet for motion-picture stocks), film LUT (sRGB-encoded Hald CLUT through `CIColorCubeWithColorSpace`), scan profile with push contrast and black lift, B&W toning, contrast / tone / presence, bloom, grain, vignette and border. Each film has a character derived from its family and ISO (`FilmCharacter`), with overrides in `films.json`. Grain is per film, density dependent, chromatic for colour films, and measured relative to the frame diagonal and band-limited so previews match exports. The Grain and Halation sliders read 50% as the film's own amount. FILMS panel: Variant picker; Push/Pull from −2 to +2 stops in thirds; Scan (Neutral, Frontier-like, Noritsu-like, our own transforms, not the vendors'); Toning for monochrome films; a rem-jet toggle that appears only on motion-picture stocks (none ship yet). A Latitude readout under the histogram and in FILMS shows how many stops of the scene the film holds. Recipes saved without a `pipeline` key (legacy) render exactly as before. Recipes with pipeline 2 are saved as Photos adjustment format version 4, which older builds refuse; versions 1 to 3 still read.
+- **RAW development.** For RAW sources `RawDevelop` and `SourceDevelop` (MiraCore) drive `CIRAWFilter`, and the DEVELOP tab shows a RAW group: white balance (as shot, or kelvin and tint), Boost (Auto means 0 when a film is chosen, so the film supplies the curve), Highlight Recovery (extended dynamic range; Auto means maximum with a film), local tone map, noise reduction, sharpness and lens correction. The camera's baseline exposure is respected. Previews use a draft decode and re-develop after a short debounce; export develops at full quality. Presets keep only boost, tone map and highlight recovery, not white balance or per-camera settings. In the Mac library an ALL / RAW toggle next to Filter limits the grid to RAW files.
 - Sliders: Strength (film blend); Light: Exposure, Contrast, Highlights, Shadows, Whites, Blacks; Presence: Texture, Clarity, Vibrance, Saturation; Color: Temperature, Tint; then Grain and Grain Size, Halation and Halation Radius, Bloom, Vignette, and an optional paper Border with width. Double-click a slider label to reset it. Edits that use Highlights, Shadows, Whites, Blacks, Texture, Clarity or Vibrance are saved as adjustment format version 2, and edits with Dodge & Burn strokes as version 3; older builds do not open them, and recipes that use neither are still written as version 1.
 - **Crop.** Non-destructive crop, 90-degree rotation, flips and straighten (-45 to 45 degrees, auto-fitted so there are no empty corners), with aspect presets. It is part of the recipe (`Recipe.crop`, decoded with defaults, so older recipes still open), applied first in the renderer so grain, halation, vignette and border follow the cropped frame, and exports use the cropped size. Press 3 or choose the CROP tab (View ▸ Crop); Done keeps the crop and goes back to the previous tab, Cancel puts back the crop you had, and leaving the tab commits. The pure maths is `CropGeometry` in MiraCore. The crop rect is normalised (top-left origin, y down) in the oriented-and-straightened canvas: rotate90, then flips, then straighten about the centre.
 - **Dodge & Burn.** A DODGE & BURN group in the DEVELOP tab. PAINT opens the brush tool (a sub-mode of Develop, so the tab keys still work; leaving the tab or starting a crop closes it): drag on the photo (fitted or zoomed) to paint. DODGE lightens, BURN darkens, ERASE removes what earlier strokes put under the brush. Sliders: Size (percent of the photo's short side), Feather (0 hard edge, 100 falls off from the centre), Flow (how much each dab adds), Strength (the most a stroke can do, up to about two stops); Range (SHADOWS, MIDTONES, HIGHLIGHTS) weights the change by tone; PROTECT TONES softly limits it so dodge never clips and burn never crushes to black; LUMINOSITY RANGE (low, high, softness) limits a stroke to a band of tones. The cursor is the brush ring (outline is the size, the dashed inner ring is where the feather starts, a plus, minus or cross shows dodge, burn or erase). Tablet pressure scales each dab when the pen reports it; a mouse or trackpad paints at full pressure. The STROKES list shows each stroke (mode, range, strength), an eye to hide it, a delete button; click a row to edit that stroke's settings instead of the brush's; CLEAR ALL removes every stroke. MASK OVERLAY washes the painted area red (never part of an export). Each finished stroke is one edit, so UNSAVED and saving work as for any slider. Keys while the tool is open: `[` and `]` smaller and bigger brush, ⌘= and ⌘- zoom (the menu's `[` `]` items are shadowed by the brush keys; pinch, scroll and Space-drag still work), hold ⌥ as a stroke starts to flip dodge and burn for that stroke, O mask overlay, Esc leaves the tool. Strokes belong to the photo, like the crop: they are stored normalised to the uncropped upright source (brush size relative to its short side) in `Recipe.dodgeBurn`, so they stay put when the crop, rotation or straighten changes; presets and `.mirapreset` files never carry them and applying a preset keeps them; sidecars and Photos adjustment data do (format version 3, written only when strokes exist). In the renderer the strokes become masks (`DodgeBurnMask`) and one Core Image kernel (`miraDodgeBurn` in `Grade.ci.metal`) applies an exposure-like gain to linear light, weighted by mask, tone range and luminosity band, as a luma ratio so hue is kept; it runs right after Exposure, before the mixer, curves and film, so the film responds to it. The same views work in the Photos extension.
@@ -67,19 +74,26 @@ project.yml              XcodeGen spec (the .xcodeproj is generated and git-igno
 
 **MiraCore** is UI-free and builds the look as a pure Core Image filter graph. `Renderer.apply(_:to:)` runs these stages in order, skipping any that are at their neutral value:
 
-1. Exposure (linear light)
-2. Film LUT, blended with the pre-LUT image by Strength
-3. Contrast (on sRGB-encoded values), then one Metal kernel for Highlights, Shadows, Whites and Blacks (masks follow a blurred luminance so highlights and shadows act locally; whites and blacks are monotonic end-point curves; luminance is changed by scaling RGB so hue holds), then Texture (small radius) and Clarity (large radius, midtone-weighted) as local contrast on luminance, then Saturation and Vibrance. Radii scale with the image, so preview and export match. With none of the new values set, contrast and saturation share one pass as before
-4. Warmth and tint (linear light)
-5. Halation (thresholded, blurred, warm-tinted highlights screened back on)
-6. Bloom
-7. Grain (deterministic noise, soft-light blended in sRGB-encoded space)
-8. Vignette
-9. Border (cream paper frame outside the image extent)
+Pipeline 2 (every recipe that has chosen a film; see `Renderer.swift` and `FilmCharacter.swift`):
+
+1. Crop
+2. Exposure with film latitude and push/pull gain (linear light)
+3. White balance (linear light)
+4. Dodge & burn, colour mixer, curves
+5. Halation (linear light, energy-conserving, in the exposure; rem-jet for motion-picture stocks)
+6. Film LUT, blended with the pre-LUT image by Strength
+7. Scan profile (`ScanParameters`: Neutral, Frontier-like, Noritsu-like) with push contrast and black lift
+8. B&W toning (monochrome films)
+9. Contrast, Highlights / Shadows / Whites / Blacks, Texture, Clarity, Saturation, Vibrance
+10. Bloom
+11. Grain (per film, density dependent, chroma for colour films, frame-diagonal-relative and band-limited)
+12. Vignette, then border
+
+Pipeline 1 (recipes without a `pipeline` key, saved before film science) runs the old order unchanged: exposure, film LUT, contrast and tone (a Metal kernel for Highlights, Shadows, Whites and Blacks with masks following a blurred luminance, whites and blacks as monotonic end-point curves, luminance changed by scaling RGB so hue holds; Texture and Clarity as local contrast with radii that scale with the image), saturation and vibrance, warmth and tint, halation, bloom, grain, vignette, border.
 
 **Colour management.** The shared `CIContext` works in extended linear sRGB with half-float intermediates (Metal-backed when available). The film LUTs are authored on sRGB-encoded values, so each cube is applied with `CIColorCubeWithColorSpace` and its colour space set to sRGB: Core Image converts into encoded sRGB, looks up, and converts back, with no manual curve handling. Contrast, saturation and grain are wrapped in explicit linear-to-sRGB and sRGB-to-linear tone curves so they behave perceptually. Export renders in Display P3 when the source is wide-gamut and sRGB otherwise; TIFF is 16-bit, JPEG and HEIC are 8-bit.
 
-**LUTs.** `FilmLibrary` reads `films.json` and loads each HaldCLUT PNG lazily, caching the result in memory. Cubes larger than 64 are trilinearly resampled to 64³ (`.cube` parsing is also implemented). The resampled 64³ cube is also written to a disk cache in `Library/Caches/<bundle id>/LUTs` (16-bit, keyed on file size, modification time and format version), so a large PNG is decoded once per install. Loading all 31 films cold takes about 0.3 to 0.5 s with parallel loading (4 to 8 workers), against about 2 s before; warm it takes about 19 ms. The app prewarms the library at launch and builds thumbnails in parallel. `mira-sheet --time-luts --films Films` prints these timings. The PNGs on disk are untouched.
+**LUTs.** `FilmLibrary` reads `films.json` and loads each HaldCLUT PNG lazily, caching the result in memory in an LRU of 64 cubes. Cubes larger than 64 are trilinearly resampled to 64³ (`.cube` parsing is also implemented). The resampled 64³ cube is also written to a disk cache in `Library/Caches/<bundle id>/LUTs` (16-bit, keyed on file size, modification time and format version), so a large PNG is decoded once per install. Loading all 260 looks cold takes about 0.3 to 0.5 s with parallel loading (4 to 8 workers), against about 2 s before; warm it takes about 19 ms. The app prewarms the stock cards (not variants) at launch and builds thumbnails in parallel. `mira-sheet --time-luts --films Films` prints these timings. The PNGs on disk are untouched.
 
 **Source loading and adjustments.** `ImageSource` loads photos upright and decodes camera RAW with `CIRAWFilter` (default decode), applying Photos' `fullSizeImageOrientation` when it is given; RAW exports in Display P3. `MiraAdjustment` is the single place that encodes and decodes a `Recipe` as Photos adjustment data, shared by the app and the extension. `SidecarStore` reads and writes the sidecar for files opened from disk; the JSON holds `formatIdentifier`, `formatVersion`, `recipe`, and `sourcePath`, `bookmark` and `modified` for reference.
 

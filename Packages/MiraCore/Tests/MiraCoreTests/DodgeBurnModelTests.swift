@@ -10,7 +10,7 @@ import Testing
     }
 
     static let painted: Recipe = {
-        var r = Recipe(filmID: "kodak-portra-400", exposure: 0.1)
+        var r = Recipe(filmID: "kodak-portra-400", exposure: 0.1, pipeline: Recipe.legacyPipeline)
         var a = stroke(.dodge, at: [(0.1, 0.2), (0.2, 0.25), (0.31234567, 0.4)], size: 0.07, strength: 0.6)
         a.points[1].pressure = 0.4
         a.range = .shadows; a.protectTones = false; a.lumaRange = LumaRange(low: 0.1, high: 0.7, softness: 0.2)
@@ -56,8 +56,8 @@ import Testing
     }
 
     @Test func formatVersionThreeOnlyWithStrokes() throws {
-        #expect(try MiraAdjustment.adjustmentData(for: .neutral).formatVersion == "1")
-        #expect(try MiraAdjustment.adjustmentData(for: Recipe(highlights: 0.2)).formatVersion == "2")
+        #expect(try MiraAdjustment.adjustmentData(for: Recipe(pipeline: Recipe.legacyPipeline)).formatVersion == "1")
+        #expect(try MiraAdjustment.adjustmentData(for: Recipe(highlights: 0.2, pipeline: Recipe.legacyPipeline)).formatVersion == "2")
         let withStrokes = Self.painted
         let adj = try MiraAdjustment.adjustmentData(for: withStrokes)
         #expect(adj.formatVersion == "3")

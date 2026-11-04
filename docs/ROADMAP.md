@@ -16,7 +16,7 @@
 ## v0.1
 
 - Photos editing extension and host app for macOS 26+.
-- 31 bundled films (RawTherapee Film Simulation Collection, CC BY-SA 4.0).
+- 260 bundled film looks, 82 stocks (RawTherapee Film Simulation Collection, CC BY-SA 4.0).
 - Strength, exposure, contrast, saturation, warmth, tint, grain, halation, bloom, vignette and border.
 - Re-editable edits via adjustment data `com.dwjames.emulsion` v1 (now `com.fieldframes.mira`, the old id is still read).
 - Host app export to JPEG, HEIC and TIFF.
