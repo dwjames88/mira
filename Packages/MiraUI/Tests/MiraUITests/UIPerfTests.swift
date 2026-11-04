@@ -61,7 +61,7 @@ struct UIPerfTests {
         #expect(model.loadSource(url: try Self.syntheticPhoto()))
         model.setCanvas(pixels: CGSize(width: 1500, height: 1000))
         #expect(await Self.waitUntil { model.isSourceFull && model.previewImage != nil && model.isPreviewIdle
-            && model.thumbnails.count == library.films.count + 1 })
+            && model.thumbnails.count == library.stocks.count + 1 })
         Self.report = ""
         Self.line("mira UI perf", "6000x4000 source, canvas 1500x1000, \(library.films.count) films")
         model.recipe = Recipe(filmID: "fuji-velvia-50", grainAmount: 0.4, halationAmount: 0.3, bloomAmount: 0.2, vignetteAmount: 0.3)
@@ -140,7 +140,7 @@ struct UIPerfTests {
         let old = model.thumbnails
         model.recipe.crop.rect = CropRect(x: 0.1, y: 0.1, w: 0.7, h: 0.7)
         while Self.ms(tb) < 60_000,
-              !(model.thumbnails.count == library.films.count + 1 && model.thumbnails.allSatisfy { old[$0.key] !== $0.value }) {
+              !(model.thumbnails.count == library.stocks.count + 1 && model.thumbnails.allSatisfy { old[$0.key] !== $0.value }) {
             host.layoutSubtreeIfNeeded()
             await Task.yield()
         }

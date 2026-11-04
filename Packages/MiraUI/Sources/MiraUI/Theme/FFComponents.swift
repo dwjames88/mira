@@ -258,13 +258,18 @@ public struct FFSlider: View {
     private let range: ClosedRange<Double>
     private let defaultValue: Double
     private let decimals: Int
+    private let snap: Double?
+    private let format: ((Double) -> String)?
 
     @FocusState private var focused: Bool
     @State private var dragging = false
     @State private var hovering = false
 
     public init(_ label: String, value: Binding<Double>, in range: ClosedRange<Double>,
-                default defaultValue: Double, decimals: Int = 2) {
+                default defaultValue: Double, decimals: Int = 2, snap: Double? = nil,
+                format: ((Double) -> String)? = nil) {
+        self.snap = snap
+        self.format = format
         self.label = label
         self._value = value
         self.range = range
@@ -276,12 +281,14 @@ public struct FFSlider: View {
     private func fraction(_ v: Double) -> Double { span > 0 ? min(1, max(0, (v - range.lowerBound) / span)) : 0 }
     /// The fill starts at zero when the range straddles it, otherwise at the minimum.
     private var origin: Double { range.lowerBound < 0 && range.upperBound > 0 ? 0 : range.lowerBound }
-    private var readout: String { value.formatted(.number.precision(.fractionLength(decimals))) }
-    private var step: Double { span / 20 }
+    private var readout: String { format?(value) ?? value.formatted(.number.precision(.fractionLength(decimals))) }
+    private var step: Double { snap ?? span / 20 }
+
+    private var keyStep: Double { snap ?? step / 5 }
 
     private func set(_ v: Double) {
         let clamped = min(range.upperBound, max(range.lowerBound, v))
-        let rounded = (clamped * 100).rounded() / 100
+        let rounded = snap.map { (clamped / $0).rounded() * $0 } ?? (clamped * 100).rounded() / 100
         if rounded != value { value = rounded }
     }
 
@@ -351,10 +358,10 @@ public struct FFSlider: View {
         .focusable()
         .focused($focused)
         .focusEffectDisabled()
-        .onKeyPress(.leftArrow) { set(value - step / 5); return .handled }
-        .onKeyPress(.rightArrow) { set(value + step / 5); return .handled }
-        .onKeyPress(.downArrow) { set(value - step / 5); return .handled }
-        .onKeyPress(.upArrow) { set(value + step / 5); return .handled }
+        .onKeyPress(.leftArrow) { set(value - keyStep); return .handled }
+        .onKeyPress(.rightArrow) { set(value + keyStep); return .handled }
+        .onKeyPress(.downArrow) { set(value - keyStep); return .handled }
+        .onKeyPress(.upArrow) { set(value + keyStep); return .handled }
     }
 }
 
