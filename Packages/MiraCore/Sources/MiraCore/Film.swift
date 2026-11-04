@@ -1,8 +1,20 @@
 import Foundation
 
-/// Broad stock category used to group films in the UI.
+/// Film chemistry, used to group films in the UI and to pick each stock's default behavior
+/// (`FilmCharacter.defaults`). Raw values are stored in `films.json`; add cases only at the end.
 public enum FilmFamily: String, Codable, CaseIterable, Sendable {
-    case colorNegative, slide, blackAndWhite, instant
+    /// C-41 colour negative.
+    case colorNegative
+    /// E-6 colour reversal (slide).
+    case slide
+    case blackAndWhite
+    case instant
+    /// K-14 Kodachrome reversal.
+    case kodachrome
+    /// ECN-2 motion-picture negative (rem-jet backing).
+    case motionPicture
+    /// Print films and papers (the positive a negative is printed onto).
+    case print
 
     public var displayName: String {
         switch self {
@@ -10,8 +22,16 @@ public enum FilmFamily: String, Codable, CaseIterable, Sendable {
         case .slide: "Slide"
         case .blackAndWhite: "Black & White"
         case .instant: "Instant"
+        case .kodachrome: "Kodachrome"
+        case .motionPicture: "Motion Picture"
+        case .print: "Print"
         }
     }
+
+    /// Order of the family tabs and groups in the UI.
+    public static let displayOrder: [FilmFamily] = [
+        .colorNegative, .slide, .kodachrome, .motionPicture, .blackAndWhite, .instant, .print,
+    ]
 }
 
 /// One entry of `films.json`.
