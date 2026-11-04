@@ -74,20 +74,6 @@ enum GalleryKit {
         return ids
     }
 
-    /// Whether the asset at each index has a RAW resource; stops early when cancelled.
-    nonisolated static func rawFlags(in result: Unchecked<PHFetchResult<PHAsset>>, indices: [Int]) -> [(Int, Bool)] {
-        var out: [(Int, Bool)] = []
-        out.reserveCapacity(indices.count)
-        for i in indices {
-            if Task.isCancelled { break }
-            let types = PHAssetResource.assetResources(for: result.value.object(at: i))
-                .filter { $0.type == .photo || $0.type == .alternatePhoto }
-                .map(\.uniformTypeIdentifier)
-            out.append((i, RAWDetection.containsRAW(types)))
-        }
-        return out
-    }
-
     /// (isRAW, isEdited) from the asset's resources; runs off the main actor.
     nonisolated static func badges(of asset: Unchecked<PHAsset>) -> (raw: Bool, edited: Bool) {
         let resources = PHAssetResource.assetResources(for: asset.value)
@@ -116,7 +102,8 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
     @ObservationIgnored let covers = CoverStore()
     /// RAW answers shared by every album grid; cleared when the library changes.
     @ObservationIgnored var rawClassification: RAWClassification?
-    @ObservationIgnored var rawFlags: [String: Bool] = [:]
+    @ObservationIgnored var rawCandidates: Set<String>?
+    @ObservationIgnored let rawChanges = RAWChangeTracker()
 
     var hasAccess: Bool { status == .authorized || status == .limited }
 
@@ -128,7 +115,10 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
         if status == .notDetermined {
             status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
         }
-        if hasAccess { await reloadSections() }
+        if hasAccess {
+            Task.detached(priority: .utility) { [tracker = rawChanges] in tracker.prime() }
+            await reloadSections()
+        }
     }
 
     deinit { PHPhotoLibrary.shared().unregisterChangeObserver(self) }
@@ -141,6 +131,10 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
     }
 
     nonisolated func photoLibraryDidChange(_ changeInstance: PHChange) {
+        let dropped = rawChanges.invalidatedIDs(for: changeInstance)
+        Task.detached(priority: .utility) {
+            if let dropped { await RAWScanStore.shared.invalidate(ids: dropped) } else { await RAWScanStore.shared.clearAll() }
+        }
         DispatchQueue.main.async { [weak self] in
             MainActor.assumeIsolated {
                 guard let self else { return }
@@ -149,7 +143,7 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
                     self.revision += 1
                     self.covers.removeAll()
                     self.rawClassification = nil
-                    self.rawFlags = [:]
+                    self.rawCandidates = nil
                     Task { await self.reloadSections() }
                 } else {
                     self.sections = []
@@ -196,6 +190,12 @@ final class AlbumModel {
     private(set) var rawOnly = false
     /// "scanned / total" while the RAW filter is still checking assets one by one.
     private(set) var scanProgress: (done: Int, total: Int)?
+    /// RAW assets found so far in this album (updates while the background scan runs); nil before it starts.
+    private(set) var rawCount: Int?
+    @ObservationIgnored private var rawMatches: [Int] = []
+    private(set) var scanFinished = false
+    /// True until the RAW scan of this album has covered every asset.
+    var scanning: Bool { !scanFinished }
     @ObservationIgnored private var displayIndices: [Int]?
     @ObservationIgnored private var rawTask: Task<Void, Never>?
     @ObservationIgnored private weak var gallery: GalleryModel?
@@ -225,63 +225,74 @@ final class AlbumModel {
         loaded = true
         caching.stopCachingImagesForAllAssets()
         cachedRange = 0..<0
-        await setRawOnly(rawOnly)
+        startScan(gallery: gallery)
+        setRawOnly(rawOnly)
     }
 
-    /// Turns the RAW filter on or off. The RAW smart album answers at once when the device has one;
-    /// otherwise assets are checked newest first in chunks, and the grid fills as matches arrive.
-    func setRawOnly(_ on: Bool) async {
-        rawTask?.cancel()
+    /// Turns the RAW filter on or off. The scan runs in the background either way (it feeds the RAW count);
+    /// this only chooses what the grid shows. Matches already found show at once.
+    func setRawOnly(_ on: Bool) {
         rawOnly = on
-        scanProgress = nil
-        guard let result, let gallery else { return }
-        guard on else {
+        guard result != nil else { return }
+        if on { publish(rawMatches) } else {
             displayIndices = nil
-            count = result.count
+            count = result?.count ?? 0
             resetCaching()
-            return
         }
-        displayIndices = []
-        count = 0
-        resetCaching()
+    }
+
+    /// RAW smart album when the device has one (authoritative, instant); otherwise newest-first batches of 200,
+    /// each answered from the persistent cache or a few parallel resource checks off the main actor.
+    private func startScan(gallery: GalleryModel) {
+        rawTask?.cancel()
+        rawMatches = []
+        scanFinished = false
+        rawCount = nil
+        scanProgress = nil
+        guard let result else { return }
         let box = Unchecked(value: result)
-        let task = Task { [weak self] in
+        rawTask = Task { [weak self] in
             let ids = await Task.detached(priority: .userInitiated) { GalleryKit.identifiers(of: box) }.value
             guard !Task.isCancelled, let self else { return }
             var classification = gallery.rawClassification
             if classification == nil {
                 let album = await Task.detached(priority: .userInitiated) { GalleryKit.rawAlbumIdentifiers() }.value
-                classification = album.map { RAWClassification(rawIDs: $0) }
-                    ?? RAWClassification(known: gallery.rawFlags, authoritative: false)
+                classification = album.map { RAWClassification(rawIDs: $0) } ?? RAWClassification(authoritative: false)
                 if album != nil { gallery.rawClassification = classification }
             }
             guard var classification, !Task.isCancelled else { return }
             if classification.authoritative {
-                self.publish(classification.matchingIndices(in: ids), replacing: true)
+                self.finishBatch(classification.matchingIndices(in: ids), done: true)
                 return
             }
+            if gallery.rawCandidates == nil {
+                gallery.rawCandidates = await Task.detached(priority: .userInitiated) { RAWScan.candidateIDs() }.value
+            }
+            let candidates = gallery.rawCandidates
             var matches: [Int] = []
-            let chunk = 200
-            var start = 0
-            while start < ids.count, !Task.isCancelled {
-                let range = start..<min(ids.count, start + chunk)
-                let todo = classification.unresolved(in: ids, range: range)
-                if !todo.isEmpty {
-                    let flags = await Task.detached(priority: .utility) { GalleryKit.rawFlags(in: box, indices: todo) }.value
-                    for (i, raw) in flags {
-                        classification.record(id: ids[i], isRAW: raw)
-                        gallery.rawFlags[ids[i]] = raw
-                    }
-                }
+            for range in RAWScanBatching.ranges(count: ids.count, size: 200) {
+                if Task.isCancelled { return }
+                let todo = Array(range)
+                let flags = await Task.detached(priority: .utility) {
+                    await RAWScan.flags(in: box, indices: todo, candidates: candidates, store: RAWScanStore.shared)
+                }.value
+                for (i, raw) in flags { classification.record(id: ids[i], isRAW: raw) }
                 if Task.isCancelled { return }
                 matches += classification.matchingIndices(in: ids, range: range)
-                start = range.upperBound
-                self.scanProgress = start < ids.count ? (start, ids.count) : nil
-                self.publish(matches, replacing: true)
+                let last = range.upperBound >= ids.count
+                self.scanProgress = last ? nil : (range.upperBound, ids.count)
+                self.finishBatch(matches, done: last)
             }
+            if ids.isEmpty { self.finishBatch([], done: true) }
         }
-        rawTask = task
-        await task.value
+    }
+
+    private func finishBatch(_ matches: [Int], done: Bool) {
+        rawMatches = matches
+        rawCount = matches.count
+        scanFinished = done
+        if done { scanProgress = nil }
+        if rawOnly { publish(matches) }
     }
 
     private func publish(_ indices: [Int], replacing: Bool = true) {
