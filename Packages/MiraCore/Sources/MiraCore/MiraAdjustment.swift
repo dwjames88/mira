@@ -20,7 +20,7 @@ public enum MiraAdjustment {
     public static let formatVersion = baseFormatVersion
 
     public static func formatVersion(for recipe: Recipe) -> String {
-        if recipe.pipeline >= 2 { return filmScienceFormatVersion }
+        if recipe.pipeline >= 2 || recipe.usesFilmScienceControls { return filmScienceFormatVersion }
         if recipe.usesDodgeBurn { return dodgeBurnFormatVersion }
         return recipe.usesToneControls ? toneFormatVersion : baseFormatVersion
     }

@@ -147,9 +147,20 @@ public struct Renderer: Sendable {
 
         // 1c. Pipeline 2 halation: in the exposure, before the film, in linear light.
         if filmScience {
-            let amount = clamp(recipe.halationAmount * 2 * character.halationStrength * 0.35, 0, 0.7)
+            var amount = recipe.halationAmount * 2 * character.halationStrength * 0.35
+            var haloCharacter = character
+            if character.remJet {
+                // Rem-jet backing absorbs most halation; with it removed the film bleeds red.
+                if recipe.remJetRemoved {
+                    amount *= 2.5
+                    haloCharacter.halationTint = [1.0, 0.15, 0.03]
+                } else {
+                    amount *= 0.15
+                }
+            }
+            amount = clamp(amount, 0, 0.7)
             if amount > 1e-4 {
-                image = filmHalation(image, extent: extent, amount: amount, character: character,
+                image = filmHalation(image, extent: extent, amount: amount, character: haloCharacter,
                                      radiusSlider: clamp(recipe.halationRadius, 0, 1), diagonal: diagonal)
             }
         }
