@@ -795,6 +795,26 @@
     "source": "HaldCLUT/Color/Lomography/Lomography Redscale 100.png"
   },
   {
+    "id": "kodak-elite-color-200",
+    "displayName": "Elite Color 200",
+    "brand": "Kodak",
+    "family": "colorNegative",
+    "iso": 200,
+    "description": "Saturated consumer color with a clean, slightly cool palette.",
+    "file": "HaldCLUT/kodak-elite-color-200.png",
+    "source": "HaldCLUT/Color/Kodak/Kodak Elite Color 200.png"
+  },
+  {
+    "id": "kodak-elite-color-400",
+    "displayName": "Elite Color 400",
+    "brand": "Kodak",
+    "family": "colorNegative",
+    "iso": 400,
+    "description": "Faster consumer color with warm saturation and a little grain.",
+    "file": "HaldCLUT/kodak-elite-color-400.png",
+    "source": "HaldCLUT/Color/Kodak/Kodak Elite Color 400.png"
+  },
+  {
     "id": "agfa-precisa-100",
     "displayName": "Precisa 100",
     "brand": "Agfa",
@@ -959,26 +979,6 @@
     "description": "Fast slide with natural color and moderately visible grain.",
     "file": "HaldCLUT/kodak-elite-chrome-400.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Elite Chrome 400.png"
-  },
-  {
-    "id": "kodak-elite-color-200",
-    "displayName": "Elite Color 200",
-    "brand": "Kodak",
-    "family": "slide",
-    "iso": 200,
-    "description": "Saturated slide color with a clean, slightly cool palette.",
-    "file": "HaldCLUT/kodak-elite-color-200.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Elite Color 200.png"
-  },
-  {
-    "id": "kodak-elite-color-400",
-    "displayName": "Elite Color 400",
-    "brand": "Kodak",
-    "family": "slide",
-    "iso": 400,
-    "description": "High-speed slide with warm saturation and a little grain.",
-    "file": "HaldCLUT/kodak-elite-color-400.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Elite Color 400.png"
   },
   {
     "id": "kodak-elite-extracolor-100",
