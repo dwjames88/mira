@@ -216,6 +216,8 @@ public final class RawDevelop: @unchecked Sendable {
 
     /// Longest side of the reduced decode used to measure headroom.
     static let headroomProbeSide: CGFloat = 400
+    /// Factor on the measured peak.
+    static let headroomMargin: CGFloat = 1.1
     /// Highest headroom reported.
     public static let maxHeadroom: CGFloat = 8
 
@@ -258,7 +260,7 @@ public final class RawDevelop: @unchecked Sendable {
     }
 
     /// Decodes a reduced draft (long side ~`headroomProbeSide`) with `settings` and returns its
-    /// peak linear value (max of R, G, B over the image), clamped to 1...8. CIRAWFilter's
+    /// peak linear value (max of R, G, B over the image) times `headroomMargin`, clamped to 1...8. CIRAWFilter's
     /// `extendedDynamicRangeAmount` has no documented fixed relation to the peak (it varies with the
     /// file, boost and white balance: see RawIntegrationTests), so it is measured. Caller holds the lock.
     private func measureHeadroom(_ settings: RawSettings, filmApplied: Bool) -> CGFloat {
@@ -267,7 +269,9 @@ public final class RawDevelop: @unchecked Sendable {
         RawSettingsMapper.apply(settings, filmApplied: filmApplied, draft: true, scale: scale,
                                 initial: initial, to: filter)
         guard let probe = filter.outputImage, !probe.extent.isEmpty, !probe.extent.isInfinite else { return 1 }
-        let peak = Self.peak(of: probe)
+        // The probe is a reduced decode, so its peak is a little below the full-size peak (a few percent on
+        // the sample files, 9% on one); `headroomMargin` covers that.
+        let peak = Self.peak(of: probe) * Self.headroomMargin
         return min(max(peak, 1), Self.maxHeadroom)
     }
 
