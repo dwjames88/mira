@@ -61,6 +61,32 @@ Painting must fit in a 16 ms frame at preview size. Measured with `mira-sheet --
 
 How it stays fast: strokes are stamped as dabs into a float bitmap at the size of the graded image; the cache keeps the committed strokes' masks, a checkpoint one stroke back and the live stroke's coverage, so a new point only stamps its new dabs and a finished stroke only the one stroke on top. Strokes that share their settings share one mask, and each mask is one kernel pass (`miraDodgeBurn`). A picture longer than 4096 px gets its masks at reduced size (export) or for the visible region only (zoomed preview). With no active strokes the stage is skipped, so a recipe without strokes costs exactly what it did before. Editing an earlier stroke (its strength, hiding it) rebuilds the masks once, about 7 ms per 10 strokes at preview size.
 
+## Film strip thumbnails: lazy and cached on disk (fs2-thumbs, 2026-11-04)
+
+With 82 stock cards under "All", every open or crop change used to render a thumbnail for each card. Now:
+
+- **Lazy.** The strip groups are `LazyHStack`s. A film card reports `onAppear`/`onDisappear` to the model, which renders the cards on screen plus 6 on each side (nearest to the screen first, the applied card ahead of them, Original always). Before any card has reported (no strip view, another tab open) the first 8 count as on screen. Each change of the window (40 ms settle) cancels the running batch and starts one for what is still missing; finished tiles stay cached in memory per crop. Batched publishing (60 ms) is unchanged.
+- **Disk cache.** Tiles are JPEGs (quality 0.9) in `Library/Caches/<bundle id or "Mira">/Thumbnails/` (the Photos extension has its own folder), 200 MB bound, least recently used first (a hit touches the file's date). Written and read on the render worker threads, never the main actor. The file name is an FNV-1a hash of: film id, a film signature (LUT file size and mtime, resolved grain/halation character), source hash, crop, thumbnail size, pipeline number of the default recipe (`Recipe.currentPipeline`) and `ThumbnailCacheVersion.renderer`. Thumbnails are `Recipe(filmID:)` defaults on the cropped base, so no slider setting is part of the key. **Bump `ThumbnailCacheVersion.renderer` when the grading graph changes how a default film looks.** The source hash is taken from the cropped thumbnail base downscaled to 32 px (6 bits per channel), so it follows the photo, crop and RAW develop settings (all in the pixels), not the file path.
+- Disk hits are delivered before any GPU work (no base render except the 32 px hash).
+
+Measured with the opt-in `ThumbnailTimingTests` (`MIRA_PERF=1`, release, `Fixtures/sample.jpg`, 82 stocks + Original, canvas 1200x800, LUTs prewarmed, ms from `loadSource`, medians of 3). The machine was heavily loaded (load average 35 to 55 from other builds), so only the large differences mean anything:
+
+| Case | First 8 thumbnails | Initial window (15 tiles) | All 83 tiles | Renders |
+|---|---|---|---|---|
+| Before: every card, no disk cache | 177 ms | 1789 ms (all) | 1789 ms | 83 |
+| After, cold disk cache | 138 ms | 154 ms | 931 ms (scrolled through the whole strip) | 83 |
+| After, warm disk cache | 73 ms | 73 ms | 166 ms | 0 |
+
+Debug build (what `swift test` runs), same load: before 1715 / 7806 / 7806 ms, cold 973 / 1537 / 9447 ms, warm 74 / 74 / 140 ms. The cold "all" figure is not faster than before in total work (83 renders either way); the gain cold is that only 15 tiles are needed to show the strip, and warm that nothing is rendered. Snapshot and perf tests now wait for the wanted tiles (`EditorModel.thumbnailsSettled`) instead of all 83 (wait ceiling 180 s down to 90 s; the full `MiraUI` suite of 142 tests passes in about 165 s in debug under that load).
+
+Reproduce:
+
+```
+cd Packages/MiraUI && MIRA_PERF=1 swift test -c release -Xswiftc -enable-testing --filter ThumbnailTimingTests
+```
+
+(writes `build/perf-thumbnails.txt`).
+
 ## What each change was
 
 1. **Narrower observation (`EditorModel.selectedFilmID`).** `FilmStrip.body` read `model.recipe.filmID`, and `recipe` is one observed property, so every slider tick re-evaluated the strip and its 32 cards. The model now keeps a stored `selectedFilmID` that changes only when the film does, and the strip reads that. Result: 0 strip evaluations per tick, SwiftUI cost per tick 4.0 to 2.3 ms.
