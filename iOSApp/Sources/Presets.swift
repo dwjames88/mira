@@ -223,6 +223,7 @@ struct PresetCardView: View {
             image: model.thumbnails[preset.filmID ?? "__original"],
             isSelected: model.isApplied(preset)
         ) { model.apply(preset) }
+        .task(id: model.thumbEpoch) { await model.requestThumbnail(preset.filmID) }
         .contextMenu {
             Button { hub.share(preset) } label: { Label("Share", systemImage: "square.and.arrow.up") }
             Button { hub.sheet = .rename(preset.id) } label: { Label("Rename", systemImage: "pencil") }

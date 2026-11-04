@@ -37,12 +37,13 @@ actor PhotoEngine {
     private var thumb: CIImage?
 
     init() {
-        let lib = FilmLibrary.bundled(in: .main)
+        let lib = Self.library
         library = lib
         renderer = lib.map { Renderer(library: $0) }
     }
 
-    nonisolated static let filmList: [Film] = FilmLibrary.bundled(in: .main)?.films ?? []
+    nonisolated static let library: FilmLibrary? = FilmLibrary.bundled(in: .main)
+    nonisolated static let filmList: [Film] = library?.films ?? []
 
     /// Loads an upright image from `data`; returns the source for the live view.
     func load(data: Data) throws -> LoadedSource {

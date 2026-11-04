@@ -233,28 +233,48 @@ struct RootView: View {
 
 struct FilmsPanel: View {
     @Bindable var model: EditorViewModel
+    @State private var optionsOpen = false
     private let hub = PresetHub.shared
+
+    private var familyTabs: [(value: FilmFamily?, title: String)] {
+        [(value: nil, title: "ALL")] + model.availableFamilies.map { (value: Optional($0), title: $0.displayName.uppercased()) }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
+            // Family tabs: ALL plus the families that have stocks, scrolling sideways when they overflow.
+            ScrollView(.horizontal, showsIndicators: false) {
+                FFTabBar(familyTabs, selection: $model.familyFilter, spacing: FieldFramesTheme.cells(2))
+                    .padding(.horizontal, FieldFramesTheme.cells(2))
+            }
+            .frame(height: FieldFramesTheme.rows(2))
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(alignment: .top, spacing: FieldFramesTheme.cells(3)) {
+                    // PRESETS always show; the family tab only narrows FILMS.
                     PresetGroup(model: model, hub: hub)
-                    StripGroup(title: "FILMS", count: PhotoEngine.filmList.count + 1) {
+                    StripGroup(title: "FILMS", count: model.visibleStocks.count + 1) {
                         FilmCard(title: "Original", caption: "NO LOOK", image: model.thumbnails["__original"],
                                  isSelected: model.filmID == nil) { model.select(nil) }
-                        ForEach(PhotoEngine.filmList) { film in
+                            .task(id: model.thumbEpoch) { await model.requestThumbnail(nil) }
+                        ForEach(model.visibleStocks) { film in
                             FilmCard(title: film.displayName, caption: "\(film.brand.uppercased()) · ISO \(film.iso)",
-                                     image: model.thumbnails[film.id], isSelected: model.filmID == film.id) {
+                                     image: model.thumbnails[film.id], isSelected: model.selectedStockID == film.id) {
                                 model.select(film.id)
                             }
+                            .task(id: model.thumbEpoch) { await model.requestThumbnail(film.id) }
                         }
                     }
                 }
                 .padding(.horizontal, FieldFramesTheme.cells(2))
                 .padding(.vertical, FieldFramesTheme.rows(0.5))
             }
+            variantRow
             HStack(spacing: FieldFramesTheme.cells(1)) {
+                Button { withAnimation(.snappy(duration: 0.2)) { optionsOpen.toggle() } } label: {
+                    Text(optionsOpen ? "OPTIONS \u{2212}" : "OPTIONS +").padding(.vertical, 4)
+                }
+                .buttonStyle(.ff)
+                .disabled(model.filmID == nil)
                 Spacer(minLength: 0)
                 Button { hub.importerShown = true } label: { Text("IMPORT").padding(.vertical, 4) }
                     .buttonStyle(.ff)
@@ -263,6 +283,7 @@ struct FilmsPanel: View {
                     .disabled(!model.hasPhoto)
             }
             .padding(.horizontal, FieldFramesTheme.cells(2))
+            if optionsOpen, model.filmID != nil { FilmOptions(model: model) }
             // STRENGTH is the one slider in focus; double-tap resets it to full strength.
             FFSlider("STRENGTH", value: $model.strength, in: 0...1, default: 1)
                 .frame(minHeight: 56)
@@ -272,6 +293,97 @@ struct FilmsPanel: View {
                 .disabled(model.filmID == nil)
         }
         .padding(.bottom, FieldFramesTheme.rows(0.5))
+    }
+
+    /// Base, -1, +1, Cold +1 ... for the applied film's stock; absent when the stock has no variants.
+    @ViewBuilder private var variantRow: some View {
+        let choices = model.variantChoices
+        if !choices.isEmpty {
+            ChipRow(label: "VARIANT") {
+                ForEach(choices) { choice in
+                    OptionChip(title: choice.label, selected: choice.id == model.filmID) { model.select(choice.id) }
+                }
+            }
+        }
+    }
+}
+
+/// Push / pull, scan and (monochrome films) toning for the applied film. Compact: one scrolling row each.
+private struct FilmOptions: View {
+    @Bindable var model: EditorViewModel
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ChipRow(label: "PUSH") {
+                ForEach(FilmBrowsing.pushSteps, id: \.self) { step in
+                    OptionChip(title: FilmBrowsing.pushLabel(step), selected: abs(model.recipe.push - step) < 0.01) {
+                        model.recipe.push = step
+                    }
+                }
+            }
+            ChipRow(label: "SCAN") {
+                ForEach(ScanProfile.allCases, id: \.self) { profile in
+                    OptionChip(title: profile.displayName, selected: model.recipe.scanProfile == profile) {
+                        model.recipe.scanProfile = profile
+                    }
+                }
+            }
+            if model.offersToning {
+                ChipRow(label: "TONING") {
+                    ForEach(Toning.allCases, id: \.self) { toning in
+                        OptionChip(title: toning.displayName, selected: model.recipe.toning == toning) {
+                            model.recipe.toning = toning
+                        }
+                    }
+                }
+                if model.recipe.toning != .none {
+                    FFSlider("TONING", value: model.bind(\.toningStrength), in: 0...1, default: 0.5)
+                        .frame(minHeight: 44)
+                        .padding(.horizontal, FieldFramesTheme.cells(2))
+                }
+            }
+        }
+    }
+}
+
+/// A mono label followed by a horizontally scrolling row of chips.
+private struct ChipRow<Content: View>: View {
+    let label: String
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        HStack(spacing: FieldFramesTheme.cells(2)) {
+            Text(label).ffLabel(size: 9, color: FieldFramesTheme.paperDim)
+                .frame(width: 56, alignment: .leading)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: FieldFramesTheme.cells(2)) { content }
+            }
+        }
+        .padding(.horizontal, FieldFramesTheme.cells(2))
+        .frame(height: 36)
+    }
+}
+
+/// A tab-bar-style choice: mono label, paper with a lichen underline when selected.
+private struct OptionChip: View {
+    let title: String
+    let selected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .ffLabel(size: 10, color: selected ? FieldFramesTheme.paper : FieldFramesTheme.paperDim,
+                         weight: selected ? .medium : .regular)
+                .lineLimit(1)
+                .frame(minWidth: 28, minHeight: 36)
+                .overlay(alignment: .bottom) {
+                    Rectangle().fill(selected ? FieldFramesTheme.lichen : .clear).frame(height: 1).padding(.bottom, 6)
+                }
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 

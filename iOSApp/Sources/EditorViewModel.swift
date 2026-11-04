@@ -1,4 +1,5 @@
 import MiraCore
+import MiraUI
 import Photos
 import PhotosUI
 import SwiftUI
@@ -12,6 +13,9 @@ final class EditorViewModel {
     var offset: CGSize = .zero
     var showingOriginal = false
     private(set) var thumbnails: [String: UIImage] = [:]
+    /// Changes whenever the thumbnails are discarded (a new photo), so visible cards ask again.
+    private(set) var thumbEpoch = 0
+    @ObservationIgnored private var thumbInFlight: Set<String> = []
     private(set) var hasPhoto = false
     private(set) var isSaving = false
     private(set) var status = ""
@@ -75,13 +79,40 @@ final class EditorViewModel {
 
     private let engine = PhotoEngine()
     private var histogramTask: Task<Void, Never>?
-    private var thumbTask: Task<Void, Never>?
 
     init() { recipe = Recipe() }
 
+    /// Applies a film (or Original). A film choice moves the recipe to the current rendering pipeline,
+    /// as on the Mac; push, scan and toning stay as the user set them.
     func select(_ id: String?) {
-        filmID = id
+        var r = recipe
+        r.filmID = id
+        r.pipeline = Recipe.currentPipeline
+        recipe = r
     }
+
+    // MARK: Film picker
+
+    /// The family tab; nil = ALL. Only shapes which stock cards the strip shows.
+    var familyFilter: FilmFamily?
+
+    var availableFamilies: [FilmFamily] { PhotoEngine.library.map(FilmBrowsing.families(in:)) ?? [] }
+
+    /// Stock cards for the current tab (variants are chosen in the Variant row, not as cards).
+    var visibleStocks: [Film] {
+        PhotoEngine.library.map { FilmBrowsing.stocks(in: $0, family: familyFilter) } ?? []
+    }
+
+    var selectedFilm: Film? { recipe.filmID.flatMap { PhotoEngine.library?.film(id: $0) } }
+
+    /// The stock card that is applied: the film itself, or the parent when a variant is applied.
+    var selectedStockID: String? { selectedFilm?.stockID ?? recipe.filmID }
+
+    var variantChoices: [FilmVariantChoice] {
+        PhotoEngine.library.map { FilmVariantChoice.choices(for: recipe.filmID, in: $0) } ?? []
+    }
+
+    var offersToning: Bool { FilmBrowsing.offersToning(selectedFilm) }
 
     /// Binding into the recipe for DEVELOP controls; writes flow through `recipe`'s didSet.
     func bind<V>(_ keyPath: WritableKeyPath<Recipe, V>) -> Binding<V> {
@@ -196,6 +227,7 @@ final class EditorViewModel {
         isLibraryAsset = false
         saveState = .saved
         thumbnails = [:]
+        startThumbnails()
         status = ""
     }
 
@@ -230,17 +262,23 @@ final class EditorViewModel {
         }
     }
 
+    /// Forgets every film thumbnail; the cards on screen render theirs again via `requestThumbnail`.
     private func startThumbnails() {
-        thumbTask?.cancel()
-        let ids: [String?] = [nil] + PhotoEngine.filmList.map { Optional($0.id) }
-        thumbTask = Task {
-            for id in ids {
-                if Task.isCancelled { return }
-                if let data = try? await engine.renderThumbnail(filmID: id), let img = UIImage(data: data) {
-                    thumbnails[id ?? "__original"] = img
-                }
-            }
+        thumbInFlight = []
+        thumbEpoch += 1
+    }
+
+    /// Renders one film's thumbnail on demand (a card became visible). Idempotent per photo.
+    func requestThumbnail(_ id: String?) async {
+        let key = id ?? "__original"
+        guard hasPhoto, thumbnails[key] == nil, !thumbInFlight.contains(key) else { return }
+        thumbInFlight.insert(key)
+        let epoch = thumbEpoch
+        if let data = try? await engine.renderThumbnail(filmID: id), let img = UIImage(data: data),
+           epoch == thumbEpoch {
+            thumbnails[key] = img
         }
+        if epoch == thumbEpoch { thumbInFlight.remove(key) }
     }
 
     /// Writes only when Save is tapped. Library assets get a non-destructive edit (adjustment data +
