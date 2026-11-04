@@ -41,11 +41,11 @@ struct SnapshotTests {
         model.recipe.halationAmount = 0.3
         let deadline = Date().addingTimeInterval(90)
         while Date() < deadline {
-            if model.previewImage != nil, model.thumbnails.count >= library.films.count + 1 { break }
+            if model.previewImage != nil, model.thumbnails.count >= library.stocks.count + 1 { break }
             try await Task.sleep(for: .milliseconds(100))
         }
         #expect(model.previewImage != nil)
-        #expect(model.thumbnails.count == library.films.count + 1)
+        #expect(model.thumbnails.count == library.stocks.count + 1)
         return model
     }
 
