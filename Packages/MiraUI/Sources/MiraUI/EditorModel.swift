@@ -253,6 +253,13 @@ public final class EditorModel {
         return stocks.filter { $0.family == familyFilter }
     }
 
+    /// Push / Pull, Scan and the other film controls apply once a film is chosen.
+    public var showsFilmControls: Bool { selectedFilm != nil }
+    /// Toning is for black-and-white (monochrome) films.
+    public var showsToning: Bool { selectedFilm?.isMonochrome == true }
+    /// The rem-jet toggle appears only for films that carry a rem-jet backing.
+    public var showsRemJetToggle: Bool { selectedFilm?.resolvedCharacter.remJet == true }
+
     /// The families that have at least one stock, in UI order; the strip's tabs.
     public var availableFamilies: [FilmFamily] {
         let present = Set(library.stocks.map(\.family))
@@ -388,10 +395,11 @@ public final class EditorModel {
         recipe = r
     }
 
-    /// Resets every slider to its default and keeps the selected film.
-    /// The dodge and burn strokes stay: they have their own CLEAR ALL.
+    /// Resets every slider to its default (including push, rem-jet, scan and toning) and keeps the selected
+    /// film. The dodge and burn strokes, the crop and the RAW settings stay: they belong to the photo.
     public func reset() {
-        recipe = Recipe(filmID: recipe.filmID, pipeline: recipe.pipeline, crop: recipe.crop, dodgeBurn: recipe.dodgeBurn)
+        recipe = Recipe(filmID: recipe.filmID, pipeline: recipe.pipeline, raw: recipe.raw, crop: recipe.crop,
+                        dodgeBurn: recipe.dodgeBurn)
     }
 
     /// Back to a neutral recipe: no film, sliders, curves, mixer or crop. Only the source stays.
@@ -402,7 +410,8 @@ public final class EditorModel {
 
     /// True when `reset()` would change something (any adjustment differs from neutral).
     public var canReset: Bool {
-        recipe != Recipe(filmID: recipe.filmID, pipeline: recipe.pipeline, crop: recipe.crop, dodgeBurn: recipe.dodgeBurn)
+        recipe != Recipe(filmID: recipe.filmID, pipeline: recipe.pipeline, raw: recipe.raw, crop: recipe.crop,
+                         dodgeBurn: recipe.dodgeBurn)
     }
 
     /// True when `resetAll()` would change something.
@@ -975,5 +984,24 @@ public struct FilmVariantChoice: Identifiable, Hashable, Sendable {
             FilmVariantChoice(id: film.id, label: film.isVariant ? (film.variant ?? film.displayName) : "Base",
                               isBase: !film.isVariant)
         }
+    }
+}
+
+/// Push / Pull stops: snapped to thirds, shown as "+1\u{2153}", "\u{2212}\u{2154}" or "0".
+public enum PushFormat {
+    public static let range: ClosedRange<Double> = -2...2
+    public static let step = 1.0 / 3.0
+
+    public static func snapped(_ v: Double) -> Double {
+        let n = (min(range.upperBound, max(range.lowerBound, v)) / step).rounded()
+        return n == 0 ? 0 : n * step
+    }
+
+    public static func label(_ v: Double) -> String {
+        let n = Int((v / step).rounded())
+        if n == 0 { return "0" }
+        let whole = abs(n) / 3, rem = abs(n) % 3
+        let fraction = rem == 1 ? "\u{2153}" : rem == 2 ? "\u{2154}" : ""
+        return (n < 0 ? "\u{2212}" : "+") + (whole > 0 ? "\(whole)" : "") + fraction
     }
 }

@@ -131,3 +131,77 @@ struct FilmVariantTests {
         #expect(model.availableFamilies == [.colorNegative, .blackAndWhite])
     }
 }
+
+@MainActor
+@Suite("Film controls", .serialized)
+struct FilmControlTests {
+    private func library(remJet: Bool) throws -> FilmLibrary {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("mira-ctl-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir.appendingPathComponent("Cube"), withIntermediateDirectories: true)
+        var cube = "LUT_3D_SIZE 2\n"
+        for b in 0..<2 { for g in 0..<2 { for r in 0..<2 { cube += "\(r) \(g) \(b)\n" } } }
+        try cube.write(to: dir.appendingPathComponent("Cube/id.cube"), atomically: true, encoding: .utf8)
+        let json = """
+        [{"id":"cine","displayName":"Cine","brand":"B","family":"colorNegative","iso":500,"description":"d","file":"Cube/id.cube","character":{"remJet":\(remJet)}},
+         {"id":"bw","displayName":"BW","brand":"B","family":"blackAndWhite","iso":400,"description":"d","file":"Cube/id.cube"}]
+        """
+        try json.write(to: dir.appendingPathComponent("films.json"), atomically: true, encoding: .utf8)
+        return try FilmLibrary(directory: dir)
+    }
+
+    @Test func remJetToggleOnlyForRemJetFilms() throws {
+        let yes = EditorModel(library: try library(remJet: true))
+        let no = EditorModel(library: try library(remJet: false))
+        #expect(!yes.showsRemJetToggle)   // Original
+        yes.selectFilm("cine"); no.selectFilm("cine")
+        #expect(yes.showsRemJetToggle)
+        #expect(!no.showsRemJetToggle)
+        yes.selectFilm("bw")
+        #expect(!yes.showsRemJetToggle)
+    }
+
+    @Test func toningOnlyForMonochromeFilms() throws {
+        let model = EditorModel(library: try library(remJet: false))
+        #expect(!model.showsToning && !model.showsFilmControls)
+        model.selectFilm("cine")
+        #expect(model.showsFilmControls && !model.showsToning)
+        model.selectFilm("bw")
+        #expect(model.showsToning)
+    }
+
+    @Test func pushSnapsToThirdsAndFormats() {
+        #expect(PushFormat.snapped(0.1) == 0)
+        #expect(abs(PushFormat.snapped(0.4) - 1.0 / 3) < 1e-9)
+        #expect(PushFormat.snapped(5) == 2 && PushFormat.snapped(-5) == -2)
+        #expect(PushFormat.label(0) == "0")
+        #expect(PushFormat.label(1) == "+1")
+        #expect(PushFormat.label(4.0 / 3) == "+1\u{2153}")
+        #expect(PushFormat.label(-2.0 / 3) == "\u{2212}\u{2154}")
+        #expect(PushFormat.label(-2) == "\u{2212}2")
+        #expect(PushFormat.label(1.0 / 3) == "+\u{2153}")
+    }
+
+    @Test func resetClearsFilmSettingsButKeepsRawFilmAndPipeline() throws {
+        let model = EditorModel(library: try library(remJet: true))
+        model.selectFilm("bw")
+        model.recipe.push = 1; model.recipe.remJetRemoved = true
+        model.recipe.scanProfile = .noritsu; model.recipe.toning = .sepia; model.recipe.toningStrength = 0.9
+        model.recipe.raw.boostAmount = 0.3
+        #expect(model.canReset)
+        model.reset()
+        let r = model.recipe
+        #expect(r.push == 0 && !r.remJetRemoved && r.scanProfile == .neutral && r.toning == .none && r.toningStrength == 0.5)
+        #expect(r.raw.boostAmount == 0.3)
+        #expect(r.filmID == "bw" && r.pipeline == Recipe.currentPipeline)
+        #expect(!model.canReset)
+        model.resetAll()
+        #expect(model.recipe == .neutral)
+    }
+
+    @Test func changingControlsDoesNotTouchPipeline() throws {
+        var legacy = Recipe(filmID: "bw"); legacy.pipeline = Recipe.legacyPipeline
+        let model = EditorModel(library: try library(remJet: false), recipe: legacy)
+        model.recipe.push = 1; model.recipe.toning = .selenium; model.recipe.scanProfile = .frontier
+        #expect(model.recipe.pipeline == Recipe.legacyPipeline)
+    }
+}

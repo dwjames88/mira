@@ -59,14 +59,18 @@ struct FilmsPanel: View {
                 .padding(.top, T.rows(2))
                 .padding(.bottom, T.rows(1))
             FFHairline()
-            VStack(alignment: .leading, spacing: 0) {
-                SpecSliders(model: model, specs: [SliderSpec("strength", "Strength", \.strength, 0...1, default: 1)])
-                    .padding(.top, T.rows(1))
-                variantSection
-                presetSection
+            FFScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    SpecSliders(model: model, specs: [SliderSpec("strength", "Strength", \.strength, 0...1, default: 1)])
+                        .padding(.top, T.rows(1))
+                    variantSection
+                    filmControls
+                    presetSection
+                }
+                .padding(.horizontal, T.cells(2))
+                .padding(.bottom, T.rows(1))
             }
-            .padding(.horizontal, T.cells(2))
-            Spacer(minLength: 0)
+            .scrollIndicators(.hidden)
         }
         .ffPanel()
     }
@@ -89,6 +93,41 @@ struct FilmsPanel: View {
                             }
                         }) { model.selectFilm(choice.id) }
                     }
+                }
+            }
+        }
+    }
+
+    /// PUSH / PULL, SCAN and (monochrome films) TONING.
+    @ViewBuilder private var filmControls: some View {
+        if model.showsFilmControls {
+            FFSlider("Push / Pull", value: Binding(get: { model.recipe.push },
+                                                   set: { model.recipe.push = PushFormat.snapped($0) }),
+                     in: PushFormat.range, default: 0, snap: PushFormat.step, format: PushFormat.label)
+                .padding(.top, T.rows(1))
+                .help("Shoot the film at a different speed and develop to compensate, in stops")
+            chipSection("Scan", ScanProfile.allCases.map { ($0.displayName, $0 == model.recipe.scanProfile, $0) }) {
+                model.recipe.scanProfile = $0
+            }
+            if model.showsToning {
+                chipSection("Toning", Toning.allCases.map { ($0.displayName, $0 == model.recipe.toning, $0) }) {
+                    model.recipe.toning = $0
+                }
+                if model.recipe.toning != .none {
+                    FFSlider("Toning", value: $model.recipe.toningStrength, in: 0...1, default: 0.5)
+                        .padding(.top, T.rows(0.5))
+                }
+            }
+        }
+    }
+
+    private func chipSection<V>(_ title: String, _ items: [(String, Bool, V)],
+                                choose: @escaping (V) -> Void) -> some View {
+        VStack(alignment: .leading, spacing: T.rows(0.5)) {
+            FFSectionLabel(title).padding(.top, T.rows(1))
+            FFWrapLayout(spacing: T.cells(2), lineSpacing: 0) {
+                ForEach(items.indices, id: \.self) { i in
+                    VariantChip(title: items[i].0, selected: items[i].1, onHover: { _ in }) { choose(items[i].2) }
                 }
             }
         }
@@ -311,6 +350,11 @@ struct DevelopPanel: View {
                     DodgeBurnPanel(model: model)
                     FFSectionLabel("Effects").padding(.top, T.rows(1)).padding(.bottom, 4)
                     SpecSliders(model: model, specs: Self.texture)
+                    if model.showsRemJetToggle {
+                        FFToggle("Remove rem-jet", isOn: $model.recipe.remJetRemoved)
+                            .padding(.bottom, 8)
+                            .help("Removing the anti-halation backing lets highlights bleed red")
+                    }
                     FFSectionLabel("Frame").padding(.top, T.rows(1)).padding(.bottom, 4)
                     SpecSliders(model: model, specs: [SliderSpec("vignette", "Vignette", \.vignetteAmount, 0...1, default: 0)])
                     FFToggle("Border", isOn: $model.recipe.borderEnabled)
