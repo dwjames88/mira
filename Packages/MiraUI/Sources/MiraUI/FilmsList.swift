@@ -16,7 +16,7 @@ public struct FilmsList: View {
             Text("\(library.stocks.count) stocks \u{00B7} \(library.films.count) looks \u{00B7} \(familyCount) families")
                 .ffLabel(color: T.paperDim)
                 .frame(height: T.rows(1))
-            ForEach(FilmFamily.allCases, id: \.self) { family in
+            ForEach(FilmFamily.displayOrder, id: \.self) { family in
                 let films = library.stocks.filter { $0.family == family }
                 if !films.isEmpty {
                     FFSectionLabel(family.displayName, trailing: String(format: "%03d", films.count))
@@ -31,7 +31,7 @@ public struct FilmsList: View {
     }
 
     private var familyCount: Int {
-        FilmFamily.allCases.filter { family in library.stocks.contains { $0.family == family } }.count
+        FilmFamily.displayOrder.filter { family in library.stocks.contains { $0.family == family } }.count
     }
 }
 

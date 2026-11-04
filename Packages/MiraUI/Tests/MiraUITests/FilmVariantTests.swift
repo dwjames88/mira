@@ -125,4 +125,9 @@ struct FilmVariantTests {
         #expect(Set(model.thumbnails.keys) == [EditorModel.originalTileID, "portra", "trix"])
         model.cancelWork()
     }
+
+    @Test func familyTabsListOnlyPresentFamiliesInDisplayOrder() throws {
+        let model = EditorModel(library: try Self.makeLibrary())
+        #expect(model.availableFamilies == [.colorNegative, .blackAndWhite])
+    }
 }

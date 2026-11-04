@@ -253,6 +253,12 @@ public final class EditorModel {
         return stocks.filter { $0.family == familyFilter }
     }
 
+    /// The families that have at least one stock, in UI order; the strip's tabs.
+    public var availableFamilies: [FilmFamily] {
+        let present = Set(library.stocks.map(\.family))
+        return FilmFamily.displayOrder.filter { present.contains($0) }
+    }
+
     /// The stock the applied film belongs to (the film itself for a stock); nil for Original.
     public var selectedStockID: String? {
         selectedFilmID.map { library.film(id: $0)?.stockID ?? $0 }
