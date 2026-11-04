@@ -200,12 +200,12 @@ import Testing
         #expect(try fourth.lut(for: film).data == a.data)
     }
 
-    @Test func prewarmLoadsEverything() throws {
+    @Test func prewarmLoadsEveryStock() throws {
         let cache = FileManager.default.temporaryDirectory.appendingPathComponent("mira-luts-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: cache) }
         let lib = try FilmLibrary(directory: FilmTests.filmsDirectory(), cacheDirectory: cache)
         lib.prewarmSync(concurrency: 4)
         let files = try FileManager.default.contentsOfDirectory(atPath: cache.path).filter { $0.hasSuffix(".lut") }
-        #expect(files.count == lib.films.count)
+        #expect(files.count == lib.stocks.count)
     }
 }
