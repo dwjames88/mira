@@ -26,6 +26,12 @@ struct Options {
     var bench = false
     var benchDir = "build/bench"
     var fixture = "Fixtures/sample.jpg"
+    var contactSheet = false
+    var cropOnly = false
+    var out: String?
+    var filmsList: String?
+    var states: String?
+    var width = 900
 }
 
 func parseArguments() -> Options {
@@ -54,6 +60,12 @@ func parseArguments() -> Options {
         case "--bench": o.bench = true
         case "--bench-dir": o.benchDir = next(flag)
         case "--fixture": o.fixture = next(flag)
+        case "--contact-sheet": o.contactSheet = true
+        case "--crop-only": o.cropOnly = true
+        case "--out": o.out = next(flag)
+        case "--films-list": o.filmsList = next(flag)
+        case "--states": o.states = next(flag)
+        case "--width": o.width = nextInt(flag)
         default: fail("unknown argument \(flag)")
         }
     }
@@ -98,6 +110,42 @@ if opts.bench {
     guard let p = opts.films else { fail("--bench needs --films <dir>") }
     do { try Bench.run(filmsPath: p, fixturePath: opts.fixture, benchDir: opts.benchDir); exit(0) }
     catch { fail("bench failed: \(error)") }
+}
+
+if opts.contactSheet {
+    guard let p = opts.films, let input = opts.input, let out = opts.out else {
+        fail("usage: mira-sheet --contact-sheet --films <dir> --input <image|RAW> --out <dir> [--films-list id,id] [--states a,b] [--width 900] [--crop-only]")
+    }
+    var states = ContactSheetState.defaults
+    if let list = opts.states {
+        states = list.split(separator: ",").map { name in
+            guard let s = ContactSheetState(rawValue: String(name)) else {
+                fail("unknown state \(name); valid: \(ContactSheetState.allCases.map(\.rawValue).joined(separator: ", "))")
+            }
+            return s
+        }
+    }
+    let ids = opts.filmsList.map { $0.split(separator: ",").map(String.init) } ?? ContactSheetState.defaultFilmIDs
+    let inputURL = URL(fileURLWithPath: input)
+    do {
+        let lib = try FilmLibrary(directory: URL(fileURLWithPath: p, isDirectory: true))
+        // RAW decodes differently with and without a film, so cache one source per case.
+        nonisolated(unsafe) var cache: [Bool: CIImage] = [:]
+        let t0 = DispatchTime.now().uptimeNanoseconds
+        let config = ContactSheet.Config(films: ids, states: states, tileWidth: opts.width, cropOnly: opts.cropOnly,
+                                         outDir: URL(fileURLWithPath: out, isDirectory: true))
+        let result = try ContactSheet.run(config: config, library: lib, warn: { print("WARN \($0)") }) { recipe in
+            let key = recipe.filmID != nil
+            if let c = cache[key] { return c }
+            guard let img = ImageSource.developedSource(url: inputURL, recipe: recipe, draft: false) else { return nil }
+            cache[key] = img
+            return img
+        }
+        for (label, ms) in result.timings { print(String(format: "%-28@ %8.0f ms", label as NSString, ms)) }
+        print(String(format: "wall (incl. library/source) %.0f ms", Double(DispatchTime.now().uptimeNanoseconds - t0) / 1e6))
+        for f in result.files { print(f.path) }
+        exit(0)
+    } catch { fail("contact sheet failed: \(error)") }
 }
 
 guard let filmsPath = opts.films, let inputPath = opts.input, let outputPath = opts.output else {
