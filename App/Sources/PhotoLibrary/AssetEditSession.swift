@@ -38,6 +38,10 @@ final class AssetEditSession {
         /// Full-size, upright source (or the display-size image when only that was available).
         let source: CIImage
         let isFullSize: Bool
+        /// Set when the editing input is a camera RAW file (the source is a draft develop of it);
+        /// the editor attaches it with `EditorModel.attachRawSource`.
+        let rawURL: URL?
+        let rawOrientation: CGImagePropertyOrientation?
     }
 
     private(set) var asset: PHAsset
@@ -76,12 +80,21 @@ final class AssetEditSession {
 
         var image: CIImage?
         var full = false
+        var rawURL: URL?
+        var rawOrientation: CGImagePropertyOrientation?
         if let url = input.fullSizeImageURL {
             let orientation = CGImagePropertyOrientation(rawValue: UInt32(input.fullSizeImageOrientation))
+            // RAW input is developed with the saved recipe's RAW settings (draft: this is the preview).
+            let developRecipe = recipe
             let loaded = await Task.detached(priority: .userInitiated) {
-                ImageSource.load(url: url, orientation: orientation).map(Unchecked.init)
+                ImageSource.developedSource(url: url, orientation: orientation, recipe: developRecipe, draft: true)
+                    .map(Unchecked.init)
             }.value
-            if let loaded { image = loaded.value; full = true }
+            if let loaded {
+                image = loaded.value
+                full = true
+                if ImageSource.isRAW(url: url) { rawURL = url; rawOrientation = orientation }
+            }
         }
         if image == nil, let cg = input.displaySizeImage?.cgImage(forProposedRect: nil, context: nil, hints: nil) {
             image = CIImage(cgImage: cg)
@@ -89,7 +102,7 @@ final class AssetEditSession {
         guard let image else { throw AssetEditError.inputUnavailable }
         isFullSize = full
         return Loaded(recipe: recipe, hadOurAdjustments: ours, foreignFormat: foreign,
-                      source: image, isFullSize: full)
+                      source: image, isFullSize: full, rawURL: rawURL, rawOrientation: rawOrientation)
     }
 
     private func requestInput(progress: (@MainActor (Double) -> Void)?) async throws -> PHContentEditingInput {
