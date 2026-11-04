@@ -30,6 +30,16 @@ public final class FilmLibrary: @unchecked Sendable {
 
     public func film(id: String) -> Film? { index[id] }
 
+    /// The films shown as cards: every entry that is not a variant, in `films.json` order.
+    public var stocks: [Film] { films.filter { !$0.isVariant } }
+
+    /// The stock `id` belongs to (itself when it is a stock), then its variants in `films.json`
+    /// order. Empty when `id` is unknown; a single element when the stock has no variants.
+    public func variants(of id: String) -> [Film] {
+        guard let film = index[id], let stock = index[film.stockID] else { return [] }
+        return [stock] + films.filter { $0.parent == stock.id }
+    }
+
     public func lut(for film: Film) throws -> LUT {
         lock.lock()
         if let hit = cache[film.id] { lock.unlock(); return hit }
