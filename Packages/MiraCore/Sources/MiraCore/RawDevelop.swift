@@ -1,5 +1,6 @@
 import CoreGraphics
 import CoreImage
+import CoreImage.CIFilterBuiltins
 import Foundation
 import ImageIO
 
@@ -213,14 +214,75 @@ public final class RawDevelop: @unchecked Sendable {
         return Float(PreviewSizing.maxSide / longSide)
     }
 
+    /// Longest side of the reduced decode used to measure headroom.
+    static let headroomProbeSide: CGFloat = 400
+    /// Highest headroom reported.
+    public static let maxHeadroom: CGFloat = 8
+
+    private struct HeadroomKey: Hashable {
+        var settings: RawSettings
+        var filmApplied: Bool
+    }
+    private var headroomCache: [HeadroomKey: CGFloat] = [:]
+
     /// The upright image for `settings`. `draft` favours speed (previews); `scale` < 1 decodes smaller.
+    /// The image is tagged with its headroom (`CIImage.miraHeadroom`).
     public func apply(
         _ settings: RawSettings, filmApplied: Bool, draft: Bool, scale: Float = 1
     ) -> CIImage? {
+        develop(settings, filmApplied: filmApplied, draft: draft, scale: scale)?.image
+    }
+
+    /// Like `apply`, also reporting the headroom: the largest linear value the decode holds. It is
+    /// 1 unless a film is applied and extended dynamic range is on (explicitly or by the film
+    /// default); then it is measured, see `measureHeadroom`.
+    public func develop(
+        _ settings: RawSettings, filmApplied: Bool, draft: Bool, scale: Float = 1
+    ) -> DevelopedSource? {
         lock.lock(); defer { lock.unlock() }
+        var headroom: CGFloat = 1
+        let edr = RawSettingsMapper.resolvedExtendedDynamicRange(settings, filmApplied: filmApplied, initial: initial)
+        if filmApplied, edr > 0 {
+            let key = HeadroomKey(settings: settings, filmApplied: filmApplied)
+            if let hit = headroomCache[key] {
+                headroom = hit
+            } else {
+                headroom = measureHeadroom(settings, filmApplied: filmApplied)
+                headroomCache[key] = headroom
+            }
+        }
         RawSettingsMapper.apply(settings, filmApplied: filmApplied, draft: draft, scale: scale,
                                 initial: initial, to: filter)
-        return filter.outputImage
+        guard let image = filter.outputImage else { return nil }
+        return DevelopedSource(image: image, headroom: headroom)
+    }
+
+    /// Decodes a reduced draft (long side ~`headroomProbeSide`) with `settings` and returns its
+    /// peak linear value (max of R, G, B over the image), clamped to 1...8. CIRAWFilter's
+    /// `extendedDynamicRangeAmount` has no documented fixed relation to the peak (it varies with the
+    /// file, boost and white balance: see RawIntegrationTests), so it is measured. Caller holds the lock.
+    private func measureHeadroom(_ settings: RawSettings, filmApplied: Bool) -> CGFloat {
+        let longSide = max(nativeSize.width, nativeSize.height)
+        let scale = Float(min(1, Self.headroomProbeSide / max(longSide, 1)))
+        RawSettingsMapper.apply(settings, filmApplied: filmApplied, draft: true, scale: scale,
+                                initial: initial, to: filter)
+        guard let probe = filter.outputImage, !probe.extent.isEmpty, !probe.extent.isInfinite else { return 1 }
+        let peak = Self.peak(of: probe)
+        return min(max(peak, 1), Self.maxHeadroom)
+    }
+
+    /// Maximum of R, G and B over `image`, in extended linear sRGB.
+    static func peak(of image: CIImage) -> CGFloat {
+        let f = CIFilter.areaMaximum()
+        f.inputImage = image
+        f.extent = image.extent
+        guard let out = f.outputImage else { return 1 }
+        var px = [Float](repeating: 0, count: 4)
+        let space = CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!
+        Renderer.sharedContext.render(out, toBitmap: &px, rowBytes: 16,
+                                      bounds: CGRect(x: 0, y: 0, width: 1, height: 1), format: .RGBAf, colorSpace: space)
+        let m = max(px[0], px[1], px[2])
+        return m.isFinite ? CGFloat(m) : 1
     }
 }
 

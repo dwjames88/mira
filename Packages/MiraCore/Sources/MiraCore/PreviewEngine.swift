@@ -71,6 +71,8 @@ public final class PreviewEngine: @unchecked Sendable {
     private var source: CIImage?
     private var generation = 0
     private var levels: [Int: CIImage] = [:]
+    /// Largest linear value the source holds (`CIImage.miraHeadroom`); derived bases lose the tag.
+    private var sourceHeadroom: CGFloat = 1
     private var bases: [BaseKey: CIImage] = [:]
     private var baseOrder: [BaseKey] = []
     private var zoomBases: [ZoomBaseKey: CIImage] = [:]
@@ -128,6 +130,7 @@ public final class PreviewEngine: @unchecked Sendable {
         } else {
             source = nil
         }
+        sourceHeadroom = image?.miraHeadroom ?? 1
         levels = [:]
         bases = [:]
         baseOrder = []
@@ -144,6 +147,12 @@ public final class PreviewEngine: @unchecked Sendable {
     public var hasSource: Bool {
         lock.lock(); defer { lock.unlock() }
         return source != nil
+    }
+
+    /// Largest linear value the source holds (1 for SDR).
+    var headroom: CGFloat {
+        lock.lock(); defer { lock.unlock() }
+        return sourceHeadroom
     }
 
     public var sourceSize: CGSize? {
@@ -164,7 +173,8 @@ public final class PreviewEngine: @unchecked Sendable {
     public func render(_ recipe: Recipe, canvas: CGSize?, maskOverlay: Bool = false) -> PreviewFrame? {
         Perf.interval("preview render") {
             guard let base = previewBase(crop: recipe.crop, canvas: canvas) else { return nil }
-            let graded = renderer.grade(recipe, cropped: base, sourceSize: sourceSize, maskOverlay: maskOverlay)
+            let graded = renderer.grade(recipe, cropped: base, sourceSize: sourceSize, maskOverlay: maskOverlay,
+                                       sourceHeadroom: headroom)
             return renderFrame(graded)
         }
     }
@@ -316,7 +326,7 @@ public final class PreviewEngine: @unchecked Sendable {
             // Dodge and burn masks are built for the region only (a zoomed 24 MP picture is huge).
             let graded = renderer.grade(recipe, cropped: base, sourceSize: sourceSize,
                                         maskRegion: recipe.dodgeBurn.hasVisibleEffect ? ci.insetBy(dx: -2, dy: -2) : nil,
-                                        maskOverlay: maskOverlay)
+                                        maskOverlay: maskOverlay, sourceHeadroom: headroom)
             let extent = graded.extent
             guard !extent.isInfinite, !extent.isEmpty else { return nil }
             return renderFrame(graded, from: ci,
@@ -369,7 +379,8 @@ public final class PreviewEngine: @unchecked Sendable {
 
     /// The cropped picture fitted into `longSide` x `longSide`, as a small bitmap, for the film strip.
     public func thumbnailBase(crop: CropSettings, longSide: CGFloat) -> CIImage? {
-        previewBase(crop: crop, canvas: CGSize(width: longSide, height: longSide))
+        // The base is a derived bitmap; it carries the source's headroom so thumbnails grade like the preview.
+        previewBase(crop: crop, canvas: CGSize(width: longSide, height: longSide))?.withMiraHeadroom(headroom)
     }
 
     /// Renders one thumbnail per id (nil is the untouched picture) from a single small base, up to
