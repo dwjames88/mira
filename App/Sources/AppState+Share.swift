@@ -74,7 +74,7 @@ extension AppState {
                 shareBusyText = nil
                 isSharing = false
             }
-            guard let source = await editor.fullSource() else {
+            guard let source = await editor.exportSource() else {
                 errorMessage = "Share failed: the full-size picture could not be read."
                 return
             }

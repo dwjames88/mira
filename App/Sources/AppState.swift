@@ -364,12 +364,14 @@ final class AppState {
             if progress.showing {
                 model.recipe = loaded.recipe
                 model.replaceSource(loaded.source, isFull: true)
+                if let url = loaded.rawURL { model.attachRawSource(url: url, orientation: loaded.rawOrientation, developedFor: loaded.recipe) }
             } else {
                 flushSidecar()
                 scopedURL?.stopAccessingSecurityScopedResource()
                 scopedURL = nil
                 model.setSource(loaded.source)
                 model.recipe = loaded.recipe
+                if let url = loaded.rawURL { model.attachRawSource(url: url, orientation: loaded.rawOrientation, developedFor: loaded.recipe) }
             }
             editor = model
             target = .asset(session)
@@ -461,7 +463,7 @@ final class AppState {
 
     @discardableResult
     func saveToPhotos() async -> Bool {
-        guard case .asset(let session) = target, let editor, let source = await editor.fullSource() else { return false }
+        guard case .asset(let session) = target, let editor, let source = await editor.exportSource() else { return false }
         let recipe = editor.recipe
         busyText = "Saving"
         busyProgress = nil
@@ -541,7 +543,7 @@ final class AppState {
         isExporting = true
         Task {
             // A large file may still be decoding in the background; export needs every pixel.
-            guard let source = await editor.fullSource() else {
+            guard let source = await editor.exportSource() else {
                 isExporting = false
                 errorMessage = "Export failed: the full-size picture could not be read."
                 return

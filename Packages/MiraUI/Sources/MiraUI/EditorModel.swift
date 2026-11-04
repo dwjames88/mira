@@ -37,6 +37,8 @@ public final class EditorModel {
     public private(set) var source: CIImage?
     /// False while `source` is only a quick low-resolution stand-in for the real photo.
     public private(set) var isSourceFull = true
+    /// RAW development state for the open photo (see EditorModel+Raw.swift).
+    public let rawSession = RawSession()
 
     public var recipe: Recipe {
         didSet {
@@ -45,6 +47,7 @@ public final class EditorModel {
             // `recipe`, so a slider tick does not re-evaluate them.
             if recipe.filmID != selectedFilmID { selectedFilmID = recipe.filmID }
             updateAppliedPreset()
+            rawRecipeChanged(from: oldValue)
             if recipe.crop != oldValue.crop { resetZoom() } else { revalidateZoom() }
             schedulePreview()
             recipeChangedWhileHovering()
@@ -265,6 +268,7 @@ public final class EditorModel {
     /// Sets the photo to edit. `image` must already be upright. `isFull` is false for a quick
     /// stand-in that `replaceSource(_:)` swaps for the real photo later.
     public func setSource(_ image: CIImage, isFull: Bool = true) {
+        endRawSession()
         fullDecodeTask?.cancel()
         fullDecodeTask = nil
         sourceGeneration += 1
@@ -293,9 +297,9 @@ public final class EditorModel {
 
     /// Swaps the stand-in for the real photo (same picture, full resolution). The frame on screen
     /// stays until the sharper one is ready, and the film strip is kept.
-    public func replaceSource(_ image: CIImage, isFull: Bool = true) {
+    public func replaceSource(_ image: CIImage, isFull: Bool = true, keepZoom: Bool = false) {
         sourceGeneration += 1
-        resetZoom()
+        if !keepZoom { resetZoom() }
         source = image
         isSourceFull = isFull
         engine.setSource(image)
@@ -325,8 +329,8 @@ public final class EditorModel {
     /// `isSourceFull` and `fullSource()` tell when the real photo is in.
     @discardableResult
     public func loadSource(url: URL, orientation: CGImagePropertyOrientation?) -> Bool {
-        if !ImageSource.isRAW(url: url),
-           let size = ImageSource.orientedPixelSize(url: url, orientation: orientation),
+        if ImageSource.isRAW(url: url) { return loadRawSource(url: url, orientation: orientation) }
+        if let size = ImageSource.orientedPixelSize(url: url, orientation: orientation),
            max(size.width, size.height) > Self.standInThreshold,
            let stand = ImageSource.loadThumbnail(url: url, orientation: orientation, maxPixelSize: Self.standInLongSide) {
             setSource(stand, isFull: false)
@@ -919,6 +923,7 @@ public final class EditorModel {
         thumbnailCancel?.cancel()
         hoverTask?.cancel()
         fullDecodeTask?.cancel()
+        cancelRawWork()
         cancelPresetWork()
     }
 }

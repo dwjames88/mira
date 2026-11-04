@@ -133,7 +133,7 @@ final class PhotoEditingViewController: NSViewController, PHContentEditingContro
         let renderType = type
         // A large file may still be decoding in the background; the export needs the full-size photo.
         exportTask = Task { @MainActor in
-            guard let source = await model.fullSource(), !Task.isCancelled else {
+            guard let source = await model.exportSource(), !Task.isCancelled else {
                 done.value(nil)
                 return
             }
