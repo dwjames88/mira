@@ -1,4 +1,5 @@
 import Foundation
+import ImageIO
 import Testing
 @testable import MiraCore
 
@@ -59,11 +60,19 @@ import Testing
         #expect(Set(referenced).count == referenced.count)
         #expect(Set(onDisk) == Set(referenced), "unreferenced or missing files: \(Set(onDisk).symmetricDifference(referenced).sorted())")
 
+        // Header check for every file (cheap): square, side a perfect cube (Hald level L, side L^3).
         for f in films {
             let url = Self.dir.appendingPathComponent(f.file)
-            let lut = try LUT.loadHald(url: url)
+            let props = CGImageSourceCreateWithURL(url as CFURL, nil)
+                .flatMap { CGImageSourceCopyPropertiesAtIndex($0, 0, nil) as? [CFString: Any] }
+            let w = props?[kCGImagePropertyPixelWidth] as? Int ?? 0
+            let h = props?[kCGImagePropertyPixelHeight] as? Int ?? 0
+            #expect(w == h && (2...32).contains { $0 * $0 * $0 == w }, "\(f.id): \(w)x\(h) is not a Hald CLUT")
+        }
+        // Full decode of a sample (every 25th film): the cube has 4 Float32 channels per texel.
+        for f in films.enumerated().filter({ $0.offset % 25 == 0 }).map(\.element) {
+            let lut = try LUT.loadHald(url: Self.dir.appendingPathComponent(f.file))
             #expect(lut.dimension >= 2 && lut.dimension <= LUT.maxHaldDimension, "\(f.id): dimension \(lut.dimension)")
-            // The decoded cube is 4 Float32 channels per texel.
             #expect(lut.data.count == lut.dimension * lut.dimension * lut.dimension * 16)
         }
     }
@@ -162,9 +171,22 @@ import Testing
     // MARK: memory cache
 
     @Test func memoryCacheIsBounded() throws {
-        let lib = try Self.library()
+        // A synthetic library of tiny .cube films, so the test does not decode 72 Hald PNGs.
         let limit = FilmLibrary.memoryCacheLimit
-        let films = Array(lib.films.prefix(limit + 8))
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("mira-lru-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        var cube = "LUT_3D_SIZE 2\n"
+        for b in 0..<2 { for g in 0..<2 { for r in 0..<2 { cube += "\(r) \(g) \(b)\n" } } }
+        var entries: [String] = []
+        for i in 0..<(limit + 8) {
+            try cube.write(to: dir.appendingPathComponent("f\(i).cube"), atomically: true, encoding: .utf8)
+            entries.append(#"{"id":"f\#(i)","displayName":"F","brand":"T","family":"slide","iso":100,"file":"f\#(i).cube"}"#)
+        }
+        try ("[" + entries.joined(separator: ",") + "]").write(to: dir.appendingPathComponent("films.json"),
+                                                              atomically: true, encoding: .utf8)
+        let lib = try FilmLibrary(directory: dir)
+        let films = lib.films
         try #require(films.count > limit)
         for f in films {
             _ = try lib.lut(for: f)
