@@ -206,6 +206,6 @@ import Testing
         let lib = try FilmLibrary(directory: FilmTests.filmsDirectory(), cacheDirectory: cache)
         lib.prewarmSync(concurrency: 4)
         let files = try FileManager.default.contentsOfDirectory(atPath: cache.path).filter { $0.hasSuffix(".lut") }
-        #expect(files.count == lib.stocks.count)
+        #expect(files.count == lib.stocks.filter { $0.proceduralID == nil }.count)  // procedural looks have no cache file
     }
 }

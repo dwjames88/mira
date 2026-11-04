@@ -15,6 +15,11 @@ import Testing
         #expect(Set(films.map(\.id)).count == films.count, "duplicate ids")
         #expect(Set(films.map(\.file)).count == films.count, "two films share a file")
         for f in films {
+            // Procedural looks are generated in code: no file, but the id must be registered.
+            if let look = f.proceduralID {
+                #expect(ProceduralLooks.isRegistered(look), "\(f.id): unregistered procedural look \(look)")
+                continue
+            }
             #expect(FileManager.default.fileExists(atPath: Self.dir.appendingPathComponent(f.file).path), "\(f.id): missing \(f.file)")
         }
     }
@@ -35,7 +40,7 @@ import Testing
     }
 
     @Test func everyFilmHasMatchingAttributionRow() throws {
-        let films = try Self.library().films
+        let films = try Self.library().films.filter { $0.proceduralID == nil }
         let text = try String(contentsOf: Self.dir.appendingPathComponent("ATTRIBUTION.md"), encoding: .utf8)
         var rows: [String: String] = [:]
         for line in text.split(separator: "\n") where line.hasPrefix("| ") {
@@ -53,7 +58,7 @@ import Testing
     }
 
     @Test func everyHaldFileIsReferencedOnceAndValid() throws {
-        let films = try Self.library().films
+        let films = try Self.library().films.filter { $0.proceduralID == nil }
         let hald = Self.dir.appendingPathComponent("HaldCLUT", isDirectory: true)
         let onDisk = try FileManager.default.contentsOfDirectory(atPath: hald.path).filter { !$0.hasPrefix(".") }
         let referenced = films.map { ($0.file as NSString).lastPathComponent }
