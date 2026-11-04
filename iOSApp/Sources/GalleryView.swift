@@ -332,6 +332,8 @@ struct AlbumGridView: View {
     @Bindable var editor: EditorViewModel
     let title: String
     @State private var album: AlbumModel
+    /// Persisted ALL / RAW choice, shared by every album.
+    @AppStorage("gallery.rawOnly") private var rawOnly = false
     @Environment(\.displayScale) private var displayScale
 
     private let columns = 3
@@ -349,8 +351,15 @@ struct AlbumGridView: View {
             FFGroundBackground(grain: 0.07).ignoresSafeArea()
             VStack(spacing: 0) {
                 HStack {
-                    Text("\(album.count) PHOTOS").ffLabel(size: 9, color: FieldFramesTheme.paperDim)
+                    Text("\(album.count) \(rawOnly ? "RAW" : "PHOTOS")").ffLabel(size: 9, color: FieldFramesTheme.paperDim)
+                    if let progress = album.scanProgress {
+                        Text("SCANNING \(progress.done.formatted()) / \(progress.total.formatted())")
+                            .ffLabel(size: 9, color: FieldFramesTheme.lichen).lineLimit(1)
+                    }
                     Spacer(minLength: 0)
+                    FFTabBar([(value: false, title: "ALL"), (value: true, title: "RAW")], selection: $rawOnly,
+                             spacing: FieldFramesTheme.cells(2))
+                        .accessibilityLabel("Show all photos or RAW only")
                     if gallery.status == .limited {
                         Button { gallery.presentLimitedPicker() } label: {
                             Text("ADD MORE").ffLabel(size: 11, color: FieldFramesTheme.lichen).frame(minHeight: 44)
@@ -363,14 +372,20 @@ struct AlbumGridView: View {
                 if !album.loaded {
                     Color.clear.frame(maxHeight: .infinity)
                 } else if album.count == 0 {
-                    FFEmptyState(title: "No photos", subtitle: gallery.status == .limited
-                                 ? "NO PHOTOS IN YOUR SELECTION" : "THIS ALBUM HAS NO PICTURES")
+                    if rawOnly {
+                        FFEmptyState(title: "No RAW photos", subtitle: album.scanProgress != nil
+                                     ? "SCANNING FOR RAW PHOTOS" : "THIS ALBUM HAS NO RAW PICTURES")
+                    } else {
+                        FFEmptyState(title: "No photos", subtitle: gallery.status == .limited
+                                     ? "NO PHOTOS IN YOUR SELECTION" : "THIS ALBUM HAS NO PICTURES")
+                    }
                 } else { grid }
             }
         }
         .ffNavigationTitle(title)
-        .task(id: gallery.revision) { await album.reload() }
-        .onDisappear { album.stopCaching() }
+        .task(id: gallery.revision) { await album.reload(rawOnly: rawOnly, gallery: gallery) }
+        .onChange(of: rawOnly) { _, on in Task { await album.setRawOnly(on) } }
+        .onDisappear { album.cancelWork(); album.stopCaching() }
     }
 
     private var grid: some View {

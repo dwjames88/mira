@@ -51,6 +51,43 @@ enum GalleryKit {
         return Unchecked(value: first)
     }
 
+    /// Identifiers of the library's RAW smart album, or nil when this device has none (then the
+    /// filter falls back to per-asset resource lookups). Runs off the main actor.
+    nonisolated static func rawAlbumIdentifiers() -> Set<String>? {
+        guard let album = SidebarLoader.smartCollection(PHAssetCollectionSubtype.smartAlbumRAW.rawValue) else { return nil }
+        let result = PHAsset.fetchAssets(in: album, options: nil)
+        var ids = Set<String>()
+        ids.reserveCapacity(result.count)
+        for i in 0..<result.count { ids.insert(result.object(at: i).localIdentifier) }
+        return ids
+    }
+
+    /// Local identifiers of a fetch, in order. Runs off the main actor.
+    nonisolated static func identifiers(of result: Unchecked<PHFetchResult<PHAsset>>) -> [String] {
+        let r = result.value
+        var ids: [String] = []
+        ids.reserveCapacity(r.count)
+        for i in 0..<r.count {
+            if i % 2048 == 0, Task.isCancelled { return [] }
+            ids.append(r.object(at: i).localIdentifier)
+        }
+        return ids
+    }
+
+    /// Whether the asset at each index has a RAW resource; stops early when cancelled.
+    nonisolated static func rawFlags(in result: Unchecked<PHFetchResult<PHAsset>>, indices: [Int]) -> [(Int, Bool)] {
+        var out: [(Int, Bool)] = []
+        out.reserveCapacity(indices.count)
+        for i in indices {
+            if Task.isCancelled { break }
+            let types = PHAssetResource.assetResources(for: result.value.object(at: i))
+                .filter { $0.type == .photo || $0.type == .alternatePhoto }
+                .map(\.uniformTypeIdentifier)
+            out.append((i, RAWDetection.containsRAW(types)))
+        }
+        return out
+    }
+
     /// (isRAW, isEdited) from the asset's resources; runs off the main actor.
     nonisolated static func badges(of asset: Unchecked<PHAsset>) -> (raw: Bool, edited: Bool) {
         let resources = PHAssetResource.assetResources(for: asset.value)
@@ -77,6 +114,9 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
     @ObservationIgnored private var observing = false
     /// Shared by every cover tile: one caching manager and an in-memory cover cache.
     @ObservationIgnored let covers = CoverStore()
+    /// RAW answers shared by every album grid; cleared when the library changes.
+    @ObservationIgnored var rawClassification: RAWClassification?
+    @ObservationIgnored var rawFlags: [String: Bool] = [:]
 
     var hasAccess: Bool { status == .authorized || status == .limited }
 
@@ -108,6 +148,8 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
                 if self.hasAccess {
                     self.revision += 1
                     self.covers.removeAll()
+                    self.rawClassification = nil
+                    self.rawFlags = [:]
                     Task { await self.reloadSections() }
                 } else {
                     self.sections = []
@@ -147,8 +189,16 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
 final class AlbumModel {
     let nodeID: String
     private(set) var result: PHFetchResult<PHAsset>?
+    /// Number of cells shown: the whole fetch, or the RAW matches while the RAW filter is on.
     private(set) var count = 0
     private(set) var loaded = false
+    /// The ALL / RAW choice. Changing it goes through `setRawOnly`.
+    private(set) var rawOnly = false
+    /// "scanned / total" while the RAW filter is still checking assets one by one.
+    private(set) var scanProgress: (done: Int, total: Int)?
+    @ObservationIgnored private var displayIndices: [Int]?
+    @ObservationIgnored private var rawTask: Task<Void, Never>?
+    @ObservationIgnored private weak var gallery: GalleryModel?
 
     @ObservationIgnored let caching = PHCachingImageManager()
     @ObservationIgnored let thumbOptions: PHImageRequestOptions = {
@@ -163,17 +213,89 @@ final class AlbumModel {
 
     init(nodeID: String) { self.nodeID = nodeID }
 
-    func reload() async {
+    func reload(rawOnly: Bool, gallery: GalleryModel) async {
         let id = nodeID
         let box = await Task.detached(priority: .userInitiated) {
             Unchecked(value: SidebarLoader.fetchAssets(nodeID: id))
         }.value
+        self.gallery = gallery
         result = box.value
+        displayIndices = nil
         count = box.value.count
         loaded = true
         caching.stopCachingImagesForAllAssets()
         cachedRange = 0..<0
+        await setRawOnly(rawOnly)
     }
+
+    /// Turns the RAW filter on or off. The RAW smart album answers at once when the device has one;
+    /// otherwise assets are checked newest first in chunks, and the grid fills as matches arrive.
+    func setRawOnly(_ on: Bool) async {
+        rawTask?.cancel()
+        rawOnly = on
+        scanProgress = nil
+        guard let result, let gallery else { return }
+        guard on else {
+            displayIndices = nil
+            count = result.count
+            resetCaching()
+            return
+        }
+        displayIndices = []
+        count = 0
+        resetCaching()
+        let box = Unchecked(value: result)
+        let task = Task { [weak self] in
+            let ids = await Task.detached(priority: .userInitiated) { GalleryKit.identifiers(of: box) }.value
+            guard !Task.isCancelled, let self else { return }
+            var classification = gallery.rawClassification
+            if classification == nil {
+                let album = await Task.detached(priority: .userInitiated) { GalleryKit.rawAlbumIdentifiers() }.value
+                classification = album.map { RAWClassification(rawIDs: $0) }
+                    ?? RAWClassification(known: gallery.rawFlags, authoritative: false)
+                if album != nil { gallery.rawClassification = classification }
+            }
+            guard var classification, !Task.isCancelled else { return }
+            if classification.authoritative {
+                self.publish(classification.matchingIndices(in: ids), replacing: true)
+                return
+            }
+            var matches: [Int] = []
+            let chunk = 200
+            var start = 0
+            while start < ids.count, !Task.isCancelled {
+                let range = start..<min(ids.count, start + chunk)
+                let todo = classification.unresolved(in: ids, range: range)
+                if !todo.isEmpty {
+                    let flags = await Task.detached(priority: .utility) { GalleryKit.rawFlags(in: box, indices: todo) }.value
+                    for (i, raw) in flags {
+                        classification.record(id: ids[i], isRAW: raw)
+                        gallery.rawFlags[ids[i]] = raw
+                    }
+                }
+                if Task.isCancelled { return }
+                matches += classification.matchingIndices(in: ids, range: range)
+                start = range.upperBound
+                self.scanProgress = start < ids.count ? (start, ids.count) : nil
+                self.publish(matches, replacing: true)
+            }
+        }
+        rawTask = task
+        await task.value
+    }
+
+    private func publish(_ indices: [Int], replacing: Bool = true) {
+        displayIndices = indices
+        count = indices.count
+        resetCaching()
+    }
+
+    private func resetCaching() {
+        caching.stopCachingImagesForAllAssets()
+        cachedRange = 0..<0
+    }
+
+    func cancelWork() { rawTask?.cancel() }
 
     func stopCaching() {
         caching.stopCachingImagesForAllAssets()
@@ -181,25 +303,26 @@ final class AlbumModel {
     }
 
     func asset(at index: Int) -> PHAsset? {
-        guard let result, index >= 0, index < result.count else { return nil }
-        return result.object(at: index)
+        guard let result, index >= 0, index < count else { return nil }
+        let source = displayIndices.map { $0[index] } ?? index
+        return source < result.count ? result.object(at: source) : nil
     }
 
     func setThumbSize(_ size: CGSize) { thumbSize = size }
 
     /// Keeps a window of ±36 around the visible index warm in the caching manager.
     func updateCaching(around index: Int) {
-        guard let result, thumbSize != .zero else { return }
-        let window = max(0, index - 36)..<min(result.count, index + 36)
+        guard result != nil, thumbSize != .zero else { return }
+        let window = max(0, index - 36)..<min(count, index + 36)
         guard window != cachedRange else { return }
         let old = Set(cachedRange), new = Set(window)
         let add = new.subtracting(old).sorted(), drop = old.subtracting(new).sorted()
         if !add.isEmpty {
-            caching.startCachingImages(for: add.map { result.object(at: $0) }, targetSize: thumbSize,
+            caching.startCachingImages(for: add.compactMap { asset(at: $0) }, targetSize: thumbSize,
                                        contentMode: .aspectFill, options: thumbOptions)
         }
         if !drop.isEmpty {
-            caching.stopCachingImages(for: drop.filter { $0 < result.count }.map { result.object(at: $0) },
+            caching.stopCachingImages(for: drop.compactMap { asset(at: $0) },
                                       targetSize: thumbSize, contentMode: .aspectFill, options: thumbOptions)
         }
         cachedRange = window
