@@ -383,7 +383,7 @@ private struct FilmStrip: View {
                     title: film.displayName,
                     caption: caption(for: film),
                     image: model.thumbnails[film.id],
-                    isSelected: model.selectedFilmID == film.id,
+                    isSelected: model.selectedStockID == film.id,
                     onHoverChange: { hover($0, film.id) }
                 ) { model.selectFilm(film.id) }
             }

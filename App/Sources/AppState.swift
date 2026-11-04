@@ -185,7 +185,7 @@ final class AppState {
     var canRevert: Bool {
         switch target {
         case .asset(let session): session.asset.hasAdjustments && !session.isReadOnly && !isBusy
-        case .file(let file): (file.persisted != nil || editor?.recipe != .neutral) && !isBusy
+        case .file(let file): (file.persisted != nil || editor?.hasEdits ?? false) && !isBusy
         case nil: false
         }
     }
