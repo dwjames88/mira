@@ -37,6 +37,7 @@ public final class RawSession {
     @ObservationIgnored var shownKey: RawDevelopKey?
     @ObservationIgnored var desiredKey: RawDevelopKey?
     @ObservationIgnored var task: Task<Void, Never>?
+    @ObservationIgnored var thumbnailTask: Task<Void, Never>?
     @ObservationIgnored var generation = 0
 
     init() {}
@@ -44,6 +45,8 @@ public final class RawSession {
     func reset() {
         task?.cancel()
         task = nil
+        thumbnailTask?.cancel()
+        thumbnailTask = nil
         generation += 1
         develop = nil
         url = nil
@@ -107,7 +110,10 @@ extension EditorModel {
     /// Called when `setSource` replaces the photo.
     func endRawSession() { rawSession.reset() }
 
-    func cancelRawWork() { rawSession.task?.cancel() }
+    func cancelRawWork() {
+        rawSession.task?.cancel()
+        rawSession.thumbnailTask?.cancel()
+    }
 
     // MARK: Re-developing
 
@@ -132,7 +138,31 @@ extension EditorModel {
             guard !Task.isCancelled, let self, self.rawSession.generation == generation, let box else { return }
             self.rawSession.shownKey = key
             self.replaceSource(box.image, keepZoom: true)
+            self.scheduleThumbnailRefresh()
         }
+    }
+
+    // MARK: Thumbnails
+
+    /// Waits for a pause in RAW changes, then regenerates the film-strip and preset thumbnails from the
+    /// newly developed source. The old tiles stay on screen until the new ones arrive.
+    func scheduleThumbnailRefresh(delay: Duration = .milliseconds(400)) {
+        rawSession.thumbnailTask?.cancel()
+        rawSession.thumbnailTask = Task { [weak self] in
+            if delay > .zero { try? await Task.sleep(for: delay) }
+            guard !Task.isCancelled, let self else { return }
+            self.invalidateThumbnailsForNewSource()
+        }
+    }
+
+    /// Drops the cached tiles (they were made from the previous develop) and renders them again.
+    func invalidateThumbnailsForNewSource() {
+        thumbnailCache = [:]
+        thumbnailCacheOrder = []
+        startThumbnails(keepShown: true)
+        presetThumbnailCache = [:]
+        presetThumbnailsDirty = true
+        startPresetThumbnails()
     }
 
     // MARK: Export
