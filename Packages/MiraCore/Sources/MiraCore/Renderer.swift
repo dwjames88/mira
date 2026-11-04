@@ -50,10 +50,15 @@ public enum RendererError: Error, CustomStringConvertible {
 ///     redistributed, not added. The slider scales the film's own halation (0.5 is native).
 ///  5. Film LUT with strength blend (the Hald CLUTs are sRGB display referred).
 ///  6. Contrast, tone, texture, clarity, saturation, vibrance: printing and scanning, after the film.
+///     Between the LUT and contrast: scan profile and push / pull contrast and base fog
+///     (`miraScan`), then toning of monochrome films (`miraToning`). Push / pull also changes the
+///     exposure gain (2^(0.33 N)), slide / Kodachrome latitude, and the grain strength.
 ///  7. Bloom.
 ///  8. Grain (`miraGrain`): band-limited smooth noise on the sRGB-encoded image, in frame-relative
 ///     coordinates (so a downscaled export and a preview agree), chroma and density dependent by film.
 ///  9. Vignette, mask overlay, border.
+/// Dodge and burn runs in step 3, long before the grain: strokes are painted light on the negative
+/// and carry the grain with them.
 public struct Renderer: Sendable {
     public let library: FilmLibrary
     /// Rasterised dodge and burn masks, shared by every copy of this renderer.
@@ -112,13 +117,21 @@ public struct Renderer: Sendable {
         let film = recipe.filmID.flatMap { library.film(id: $0) }
         let character = film?.resolvedCharacter ?? .generic
         let diagonal = hypot(extent.width, extent.height)
+        // Push / pull (pipeline 2): stops of push development, -2 ... 2.
+        let push = filmScience ? clamp(recipe.push, -2, 2) : 0
+        let family = film?.family
 
         // 1. Exposure. Pipeline 2: a gain in linear light with the film's highlight latitude, then
         // white balance (the light the film is exposed to).
         if filmScience {
-            if abs(recipe.exposure) > eps {
-                image = GradeKernels.applyFilmExposure(gain: exp2(clamp(recipe.exposure, -2, 2)),
-                                                       latitude: film?.resolvedCharacter.latitude ?? 0, to: image)
+            if abs(recipe.exposure) > eps || abs(push) > eps {
+                // Pushing develops for more density (a gain of 2^(0.33 N) before the film); slide
+                // and Kodachrome lose latitude (clip harder) when pushed.
+                var latitude = character.latitude
+                if film == nil { latitude = 0 }
+                if push > 0, family == .slide || family == .kodachrome { latitude *= max(0, 1 - 0.3 * push) }
+                image = GradeKernels.applyFilmExposure(gain: exp2(clamp(recipe.exposure, -2, 2) + 0.33 * push),
+                                                       latitude: latitude, to: image)
             }
             image = whiteBalance(image, recipe)
         } else if abs(recipe.exposure) > eps {
@@ -185,6 +198,22 @@ public struct Renderer: Sendable {
                         image = graded
                     }
                 }
+            }
+        }
+
+        // 2b. Pipeline 2: scan profile, push / pull contrast and base fog, then B&W toning.
+        if filmScience {
+            var scan = ScanParameters.profile(recipe.scanProfile)
+            scan.contrast += push * character.pushContrastPerStop
+            if push > 0, let family, family == .colorNegative || family == .motionPicture || family == .blackAndWhite {
+                scan.blackLift += 0.012 * push
+            }
+            if !scan.isIdentity {
+                image = fromGamma(GradeKernels.applyScan(scan, to: toGamma(image))).cropped(to: extent)
+            }
+            if film?.isMonochrome == true, recipe.toning != .none {
+                image = fromGamma(GradeKernels.applyToning(recipe.toning, amount: clamp(recipe.toningStrength, 0, 1),
+                                                           to: toGamma(image))).cropped(to: extent)
             }
         }
 
@@ -259,7 +288,9 @@ public struct Renderer: Sendable {
         // 7. Grain
         if filmScience {
             if recipe.grainAmount > eps {
-                image = filmGrain(image, extent: extent, character: character,
+                var grainCharacter = character
+                grainCharacter.grainStrength *= push > 0 ? 1 + character.pushGrainPerStop * push : 1 + 0.15 * push
+                image = filmGrain(image, extent: extent, character: grainCharacter,
                                   amount: clamp(recipe.grainAmount, 0, 1), sizeSlider: clamp(recipe.grainSize, 0, 1),
                                   diagonal: diagonal)
             }
@@ -302,6 +333,8 @@ public struct Renderer: Sendable {
     }
 
     /// Warmth / tint. Positive warmth = warmer (more red), positive tint = more magenta.
+    func whiteBalanceForMeter(_ image: CIImage, _ recipe: Recipe) -> CIImage { whiteBalance(image, recipe) }
+
     private func whiteBalance(_ image: CIImage, _ recipe: Recipe) -> CIImage {
         guard abs(recipe.warmth) > eps || abs(recipe.tint) > eps else { return image }
         let f = CIFilter.temperatureAndTint()
