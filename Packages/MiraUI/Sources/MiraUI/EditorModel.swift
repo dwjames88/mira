@@ -967,6 +967,8 @@ public final class EditorModel {
 
 #endif
 
+import MiraCore
+
 /// One entry of the FILMS panel's Variant picker: the stock itself ("Base") or one of its variants.
 public struct FilmVariantChoice: Identifiable, Hashable, Sendable {
     public let id: String

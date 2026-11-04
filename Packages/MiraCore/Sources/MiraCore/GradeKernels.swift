@@ -5,8 +5,19 @@ import Foundation
 /// `Kernels/Grade.ci.metal` and ship precompiled as `Resources/Grade.ci.metallib`
 /// (see `scripts/build-kernels.sh`).
 enum GradeKernels {
+    /// A metallib carries its platform in its target triple, so each platform loads its own build.
+    private static var resourceName: String {
+        #if os(iOS) && targetEnvironment(simulator)
+        "Grade.ci.iossim"
+        #elseif os(iOS)
+        "Grade.ci.ios"
+        #else
+        "Grade.ci"
+        #endif
+    }
+
     private static let library: Data? = {
-        guard let url = Bundle.module.url(forResource: "Grade.ci", withExtension: "metallib") else { return nil }
+        guard let url = Bundle.module.url(forResource: resourceName, withExtension: "metallib") else { return nil }
         return try? Data(contentsOf: url)
     }()
 
