@@ -220,14 +220,17 @@ public struct FFToggle: View {
 public struct FFTabBar<Value: Hashable>: View {
     private let options: [(value: Value, title: String)]
     @Binding private var selection: Value
+    private let spacing: CGFloat
 
-    public init(_ options: [(value: Value, title: String)], selection: Binding<Value>) {
+    public init(_ options: [(value: Value, title: String)], selection: Binding<Value>,
+                spacing: CGFloat = FieldFramesTheme.cells(3)) {
+        self.spacing = spacing
         self.options = options
         self._selection = selection
     }
 
     public var body: some View {
-        HStack(spacing: T.cells(3)) {
+        HStack(spacing: spacing) {
             ForEach(options.indices, id: \.self) { i in
                 let selected = options[i].value == selection
                 Button { selection = options[i].value } label: {

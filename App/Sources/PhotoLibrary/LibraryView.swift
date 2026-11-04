@@ -261,6 +261,7 @@ private struct LibraryGridPane: View {
                 Text("LIMITED ACCESS").ffLabel(size: 10, color: T.lichen)
             }
             Spacer()
+            RawQuickToggle(store: store)
             FilterButton(store: store)
         }
         .padding(.horizontal, T.cells(2))

@@ -58,7 +58,7 @@ extension EditorModel {
     /// The recipe applying `preset` would give right now: its film (none if missing) and develop
     /// settings, this photo's crop.
     public func recipe(applying preset: Preset) -> Recipe {
-        var r = preset.recipe(keeping: recipe.crop, dodgeBurn: recipe.dodgeBurn)
+        var r = preset.recipe(keeping: recipe.crop, dodgeBurn: recipe.dodgeBurn, raw: recipe.raw)
         if isFilmMissing(preset) { r.filmID = nil }
         return r
     }
@@ -168,6 +168,7 @@ extension EditorModel {
         }
         var swapped = recipe
         swapped.filmID = target.filmID
+        swapped.pipeline = Recipe.currentPipeline   // as selectFilm would
         return swapped
     }
 

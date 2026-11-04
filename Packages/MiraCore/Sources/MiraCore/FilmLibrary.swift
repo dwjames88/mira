@@ -15,7 +15,11 @@ public final class FilmLibrary: @unchecked Sendable {
     private static let headerSize = 12
 
     private let lock = NSLock()
+    /// Most cubes kept in memory (each 64³ Float32 RGBA cube is 4 MB); the least recently used is dropped.
+    static let memoryCacheLimit = 64
     private var cache: [String: LUT] = [:]
+    /// Film ids in `cache`, least recently used first.
+    private var cacheOrder: [String] = []
     private var filmLocks: [String: NSLock] = [:]
     private let index: [String: Film]
 
@@ -30,9 +34,43 @@ public final class FilmLibrary: @unchecked Sendable {
 
     public func film(id: String) -> Film? { index[id] }
 
+    /// The films shown as cards: every entry that is not a variant, in `films.json` order.
+    public var stocks: [Film] { films.filter { !$0.isVariant } }
+
+    /// The stock `id` belongs to (itself when it is a stock), then its variants in `films.json`
+    /// order. Empty when `id` is unknown; a single element when the stock has no variants.
+    public func variants(of id: String) -> [Film] {
+        guard let film = index[id], let stock = index[film.stockID] else { return [] }
+        return [stock] + films.filter { $0.parent == stock.id }
+    }
+
+    /// Number of cubes currently held in memory (at most `memoryCacheLimit`).
+    var memoryCacheCount: Int {
+        lock.lock(); defer { lock.unlock() }
+        return cache.count
+    }
+
+    /// Looks `id` up and marks it most recently used. Call with `lock` held.
+    private func cached(_ id: String) -> LUT? {
+        guard let hit = cache[id] else { return nil }
+        if let i = cacheOrder.lastIndex(of: id) { cacheOrder.remove(at: i) }
+        cacheOrder.append(id)
+        return hit
+    }
+
+    /// Stores `lut` as most recently used and evicts the oldest beyond the limit. Call with `lock` held.
+    private func store(_ lut: LUT, id: String) {
+        if cache[id] != nil, let i = cacheOrder.lastIndex(of: id) { cacheOrder.remove(at: i) }
+        cache[id] = lut
+        cacheOrder.append(id)
+        while cacheOrder.count > Self.memoryCacheLimit {
+            cache[cacheOrder.removeFirst()] = nil
+        }
+    }
+
     public func lut(for film: Film) throws -> LUT {
         lock.lock()
-        if let hit = cache[film.id] { lock.unlock(); return hit }
+        if let hit = cached(film.id) { lock.unlock(); return hit }
         // One loader per film at a time, so concurrent callers don't decode the same PNG twice.
         let filmLock: NSLock
         if let existing = filmLocks[film.id] { filmLock = existing } else {
@@ -43,7 +81,7 @@ public final class FilmLibrary: @unchecked Sendable {
         filmLock.lock()
         defer { filmLock.unlock() }
         lock.lock()
-        if let hit = cache[film.id] { lock.unlock(); return hit }
+        if let hit = cached(film.id) { lock.unlock(); return hit }
         lock.unlock()
 
         let url = directory.appendingPathComponent(film.file)
@@ -62,28 +100,28 @@ public final class FilmLibrary: @unchecked Sendable {
                 // Return exactly what a later cache hit would produce.
                 if let packed = Self.pack(lut), (try? packed.write(to: cacheFile, options: .atomic)) != nil {
                     let reread = Self.unpack(packed)
-                    lock.lock(); cache[film.id] = reread ?? lut; lock.unlock()
+                    lock.lock(); store(reread ?? lut, id: film.id); lock.unlock()
                     return reread ?? lut
                 }
             }
         }
 
         lock.lock()
-        cache[film.id] = lut
+        store(lut, id: film.id)
         lock.unlock()
         return lut
     }
 
-    /// Cold start decodes 31 Hald PNGs; more workers than 4 cut that by about 45 % on a 10-core Mac.
+    /// Cold start decodes one Hald PNG per stock card (variants load on demand); more workers than 4 cut that by about 45 % on a 10-core Mac.
     /// Utility priority keeps the UI responsive.
     public static var defaultPrewarmConcurrency: Int {
         min(8, max(4, ProcessInfo.processInfo.activeProcessorCount - 2))
     }
 
-    /// Loads every LUT with up to `concurrency` loads in flight. Failures are ignored here; they
+    /// Loads the LUT of every stock (not the variants) with up to `concurrency` loads in flight. Failures are ignored here; they
     /// surface again from `lut(for:)`.
     public func prewarmSync(concurrency: Int = FilmLibrary.defaultPrewarmConcurrency) {
-        let films = self.films
+        let films = self.stocks
         guard !films.isEmpty else { return }
         let workers = max(1, min(concurrency, films.count))
         let next = NSLock()

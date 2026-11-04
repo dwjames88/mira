@@ -27,9 +27,9 @@ public enum ImageSource {
     }
 
     private static func loadUntraced(url: URL, orientation: CGImagePropertyOrientation?) -> CIImage? {
-        if isRAW(url: url), let raw = CIRAWFilter(imageURL: url) {
-            if let orientation { raw.orientation = orientation }
-            if let out = raw.outputImage { return out }
+        if isRAW(url: url), let develop = RawDevelop(url: url, orientation: orientation),
+           let out = develop.apply(.identity, filmApplied: false, draft: false) {
+            return out
         }
         return loadNonRAW(url: url, orientation: orientation)
     }
