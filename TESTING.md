@@ -47,7 +47,7 @@ The first launch of the app asks for access to your Photos library (`NSPhotoLibr
 scripts/run.sh
 ```
 
-Check: the app opens; Open (or drag a photo onto the window) loads it; the film strip shows thumbnails and the family picker filters them; selecting a film updates the preview; holding C or the HOLD TO COMPARE button shows the original; the Films window (Shift-Command-L) lists all 31 films and the credit; File ▸ Export… (⌘E) offers JPEG, HEIC and TIFF, and the written files open correctly with orientation and colour intact.
+Check: the app opens; Open (or drag a photo onto the window) loads it; the film strip shows thumbnails and the family picker filters them; selecting a film updates the preview; holding C or the HOLD TO COMPARE button shows the original; the Films window (Shift-Command-L) lists all 260 looks (82 stocks) and the credit; File ▸ Export… (⌘E) offers JPEG, HEIC and TIFF, and the written files open correctly with orientation and colour intact.
 
 ### Library browser
 
@@ -297,3 +297,19 @@ Installed with `scripts/install.sh` and driven live (test asset in "Emulsion Tes
 - Photos extension: listed in Photos' Extensions menu; with the fix it fills the editing window (1723×1063, then follows a resize to 1300×808 — confirmed by the `extension` log category); tabs FILMS / DEVELOP / CROP. Cancelled without saving.
 
 Not verified live: Space-drag pan, mixer eyedropper, SAVE through the new sub-toolbar button, file-from-disk sidecar flow in the new layout.
+
+
+## Film science and RAW development
+
+No RAW or DNG fixture ships with the repository, so the RAW checks need a RAW/DNG file of your own.
+
+1. Variant picker: choose a stock with variants (Portra 400); the FILMS panel's Variant picker lists them (−1, +1, NC, VC…), and picking one changes the preview without adding a card to the strip, which shows stocks only (82).
+2. Push/Pull: drag from −2 to +2 stops in thirds; the image gets brighter, harder and grainier with push, softer with pull; reset returns to 0.
+3. Scan: Neutral, Frontier-like and Noritsu-like each shift colour and contrast slightly; Neutral is the unchanged film.
+4. Toning: on a black and white stock the Toning control is present and tints the image; on a colour stock it is absent.
+5. Rem-jet: the toggle appears only on motion-picture stocks. None ship yet, so it never shows; confirm it is absent everywhere.
+6. Latitude readout: under the histogram and in FILMS; it changes with the film and with push/pull.
+7. Grain and Halation at 50% read as the film's own amount; the preview and a full-size export have the same grain character.
+8. Legacy: open a photo edited in an earlier build; it renders as before until you choose a film.
+9. RAW group: open a RAW/DNG file; DEVELOP shows the RAW group (white balance, boost, highlight recovery, tone map, noise reduction, sharpness, lens correction); changes re-develop after a short pause; a JPEG shows no RAW group; export is sharper than the draft preview.
+10. ALL / RAW toggle: beside Filter in the Mac library; RAW limits the grid to RAW files, ALL restores it.
