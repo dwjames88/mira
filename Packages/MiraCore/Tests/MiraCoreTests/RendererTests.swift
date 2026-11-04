@@ -51,7 +51,7 @@ import UniformTypeIdentifiers
 
     @Test func grainIsResolutionIndependent() throws {
         let r = Renderer(library: try emptyLibrary())
-        let recipe = Recipe(grainAmount: 0.6)
+        let recipe = Recipe(grainAmount: 0.6, pipeline: Recipe.legacyPipeline)
         let small = Pixels(r.apply(recipe, to: Fixture.solid(gray: 0.5, size: 1000)), context: context)
         let bigImage = r.apply(recipe, to: Fixture.solid(gray: 0.5, size: 2000))
         let big = Pixels(bigImage, context: context)

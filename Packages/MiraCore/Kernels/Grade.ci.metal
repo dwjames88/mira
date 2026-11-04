@@ -277,3 +277,114 @@ float4 miraDodgeBurn(coreimage::sample_t s, coreimage::sample_t m, float ev, flo
 
 } // namespace coreimage
 } // extern "C"
+
+// MARK: Film science (pipeline 2)
+
+// Film exposure with latitude, per channel in linear light. For a gain g > 1 the highlights roll off
+// toward white instead of clipping, by `latitude` (0 plain gain, 1 full negative-film shoulder):
+// x (g + x) / (1 + g x) is the identity at g = 1, maps 1 to 1 and has slope g at 0. For g <= 1 (and for
+// negative values) it is a plain gain. Mirrored by FilmMath.exposure in Swift.
+extern "C" {
+namespace coreimage {
+
+float4 miraFilmExposure(coreimage::sample_t s, float g, float latitude) {
+    if (s.a <= 0.0) { return s; }
+    float3 c = miraUnpremultiply(s);
+    float3 plain = c * g;
+    if (g > 1.0) {
+        float3 x = max(c, float3(0.0));
+        float3 shoulder = x * (float3(g) + x) / (float3(1.0) + g * x);
+        float3 y = mix(g * x, shoulder, latitude);
+        c = float3(c.r >= 0.0 ? y.r : plain.r, c.g >= 0.0 ? y.g : plain.g, c.b >= 0.0 ? y.b : plain.b);
+    } else {
+        c = plain;
+    }
+    return float4(c * s.a, s.a);
+}
+
+} // namespace coreimage
+} // extern "C"
+
+// Halation. The light that is scattered is taken from the highlights (smoothstep on Rec.709 luma of
+// the non-negative colour) and put back, blurred and tinted, so luminance is redistributed rather than
+// added. `miraHighlights` yields the part to blur; `miraHalationCombine` recomputes it from the source.
+static inline float3 miraHighlightPart(float3 c) {
+    float3 p = max(c, float3(0.0));
+    return p * smoothstep(0.75, 1.1, miraLuma(p));
+}
+
+extern "C" {
+namespace coreimage {
+
+float4 miraHighlights(coreimage::sample_t s) {
+    float3 h = s.a > 0.0 ? miraHighlightPart(miraUnpremultiply(s)) : float3(0.0);
+    return float4(h * s.a, s.a);
+}
+
+// out = src - amount * h + amount * tint / luma(tint) * luma(blurred h)
+float4 miraHalationCombine(coreimage::sample_t s, coreimage::sample_t b, float amount, float4 tint) {
+    if (s.a <= 0.0) { return s; }
+    float3 c = miraUnpremultiply(s);
+    float3 h = miraHighlightPart(c);
+    float3 t = tint.rgb / max(miraLuma(tint.rgb), 1.0e-6);
+    float lb = miraLuma(miraUnpremultiply(b));
+    c = c - amount * h + amount * t * lb;
+    return float4(c * s.a, s.a);
+}
+
+} // namespace coreimage
+} // extern "C"
+
+// Film grain: smooth value noise (hashed integer lattice, quintic interpolation, two octaves) in
+// coordinates relative to the frame, so the pattern scales with the picture. Works on sRGB-encoded
+// values: the input is already encoded (the caller wraps the kernel in the encode / decode curves).
+static inline float miraGrainHash(int2 p, uint seed) {
+    uint x = uint(p.x) * 0x8da6b343u ^ uint(p.y) * 0xd8163841u ^ seed * 0xcb1ab31fu;
+    x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16;
+    return float(x >> 8) * (2.0 / 16777216.0) - 1.0;
+}
+
+static inline float miraValueNoise(float2 q, uint seed) {
+    float2 f0 = floor(q);
+    float2 f = q - f0;
+    float2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+    int2 i = int2(f0);
+    float a = miraGrainHash(i, seed);
+    float b = miraGrainHash(i + int2(1, 0), seed);
+    float c = miraGrainHash(i + int2(0, 1), seed);
+    float d = miraGrainHash(i + int2(1, 1), seed);
+    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+// Two octaves (the second at twice the frequency, half the weight), scaled to a standard deviation of
+// about 1 (measured: 0.506 before the scale).
+static inline float miraGrainNoise(float2 q, uint seed) {
+    float n = miraValueNoise(q, seed) + 0.5 * miraValueNoise(q * 2.0 + float2(37.1, 17.3), seed);
+    return n * 1.977;
+}
+
+extern "C" {
+namespace coreimage {
+
+// geo = (frame origin x, y, frame diagonal in pixels, grain cell as a fraction of the diagonal)
+// par = (noise standard deviation, chroma, tonal centre, 0)
+float4 miraGrain(coreimage::sample_t s, float4 geo, float4 par, coreimage::destination dest) {
+    if (s.a <= 0.0) { return s; }
+    float2 q = (dest.coord() - geo.xy) / (geo.z * geo.w);
+    float chroma = clamp(par.y, 0.0, 1.0);
+    float n0 = miraGrainNoise(q, 0u);
+    float3 nc = float3(miraGrainNoise(q, 1u), miraGrainNoise(q, 2u), miraGrainNoise(q, 3u));
+    float norm = rsqrt(chroma * chroma + (1.0 - chroma) * (1.0 - chroma));
+    float3 n = (chroma * nc + (1.0 - chroma) * n0) * norm;
+
+    float3 e = miraUnpremultiply(s);
+    float l = miraLuma(e);
+    float d = (l - par.z) / 0.3;
+    float w = 0.25 + 0.75 * exp(-d * d);
+    w *= smoothstep(0.02, 0.08, l) * (1.0 - smoothstep(0.92, 0.98, l));
+    e += par.x * w * n;
+    return float4(e * s.a, s.a);
+}
+
+} // namespace coreimage
+} // extern "C"

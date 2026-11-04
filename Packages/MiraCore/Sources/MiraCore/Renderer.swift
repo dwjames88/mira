@@ -32,6 +32,28 @@ public enum RendererError: Error, CustomStringConvertible {
 ///
 /// All spatial parameters are multiplied by `scale = min(width, height) / 1000`, so the look
 /// is the same at any resolution.
+///
+/// Two pipelines, chosen by `Recipe.pipeline` (a saved edit keeps its pipeline so it reopens the same):
+///
+/// Pipeline 1 (legacy, every recipe saved before 0.5): crop, exposure (`CIExposureAdjust`), dodge and
+/// burn, colour mixer, curves, film LUT (blended by strength), contrast, tone, texture, clarity,
+/// saturation, vibrance, warmth / tint, a screen-blended halation, bloom, soft-light white-noise
+/// grain, vignette, mask overlay, border. Its output must not change.
+///
+/// Pipeline 2 (film science, see `FilmCharacter` for the physics): the order follows the light.
+///  1. Exposure with latitude (`miraFilmExposure`): a gain in linear light whose highlights roll off
+///     like a negative's shoulder, by the film's latitude, instead of clipping.
+///  2. White balance (warmth / tint): the light the film is exposed to, so before the film.
+///  3. Dodge and burn, colour mixer, curves (unchanged).
+///  4. Halation, in the exposure and in linear light: the highlights (`miraHighlights`) are blurred
+///     by the film's radius and put back tinted (`miraHalationCombine`), so luminance is
+///     redistributed, not added. The slider scales the film's own halation (0.5 is native).
+///  5. Film LUT with strength blend (the Hald CLUTs are sRGB display referred).
+///  6. Contrast, tone, texture, clarity, saturation, vibrance: printing and scanning, after the film.
+///  7. Bloom.
+///  8. Grain (`miraGrain`): band-limited smooth noise on the sRGB-encoded image, in frame-relative
+///     coordinates (so a downscaled export and a preview agree), chroma and density dependent by film.
+///  9. Vignette, mask overlay, border.
 public struct Renderer: Sendable {
     public let library: FilmLibrary
     /// Rasterised dodge and burn masks, shared by every copy of this renderer.
@@ -86,9 +108,20 @@ public struct Renderer: Sendable {
         guard !extent.isInfinite, !extent.isEmpty else { return input }
         let scale = min(extent.width, extent.height) / 1000
         var image = input
+        let filmScience = recipe.pipeline >= 2
+        let film = recipe.filmID.flatMap { library.film(id: $0) }
+        let character = film?.resolvedCharacter ?? .generic
+        let diagonal = hypot(extent.width, extent.height)
 
-        // 1. Exposure
-        if abs(recipe.exposure) > eps {
+        // 1. Exposure. Pipeline 2: a gain in linear light with the film's highlight latitude, then
+        // white balance (the light the film is exposed to).
+        if filmScience {
+            if abs(recipe.exposure) > eps {
+                image = GradeKernels.applyFilmExposure(gain: exp2(clamp(recipe.exposure, -2, 2)),
+                                                       latitude: film?.resolvedCharacter.latitude ?? 0, to: image)
+            }
+            image = whiteBalance(image, recipe)
+        } else if abs(recipe.exposure) > eps {
             let f = CIFilter.exposureAdjust()
             f.inputImage = image
             f.ev = Float(clamp(recipe.exposure, -2, 2))
@@ -112,8 +145,17 @@ public struct Renderer: Sendable {
             image = GradeKernels.applyCurves(recipe.curves, to: image)
         }
 
+        // 1c. Pipeline 2 halation: in the exposure, before the film, in linear light.
+        if filmScience {
+            let amount = clamp(recipe.halationAmount * 2 * character.halationStrength * 0.35, 0, 0.7)
+            if amount > 1e-4 {
+                image = filmHalation(image, extent: extent, amount: amount, character: character,
+                                     radiusSlider: clamp(recipe.halationRadius, 0, 1), diagonal: diagonal)
+            }
+        }
+
         // 2. Film LUT, blended with the pre-LUT image by strength
-        if let id = recipe.filmID, let film = library.film(id: id), let lut = try? library.lut(for: film) {
+        if let film, let lut = try? library.lut(for: film) {
             let strength = clamp(recipe.strength, 0, 1)
             if strength > eps {
                 let f = CIFilter.colorCubeWithColorSpace()
@@ -183,19 +225,13 @@ public struct Renderer: Sendable {
             image = fromGamma(f.outputImage ?? encoded)
         }
 
-        // 4. Warmth / tint. Positive warmth = warmer (more red), positive tint = more magenta.
-        if abs(recipe.warmth) > eps || abs(recipe.tint) > eps {
-            let f = CIFilter.temperatureAndTint()
-            f.inputImage = image
-            f.neutral = CIVector(x: 6500, y: 0)
-            f.targetNeutral = CIVector(
-                x: 6500 - 1500 * clamp(recipe.warmth, -1, 1),
-                y: -40 * clamp(recipe.tint, -1, 1))
-            image = f.outputImage ?? image
+        // 4. Warmth / tint (pipeline 1: after the film; pipeline 2 did it before).
+        if !filmScience {
+            image = whiteBalance(image, recipe)
         }
 
-        // 5. Halation
-        if recipe.halationAmount > eps {
+        // 5. Halation (pipeline 1)
+        if !filmScience, recipe.halationAmount > eps {
             image = halation(image, extent: extent, amount: clamp(recipe.halationAmount, 0, 1),
                              radius: clamp(recipe.halationRadius, 0, 1), scale: scale)
         }
@@ -210,14 +246,20 @@ public struct Renderer: Sendable {
         }
 
         // 7. Grain
-        if recipe.grainAmount > eps {
+        if filmScience {
+            if recipe.grainAmount > eps {
+                image = filmGrain(image, extent: extent, character: character,
+                                  amount: clamp(recipe.grainAmount, 0, 1), sizeSlider: clamp(recipe.grainSize, 0, 1),
+                                  diagonal: diagonal)
+            }
+        } else if recipe.grainAmount > eps {
             image = grain(image, extent: extent, amount: clamp(recipe.grainAmount, 0, 1),
                           size: clamp(recipe.grainSize, 0, 1), scale: scale)
         }
 
         // 8. Vignette
         if recipe.vignetteAmount > eps {
-            let diag = hypot(extent.width, extent.height)
+            let diag = diagonal
             let f = CIFilter.vignetteEffect()
             f.inputImage = image
             f.center = CGPoint(x: extent.midX, y: extent.midY)
@@ -246,6 +288,42 @@ public struct Renderer: Sendable {
             }
         }
         return image
+    }
+
+    /// Warmth / tint. Positive warmth = warmer (more red), positive tint = more magenta.
+    private func whiteBalance(_ image: CIImage, _ recipe: Recipe) -> CIImage {
+        guard abs(recipe.warmth) > eps || abs(recipe.tint) > eps else { return image }
+        let f = CIFilter.temperatureAndTint()
+        f.inputImage = image
+        f.neutral = CIVector(x: 6500, y: 0)
+        f.targetNeutral = CIVector(
+            x: 6500 - 1500 * clamp(recipe.warmth, -1, 1),
+            y: -40 * clamp(recipe.tint, -1, 1))
+        return f.outputImage ?? image
+    }
+
+    /// Pipeline 2 halation: blur the highlights at the film's radius, take them out of the image and put
+    /// the same luminance back as a tinted glow (energy conserving).
+    private func filmHalation(_ image: CIImage, extent: CGRect, amount: Double, character: FilmCharacter,
+                              radiusSlider: Double, diagonal: CGFloat) -> CIImage {
+        let sigma = character.halationRadius * diagonal * exp2((radiusSlider - 0.5) * 2)
+        let blurred = Self.softBlur(GradeKernels.halationHighlights(of: image), extent: extent, sigma: sigma)
+        return GradeKernels.applyHalation(amount: amount, tint: character.halationTint, to: image, blurred: blurred)
+            .cropped(to: extent)
+    }
+
+    /// Pipeline 2 grain: smooth band-limited noise on the encoded image (see `miraGrain`).
+    private func filmGrain(_ image: CIImage, extent: CGRect, character: FilmCharacter, amount: Double,
+                           sizeSlider: Double, diagonal: CGFloat) -> CIImage {
+        let size = character.grainSize * exp2((sizeSlider - 0.5) * 2)
+        // A pixel that averages f x f grains sees 1/f of the variation (f = grain cells per pixel).
+        let cellsPerPixel = 1 / (size * diagonal)
+        let bandLimit = min(1, 1 / cellsPerPixel)
+        let std = amount * 2 * character.grainStrength * 0.025 * bandLimit
+        let encoded = toGamma(image)
+        let grained = GradeKernels.applyGrain(std: std, cell: size, chroma: character.grainChroma,
+                                              tonalCenter: character.grainTonalCenter, diagonal: diagonal, to: encoded)
+        return fromGamma(grained).cropped(to: extent)
     }
 
     private func halation(_ image: CIImage, extent: CGRect, amount: Double, radius: Double, scale: CGFloat) -> CIImage {
