@@ -35,6 +35,22 @@ public struct Recipe: Codable, Hashable, Sendable {
     public var pipeline: Int
     public static let legacyPipeline = 1
     public static let currentPipeline = 2
+    /// Push (+) or pull (−) processing in stops, −2...2 in thirds (pipeline 2).
+    public var push: Double
+    /// Removes the rem-jet backing of motion-picture stocks, unlocking their strong red halation.
+    public var remJetRemoved: Bool
+    /// Lab-scan rendering after the film (pipeline 2).
+    public var scanProfile: ScanProfile
+    /// Black-and-white toning and its strength 0...1 (pipeline 2, monochrome films).
+    public var toning: Toning
+    public var toningStrength: Double
+    /// Camera RAW decode settings; identity for non-RAW sources.
+    public var raw: RawSettings
+
+    /// True when any film-science control is set (adjustment-data format version 4).
+    public var usesFilmScienceControls: Bool {
+        push != 0 || remJetRemoved || scanProfile != .neutral || toning != .none || !raw.isIdentity
+    }
     /// Crop, rotation, flips and straighten; identity by default.
     public var crop: CropSettings
     /// Tone curves (RGB, red, green, blue, luminance); identity by default.
@@ -71,6 +87,12 @@ public struct Recipe: Codable, Hashable, Sendable {
         borderWidth: Double = 0.04,
         version: Int = 1,
         pipeline: Int = Recipe.currentPipeline,
+        push: Double = 0,
+        remJetRemoved: Bool = false,
+        scanProfile: ScanProfile = .neutral,
+        toning: Toning = .none,
+        toningStrength: Double = 0.5,
+        raw: RawSettings = .identity,
         crop: CropSettings = .identity,
         curves: CurvesSettings = .identity,
         colorMixer: ColorMixerSettings = .identity,
@@ -100,6 +122,12 @@ public struct Recipe: Codable, Hashable, Sendable {
         self.borderWidth = borderWidth
         self.version = version
         self.pipeline = pipeline
+        self.push = push
+        self.remJetRemoved = remJetRemoved
+        self.scanProfile = scanProfile
+        self.toning = toning
+        self.toningStrength = toningStrength
+        self.raw = raw
         self.crop = crop
         self.curves = curves
         self.colorMixer = colorMixer
@@ -109,7 +137,8 @@ public struct Recipe: Codable, Hashable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case filmID, strength, exposure, contrast, saturation, warmth, tint
         case grainAmount, grainSize, halationAmount, halationRadius, bloomAmount
-        case vignetteAmount, borderEnabled, borderWidth, version, pipeline, crop, curves, colorMixer, dodgeBurn
+        case vignetteAmount, borderEnabled, borderWidth, version, pipeline, crop
+        case push, remJetRemoved, scanProfile, toning, toningStrength, raw, curves, colorMixer, dodgeBurn
         case highlights, shadows, whites, blacks, vibrance, clarity, texture
     }
 
@@ -140,6 +169,13 @@ public struct Recipe: Codable, Hashable, Sendable {
         borderWidth = try c.decodeIfPresent(Double.self, forKey: .borderWidth) ?? d.borderWidth
         version = try c.decodeIfPresent(Int.self, forKey: .version) ?? d.version
         pipeline = try c.decodeIfPresent(Int.self, forKey: .pipeline) ?? Recipe.legacyPipeline
+        push = try c.decodeIfPresent(Double.self, forKey: .push) ?? d.push
+        remJetRemoved = try c.decodeIfPresent(Bool.self, forKey: .remJetRemoved) ?? d.remJetRemoved
+        // Unknown enum values (from a newer build) fall back to the default rather than failing.
+        scanProfile = (try? c.decodeIfPresent(ScanProfile.self, forKey: .scanProfile)) ?? d.scanProfile
+        toning = (try? c.decodeIfPresent(Toning.self, forKey: .toning)) ?? d.toning
+        toningStrength = try c.decodeIfPresent(Double.self, forKey: .toningStrength) ?? d.toningStrength
+        raw = try c.decodeIfPresent(RawSettings.self, forKey: .raw) ?? .identity
         crop = try c.decodeIfPresent(CropSettings.self, forKey: .crop) ?? .identity
         curves = try c.decodeIfPresent(CurvesSettings.self, forKey: .curves) ?? .identity
         colorMixer = try c.decodeIfPresent(ColorMixerSettings.self, forKey: .colorMixer) ?? .identity
@@ -168,6 +204,14 @@ public struct Recipe: Codable, Hashable, Sendable {
         try c.encode(version, forKey: .version)
         // Absent means the legacy pipeline, so legacy recipes keep exactly the bytes older versions wrote.
         if pipeline != Recipe.legacyPipeline { try c.encode(pipeline, forKey: .pipeline) }
+        if push != 0 { try c.encode(push, forKey: .push) }
+        if remJetRemoved { try c.encode(remJetRemoved, forKey: .remJetRemoved) }
+        if scanProfile != .neutral { try c.encode(scanProfile, forKey: .scanProfile) }
+        if toning != .none {
+            try c.encode(toning, forKey: .toning)
+            try c.encode(toningStrength, forKey: .toningStrength)
+        }
+        if !raw.isIdentity { try c.encode(raw, forKey: .raw) }
         try c.encode(crop, forKey: .crop)
         if !curves.isIdentity { try c.encode(curves, forKey: .curves) }
         if !colorMixer.isIdentity { try c.encode(colorMixer, forKey: .colorMixer) }

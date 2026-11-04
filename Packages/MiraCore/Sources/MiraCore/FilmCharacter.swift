@@ -32,9 +32,23 @@ public struct FilmCharacter: Codable, Hashable, Sendable {
     public var halationRadius: Double
     /// 0 hard clip on overexposure (slide, digital), 1 full negative-film shoulder.
     public var latitude: Double
+    /// Stops below and above a normal exposure the stock still records with detail (for the latitude
+    /// indicator): e.g. colour negative 2 and 3, slide 2 and 1.5.
+    public var latitudeUnder: Double
+    public var latitudeOver: Double
+    /// True for stocks with a rem-jet anti-halation backing (ECN-2 motion-picture film): halation is
+    /// suppressed unless the recipe removes the rem-jet (`Recipe.remJetRemoved`), which gives the strong
+    /// red bleed of rem-jet-free stocks.
+    public var remJet: Bool
+    /// Per stop of push (negative stops = pull): added print contrast (0...1 scale of the contrast
+    /// slider) and relative grain growth.
+    public var pushContrastPerStop: Double
+    public var pushGrainPerStop: Double
 
     public init(grainStrength: Double, grainSize: Double, grainChroma: Double, grainTonalCenter: Double,
-                halationStrength: Double, halationTint: [Double], halationRadius: Double, latitude: Double) {
+                halationStrength: Double, halationTint: [Double], halationRadius: Double, latitude: Double,
+                latitudeUnder: Double = 2, latitudeOver: Double = 3, remJet: Bool = false,
+                pushContrastPerStop: Double = 0.08, pushGrainPerStop: Double = 0.25) {
         self.grainStrength = grainStrength
         self.grainSize = grainSize
         self.grainChroma = grainChroma
@@ -43,6 +57,11 @@ public struct FilmCharacter: Codable, Hashable, Sendable {
         self.halationTint = halationTint
         self.halationRadius = halationRadius
         self.latitude = latitude
+        self.latitudeUnder = latitudeUnder
+        self.latitudeOver = latitudeOver
+        self.remJet = remJet
+        self.pushContrastPerStop = pushContrastPerStop
+        self.pushGrainPerStop = pushGrainPerStop
     }
 
     /// Used when no film is selected: an ISO 400 colour negative.
@@ -58,16 +77,31 @@ public struct FilmCharacter: Codable, Hashable, Sendable {
         var halation: Double
         var tint: [Double] = [1.0, 0.28, 0.06]
         var latitude: Double
+        var under = 2.0, over = 3.0
+        var remJet = false
+        var pushContrast = 0.08, pushGrain = 0.25
         switch family {
         case .colorNegative:
             chroma = 0.3; center = 0.4; halation = 1.0; latitude = 1.0
         case .slide:
             strength *= 0.8; chroma = 0.2; center = 0.65; halation = 0.15; latitude = 0.15
+            over = 1.5; pushContrast = 0.12
+        case .kodachrome:
+            // K-14: dyes added in development, no dye couplers in the emulsion, so very fine grain.
+            strength *= 0.55; chroma = 0.15; center = 0.65; halation = 0.1; latitude = 0.15
+            under = 1.5; over = 1; pushContrast = 0.12
+        case .motionPicture:
+            // ECN-2: rem-jet backing suppresses halation until it is removed.
+            chroma = 0.3; center = 0.4; halation = 1.2; latitude = 1.0; over = 4; under = 3; remJet = true
         case .blackAndWhite:
             strength *= 1.1; chroma = 0; center = 0.4; halation = 0.25; latitude = 0.9
+            pushContrast = 0.12; pushGrain = 0.35
         case .instant:
             strength *= 0.6; size *= 1.3; chroma = 0.15; center = 0.5; halation = 0.3; latitude = 0.5
-            tint = [1.0, 0.5, 0.25]
+            tint = [1.0, 0.5, 0.25]; under = 1; over = 1
+        case .print:
+            // A print stock on its own: fine-grained positive, moderate shoulder.
+            strength *= 0.4; chroma = 0.2; center = 0.5; halation = 0.5; latitude = 0.6; over = 2
         }
         if monochrome {
             chroma = 0
@@ -78,7 +112,9 @@ public struct FilmCharacter: Codable, Hashable, Sendable {
         size = min(max(size, 0.0002), 0.0012)
         return FilmCharacter(grainStrength: strength, grainSize: size, grainChroma: chroma,
                              grainTonalCenter: center, halationStrength: halation, halationTint: tint,
-                             halationRadius: 0.012, latitude: latitude)
+                             halationRadius: 0.012, latitude: latitude, latitudeUnder: under,
+                             latitudeOver: over, remJet: remJet, pushContrastPerStop: pushContrast,
+                             pushGrainPerStop: pushGrain)
     }
 
     /// Any subset of the fields, as written in `films.json`.
@@ -91,10 +127,14 @@ public struct FilmCharacter: Codable, Hashable, Sendable {
         public var halationTint: [Double]?
         public var halationRadius: Double?
         public var latitude: Double?
+        public var latitudeUnder: Double?
+        public var latitudeOver: Double?
+        public var remJet: Bool?
 
         public init(grainStrength: Double? = nil, grainSize: Double? = nil, grainChroma: Double? = nil,
                     grainTonalCenter: Double? = nil, halationStrength: Double? = nil,
-                    halationTint: [Double]? = nil, halationRadius: Double? = nil, latitude: Double? = nil) {
+                    halationTint: [Double]? = nil, halationRadius: Double? = nil, latitude: Double? = nil,
+                    latitudeUnder: Double? = nil, latitudeOver: Double? = nil, remJet: Bool? = nil) {
             self.grainStrength = grainStrength
             self.grainSize = grainSize
             self.grainChroma = grainChroma
@@ -103,6 +143,9 @@ public struct FilmCharacter: Codable, Hashable, Sendable {
             self.halationTint = halationTint
             self.halationRadius = halationRadius
             self.latitude = latitude
+            self.latitudeUnder = latitudeUnder
+            self.latitudeOver = latitudeOver
+            self.remJet = remJet
         }
     }
 
@@ -117,6 +160,9 @@ public struct FilmCharacter: Codable, Hashable, Sendable {
         if let v = o.halationTint, v.count == 3 { c.halationTint = v }
         if let v = o.halationRadius { c.halationRadius = v }
         if let v = o.latitude { c.latitude = v }
+        if let v = o.latitudeUnder { c.latitudeUnder = v }
+        if let v = o.latitudeOver { c.latitudeOver = v }
+        if let v = o.remJet { c.remJet = v }
         return c
     }
 }
