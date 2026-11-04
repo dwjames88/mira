@@ -34,6 +34,18 @@ struct FilterButton: View {
     }
 }
 
+/// ALL / RAW next to the FILTER button: the same `rawOnly` state as the "RAW only" toggle in the panel.
+struct RawQuickToggle: View {
+    let store: LibraryStore
+
+    var body: some View {
+        FFTabBar([(value: false, title: "ALL"), (value: true, title: "RAW")],
+                 selection: Binding(get: { store.filter.rawOnly },
+                                    set: { new in store.updateFilter { $0.rawOnly = new } }))
+            .accessibilityLabel("Show all photos or RAW only")
+    }
+}
+
 /// The filter popover: ink panel, mono labels, hairlines, no materials.
 private struct FilterPanel: View {
     let store: LibraryStore
