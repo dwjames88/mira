@@ -4,7 +4,7 @@ import Foundation
 ///
 /// The crop and the dodge and burn strokes belong to a photo, not to a look, so a preset always
 /// stores `CropSettings.identity` and `DodgeBurnSettings.identity`, and applying one never touches
-/// the photo's crop or strokes. Decoding is tolerant: any missing key falls
+/// the photo's crop or strokes. Of the RAW settings only `RawSettings.presetPortion` is stored. Decoding is tolerant: any missing key falls
 /// back to a default, so files written by other versions stay readable.
 public struct Preset: Codable, Identifiable, Hashable, Sendable {
     public static let currentVersion = 1
@@ -53,11 +53,14 @@ public struct Preset: Codable, Identifiable, Hashable, Sendable {
     public static func displayName(filmName: String, nickname: String) -> String { "\(filmName) - \(nickname)" }
 
     /// The recipe to apply to a photo: the preset's film and develop settings, the photo's crop
-    /// (and, when given, its dodge and burn strokes).
-    public func recipe(keeping crop: CropSettings, dodgeBurn: DodgeBurnSettings = .identity) -> Recipe {
+    /// (and, when given, its dodge and burn strokes). RAW settings merge: the preset's look portion
+    /// (boost, tone mapping, extended range) over the photo's own white balance and noise settings.
+    public func recipe(keeping crop: CropSettings, dodgeBurn: DodgeBurnSettings = .identity,
+                       raw: RawSettings = .identity) -> Recipe {
         var r = recipe
         r.crop = crop
         r.dodgeBurn = dodgeBurn
+        r.raw = raw.applyingPreset(recipe.raw)
         return r
     }
 
@@ -71,6 +74,7 @@ public struct Preset: Codable, Identifiable, Hashable, Sendable {
         var r = recipe
         r.crop = .identity
         r.dodgeBurn = .identity
+        r.raw = recipe.raw.presetPortion
         return r
     }
 
