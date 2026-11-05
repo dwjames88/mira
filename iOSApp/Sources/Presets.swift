@@ -430,31 +430,34 @@ struct ActivityView: UIViewControllerRepresentable {
 struct PresetPresentations<M: FilmPanelModel>: ViewModifier {
     let hub: PresetHub
     let model: M
+    /// Only one set of presentations may be live: the editor's while the camera is closed, the camera's while it is
+    /// open (both read the same hub, so two live sets would present every sheet twice).
+    var enabled = true
 
     func body(content: Content) -> some View {
         @Bindable var hub = hub
         content
-            .sheet(item: $hub.sheet) { mode in
+            .sheet(item: enabled ? $hub.sheet : .constant(nil)) { mode in
                 SavePresetSheet(model: model, hub: hub, mode: mode,
                                 initialNickname: ProcessInfo.processInfo.environment["MIRA_SNAPSHOT"] == "1"
                                     && mode == .save ? "Golden Hour" : "")
             }
             .sheet(item: Binding(
-                get: { hub.conflict },
+                get: { enabled ? hub.conflict : nil },
                 set: { if $0 == nil, hub.conflict != nil { hub.resolveConflict(.skip) } }
             )) { conflict in
                 PresetConflictSheet(hub: hub, conflict: conflict)
             }
-            .sheet(item: $hub.shareItem) { item in
+            .sheet(item: enabled ? $hub.shareItem : .constant(nil)) { item in
                 ActivityView(url: item.url).presentationDetents([.medium, .large])
             }
-            .fileImporter(isPresented: $hub.importerShown, allowedContentTypes: [.miraPreset],
+            .fileImporter(isPresented: enabled ? $hub.importerShown : .constant(false), allowedContentTypes: [.miraPreset],
                           allowsMultipleSelection: true) { result in
                 if case .success(let urls) = result { hub.startImport(urls) }
             }
             .confirmationDialog(
                 hub.pendingDelete.map { "Delete \u{201C}\($0.displayName)\u{201D}?" } ?? "Delete preset?",
-                isPresented: Binding(get: { hub.pendingDelete != nil }, set: { if !$0 { hub.pendingDelete = nil } }),
+                isPresented: Binding(get: { enabled && hub.pendingDelete != nil }, set: { if !$0 { hub.pendingDelete = nil } }),
                 titleVisibility: .visible
             ) {
                 Button("Delete", role: .destructive) {
@@ -466,7 +469,7 @@ struct PresetPresentations<M: FilmPanelModel>: ViewModifier {
                 Text("The saved look is removed. Photos already edited with it are not changed.")
             }
             .overlay(alignment: .top) {
-                if let notice = hub.notice {
+                if enabled, let notice = hub.notice {
                     Text(notice)
                         .ffLabel(size: 10, color: T.paper)
                         .multilineTextAlignment(.leading)
@@ -484,8 +487,8 @@ struct PresetPresentations<M: FilmPanelModel>: ViewModifier {
 }
 
 extension View {
-    func presetPresentations<M: FilmPanelModel>(hub: PresetHub, model: M) -> some View {
-        modifier(PresetPresentations(hub: hub, model: model))
+    func presetPresentations<M: FilmPanelModel>(hub: PresetHub, model: M, enabled: Bool = true) -> some View {
+        modifier(PresetPresentations(hub: hub, model: model, enabled: enabled))
     }
 }
 

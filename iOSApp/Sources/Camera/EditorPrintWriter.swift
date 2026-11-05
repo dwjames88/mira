@@ -1,4 +1,5 @@
 import MiraCamera
+import MiraCameraKit
 import MiraCore
 import Photos
 
@@ -34,4 +35,15 @@ struct EditorPrintWriter: PrintWriting {
         }
         do { try await session.save(recipe: recipe, renderer: renderer) } catch { throw PrintError.failed(error.localizedDescription) }
     }
+}
+
+/// The one print queue of the app: the camera saves into it, and the app drains it at launch and whenever it becomes
+/// active, so frames saved before a crash or a backgrounding get their recipe even if the camera is never reopened.
+@MainActor
+enum CameraPrints {
+    static let queue = PrintQueue(
+        store: PendingPrintStore(directory: CameraModel.defaultPendingDirectory()),
+        writer: EditorPrintWriter(renderer: PhotoEngine.library.map { Renderer(library: $0) }))
+
+    static func drain() { Task { await queue.drain() } }
 }

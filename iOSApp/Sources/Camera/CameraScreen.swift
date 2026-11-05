@@ -11,21 +11,30 @@ struct CameraScreen: View {
     let onClose: () -> Void
     // Made once on appear: building it in `init` would make a model (Metal device, queues) per parent redraw.
     @State private var model: CameraModel?
+    @State private var doors: CameraFilmDoorModel?
 
     var body: some View {
         ZStack {
             FieldFramesTheme.ink.ignoresSafeArea()
-            if let model {
-                CameraView(model: model, filmName: filmName(model), onClose: onClose) {
-                    // LEAD: wire CameraFilmDoor here
-                    CameraFilmDoorPlaceholder(model: model)
-                } wbDoor: {
-                    // LEAD: wire CameraWBDoor here
-                    CameraWBRowPlaceholder(model: model)
+            if let model, let doors {
+                CameraView(model: model, filmName: filmName(model), onClose: onClose) { context in
+                    FilmDoorHost(camera: model, doors: doors, context: context)
+                } wbDoor: { context in
+                    WBDoorHost(camera: model, context: context)
                 }
+                // IMPORT / SAVE PRESET from the door: the camera's presentations, bound to the door model
+                // (RootView turns the editor's off while the camera is open).
+                .presetPresentations(hub: PresetHub.shared, model: doors)
             }
         }
-        .onAppear { if model == nil { model = makeModel() } }
+        .onAppear {
+            guard model == nil else { return }
+            let made = makeModel()
+            let door = CameraFilmDoorModel(recipe: made.recipe)
+            door.onRecipeChange = { [weak made] in made?.recipe = $0 }
+            model = made
+            doors = door
+        }
     }
 
     private func filmName(_ model: CameraModel) -> String? {
@@ -44,6 +53,7 @@ struct CameraScreen: View {
             renderer: renderer,
             initialRecipe: initial,
             fixtureURL: Bundle.main.url(forResource: "sample", withExtension: "jpg"),
+            printQueue: CameraPrints.queue,
             onOpenFrame: { [editor, onClose] id in
                 guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil).firstObject else { return }
                 onClose()
@@ -52,66 +62,51 @@ struct CameraScreen: View {
     }
 }
 
-/// Until `CameraFilmDoor` lands: pick a film from a plain list.
-struct CameraFilmDoorPlaceholder: View {
-    let model: CameraModel
+/// The film door as the camera presents it: `CameraFilmDoor` over the door model, which is bound to the camera model.
+/// Cards are requested from the finder only while the door is on screen.
+private struct FilmDoorHost: View {
+    let camera: CameraModel
+    let doors: CameraFilmDoorModel
+    let context: CameraDoorContext
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                Text("FILM").ffLabel(size: 11).padding(FieldFramesTheme.cells(2))
-                ForEach(PhotoEngine.filmList) { film in
-                    Button {
-                        model.recipe = Recipe(filmID: film.id).applyingNativeTexture(filmID: film.id)
-                    } label: {
-                        Text(film.displayName.uppercased())
-                            .ffLabel(size: 11, color: model.recipe.filmID == film.id ? FieldFramesTheme.paper : FieldFramesTheme.paperDim)
-                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                            .padding(.horizontal, FieldFramesTheme.cells(2))
-                            .contentShape(Rectangle())
+        CameraFilmDoor(
+            model: doors,
+            grain: Binding(get: { camera.settings.finderGrainLive }, set: { camera.settings.finderGrainLive = $0 }),
+            onClose: context.close,
+            maxHeight: context.maxHeight)
+            .onAppear {
+                doors.resetWantedThumbnails()
+                doors.setThumbnails(camera.cardThumbnails)
+            }
+            .onDisappear {
+                camera.setWantedCardIDs([])
+                doors.resetWantedThumbnails()
+            }
+            // The cards ask for their thumbnails as they appear; forward the set to the finder when it changes.
+            .task {
+                var sent: Set<String> = []
+                while !Task.isCancelled {
+                    let wanted = doors.wantedThumbnailIDs
+                    if wanted != sent {
+                        sent = wanted
+                        camera.setWantedCardIDs(wanted.sorted())
                     }
-                    .buttonStyle(.plain)
+                    try? await Task.sleep(for: .milliseconds(200))
                 }
             }
-        }
-        .foregroundStyle(FieldFramesTheme.paper)
+            // The finder renders new card images about twice a second (CGImages are classes: compare identities).
+            .onChange(of: camera.cardThumbnails.mapValues { ObjectIdentifier($0) }) {
+                doors.setThumbnails(camera.cardThumbnails)
+            }
     }
 }
 
-/// Until `CameraWBDoor` lands: one row of chips, AUTO · DAYLIGHT · CLOUDY · TUNGSTEN · FLUOR. · LOCK.
-struct CameraWBRowPlaceholder: View {
-    @Bindable var model: CameraModel
+private struct WBDoorHost: View {
+    @Bindable var camera: CameraModel
+    let context: CameraDoorContext
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("WHITE BALANCE").ffLabel(size: 11)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(WhiteBalancePreset.allCases, id: \.self) { preset in
-                        chip(preset.label, on: model.wb.preset == preset, label: preset.accessibilityLabel) {
-                            model.wb.preset = preset
-                        }
-                    }
-                    chip("LOCK", on: model.wb.locked, label: "Lock white balance to the current value") {
-                        model.wb.locked.toggle()
-                    }
-                }
-            }
-        }
-        .padding(FieldFramesTheme.cells(2))
-        .frame(maxHeight: .infinity, alignment: .top)
-        .foregroundStyle(FieldFramesTheme.paper)
-    }
-
-    private func chip(_ title: String, on: Bool, label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title).ffLabel(size: 10, color: on ? FieldFramesTheme.paper : FieldFramesTheme.paperDim)
-                .padding(.horizontal, 8).frame(minHeight: 44)
-                .overlay(Rectangle().stroke(on ? FieldFramesTheme.lichen : FieldFramesTheme.hair, lineWidth: 1))
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(label)
-        .accessibilityAddTraits(on ? .isSelected : [])
+        CameraWBDoor(state: $camera.wb, onClose: context.close)
     }
 }

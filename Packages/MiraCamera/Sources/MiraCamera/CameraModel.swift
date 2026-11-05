@@ -131,6 +131,7 @@ public final class CameraModel {
     ///   - renderer: the film renderer the finder and the baker use (the bundled films when nil).
     ///   - backend: the device and frame source; `CameraBackend.make` (real on a phone, fake elsewhere) when nil.
     ///   - fixtureURL: the picture the fake backend shows.
+    ///   - printQueue: the app's shared print queue (it drains at launch, even with the camera closed); built here when nil.
     ///   - onOpenFrame: opens the asset with this local identifier in the editor.
     public init(
         printWriter: any PrintWriting,
@@ -143,6 +144,7 @@ public final class CameraModel {
         requestLibraryAccess: @escaping @Sendable () async -> LibraryAccess = { await PhotoKitLibraryWriter.requestAccess() },
         settingsStore: CameraSettingsStore = CameraSettingsStore(),
         pendingDirectory: URL? = nil,
+        printQueue: PrintQueue? = nil,
         onOpenFrame: @escaping @MainActor (String) -> Void = { _ in }
     ) {
         let made = backend ?? CameraBackend.make(fixtureURL: fixtureURL)
@@ -158,7 +160,7 @@ public final class CameraModel {
         filmLibrary = renderer?.library
         finder = FinderRenderer(renderer: renderer)
         let directory = pendingDirectory ?? Self.defaultPendingDirectory()
-        queue = PrintQueue(store: PendingPrintStore(directory: directory), writer: printWriter)
+        queue = printQueue ?? PrintQueue(store: PendingPrintStore(directory: directory), writer: printWriter)
         let bakerInUse = baker ?? (renderer?.library).map { PhotoKitBaker(library: $0) } ?? PhotoKitBaker()
         saver = CaptureSaver(library: library, baker: bakerInUse, queue: queue)
 
@@ -176,11 +178,14 @@ public final class CameraModel {
         startConsumers(commands: commands)
     }
 
-    private static func defaultPendingDirectory() -> URL {
+    public static func defaultPendingDirectory() -> URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
         return base.appendingPathComponent("MiraCamera", isDirectory: true)
     }
+
+    /// Lets the commands consumer end when the camera closes (the other streams end with the device).
+    deinit { commandsOut.finish() }
 
     // MARK: Streams (each has exactly one consumer, a main-actor task)
 

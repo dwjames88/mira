@@ -29,9 +29,9 @@ final class CameraLayoutTests: XCTestCase {
     func render(_ device: TestDevice, name: String) async -> [String: CGRect] {
         let box = FrameBox()
         let model = makeModel()
-        let view = CameraView(model: model, filmName: "Kodak Portra 400", onClose: {}, onLayout: { box.frames = $0 }) {
+        let view = CameraView(model: model, filmName: "Kodak Portra 400", onClose: {}, onLayout: { box.frames = $0 }) { _ in
             Color.clear
-        } wbDoor: {
+        } wbDoor: { _ in
             Color.clear
         }
         await Snapshot.render(view, device: device, name: name, settle: .milliseconds(1500))

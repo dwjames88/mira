@@ -58,30 +58,39 @@ final class FinderTouchDriver {
     }
 }
 
-enum CameraSheet: String, Identifiable {
-    case film, wb, settings
+/// The two doors that slide up over the lower chrome (the settings stay a sheet).
+enum CameraDoor: String, Identifiable {
+    case film, wb
     var id: String { rawValue }
+}
+
+/// What the app's door views get from the camera: a way to close the door and the most height it may take.
+public struct CameraDoorContext {
+    public let close: () -> Void
+    public let maxHeight: CGFloat
 }
 
 /// The camera screen: header, meter, finder, lens chips, EV dial, shutter row. Portrait stacks them; landscape
 /// gives the finder the long side with the meter, lens chips and EV dial on the left and the shutter column on the right.
-/// The film and white balance doors are supplied by the app (`filmDoor`, `wbDoor`) and shown in sheets.
+/// The film and white balance doors are supplied by the app (`filmDoor`, `wbDoor`) and slide up as a bottom panel
+/// over the lower chrome, the finder staying visible above.
 public struct CameraView<FilmDoor: View, WBDoor: View>: View {
     @Bindable var model: CameraModel
     let filmName: String?
     let onClose: () -> Void
-    let filmDoor: () -> FilmDoor
-    let wbDoor: () -> WBDoor
+    let filmDoor: (CameraDoorContext) -> FilmDoor
+    let wbDoor: (CameraDoorContext) -> WBDoor
     /// Layout tests report the finder's frame in the camera's coordinate space.
     var onLayout: (@MainActor @Sendable ([String: CGRect]) -> Void)?
 
-    @State private var sheet: CameraSheet?
+    @State private var door: CameraDoor?
+    @State private var settingsShown = false
     @State private var touch = FinderTouchDriver()
     @Environment(\.scenePhase) private var scenePhase
 
     public init(
         model: CameraModel, filmName: String?, onClose: @escaping () -> Void,
-        @ViewBuilder filmDoor: @escaping () -> FilmDoor, @ViewBuilder wbDoor: @escaping () -> WBDoor
+        @ViewBuilder filmDoor: @escaping (CameraDoorContext) -> FilmDoor, @ViewBuilder wbDoor: @escaping (CameraDoorContext) -> WBDoor
     ) {
         self.model = model
         self.filmName = filmName
@@ -94,7 +103,7 @@ public struct CameraView<FilmDoor: View, WBDoor: View>: View {
     public init(
         model: CameraModel, filmName: String?, onClose: @escaping () -> Void,
         onLayout: (@MainActor @Sendable ([String: CGRect]) -> Void)?,
-        @ViewBuilder filmDoor: @escaping () -> FilmDoor, @ViewBuilder wbDoor: @escaping () -> WBDoor
+        @ViewBuilder filmDoor: @escaping (CameraDoorContext) -> FilmDoor, @ViewBuilder wbDoor: @escaping (CameraDoorContext) -> WBDoor
     ) {
         self.init(model: model, filmName: filmName, onClose: onClose, filmDoor: filmDoor, wbDoor: wbDoor)
         self.onLayout = onLayout
@@ -112,6 +121,7 @@ public struct CameraView<FilmDoor: View, WBDoor: View>: View {
                     portrait
                 }
             }
+            doorPanel
         }
         .coordinateSpace(name: CameraSpace.name)
         .onPreferenceChange(CameraFrameKey.self) { frames in
@@ -120,6 +130,16 @@ public struct CameraView<FilmDoor: View, WBDoor: View>: View {
         .foregroundStyle(T.paper)
         .tint(T.lichen)
         .task { await model.start() }
+        .onAppear {
+            // Headless snapshots: MIRA_SNAPSHOT_SHEET=filmdoor|wbdoor opens a door without a tap.
+            let env = ProcessInfo.processInfo.environment
+            guard env["MIRA_SNAPSHOT"] == "1" else { return }
+            switch env["MIRA_SNAPSHOT_SHEET"] {
+            case "filmdoor": door = .film
+            case "wbdoor": door = .wb
+            default: break
+            }
+        }
         .onDisappear { Task { await model.stop() } }
         .onChange(of: scenePhase) { _, phase in model.scenePhaseChanged(phase) }
         .onCameraCaptureEvent { event in
@@ -131,18 +151,41 @@ public struct CameraView<FilmDoor: View, WBDoor: View>: View {
             }
             if HardwareShutter.shouldFire(phase: phase) { model.shutter() }
         }
-        .sheet(item: $sheet) { which in
-            Group {
-                switch which {
-                case .film: filmDoor()
-                case .wb: wbDoor()
-                case .settings: CameraSettingsSheet(model: model)
+        .sheet(isPresented: $settingsShown) {
+            CameraSettingsSheet(model: model)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(T.inkSoft)
+                .presentationCornerRadius(0)
+                .preferredColorScheme(.dark)
+        }
+    }
+
+    // MARK: Doors
+
+    private func closeDoor() { withAnimation(.snappy(duration: 0.22)) { door = nil } }
+
+    private func openDoor(_ which: CameraDoor) { withAnimation(.snappy(duration: 0.22)) { door = which } }
+
+    /// The open door as a bottom panel over the lower chrome (square, ink-soft, hairline on top).
+    private var doorPanel: some View {
+        GeometryReader { geo in
+            if let door {
+                let context = CameraDoorContext(close: closeDoor, maxHeight: geo.size.height * 0.5 - 32)
+                VStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                    FFHairline()
+                    Group {
+                        switch door {
+                        case .film: filmDoor(context)
+                        case .wb: wbDoor(context)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .background(T.inkSoft)
                 }
+                .transition(.move(edge: .bottom))
             }
-            .presentationDetents(which == .wb ? [.height(180)] : [.medium, .large])
-            .presentationDragIndicator(.visible)
-            .presentationBackground(T.inkSoft)
-            .preferredColorScheme(.dark)
         }
     }
 
@@ -150,7 +193,7 @@ public struct CameraView<FilmDoor: View, WBDoor: View>: View {
 
     private var portrait: some View {
         VStack(spacing: 0) {
-            CameraHeader(filmName: filmName, developing: model.developingCount, onBack: onClose) { sheet = .settings }
+            CameraHeader(filmName: filmName, developing: model.developingCount, onBack: onClose) { settingsShown = true }
                 .reportFrame("header")
             FFHairline()
             MeterView(needle: model.needle, readout: model.readoutText, latitude: model.latitude,
@@ -182,7 +225,7 @@ public struct CameraView<FilmDoor: View, WBDoor: View>: View {
     private var landscape: some View {
         HStack(spacing: 0) {
             VStack(spacing: 0) {
-                CameraHeader(filmName: filmName, developing: 0, onBack: onClose, onSettings: { sheet = .settings }, showsFilmName: false)
+                CameraHeader(filmName: filmName, developing: 0, onBack: onClose, onSettings: { settingsShown = true }, showsFilmName: false)
                     .reportFrame("header")
                 FFHairline()
                 if let filmName, !filmName.isEmpty {
@@ -217,8 +260,8 @@ public struct CameraView<FilmDoor: View, WBDoor: View>: View {
 
     private var doors: some View {
         VStack(alignment: .trailing, spacing: 0) {
-            DoorButton(title: "FILM", label: "Choose film") { sheet = .film }
-            DoorButton(title: "WB", label: "White balance") { sheet = .wb }
+            DoorButton(title: "FILM", label: "Choose film") { openDoor(.film) }
+            DoorButton(title: "WB", label: "White balance") { openDoor(.wb) }
         }
     }
 

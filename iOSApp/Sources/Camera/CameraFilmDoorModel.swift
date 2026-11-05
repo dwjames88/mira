@@ -64,6 +64,9 @@ final class CameraFilmDoorModel: FilmPanelModel {
         for (key, image) in images { thumbnails[key] = UIImage(cgImage: image) }
     }
 
+    /// The door just opened or closed: forget what the old cards asked for.
+    func resetWantedThumbnails() { wantedThumbnailIDs = [] }
+
     func requestThumbnail(_ id: String?) async { wantedThumbnailIDs.insert(id ?? "__original") }
 
     // MARK: Film picker (same rules as the editor)

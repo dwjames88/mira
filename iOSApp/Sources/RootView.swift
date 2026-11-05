@@ -20,17 +20,25 @@ struct RootView: View {
 
     var body: some View {
         content
-            .presetPresentations(hub: hub, model: model)
+            .presetPresentations(hub: hub, model: model, enabled: !cameraOpen)
             .onChange(of: scenePhase) { _, phase in
-                if phase == .active { _ = hub.store.reloadIfChanged(); hub.refresh() }
+                if phase == .active { _ = hub.store.reloadIfChanged(); hub.refresh(); CameraPrints.drain() }
             }
             .onChange(of: launch.cameraRequested) { _, requested in
                 if requested { openRequestedCamera() }
             }
-            .onAppear { if launch.cameraRequested { openRequestedCamera() } }
+            .onAppear {
+                CameraPrints.drain()
+                if launch.cameraRequested { openRequestedCamera() }
+            }
     }
 
     @Environment(\.scenePhase) private var scenePhase
+
+    /// The camera screen carries its own preset presentations (bound to its film door), so the editor's step aside.
+    private var cameraOpen: Bool {
+        snapshotMode ? ProcessInfo.processInfo.environment["MIRA_SNAPSHOT_TAB"] == "camera" : showCamera && !model.hasPhoto
+    }
 
     /// The Home Screen quick action: show the camera over whatever is open (the editor closes first).
     private func openRequestedCamera() {

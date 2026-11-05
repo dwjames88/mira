@@ -421,7 +421,9 @@ public final class FinderRenderer: @unchecked Sendable {
             let r = renderer.withPreviewScale(scale)
             var out: [String: CGImage] = [:]
             for id in ids {
-                let recipe = Recipe(filmID: id, reciprocity: .off).applyingNativeTexture(filmID: id)
+                // "__original" is the door's key for the no-look card.
+                let filmID: String? = id == "__original" ? nil : id
+                let recipe = Recipe(filmID: filmID, reciprocity: .off).applyingNativeTexture(filmID: filmID)
                 let graded = r.thumbnail(recipe, input: small.withMiraHeadroom(1))
                 if let cg = ciContext.createCGImage(graded, from: graded.extent, format: .RGBA8, colorSpace: sRGB) { out[id] = cg }
             }
