@@ -12,11 +12,15 @@ struct ContentView: View {
     private var isImmersive: Bool { state.mode == .editor && (state.editor?.isImmersive ?? false) }
 
     var body: some View {
-        Group {
-            switch state.mode {
-            case .library:
-                LibraryView(state: state)
-            case .editor:
+        // The library stays mounted under the editor, hidden and inert, so leaving a photo returns to
+        // the same scroll position with every thumbnail still in place (nothing is rebuilt or refetched).
+        ZStack {
+            LibraryView(state: state, isActive: state.mode == .library)
+                .opacity(state.mode == .library ? 1 : 0)
+                .disabled(state.mode != .library)
+                .allowsHitTesting(state.mode == .library)
+                .accessibilityHidden(state.mode != .library)
+            if state.mode == .editor {
                 if let editor = state.editor {
                     EditorScreen(state: state, editor: editor)
                 } else {
