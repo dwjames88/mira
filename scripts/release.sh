@@ -80,9 +80,10 @@ hdiutil create -volname "Mira $VERSION" -srcfolder "$STAGE" -ov -format UDZO "$D
 
 1. Download the DMG (or zip) and drag **Mira** to Applications.
 2. Mira is signed with a free Personal Team development certificate (no Developer ID, not notarized), so macOS blocks the first launch on other Macs. Right-click Mira, choose Open, then Open again; or go to System Settings ▸ Privacy & Security and click "Open Anyway".
-3. Development-signed builds may refuse to run at all on a Mac not registered to the team. In that case build from source: `scripts/install.sh` (needs Xcode, XcodeGen and your own team ID in `project.yml`).
+3. Development-signed builds may refuse to run at all on a Mac not registered to the team. In that case build from source: `scripts/install.sh` (needs Xcode and XcodeGen; put your own team ID in `Local.xcconfig`, see the README).
 4. Enable the extension in System Settings ▸ General ▸ Login Items & Extensions ▸ Photos Editing ▸ Mira, and grant Photos access on first launch.
 5. The free-team signature expires after 7 days.
+6. Updating from inside Mira (0.3.0 and later): the sandboxed updater cannot clear the quarantine flag on the downloaded app, so macOS may ask once more on the first launch after the update; right-click Mira and choose Open.
 INSTALL
 } > "$NOTES"
 
