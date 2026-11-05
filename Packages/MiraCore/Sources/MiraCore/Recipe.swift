@@ -53,12 +53,50 @@ public struct Recipe: Codable, Hashable, Sendable {
     public var exposureTime: Double?
     /// How the film's reciprocity failure is simulated (pipeline 2); `.compensated` by default.
     public var reciprocity: ReciprocityMode
+    /// How strongly the reciprocity residue shows, 0...2 (1 = the datasheet model, 0 = none). Scales the cast,
+    /// contrast and shadow-grain residue, and in Uncompensated mode the loss.
+    public var reciprocityStrength: Double
 
     /// True when any film-science control is set (adjustment-data format version 4).
     public var usesFilmScienceControls: Bool {
         push != 0 || remJetRemoved || scanProfile != .neutral || paper != .none || toning != .none || !raw.isIdentity
-            || exposureTime != nil || reciprocity != .compensated
+            || exposureTime != nil || reciprocity != .compensated || reciprocityStrength != 1
     }
+
+    /// The controls only pipeline 2 renders (push, rem-jet, scan, paper, toning, exposure time, reciprocity).
+    struct FilmScienceControls: Equatable {
+        var push: Double, remJet: Bool, scan: ScanProfile, paper: PaperProfile, toning: Toning, toningStrength: Double
+        var exposureTime: Double?, reciprocity: ReciprocityMode, reciprocityStrength: Double
+    }
+    var filmScienceControls: FilmScienceControls {
+        FilmScienceControls(push: push, remJet: remJetRemoved, scan: scanProfile, paper: paper, toning: toning,
+                            toningStrength: toningStrength, exposureTime: exposureTime, reciprocity: reciprocity,
+                            reciprocityStrength: reciprocityStrength)
+    }
+
+    /// True for a recipe on the legacy pipeline: it ignores the film-science controls.
+    public var isLegacyPipeline: Bool { pipeline < Recipe.currentPipeline }
+
+    /// Moves the recipe to the current pipeline when `self` differs from `old` in a pipeline-2-only control while
+    /// both are on the legacy pipeline (same film). The one rule behind every film-science control, Mac and iOS:
+    /// the control would otherwise do nothing. Returns true when it upgraded.
+    @discardableResult
+    public mutating func upgradePipelineIfFilmScienceChanged(from old: Recipe) -> Bool {
+        guard isLegacyPipeline, old.isLegacyPipeline, filmID == old.filmID,
+              filmScienceControls != old.filmScienceControls else { return false }
+        pipeline = Recipe.currentPipeline
+        return true
+    }
+
+    /// Applies `edit` (a change to film-science controls) and upgrades a legacy recipe to the current pipeline
+    /// in the same edit; reopening without touching a control keeps the pipeline.
+    public mutating func settingFilmScienceControl(_ edit: (inout Recipe) -> Void) {
+        let old = self
+        edit(&self)
+        upgradePipelineIfFilmScienceChanged(from: old)
+    }
+
+
     /// Crop, rotation, flips and straighten; identity by default.
     public var crop: CropSettings
     /// Tone curves (RGB, red, green, blue, luminance); identity by default.
@@ -104,6 +142,7 @@ public struct Recipe: Codable, Hashable, Sendable {
         raw: RawSettings = .identity,
         exposureTime: Double? = nil,
         reciprocity: ReciprocityMode = .compensated,
+        reciprocityStrength: Double = 1,
         crop: CropSettings = .identity,
         curves: CurvesSettings = .identity,
         colorMixer: ColorMixerSettings = .identity,
@@ -142,6 +181,7 @@ public struct Recipe: Codable, Hashable, Sendable {
         self.raw = raw
         self.exposureTime = exposureTime
         self.reciprocity = reciprocity
+        self.reciprocityStrength = reciprocityStrength
         self.crop = crop
         self.curves = curves
         self.colorMixer = colorMixer
@@ -153,7 +193,7 @@ public struct Recipe: Codable, Hashable, Sendable {
         case grainAmount, grainSize, halationAmount, halationRadius, bloomAmount
         case vignetteAmount, borderEnabled, borderWidth, version, pipeline, crop
         case push, remJetRemoved, scanProfile, paper, toning, toningStrength, raw, curves, colorMixer, dodgeBurn
-        case exposureTime, reciprocity
+        case exposureTime, reciprocity, reciprocityStrength
         case highlights, shadows, whites, blacks, vibrance, clarity, texture
     }
 
@@ -194,6 +234,7 @@ public struct Recipe: Codable, Hashable, Sendable {
         raw = try c.decodeIfPresent(RawSettings.self, forKey: .raw) ?? .identity
         exposureTime = try c.decodeIfPresent(Double.self, forKey: .exposureTime)
         reciprocity = (try? c.decodeIfPresent(ReciprocityMode.self, forKey: .reciprocity)) ?? d.reciprocity
+        reciprocityStrength = try c.decodeIfPresent(Double.self, forKey: .reciprocityStrength) ?? d.reciprocityStrength
         crop = try c.decodeIfPresent(CropSettings.self, forKey: .crop) ?? .identity
         curves = try c.decodeIfPresent(CurvesSettings.self, forKey: .curves) ?? .identity
         colorMixer = try c.decodeIfPresent(ColorMixerSettings.self, forKey: .colorMixer) ?? .identity
@@ -233,6 +274,7 @@ public struct Recipe: Codable, Hashable, Sendable {
         if !raw.isIdentity { try c.encode(raw, forKey: .raw) }
         if let exposureTime { try c.encode(exposureTime, forKey: .exposureTime) }
         if reciprocity != .compensated { try c.encode(reciprocity, forKey: .reciprocity) }
+        if reciprocityStrength != 1 { try c.encode(reciprocityStrength, forKey: .reciprocityStrength) }
         try c.encode(crop, forKey: .crop)
         if !curves.isIdentity { try c.encode(curves, forKey: .curves) }
         if !colorMixer.isIdentity { try c.encode(colorMixer, forKey: .colorMixer) }

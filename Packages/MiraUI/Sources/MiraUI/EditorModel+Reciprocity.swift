@@ -12,17 +12,20 @@ extension EditorModel {
     /// The time the film is exposed for: the recipe's own, else the photo's EXIF value.
     public var effectiveExposureTime: Double? { recipe.exposureTime ?? sourceExposureTime }
 
-    /// What the exposure time does to the selected film; nil when reciprocity is off, there is no time, or the
-    /// effect is nil at that time.
+    /// What the exposure time does to the selected film; nil when reciprocity is off, the recipe is on the legacy
+    /// pipeline, there is no time, or the effect is nil at that time.
     public var reciprocityEffect: ReciprocityEffect? {
-        guard recipe.reciprocity != .off, let film = selectedFilm, let t = effectiveExposureTime else { return nil }
-        let e = Reciprocity.effect(film: film, exposureTime: t)
-        return e.isIdentity ? nil : e
+        Reciprocity.effect(for: recipe, film: selectedFilm, sourceExposureTime: sourceExposureTime)
     }
 
-    /// "Reciprocity −1⅓ stops · cast +G · contrast +7%" (plus "beyond datasheet" in `reciprocityExtrapolated`).
-    public var reciprocityReadout: String? { reciprocityEffect.map(ReciprocityFormat.readout) }
-    public var reciprocityExtrapolated: Bool { reciprocityEffect?.beyondDatasheet ?? false }
+    /// "\u{2212}1\u{2153} stops (compensated) \u{00B7} cast G +0.12 st \u{00B7} contrast +7 % \u{00B7} shadow grain +38 %",
+    /// or "No change at this speed" (plus "beyond datasheet" in `reciprocityExtrapolated`).
+    public var reciprocityReadout: String? {
+        ReciprocityFormat.summary(recipe: recipe, film: selectedFilm, sourceExposureTime: sourceExposureTime)?.text
+    }
+    public var reciprocityExtrapolated: Bool {
+        ReciprocityFormat.summary(recipe: recipe, film: selectedFilm, sourceExposureTime: sourceExposureTime)?.beyondDatasheet ?? false
+    }
 
     /// Slider position (log2 of seconds) of the effective time; 1/125 s with no time at all.
     public var exposureTimeSliderValue: Double { log2(effectiveExposureTime ?? ExposureTimeFormat.neutral) }

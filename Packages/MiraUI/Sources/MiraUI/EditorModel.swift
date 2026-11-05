@@ -46,6 +46,9 @@ public final class EditorModel {
     public var recipe: Recipe {
         didSet {
             guard recipe != oldValue else { return }
+            // A pipeline-2-only control changed on a legacy recipe: move it to the current pipeline in the same
+            // edit (push, scan, paper, toning, rem-jet, exposure time, reciprocity would otherwise do nothing).
+            recipe.upgradePipelineIfFilmScienceChanged(from: oldValue)
             // Views that only care which film is applied (the film strip) read this instead of
             // `recipe`, so a slider tick does not re-evaluate them.
             if recipe.filmID != selectedFilmID { selectedFilmID = recipe.filmID }
@@ -420,6 +423,10 @@ public final class EditorModel {
         r.pipeline = Recipe.currentPipeline
         recipe = r.applyingNativeTexture(filmID: id)   // grain, halation, bloom at the new film's own level
     }
+
+    /// True when the open recipe was made with the original (pipeline 1) film model, which ignores the film-science
+    /// controls until one of them is changed.
+    public var isLegacyPipeline: Bool { recipe.isLegacyPipeline && recipe.filmID != nil }
 
     /// Resets every slider to its default (including push, rem-jet, scan and toning) and keeps the selected
     /// film. The dodge and burn strokes, the crop and the RAW settings stay: they belong to the photo.

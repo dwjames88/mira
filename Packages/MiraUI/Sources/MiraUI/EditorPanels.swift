@@ -103,6 +103,13 @@ struct FilmsPanel: View {
     /// PUSH / PULL, SCAN, PAPER (not on print cards) and (monochrome films) TONING.
     @ViewBuilder private var filmControls: some View {
         if model.showsFilmControls {
+            if model.isLegacyPipeline {
+                Text("Made with an earlier Mira; changing film settings updates it to the current film model")
+                    .ffLabel(color: T.paperDim)
+                    .lineLimit(3)
+                    .padding(.top, T.rows(1))
+                    .help("This edit uses the original film model, which ignores Push / Pull, Scan, Paper, Toning and Exposure time")
+            }
             FFSlider("Push / Pull", value: Binding(get: { model.recipe.push },
                                                    set: { model.recipe.push = PushFormat.snapped($0) }),
                      in: PushFormat.range, default: 0, snap: PushFormat.step, format: PushFormat.label)
@@ -149,6 +156,12 @@ struct FilmsPanel: View {
             model.recipe.reciprocity = $0
         }
         .help("Off ignores the exposure time. Compensated keeps the brightness and shows the colour cast, contrast and shadow grain. Uncompensated also darkens")
+        if model.recipe.reciprocity != .off {
+            FFSlider("Reciprocity strength", value: $model.recipe.reciprocityStrength, in: 0...2, default: 1,
+                     format: { "\(Int(($0 * 100).rounded())) %" })
+                .padding(.top, T.rows(0.5))
+                .help("How strongly the colour cast, contrast and shadow grain of reciprocity failure show; 100 % is the datasheet model")
+        }
         if let readout = model.reciprocityReadout {
             (Text(readout).foregroundStyle(T.paperMid)
                 + Text(model.reciprocityExtrapolated ? " \u{00B7} beyond datasheet" : "").foregroundStyle(T.paperDim))

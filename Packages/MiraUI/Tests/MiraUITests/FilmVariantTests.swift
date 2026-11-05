@@ -198,10 +198,13 @@ struct FilmControlTests {
         #expect(model.recipe == .neutral)
     }
 
-    @Test func changingControlsDoesNotTouchPipeline() throws {
+    @Test func legacyControlsKeepThePipelineAndFilmScienceControlsUpgradeIt() throws {
         var legacy = Recipe(filmID: "bw"); legacy.pipeline = Recipe.legacyPipeline
         let model = EditorModel(library: try library(remJet: false), recipe: legacy)
-        model.recipe.push = 1; model.recipe.toning = .selenium; model.recipe.scanProfile = .frontier
+        model.recipe.grainAmount = 0.4; model.recipe.strength = 0.7
         #expect(model.recipe.pipeline == Recipe.legacyPipeline)
+        // Push, toning and scan do nothing on pipeline 1, so changing one moves the recipe up in the same edit.
+        model.recipe.push = 1
+        #expect(model.recipe.pipeline == Recipe.currentPipeline)
     }
 }

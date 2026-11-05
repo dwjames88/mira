@@ -314,6 +314,13 @@ private struct FilmOptions: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if model.recipe.isLegacyPipeline && model.recipe.filmID != nil {
+                Text("Made with an earlier Mira; changing film settings updates it to the current film model")
+                    .ffLabel(size: 9, color: FieldFramesTheme.paperDim)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, FieldFramesTheme.cells(2))
+            }
             ChipRow(label: "PUSH") {
                 ForEach(FilmBrowsing.pushSteps, id: \.self) { step in
                     OptionChip(title: FilmBrowsing.pushLabel(step), selected: abs(model.recipe.push - step) < 0.01) {
@@ -355,6 +362,12 @@ private struct FilmOptions: View {
                         model.recipe.reciprocity = mode
                     }
                 }
+            }
+            if model.recipe.reciprocity != .off {
+                FFSlider("RECIP. STRENGTH", value: model.bind(\.reciprocityStrength), in: 0...2, default: 1,
+                         format: { "\(Int(($0 * 100).rounded())) %" })
+                    .frame(minHeight: 44)
+                    .padding(.horizontal, FieldFramesTheme.cells(2))
             }
             if let readout = model.reciprocityReadout {
                 (Text(readout).foregroundStyle(FieldFramesTheme.paperMid)

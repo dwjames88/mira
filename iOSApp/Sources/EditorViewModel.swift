@@ -29,6 +29,8 @@ final class EditorViewModel {
     var recipe: Recipe {
         didSet {
             guard recipe != oldValue else { return }
+            // A pipeline-2-only control changed on a legacy recipe: move it to the current pipeline in the same edit.
+            if !isRestoring { recipe.upgradePipelineIfFilmScienceChanged(from: oldValue) }
             if !isRestoring, saveState != .saving { saveState = .unsaved }
             scheduleHistogram()
         }
@@ -138,12 +140,14 @@ final class EditorViewModel {
     var effectiveExposureTime: Double? { recipe.exposureTime ?? sourceExposureTime }
 
     var reciprocityEffect: ReciprocityEffect? {
-        guard recipe.reciprocity != .off, let film = selectedFilm, let t = effectiveExposureTime else { return nil }
-        let e = Reciprocity.effect(film: film, exposureTime: t)
-        return e.isIdentity ? nil : e
+        Reciprocity.effect(for: recipe, film: selectedFilm, sourceExposureTime: sourceExposureTime)
     }
-    var reciprocityReadout: String? { reciprocityEffect.map(ReciprocityFormat.readout) }
-    var reciprocityExtrapolated: Bool { reciprocityEffect?.beyondDatasheet ?? false }
+    var reciprocityReadout: String? {
+        ReciprocityFormat.summary(recipe: recipe, film: selectedFilm, sourceExposureTime: sourceExposureTime)?.text
+    }
+    var reciprocityExtrapolated: Bool {
+        ReciprocityFormat.summary(recipe: recipe, film: selectedFilm, sourceExposureTime: sourceExposureTime)?.beyondDatasheet ?? false
+    }
 
     var exposureTimeSliderValue: Double { log2(effectiveExposureTime ?? ExposureTimeFormat.neutral) }
 

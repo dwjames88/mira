@@ -21,6 +21,7 @@ struct Options {
     var tile = 360
     var film: String?
     var recipeJSON: String?
+    var legacy = false
     var limit: Int?
     var timeLUTs = false
     var bench = false
@@ -59,6 +60,7 @@ func parseArguments() -> Options {
         case "--tile": o.tile = nextInt(flag)
         case "--film": o.film = next(flag)
         case "--recipe-json": o.recipeJSON = next(flag)
+        case "--legacy": o.legacy = true
         case "--limit": o.limit = nextInt(flag)
         case "--time-luts": o.timeLUTs = true
         case "--bench": o.bench = true
@@ -165,7 +167,7 @@ if opts.contactSheet {
 }
 
 guard let filmsPath = opts.films, let inputPath = opts.input, let outputPath = opts.output else {
-    fail("usage: mira-sheet --films <dir> --input <image> --output <png> [--columns 6] [--tile 360] [--film id] [--recipe-json '{...}'] [--limit N]")
+    fail("usage: mira-sheet --films <dir> --input <image> --output <png> [--columns 6] [--tile 360] [--film id] [--recipe-json '{...}' [--legacy]] [--limit N]")
 }
 
 let library: FilmLibrary
@@ -175,6 +177,14 @@ catch { fail("cannot read films.json: \(error)") }
 var base = Recipe()
 if let json = opts.recipeJSON {
     do { base = try Recipe.decode(Data(json.utf8)) } catch { fail("bad --recipe-json: \(error)") }
+    // The app gives a new edit the current pipeline; a JSON without a `pipeline` key would decode as legacy
+    // and silently ignore push, scan, paper, toning and exposure time. This is a QA tool: match the app,
+    // unless --legacy asks for the old graph.
+    let hasPipelineKey = ((try? JSONSerialization.jsonObject(with: Data(json.utf8))) as? [String: Any])?["pipeline"] != nil
+    if !hasPipelineKey && !opts.legacy {
+        base.pipeline = Recipe.currentPipeline
+        print("note: --recipe-json has no \"pipeline\" key; using pipeline \(Recipe.currentPipeline) (pass --legacy for the original graph)")
+    }
 }
 
 guard let source = ImageSource.load(url: URL(fileURLWithPath: inputPath)) else {

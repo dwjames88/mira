@@ -142,12 +142,7 @@ public struct Renderer: Sendable {
         let push = filmScience ? clamp(recipe.push, -2, 2) : 0
         let family = film?.family
         // Reciprocity (pipeline 2, with a film): nil when off, no usable time, or no effect at that time.
-        let reciprocityEffect: ReciprocityEffect? = {
-            guard filmScience, recipe.reciprocity != .off, let film,
-                  let t = recipe.exposureTime ?? sourceExposureTime, t.isFinite, t > 0 else { return nil }
-            let e = Reciprocity.effect(film: film, exposureTime: t)
-            return e.isIdentity ? nil : e
-        }()
+        let reciprocityEffect = Reciprocity.effect(for: recipe, film: film, sourceExposureTime: sourceExposureTime)
 
         // 1. Exposure. Pipeline 2: a gain in linear light with the film's highlight latitude, then
         // white balance (the light the film is exposed to).
