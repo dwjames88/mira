@@ -2,7 +2,7 @@
 
 All notable changes to Mira. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [1.0.1] - Unreleased
+## [1.0.1] - 2026-11-05
 
 A fix release after a run-through of the whole app on the Mac and on iPhone.
 
@@ -23,6 +23,11 @@ A fix release after a run-through of the whole app on the Mac and on iPhone.
 
 ### Tests
 - RAW Develop slider sweep (every slider, with and without a film, three RAW files) for NaN, infinity and black tiles; injected NaN/infinity; shadow speckle across every film family; preview proxy vs export; iOS step consistency (FILMS vs DEVELOP, preset A then B, RAW draft vs full) and layout snapshots at iPhone 16 Pro and iPhone SE sizes; iOS UI tests (`scripts/ios-uitests.sh`); live v1.0.0 release fixture for the updater.
+
+### Notes
+- The Mac build is signed with an Apple Development certificate and is not notarized. On first launch macOS may refuse to open it: right-click Mira and choose Open.
+- The in-app updater (0.3.0 and later) installs 1.0.1. The sandboxed updater cannot clear the quarantine flag on the downloaded app, so macOS may ask once more on the first launch after the update; right-click Mira and choose Open. 0.2.0 has no updater; install 1.0.1 by hand.
+- iOS has no self-updater. Build it from source (supported; see the README), or use the attached development-signed ipa, which installs only on devices registered to the publisher's team.
 
 ## [1.0.0] - 2026-11-05
 
