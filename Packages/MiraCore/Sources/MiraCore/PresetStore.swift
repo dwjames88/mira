@@ -15,7 +15,15 @@ public enum PresetError: Error, Equatable, Sendable {
 /// read and before every change).
 @MainActor
 public final class PresetStore {
-    public nonisolated static let groupIdentifier = "VF945J28YU.com.fieldframes.mira"
+    /// The publisher's App Group, used when the bundle does not name one (tests, command line tools).
+    public nonisolated static let defaultGroupIdentifier = "VF945J28YU.com.fieldframes.mira"
+    /// The App Group of the running build: the `MiraAppGroup` Info.plist key, which project.yml sets from
+    /// `DEVELOPMENT_TEAM` and `MIRA_BUNDLE_PREFIX` (so forks with their own team and prefix work), else the default.
+    public nonisolated static let groupIdentifier: String = {
+        let value = Bundle.main.object(forInfoDictionaryKey: "MiraAppGroup") as? String
+        guard let value, !value.isEmpty, !value.contains("$(") else { return defaultGroupIdentifier }
+        return value
+    }()
     public nonisolated static let fileName = "Presets.json"
     nonisolated static let fileVersion = 1
 

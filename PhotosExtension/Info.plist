@@ -22,6 +22,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<key>MiraAppGroup</key>
+	<string>$(DEVELOPMENT_TEAM).$(MIRA_BUNDLE_PREFIX).mira</string>
 	<key>NSExtension</key>
 	<dict>
 		<key>NSExtensionAttributes</key>

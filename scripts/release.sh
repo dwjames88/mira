@@ -25,6 +25,7 @@ xcodebuild -project Mira.xcodeproj -scheme Mira -configuration Release \
   -derivedDataPath build/DerivedData \
   CODE_SIGN_IDENTITY="Apple Development" \
   DEVELOPMENT_TEAM=VF945J28YU \
+  MIRA_BUNDLE_PREFIX=com.fieldframes \
   ENABLE_HARDENED_RUNTIME=YES \
   OTHER_CODE_SIGN_FLAGS=--timestamp \
   build

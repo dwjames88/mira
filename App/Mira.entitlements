@@ -6,7 +6,7 @@
 	<true/>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>VF945J28YU.com.fieldframes.mira</string>
+		<string>$(DEVELOPMENT_TEAM).$(MIRA_BUNDLE_PREFIX).mira</string>
 	</array>
 	<key>com.apple.security.files.bookmarks.app-scope</key>
 	<true/>

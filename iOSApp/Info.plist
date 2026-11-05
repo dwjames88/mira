@@ -37,6 +37,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.photography</string>
+	<key>MiraAppGroup</key>
+	<string>$(DEVELOPMENT_TEAM).$(MIRA_BUNDLE_PREFIX).mira</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Mira saves your edited pictures to your Photos library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

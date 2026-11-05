@@ -1,0 +1,12 @@
+// Signing and identity settings shared by every target (see project.yml `configFiles`).
+//
+// The defaults below are the publisher's. To build with your own team or bundle id prefix, copy
+// Local.xcconfig.example to Local.xcconfig at the repository root (untracked) and set your values;
+// the optional include at the end overrides these.
+//
+// The in-app updater keeps verifying com.fieldframes.mira signed by team VF945J28YU whatever you set
+// here, so a self-built copy with another prefix does not self-update. That is intended.
+DEVELOPMENT_TEAM = VF945J28YU
+MIRA_BUNDLE_PREFIX = com.fieldframes
+
+#include? "../Local.xcconfig"

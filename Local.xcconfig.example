@@ -1,0 +1,8 @@
+// Copy to Local.xcconfig (untracked) and edit. It overrides Config/Base.xcconfig.
+//
+// Your Apple Developer team ID (Xcode > Settings > Accounts, or developer.apple.com > Membership).
+DEVELOPMENT_TEAM = YOURTEAMID
+// Reverse-DNS prefix you can register under your team. Bundle ids become
+// $(MIRA_BUNDLE_PREFIX).mira, .mira.photos and .mira.ios; the App Group becomes
+// $(DEVELOPMENT_TEAM).$(MIRA_BUNDLE_PREFIX).mira.
+MIRA_BUNDLE_PREFIX = com.example

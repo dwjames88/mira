@@ -6,18 +6,20 @@ options:
     iOS: "18.0"
   createIntermediateGroups: true
   developmentLanguage: en
+configFiles:
+  Debug: Config/Base.xcconfig
+  Release: Config/Base.xcconfig
 settings:
   base:
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
     MACOSX_DEPLOYMENT_TARGET: "26.0"
-    DEVELOPMENT_TEAM: VF945J28YU
     CODE_SIGN_STYLE: Automatic
     CODE_SIGN_IDENTITY: "Apple Development"
     ENABLE_HARDENED_RUNTIME: YES
     ENABLE_USER_SCRIPT_SANDBOXING: YES
-    MARKETING_VERSION: "0.5.0"
-    CURRENT_PROJECT_VERSION: "6"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "7"
 packages:
   MiraCore:
     path: Packages/MiraCore
@@ -27,6 +29,9 @@ targets:
   Mira:
     type: application
     platform: macOS
+    configFiles:
+      Debug: Config/Base.xcconfig
+      Release: Config/Base.xcconfig
     sources:
       - path: App/Sources
       - path: App/Resources
@@ -53,13 +58,14 @@ targets:
         com.apple.security.files.user-selected.read-write: true
         com.apple.security.personal-information.photos-library: true
         com.apple.security.application-groups:
-          - VF945J28YU.com.fieldframes.mira
+          - $(DEVELOPMENT_TEAM).$(MIRA_BUNDLE_PREFIX).mira
     info:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: Mira
         CFBundleName: Mira
         CFBundleShortVersionString: $(MARKETING_VERSION)
+        MiraAppGroup: $(DEVELOPMENT_TEAM).$(MIRA_BUNDLE_PREFIX).mira
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSApplicationCategoryType: public.app-category.photography
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
@@ -93,7 +99,7 @@ targets:
                 - mirapreset
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.fieldframes.mira
+        PRODUCT_BUNDLE_IDENTIFIER: $(MIRA_BUNDLE_PREFIX).mira
         PRODUCT_NAME: Mira
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
@@ -101,6 +107,9 @@ targets:
   MiraPhotos:
     type: app-extension
     platform: macOS
+    configFiles:
+      Debug: Config/Base.xcconfig
+      Release: Config/Base.xcconfig
     sources:
       - path: PhotosExtension
         excludes:
@@ -120,13 +129,14 @@ targets:
       properties:
         com.apple.security.app-sandbox: true
         com.apple.security.application-groups:
-          - VF945J28YU.com.fieldframes.mira
+          - $(DEVELOPMENT_TEAM).$(MIRA_BUNDLE_PREFIX).mira
     info:
       path: PhotosExtension/Info.plist
       properties:
         CFBundleDisplayName: Mira
         CFBundleName: MiraPhotos
         CFBundleShortVersionString: $(MARKETING_VERSION)
+        MiraAppGroup: $(DEVELOPMENT_TEAM).$(MIRA_BUNDLE_PREFIX).mira
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
         NSExtension:
@@ -137,13 +147,16 @@ targets:
               - Image
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.fieldframes.mira.photos
+        PRODUCT_BUNDLE_IDENTIFIER: $(MIRA_BUNDLE_PREFIX).mira.photos
         PRODUCT_NAME: MiraPhotos
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         APPLICATION_EXTENSION_API_ONLY: YES
   MiraiOS:
     type: application
     platform: iOS
+    configFiles:
+      Debug: Config/Base.xcconfig
+      Release: Config/Base.xcconfig
     sources:
       - path: iOSApp/Sources
       - path: App/Sources/PhotoLibrary/SidebarLoader.swift
@@ -163,6 +176,7 @@ targets:
         CFBundleDisplayName: Mira
         CFBundleName: Mira
         CFBundleShortVersionString: $(MARKETING_VERSION)
+        MiraAppGroup: $(DEVELOPMENT_TEAM).$(MIRA_BUNDLE_PREFIX).mira
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSApplicationCategoryType: public.app-category.photography
         UILaunchScreen: {}
@@ -194,7 +208,7 @@ targets:
                 - mirapreset
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.fieldframes.mira.ios
+        PRODUCT_BUNDLE_IDENTIFIER: $(MIRA_BUNDLE_PREFIX).mira.ios
         PRODUCT_NAME: Mira
         TARGETED_DEVICE_FAMILY: "1,2"
         IPHONEOS_DEPLOYMENT_TARGET: "18.0"
