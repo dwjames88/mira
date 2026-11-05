@@ -198,6 +198,12 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         NSPhotoLibraryUsageDescription: "Mira shows your photo library so you can browse your pictures and apply film looks."
         NSPhotoLibraryAddUsageDescription: "Mira saves your edited pictures to your Photos library."
+        NSCameraUsageDescription: "Mira uses the camera to take pictures through your chosen film."
+        NSLocationWhenInUseUsageDescription: "Mira adds your location to frames only if you turn on Add location to frames in the camera settings."
+        UIApplicationShortcutItems:
+          - UIApplicationShortcutItemType: com.fieldframes.mira.camera
+            UIApplicationShortcutItemTitle: Load film
+            UIApplicationShortcutItemIconSymbolName: camera
         CFBundleDocumentTypes:
           - CFBundleTypeName: Mira Preset
             CFBundleTypeRole: Viewer

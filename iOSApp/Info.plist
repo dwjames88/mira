@@ -41,10 +41,25 @@
 	<false/>
 	<key>MiraAppGroup</key>
 	<string>$(DEVELOPMENT_TEAM).$(MIRA_BUNDLE_PREFIX).mira</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Mira uses the camera to take pictures through your chosen film.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Mira adds your location to frames only if you turn on Add location to frames in the camera settings.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Mira saves your edited pictures to your Photos library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Mira shows your photo library so you can browse your pictures and apply film looks.</string>
+	<key>UIApplicationShortcutItems</key>
+	<array>
+		<dict>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>camera</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Load film</string>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.fieldframes.mira.camera</string>
+		</dict>
+	</array>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>
