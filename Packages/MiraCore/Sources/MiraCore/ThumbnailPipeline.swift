@@ -19,6 +19,13 @@ public struct GridThumbnailKey: Hashable, Sendable {
         self.version = version
     }
 
+    /// The key for an asset whose metadata-only changes must not refresh its thumbnail: the version
+    /// and modification date come from `versions` (which substitutes the pinned date, see
+    /// `AssetVersions.apply`). `modificationDate` is the asset's current `PHAsset.modificationDate`.
+    public init(id: String, pixels: Int, modificationDate: Date?, versions: AssetVersions) {
+        self.init(id: id, pixels: pixels, modificationDate: versions.effectiveModification(for: id, current: modificationDate), version: versions[id])
+    }
+
     var cacheString: NSString {
         "\(id)|\(pixels)|\(modified.map { String($0) } ?? "-")|\(version)" as NSString
     }
@@ -72,11 +79,55 @@ public final class ThumbnailMetrics: @unchecked Sendable {
 
 /// Per-asset change counters. The library bumps an asset when PhotoKit reports it changed (an edit,
 /// a revert, a favorite); cells key their thumbnail on the counter so only that cell refreshes.
+///
+/// Metadata-only changes (favorite, hidden, album membership) leave the pixels alone, but PhotoKit
+/// reports the asset as changed and may move `PHAsset.modificationDate`, so both the counter and the
+/// date in `GridThumbnailKey` would invalidate a thumbnail that is still right. To opt in to keeping
+/// the key stable:
+///
+/// 1. Build every key with `GridThumbnailKey(id:pixels:modificationDate:versions:)`, passing the
+///    asset's current `modificationDate` and the library's `AssetVersions`.
+/// 2. In `photoLibraryDidChange`, fill `LibraryChangeSummary.contentChangedIDs` with
+///    `LibraryActions.contentChangedIDs(in:details:)`, and call
+///    `versions.apply(summary, previousModification: { oldAssetsByID[$0]?.modificationDate })`
+///    BEFORE swapping in the new fetch result, so the closure still sees the old assets' dates.
+///    Content changes are bumped (and un-pinned); metadata-only changes are pinned to the date the
+///    asset had before the change and are not bumped.
+/// 3. With `contentChangedIDs == nil` (unknown) `apply` bumps every changed id, exactly like `bump`.
+///
+/// Pins live in memory only; after a relaunch keys use the real date again.
 public struct AssetVersions: Sendable, Equatable {
+    private struct Pin: Sendable, Equatable { var date: Date? }
     private var map: [String: Int] = [:]
+    private var pins: [String: Pin] = [:]
     public init() {}
     public subscript(id: String) -> Int { map[id] ?? 0 }
     public mutating func bump(_ ids: some Sequence<String>) { for id in ids { map[id, default: 0] += 1 } }
+
+    /// Pins the modification date a key uses for `id` (only if not already pinned). A nil date pins "none".
+    public mutating func pin(_ id: String, _ date: Date?) {
+        if pins[id] == nil { pins[id] = Pin(date: date) }
+    }
+
+    /// Drops the pin so keys use the asset's real modification date again.
+    public mutating func unpin(_ id: String) { pins[id] = nil }
+
+    public func isPinned(_ id: String) -> Bool { pins[id] != nil }
+
+    /// The pinned date when there is a pin, else `current`.
+    public func effectiveModification(for id: String, current: Date?) -> Date? {
+        if let pin = pins[id] { return pin.date }
+        return current
+    }
+
+    /// Applies a change: content changes (or every change, when the summary does not know) are
+    /// un-pinned and bumped; metadata-only changes are pinned to `previousModification(id)`, the date
+    /// from before the change, and not bumped.
+    public mutating func apply(_ summary: LibraryChangeSummary, previousModification: (String) -> Date?) {
+        for id in summary.metadataOnlyIDs { pin(id, previousModification(id)) }
+        for id in summary.contentIDs { unpin(id) }
+        bump(summary.contentIDs)
+    }
 }
 
 /// How a `PHChange` touched one fetch result, reduced to what the grids need (testable without PhotoKit).
@@ -88,13 +139,31 @@ public struct LibraryChangeSummary: Sendable, Equatable {
     public var hasMoves: Bool
     /// Identifiers of assets whose content or metadata changed.
     public var changedIDs: [String]
+    /// The subset of `changedIDs` whose pixels changed (`PHObjectChangeDetails.assetContentChanged`);
+    /// see `LibraryActions.contentChangedIDs`. nil = unknown, every changed id is treated as a content change.
+    public var contentChangedIDs: [String]?
 
-    public init(isIncremental: Bool, removedCount: Int = 0, insertedCount: Int = 0, hasMoves: Bool = false, changedIDs: [String] = []) {
+    public init(isIncremental: Bool, removedCount: Int = 0, insertedCount: Int = 0, hasMoves: Bool = false, changedIDs: [String] = [], contentChangedIDs: [String]? = nil) {
+        self.contentChangedIDs = contentChangedIDs
         self.isIncremental = isIncremental
         self.removedCount = removedCount
         self.insertedCount = insertedCount
         self.hasMoves = hasMoves
         self.changedIDs = changedIDs
+    }
+
+    /// Changed ids whose pixels changed (all of `changedIDs` when unknown).
+    public var contentIDs: [String] {
+        guard let content = contentChangedIDs else { return changedIDs }
+        let set = Set(content)
+        return changedIDs.filter(set.contains)
+    }
+
+    /// Changed ids known to be metadata-only (empty when unknown).
+    public var metadataOnlyIDs: [String] {
+        guard let content = contentChangedIDs else { return [] }
+        let set = Set(content)
+        return changedIDs.filter { !set.contains($0) }
     }
 
     /// Photos came, went or moved, so grid positions and counts are different.
