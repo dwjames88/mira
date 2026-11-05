@@ -280,18 +280,40 @@ float4 miraDodgeBurn(coreimage::sample_t s, coreimage::sample_t m, float ev, flo
 
 // MARK: Film science (pipeline 2)
 
-// Film exposure with latitude, per channel in linear light. For a gain g > 1 the highlights roll off
-// toward white instead of clipping, by `latitude` (0 plain gain, 1 full negative-film shoulder):
-// x (g + x) / (1 + g x) is the identity at g = 1, maps 1 to 1 and has slope g at 0. For g <= 1 (and for
-// negative values) it is a plain gain. Mirrored by FilmMath.exposure in Swift.
+// Film exposure with latitude, per channel in linear light, g = gain (exposure and push).
+//
+// SDR source (headroom H = 1): for g > 1 the highlights roll off toward white instead of clipping, by
+// `latitude` (0 plain gain, 1 full negative-film shoulder): x (g + x) / (1 + g x) is the identity at
+// g = 1, maps 1 to 1 and has slope g at 0. For g <= 1 (and for negative values) it is a plain gain.
+//
+// Scene-referred source (H > 1: RAW decoded with extended range, HDR): values reach H, so the white
+// point after the gain is W = g H. When W > 1 the shoulder instead maps W to 1 and is the identity
+// below a knee k = 0.6. With u = g x:
+//     u <= k:  y = u
+//     u >  k:  y = k + (1 - k) f(t),  t = (u - k) / (W - k),  f(t) = t (1 + a) / (1 + a t),
+//              a = (W - 1) / (1 - k)
+// f(0) = 0, f(1) = 1, f is monotone and concave, and f'(0) (1 - k) / (W - k) = 1, so the curve is
+// C1 at the knee (slope 1). The result is blended with the plain gain u by `latitude`, as in the SDR
+// case: y = mix(u, shoulder, latitude). Slide films (low latitude) therefore still clip hard.
+// Mirrored by FilmMath.exposure in Swift.
 extern "C" {
 namespace coreimage {
 
-float4 miraFilmExposure(coreimage::sample_t s, float g, float latitude) {
+float4 miraFilmExposure(coreimage::sample_t s, float g, float latitude, float headroom) {
     if (s.a <= 0.0) { return s; }
     float3 c = miraUnpremultiply(s);
     float3 plain = c * g;
-    if (g > 1.0) {
+    float W = g * headroom;
+    if (headroom > 1.0 && W > 1.0) {
+        const float k = 0.6;
+        float a = (W - 1.0) / (1.0 - k);
+        float3 u = max(c, float3(0.0)) * g;
+        float3 t = (u - k) / (W - k);
+        float3 f = t * (1.0 + a) / (1.0 + a * t);
+        float3 shoulder = select(k + (1.0 - k) * f, u, u <= k);
+        float3 y = mix(u, shoulder, latitude);
+        c = float3(c.r >= 0.0 ? y.r : plain.r, c.g >= 0.0 ? y.g : plain.g, c.b >= 0.0 ? y.b : plain.b);
+    } else if (g > 1.0) {
         float3 x = max(c, float3(0.0));
         float3 shoulder = x * (float3(g) + x) / (float3(1.0) + g * x);
         float3 y = mix(g * x, shoulder, latitude);
