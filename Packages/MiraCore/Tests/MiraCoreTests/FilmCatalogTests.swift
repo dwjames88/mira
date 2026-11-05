@@ -97,35 +97,35 @@ import Testing
         #expect(procedural.png == nil)
     }
 
-    /// Fidelity of the shipped 48^3 cubes: each is evaluated trilinearly at all 64^3 lattice points of the original
-    /// (`LUT.resampled(to: 64)`) and compared with the PNG's own 64^3 values. Header, payload and size are checked
-    /// for every film; the full comparison runs on every 5th film (debug builds are slow).
-    ///
-    /// Measured over all 260 films (`mira-sheet --pack-fidelity FilmSources Films`, release): worst max error
-    /// 32.0/255 (fuji-fp-100c-negative-plus-2-alt), worst per-channel mean 0.415/255 (fuji-fp-100c-negative-minus-2),
-    /// worst 99.9th percentile 9.0/255. The requested bounds of 2/255 (max) and 0.25/255 (mean) are NOT met by any
-    /// 48^3 resampling of these cubes (56^3 gives 15/255 and 0.32/255), so the bounds below are the measured ones.
-    @Test func packedCubesStayCloseToTheirPNGs() throws {
+    /// Every packed cube is 48^3 or 56^3 and within max 6/255 and 99.9th percentile 2/255 of its 64^3 original, or is
+    /// the 64^3 cube itself, equal to what `LUT.loadHald` reads from the PNG (exactly, up to 16-bit rounding for the
+    /// few Hald images larger than 64^3, which `loadHald` resamples in Float). Headers and sizes are checked for every
+    /// film; the error measurement runs on every film too (it takes a few seconds per 10 films in debug builds).
+    /// `mira-sheet --pack-films` picks the smallest dimension that passes.
+    @Test func packedCubesMeetTheErrorLimitsOrAreExact() throws {
         let films = try Self.library().films.filter { $0.proceduralID == nil }
-        let maxAllowed = Float(40.0 / 255), meanAllowed = Float(0.5 / 255)
-        for (i, f) in films.enumerated() {
+        var counts: [Int: Int] = [:]
+        for f in films {
             let data = try Data(contentsOf: Self.dir.appendingPathComponent(f.file))
             let packed = try PackedLUT.unpack(data)
-            #expect(packed.dimension == PackedLUT.shippedDimension, "\(f.id)")
-            #expect(data.count < 600_000, "\(f.id): \(data.count) bytes")
-            guard i % 5 == 0 else { continue }
-            let orig = try LUT.loadHald(url: Self.sources.appendingPathComponent(try #require(f.png)))
+            #expect(PackedLUT.candidateDimensions.contains(packed.dimension), "\(f.id): dimension \(packed.dimension)")
+            counts[packed.dimension, default: 0] += 1
+            let (n, rgb) = try LUT.haldSamples(url: Self.sources.appendingPathComponent(try #require(f.png)))
+            let orig = PackedLUT.original(rgb, dimension: n)
             #expect(orig.dimension == 64)
-            let a = orig.data.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
-            let b = packed.resampled(to: 64).data.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
-            var maxErr: Float = 0, sums = [Double](repeating: 0, count: 3)
-            for t in 0..<(a.count / 4) { for c in 0..<3 {
-                let e = abs(a[t * 4 + c] - b[t * 4 + c]); maxErr = max(maxErr, e); sums[c] += Double(e)
-            } }
-            let meanErr = Float(sums.max()! / Double(a.count / 4))
-            #expect(maxErr <= maxAllowed, "\(f.id): max error \(maxErr * 255)/255")
-            #expect(meanErr <= meanAllowed, "\(f.id): mean error \(meanErr * 255)/255")
+            if packed.dimension == 64 {
+                let a = orig.data.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
+                let b = packed.data.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
+                // Exact for 64^3 sources; at most half a 16-bit step for larger ones.
+                let tolerance: Float = n == 64 ? 0 : 0.5 / 65535 + 1e-7
+                #expect(zip(a, b).allSatisfy { abs($0 - $1) <= tolerance }, "\(f.id): 64^3 cube differs from its PNG")
+            } else {
+                let fid = PackedLUT.fidelity(original: orig, candidate: packed)
+                #expect(fid.within(maxError: PackedLUT.acceptedMaxError, p999Error: PackedLUT.acceptedP999Error),
+                        "\(f.id): \(packed.dimension)^3 max \(fid.max * 255)/255 p99.9 \(fid.p999 * 255)/255")
+            }
         }
+        print("packed dimensions: \(counts.sorted { $0.key < $1.key })")
     }
 
     // MARK: stock / variant grouping

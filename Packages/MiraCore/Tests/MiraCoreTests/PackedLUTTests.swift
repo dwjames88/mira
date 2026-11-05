@@ -94,15 +94,16 @@ import Testing
         let t0 = DispatchTime.now().uptimeNanoseconds
         for _ in 0..<5 { _ = try PackedLUT.unpack(data) }
         let ms = Double(DispatchTime.now().uptimeNanoseconds - t0) / 5e6
-        // Release builds measure ~10-20 ms; debug test builds are several times slower, so this only catches blow-ups.
-        #expect(ms < 400, "decode took \(ms) ms")
+        // Release builds decode a 64^3 cube in ~65 ms (48^3 in ~9 ms); debug test builds are several times slower,
+        // so this only catches blow-ups.
+        #expect(ms < 2000, "decode took \(ms) ms")
     }
 
-    /// A bundled 48^3 film renders through the current (atlas) pipeline and changes the picture.
-    @Test func bundled48CubeRendersThroughThePipeline() throws {
+    /// A bundled packed film renders through the current (atlas) pipeline and changes the picture.
+    @Test func bundledPackedCubeRendersThroughThePipeline() throws {
         let lib = try FilmLibrary(directory: FilmTests.filmsDirectory())
         let film = try #require(lib.film(id: "kodak-portra-400"))
-        #expect(try lib.lut(for: film).dimension == PackedLUT.shippedDimension)
+        #expect(PackedLUT.candidateDimensions.contains(try lib.lut(for: film).dimension))
         let r = Renderer(library: lib)
         let ctx = Renderer.makeContext()
         let input = Fixture.gradientAndPatches(size: 128)

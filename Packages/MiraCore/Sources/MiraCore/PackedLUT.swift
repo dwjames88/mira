@@ -16,7 +16,7 @@ public enum PackedLUTError: Error, Equatable, CustomStringConvertible {
 }
 
 /// `.mlut`: a compressed 3D cube of 16-bit RGB samples. The container is lossless; the app ships each film's
-/// 64^3 Hald cube resampled to `shippedDimension`^3 (`resampled`) to keep the bundle small.
+/// 64^3 Hald cube at the smallest of `candidateDimensions` whose error stays within `Limits` (`choose`).
 ///
 /// Layout, little endian: `"MLUT"`, UInt16 version, UInt16 dimension, UInt8 channels (3), UInt8 transform,
 /// UInt8 codec, UInt8 reserved (0), UInt32 raw payload length; then the compressed payload.
@@ -25,8 +25,59 @@ public enum PackedLUTError: Error, Equatable, CustomStringConvertible {
 public enum PackedLUT {
     public static let fileExtension = "mlut"
     public static let version: UInt16 = 1
-    /// Cube dimension of the bundled films (the source Hald PNGs hold 64^3).
-    public static let shippedDimension = 48
+    /// Cube dimensions the packer tries, smallest first. 64 is the source resolution and is stored exactly.
+    public static let candidateDimensions = [48, 56, 64]
+
+    /// Error of a smaller cube against the 64^3 original, evaluated trilinearly at the 64^3 lattice points.
+    public struct Fidelity: Sendable {
+        /// Largest absolute difference of any channel, 0...1.
+        public var max: Float
+        /// Largest per-channel 99.9th percentile of the absolute difference, 0...1.
+        public var p999: Float
+        public func within(maxError: Float, p999Error: Float) -> Bool { max <= maxError && p999 <= p999Error }
+    }
+
+    /// Limits for accepting a smaller cube: max 6/255 and 99.9th percentile 2/255.
+    public static let acceptedMaxError: Float = 6.0 / 255
+    public static let acceptedP999Error: Float = 2.0 / 255
+
+    /// The 64^3 RGBA Float cube a Hald image yields in the app (`LUT.loadHald`), from its raw samples.
+    public static func original(_ rgb: [UInt16], dimension n: Int) -> LUT {
+        let lut = LUT(dimension: n, rgb16: rgb)
+        return n > LUT.maxHaldDimension ? lut.resampled(to: LUT.maxHaldDimension) : lut
+    }
+
+    /// How far `candidate` (any dimension) is from `original` when sampled at `original`'s lattice points.
+    public static func fidelity(original: LUT, candidate: LUT) -> Fidelity {
+        let up = candidate.dimension == original.dimension ? candidate : candidate.resampled(to: original.dimension)
+        let a = original.data.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
+        let b = up.data.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
+        let texels = a.count / 4
+        var worst: Float = 0, p999: Float = 0
+        var errs = [Float](repeating: 0, count: texels)
+        for c in 0..<3 {
+            for i in 0..<texels { errs[i] = abs(a[i * 4 + c] - b[i * 4 + c]) }
+            errs.sort()
+            worst = Swift.max(worst, errs[texels - 1])
+            p999 = Swift.max(p999, errs[Int(Double(texels) * 0.999)])
+        }
+        return Fidelity(max: worst, p999: p999)
+    }
+
+    /// The samples to store for a Hald image: the first of `candidateDimensions` that meets the limits, else the
+    /// 64^3 cube itself. Returns the dimension and samples, and the error of the choice.
+    public static func choose(
+        _ rgb: [UInt16], dimension n: Int, maxError: Float = acceptedMaxError, p999Error: Float = acceptedP999Error
+    ) -> (dimension: Int, rgb: [UInt16], fidelity: Fidelity) {
+        let orig = original(rgb, dimension: n)
+        for m in candidateDimensions where m < orig.dimension {
+            let samples = resampled(rgb, from: n, to: m)
+            let f = fidelity(original: orig, candidate: LUT(dimension: m, rgb16: samples))
+            if f.within(maxError: maxError, p999Error: p999Error) { return (m, samples, f) }
+        }
+        let m = orig.dimension
+        return (m, n == m ? rgb : resampled(rgb, from: n, to: m), Fidelity(max: 0, p999: 0))
+    }
 
     /// Trilinear resample of interleaved 16-bit RGB samples from `n`^3 (via 64^3 when larger) to `m`^3 at lattice points (in Float),
     /// rounded to the nearest UInt16. This is what `mira-sheet --pack-films` stores.
