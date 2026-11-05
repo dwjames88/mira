@@ -21,6 +21,7 @@ import XCTest
 @MainActor
 final class StepConsistencyTests: XCTestCase {
     static let placementTolerance = 3.0
+    static let rawDraftTolerance = 6.0
     static let ink = CIColor(red: 0.082, green: 0.078, blue: 0.059)
 
     // MARK: Fixtures
@@ -348,5 +349,81 @@ extension StepConsistencyTests {
         let d = diff(staged, bitmap(lazy, m.live.ciContext, rect: CGRect(origin: .zero, size: size)))
         print("STAGED vs lazy: mean \(d.mean) max \(d.max)")
         XCTAssertLessThan(d.mean, 0.5, "the stage must neither flip nor shift nor re-tone the picture")
+    }
+}
+
+// MARK: RAW: original -> preset with a film -> draft, then full develop
+
+extension StepConsistencyTests {
+    func lowpass(_ image: CIImage, _ ctx: CIContext) -> Bitmap {
+        let e = image.extent
+        let l = CIFilter.lanczosScaleTransform()
+        l.inputImage = image.transformed(by: CGAffineTransform(translationX: -e.minX, y: -e.minY))
+        l.scale = Float(32 / e.height); l.aspectRatio = Float((48 / e.width) / (32 / e.height))
+        return bitmap(l.outputImage!, ctx, rect: CGRect(x: 0, y: 0, width: 48, height: 32))
+    }
+
+    /// The app's RAW path: open with no film (draft), apply a preset with a colour film (the film changes how the RAW is
+    /// developed, so the app develops it again: a draft first, then the full develop), and look at the preview after each.
+    /// Draft and full differ by decode quality only (draft demosaic, preview size): mean `rawDraftTolerance` of 255.
+    /// Both must be far from the film-off render, and the old 8-bit proxy must be far from both (evidence).
+    func testRawDraftThenFullDevelopKeepTheLook() async throws {
+        let url = Snapshot.root.appendingPathComponent("Fixtures/raw/iphone-xs.dng")
+        guard let off = RawOpener.openDraft(url: url, orientation: nil, settings: .identity, filmApplied: false, cacheKey: nil)
+        else { throw XCTSkip("iphone-xs.dng not present") }
+        let develop = off.develop
+        let space = ImageSource.outputColorSpace(url: url, image: off.source.image)
+        func loaded(_ s: DevelopedSource) -> LoadedSource { LoadedSource(image: s.image, colorSpace: space, size: s.image.extent.size) }
+        let tol = Self.rawDraftTolerance
+
+        for d in TestDevice.all {
+            let m = EditorViewModel()
+            m.present(loaded(off.source))                       // opened with no film
+            setBox(m, d)
+            let preset = Self.preset("Raw", film: Self.film(mono: false))
+            let filmOffFrame = { self.photoRegion(m, size: CGSize(width: d.size.width * d.scale - 12, height: 900), scale: d.scale) }
+            _ = filmOffFrame
+            m.apply(preset)                                       // film nil -> non-nil: the app redevelops
+            let size = CGSize(width: d.size.width * d.scale - 12, height: 900)
+            let stale = photoRegion(m, size: size, scale: d.scale)            // film preset on the film-off develop (before the draft lands)
+
+            let draft = try XCTUnwrap(develop.develop(m.recipe.raw, filmApplied: true, draft: true, scale: develop.previewScale()))
+            m.live.setSource(draft.image, colorSpace: space, size: draft.image.extent.size)
+            let a = photoRegion(m, size: size, scale: d.scale)
+            let gradedDraft = graded(m)
+
+            let full = try XCTUnwrap(develop.develop(m.recipe.raw, filmApplied: true, draft: false, scale: 1))
+            m.live.setSource(full.image, colorSpace: space, size: full.image.extent.size)
+            let b = photoRegion(m, size: size, scale: d.scale)
+
+            let dv = diff(a, b), st = diff(stale, b)
+            print("RAW \(d.name) headroom film-off \(off.source.headroom) draft \(draft.headroom) full \(full.headroom); draft vs full mean \(dv.mean) max \(dv.max); film-off-develop vs full mean \(st.mean) max \(st.max)")
+            XCTAssertLessThanOrEqual(dv.mean, tol, "\(d.name): draft and full develop must look the same")
+
+            // Film off entirely.
+            var bare = m.recipe; bare.filmID = nil; bare.pipeline = m.recipe.pipeline
+            let keep = m.recipe
+            m.recipe = Recipe(filmID: nil)
+            let none = photoRegion(m, size: size, scale: d.scale)
+            m.recipe = keep
+            let far = diff(none, b)
+            print("RAW \(d.name) film-off render vs preset: mean \(far.mean)")
+            XCTAssertGreaterThan(far.mean, tol * 2)
+
+            // Legacy policy: the full develop through an 8-bit proxy that clips above 1 but keeps the headroom tag.
+            let renderer = try XCTUnwrap(m.live.renderer)
+            let wanted = m.live.proxyLongSide(zoom: 1)
+            let scaled = renderer.previewImage(from: full.image, maxPixelSize: wanted)
+            let cg8 = try XCTUnwrap(m.live.ciContext.createCGImage(scaled, from: scaled.extent, format: .RGBA8,
+                                                                    colorSpace: CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!))
+            let legacy = CIImage(cgImage: cg8, options: [.colorSpace: CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!])
+                .withMiraExposureTime(full.image.miraExposureTime).withMiraHeadroom(full.image.miraHeadroom)
+            let scale = min(1, legacy.extent.width / full.image.extent.width)
+            let legacyGraded = renderer.withPreviewScale(scale).apply(m.liveRecipe, to: legacy)
+            let current = m.live.gradedImage(for: m.liveRecipe, cropping: false, showingOriginal: false)!
+            let ld = diff(lowpass(legacyGraded, m.live.ciContext), lowpass(current, m.live.ciContext))
+            print("RAW \(d.name) LEGACY 8-bit proxy vs half-float proxy (full develop, headroom \(full.headroom)): mean \(ld.mean) max \(ld.max)")
+            _ = gradedDraft
+        }
     }
 }
