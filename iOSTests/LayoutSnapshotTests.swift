@@ -207,10 +207,6 @@ final class LayoutSnapshotTests: XCTestCase {
             m.select(film.id)
             if !m.isoChoices.isEmpty && !m.variationChoices.isEmpty { break }
         }
-        let cg = Self.sample.cgImage!
-        var thumbs: [String: CGImage] = ["__original": cg]
-        for film in m.visibleStocks.prefix(8) { thumbs[film.id] = cg }
-        m.setThumbnails(thumbs)
         return m
     }
 
@@ -293,14 +289,15 @@ final class LayoutSnapshotTests: XCTestCase {
         XCTAssertTrue(m.hasPhoto)
     }
 
-    func testCameraThumbnailsWantedDoNotBumpEpoch() async {
+    func testCameraFilmListIsStatic() async {
         let m = CameraFilmDoorModel()
         let epoch = m.thumbEpoch
         await m.requestThumbnail(nil)
         await m.requestThumbnail("x")
-        XCTAssertEqual(m.wantedThumbnailIDs, ["__original", "x"])
-        m.setThumbnails(["x": Self.sample.cgImage!])
-        XCTAssertNotNil(m.thumbnails["x"])
+        XCTAssertFalse(m.showsThumbnails)
+        XCTAssertTrue(m.thumbnails.isEmpty, "requesting a thumbnail does nothing in the camera")
         XCTAssertEqual(m.thumbEpoch, epoch)
+        let editor = EditorViewModel()
+        XCTAssertTrue(editor.showsThumbnails, "the editor keeps its real thumbnails")
     }
 }
