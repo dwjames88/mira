@@ -5,25 +5,27 @@ import SwiftUI
 /// The stages of the development workflow. The sub-toolbar shows them as tabs; the right
 /// panel and the strip under the canvas follow the selected one.
 public enum EditorTab: String, CaseIterable, Identifiable, Sendable {
-    case films, develop, crop
+    case crop, films, develop, dodgeBurn
 
     public var id: String { rawValue }
 
     /// The mono label in the sub-toolbar (shown uppercase by the label style).
     public var title: String {
         switch self {
+        case .crop: "Crop"
         case .films: "Films"
         case .develop: "Develop"
-        case .crop: "Crop"
+        case .dodgeBurn: "Dodge & Burn"
         }
     }
 
     /// The key that selects the tab, with no modifier.
     public var key: String {
         switch self {
-        case .films: "1"
-        case .develop: "2"
-        case .crop: "3"
+        case .crop: "1"
+        case .films: "2"
+        case .develop: "3"
+        case .dodgeBurn: "4"
         }
     }
 

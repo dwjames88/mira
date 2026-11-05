@@ -8,21 +8,36 @@ import MiraCore
 extension EditorModel {
     // MARK: Tool
 
-    /// Opens or closes the brush tool. It lives on the DEVELOP tab: opening it selects that tab.
+    /// Opens or closes the brush tool. It is the DODGE & BURN step: opening it selects that step
+    /// (which opens the tool), closing it returns to DEVELOP.
     public func setDodgeBurnTool(_ on: Bool) {
-        let tool = dodgeBurnTool
-        guard on != tool.isActive else { return }
         if on {
-            guard source != nil, !isCropping else { return }
-            endHover()
-            showOriginal = false
-            if tab != .develop { selectTab(.develop) }
-            tool.isActive = true
+            guard source != nil else { return }
+            selectTab(.dodgeBurn)
+        } else if tab == .dodgeBurn {
+            selectTab(.develop)
         } else {
-            endLiveStroke()
-            tool.isActive = false
-            tool.isFlipping = false
+            closeBrushTool()
         }
+    }
+
+    /// Activates the brush; the DODGE & BURN step calls this on entry.
+    func openBrushTool() {
+        let tool = dodgeBurnTool
+        guard !tool.isActive, source != nil, !isCropping else { return }
+        endHover()
+        showOriginal = false
+        tool.isActive = true
+        if tool.maskOverlay { schedulePreview() }
+    }
+
+    /// Deactivates the brush; leaving the step (or starting a crop) calls this.
+    func closeBrushTool() {
+        let tool = dodgeBurnTool
+        guard tool.isActive else { return }
+        endLiveStroke()
+        tool.isActive = false
+        tool.isFlipping = false
         if tool.maskOverlay { schedulePreview() }
     }
 

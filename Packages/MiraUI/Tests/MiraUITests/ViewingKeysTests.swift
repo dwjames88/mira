@@ -15,12 +15,15 @@ struct EditorKeyMapTests {
     }
 
     @Test func tabsOnOneTwoThree() {
-        #expect(act(key("1")) == .selectTab(.films))
-        #expect(act(key("2")) == .selectTab(.develop))
-        #expect(act(key("3")) == .selectTab(.crop))
-        // Presets live in the FILMS tab: there is no fourth tab or key.
-        #expect(act(key("4")) == nil)
-        #expect(EditorTab.allCases == [.films, .develop, .crop])
+        #expect(act(key("1")) == .selectTab(.crop))
+        #expect(act(key("2")) == .selectTab(.films))
+        #expect(act(key("3")) == .selectTab(.develop))
+        #expect(act(key("4")) == .selectTab(.dodgeBurn))
+        // Presets live in the FILMS tab: there is no fifth step or key.
+        #expect(act(key("5")) == nil)
+        #expect(EditorTab.allCases == [.crop, .films, .develop, .dodgeBurn])
+        #expect(EditorTab.allCases.map(\.title) == ["Crop", "Films", "Develop", "Dodge & Burn"])
+        #expect(EditorTab.allCases.map(\.key) == ["1", "2", "3", "4"])
         #expect(act(key("2", rep: true)) == .swallow)
         // Tabs are not available with the panels hidden.
         #expect(act(key("2"), EditorKeyContext(isImmersive: true)) == .swallow)

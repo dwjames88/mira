@@ -99,13 +99,13 @@ Move the pointer over the film cards. After a short pause the canvas shows that 
 
 ### Dodge & burn
 
-1. Open a photo, press 2, scroll to DODGE & BURN and switch PAINT on. The cursor becomes a ring; drag across a dark face: it lightens (DODGE, MIDTONES). Release: UNSAVED appears and one row is added to STROKES. `[` and `]` change the ring, the Size slider follows. Hold ⌥, start a stroke: it burns instead (the ring's centre mark changes while ⌥ is held); the brush stays on DODGE.
-2. Press O: a red wash shows exactly where the strokes are; O again hides it. Click a stroke row: the sliders now edit that stroke (header reads STROKE 02); change Strength and the picture follows. Eye hides it, the cross deletes it, CLEAR ALL empties the list. Esc leaves the tool; 1 or 3 does too.
+1. Open a photo, press 4 (DODGE & BURN; the brush is open straight away). The cursor becomes a ring; drag across a dark face: it lightens (DODGE, MIDTONES). Release: UNSAVED appears and one row is added to STROKES. `[` and `]` change the ring, the Size slider follows. Hold ⌥, start a stroke: it burns instead (the ring's centre mark changes while ⌥ is held); the brush stays on DODGE.
+2. Press O: a red wash shows exactly where the strokes are; O again hides it. Click a stroke row: the sliders now edit that stroke (header reads STROKE 02); change Strength and the picture follows. Eye hides it, the cross deletes it, CLEAR ALL empties the list. Esc leaves the step (back to DEVELOP); 1, 2 or 3 does too.
 3. Zoom with ⌘= to 200% (then ⌘-); pinch and Space-drag also work; paint zoomed in and fit again: the strokes are where you painted them. Crop the photo, rotate it a quarter turn and straighten it: the strokes stay on the same part of the picture.
 4. With PROTECT TONES on, dodge a bright sky with HIGHLIGHTS: it brightens without clipping to flat white; turn it off and it does. Switch on LUMINOSITY RANGE and move Low/High: only that band of tones changes.
 5. Save to Photos, close the picture and reopen it in the app and in Photos ▸ Edit ▸ Mira: every stroke is back and editable. Save a preset on that photo, apply it to another: the film and sliders come over, the strokes do not; applying it back on the first keeps its strokes. The Save Preset sheet carries the note about strokes.
 6. Tablet pressure: with a Wacom or similar pen, press lightly then firmly in one stroke: the line builds from faint to strong (Flow low makes it easy to see). With a mouse or trackpad pressure is constant.
-7. Photos extension: Edit ▸ Mira, DEVELOP, PAINT; paint, Done, reopen: strokes persist (format version 3). Check with an older build that a version 3 edit is refused rather than shown without strokes.
+7. Photos extension: Edit ▸ Mira, DODGE & BURN; paint, Done, reopen: strokes persist (format version 3). Check with an older build that a version 3 edit is refused rather than shown without strokes.
 8. Painting stays smooth on a 24 MP photo at full window size; see docs/PERFORMANCE.md for the numbers.
 
 ### Sharing presets
@@ -145,14 +145,14 @@ It imports `App/SelfTest/sample.jpg` into the album "Emulsion Test", saves Velvi
 
 ## Key map and menus
 
-The window toolbar shows the Mira wordmark and, at the trailing edge, the appearance toggle. Every command is in the menu bar, and the editor has a strip under the title bar: `← LIBRARY` (app only), the FILMS · DEVELOP · CROP tabs, then the status (UNSAVED / SAVED / REVERTED / READ ONLY), Share and SAVE (app only; the Photos extension shows the tabs only and uses Photos' own Save).
+The window toolbar shows the Mira wordmark and, at the trailing edge, the appearance toggle. Every command is in the menu bar, and the editor has a strip under the title bar: `← LIBRARY` (app only), the CROP · FILMS · DEVELOP · DODGE & BURN steps, then the status (UNSAVED / SAVED / REVERTED / READ ONLY), Share and SAVE (app only; the Photos extension shows the tabs only and uses Photos' own Save).
 
 Menus:
 
 - **File**: Open… (⌘O); Export… (⌘E, photo open, not while the crop tab is open); Share… (⌥⌘S, photo open); Save to Photos (⌘S; for a file the same item reads Save Sidecar and writes the sidecar now; disabled when there is nothing to save, read-only or preview-only); Revert to Original… (asks first); Back to Library (⌘←, guarded: asks about unsaved Photos edits).
 - **Edit**: Reset Adjustments (sliders, curves and mixer; keeps film and crop); Reset All (everything except the photo).
 - **Preset**: Save as Preset… (⇧⌘S, photo open, not while the crop tab is open); Import Presets… (⇧⌘I); Export All Presets….
-- **View**: Films (1), Develop (2), Crop (3), Toggle Full Screen (F), Zoom In (]), Zoom Out ([), Zoom to Fit (⌘0).
+- **View**: Crop (1), Films (2), Develop (3), Dodge & Burn (4), Toggle Full Screen (F), Zoom In (]), Zoom Out ([), Zoom to Fit (⌘0).
 - **View ▸ Appearance**: System / Light / Dark (checkmark on current), the same choice as the sun/moon button at the trailing edge of the window toolbar (click toggles Light/Dark, right-click offers all three; hidden in full screen) and Settings ▸ APPEARANCE; stored in `mira.appearance`.
 - Mira ▸ Settings… (⌘,) and About Mira are unchanged.
 
@@ -160,13 +160,13 @@ Keys (single keys work when no text field is being edited, in the app and the ex
 
 | Key / gesture | Does |
 |---|---|
-| 1 / 2 / 3 | FILMS / DEVELOP / CROP tab (3 begins the crop tool; leaving it commits) |
+| 1 / 2 / 3 / 4 | CROP / FILMS / DEVELOP / DODGE & BURN step (1 begins the crop tool, leaving it commits; 4 opens the brush, leaving closes it) |
 | F | Full screen: window full screen (app) and every panel hidden, the photo alone on pure ink. Not available while cropping. In the extension F only hides the panels |
 | Esc | Leaves that view (restores panels, leaves full screen). In the crop tab Esc is CANCEL |
 | C (hold) | Shows the original while held; releasing returns to the edit. Mouse: press and hold HOLD TO COMPARE |
 | Click on the photo | Fit → 200% centred on the click; click again → fit. Not in the crop tab, not while the eyedropper is active |
 | Drag, Space + drag, two-finger scroll or wheel | Pans while zoomed (scroll follows the fingers, momentum included; at fit scroll passes through). Space alone does nothing. Pinch zooms between fit and 400% at the pointer |
-| ] / [ (dodge & burn tool open) | Brush bigger / smaller; zoom moves to ⌘= / ⌘-. O toggles the mask overlay, Esc leaves the tool, ⌥ at the start of a stroke flips dodge and burn |
+| ] / [ (dodge & burn tool open) | Brush bigger / smaller; zoom moves to ⌘= / ⌘-. O toggles the mask overlay, Esc leaves the step, ⌥ at the start of a stroke flips dodge and burn |
 | ] / [ | Zoom in / out through fit, 50%, 100%, 200%, 400% (anchored at the pointer over the photo, else the centre); a readout (100%) shows bottom left for about a second |
 | ⌘0 | Zoom to Fit |
 | ⌘O / ⌘E / ⌘S / ⌘← / ⌘, | Open / Export / Save / Back to Library / Settings |
@@ -174,8 +174,8 @@ Keys (single keys work when no text field is being edited, in the app and the ex
 
 Check by hand after a change to the editor chrome:
 
-1. Open a photo. The strip shows `← LIBRARY`, FILMS (underlined in lichen), DEVELOP, CROP. FILMS shows the film strip and, on the right, the film name and STRENGTH. DEVELOP shows the histogram, sliders, curves, mixer, TEXTURE and FRAME with RESET at the foot, and no film strip.
-2. Press 3: the crop box appears. Change the ratio, press CANCEL: the box returns to the committed crop and the tab stays. Press DONE: the crop is kept and the previous tab returns. Press 3 then 1: the crop is committed.
+1. Open a photo. The strip shows `← LIBRARY`, CROP, FILMS (underlined in lichen), DEVELOP, DODGE & BURN. FILMS shows the film strip and, on the right, the film name and STRENGTH. DEVELOP shows the histogram, sliders, curves, mixer, TEXTURE and FRAME with RESET at the foot, and no film strip.
+2. Press 1: the crop box appears. Change the ratio, press CANCEL: the box returns to the committed crop and the tab stays. Press DONE: the crop is kept and the previous tab returns. Press 1 then 2: the crop is committed. Press 4: the brush ring appears and the right panel shows the strokes and brush; press 3: the ring goes.
 3. Press F: the window goes full screen with only the photo on dark ink. F or Esc returns. In the Photos extension F hides the panels only.
 4. Hold C: the original shows; release: the edit returns. Click the photo: 200% around the click, with `200%` bottom left for about a second; drag pans; two-finger scroll pans; pinch zooms; hold Space and drag pans; `]` and `[` step; click again or ⌘0 fits. In DEVELOP at 200%, moving a slider updates the zoomed view at once.
 5. File ▸ Save adapts: Save to Photos for a Photos picture, Save Sidecar for a file. The SAVE button in the strip does the same and reads SAVED afterwards.
@@ -293,11 +293,11 @@ Not measured: SwiftUI-side slider drag latency and grid scroll frame rate (no re
 Installed with `scripts/install.sh` and driven live (test asset in "Emulsion Test" only; nothing saved to Photos):
 
 - Library: empty window toolbar (wordmark only); collapsible LIBRARY / ALBUMS sections; albums and folders in the same order as Photos' own sidebar; breadcrumb for nested albums; FILTER popover with scope, show-only toggles, CAMERA and LENS lists populated from the metadata index (e.g. Fujifilm X100V 246) and "INDEXING n / 48873" progress.
-- Menus: File (Open…, Export…, Save to Photos, Revert to Original…, Back to Library), Edit (Reset Adjustments, Reset All), View (Films, Develop, Crop, Toggle Full Screen, Zoom In/Out, Zoom to Fit).
-- Editor tabs via 1/2/3: FILMS (strip + strength), DEVELOP (live histogram; a curve point added and dragged; Orange hue +48 in the color mixer; status UNSAVED), CROP (handles, controls, readout).
+- Menus: File (Open…, Export…, Save to Photos, Revert to Original…, Back to Library), Edit (Reset Adjustments, Reset All), View (Crop, Films, Develop, Dodge & Burn, Toggle Full Screen, Zoom In/Out, Zoom to Fit).
+- Editor steps via 1/2/3/4: CROP (handles, controls, readout), FILMS (strip + strength), DEVELOP (live histogram; a curve point added and dragged; Orange hue +48 in the color mixer; status UNSAVED), DODGE & BURN (brush ring, strokes, mask overlay).
 - Click-to-zoom shows 200% with the readout; `]` steps to 400%, sharp; ⌘0 fits. Holding C shows the original.
 - F: true full screen, photo on ink, window toolbar hidden; Esc exits.
-- Photos extension: listed in Photos' Extensions menu; with the fix it fills the editing window (1723×1063, then follows a resize to 1300×808 — confirmed by the `extension` log category); tabs FILMS / DEVELOP / CROP. Cancelled without saving.
+- Photos extension: listed in Photos' Extensions menu; with the fix it fills the editing window (1723×1063, then follows a resize to 1300×808 — confirmed by the `extension` log category); steps CROP / FILMS / DEVELOP / DODGE & BURN. Cancelled without saving.
 
 Not verified live: Space-drag pan, mixer eyedropper, SAVE through the new sub-toolbar button, file-from-disk sidecar flow in the new layout.
 

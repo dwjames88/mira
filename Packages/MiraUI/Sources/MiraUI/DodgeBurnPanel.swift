@@ -32,9 +32,24 @@ extension DodgeBurnRange {
     }
 }
 
-/// The DODGE & BURN group of the DEVELOP tab: the PAINT switch that opens the brush tool, the brush
+/// The DODGE & BURN step's panel (the brush tool is open while it shows): the brush
 /// (or the selected stroke) with its sliders, tone range, protect tones and luminosity range, the
 /// stroke list, and the mask overlay switch.
+public struct DodgeBurnStepPanel: View {
+    @Bindable var model: EditorModel
+
+    public init(model: EditorModel) { self.model = model }
+
+    public var body: some View {
+        FFScrollView {
+            DodgeBurnPanel(model: model)
+                .padding(.horizontal, T.cells(2))
+                .padding(.bottom, T.rows(1))
+        }
+        .ffPanel()
+    }
+}
+
 public struct DodgeBurnPanel: View {
     @Bindable private var model: EditorModel
 
@@ -58,7 +73,6 @@ public struct DodgeBurnPanel: View {
     public var body: some View {
         InspectorGroup("dodgeBurn", title: "Dodge & burn", trailing: strokes.isEmpty ? nil : String(format: "%02d", strokes.count)) {
             VStack(alignment: .leading, spacing: 0) {
-                paintRow
                 if showsSettings { brushSettings }
                 strokeList
                 FFToggle("Mask overlay", isOn: Binding(get: { tool.maskOverlay }, set: { model.setMaskOverlay($0) }))
@@ -76,17 +90,8 @@ public struct DodgeBurnPanel: View {
 
     private var hint: String {
         tool.isActive
-            ? "Drag on the photo. [ ] size \u{00B7} \u{2325} flips dodge and burn \u{00B7} O mask \u{00B7} \u{2318}= \u{2318}- zoom \u{00B7} Esc leaves"
-            : "Paint light onto the photo. Strokes stay with the photo, not with presets."
-    }
-
-    // MARK: Paint
-
-    private var paintRow: some View {
-        FFToggle("Paint", isOn: Binding(get: { tool.isActive }, set: { model.setDodgeBurnTool($0) }))
-            .padding(.vertical, 4)
-            .disabled(model.source == nil || model.isCropping)
-            .help("Paint dodge and burn on the photo \u{2014} Esc leaves")
+            ? "Drag on the photo. [ ] size \u{00B7} \u{2325} flips dodge and burn \u{00B7} O mask \u{00B7} \u{2318}= \u{2318}- zoom \u{00B7} Esc returns to Develop"
+            : "Strokes stay with the photo, not with presets."
     }
 
     // MARK: Brush settings

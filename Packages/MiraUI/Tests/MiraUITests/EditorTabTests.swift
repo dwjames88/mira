@@ -35,6 +35,30 @@ struct EditorTabTests {
         model.cancelWork()
     }
 
+    @Test func dodgeBurnIsItsOwnStepWhoseEntryOpensTheBrush() async throws {
+        let model = try await CropModelTests.makeModel()
+        #expect(!model.dodgeBurnTool.isActive)
+        model.selectTab(.dodgeBurn)
+        #expect(model.tab == .dodgeBurn)
+        #expect(model.dodgeBurnTool.isActive)
+
+        model.selectTab(.develop)
+        #expect(!model.dodgeBurnTool.isActive)
+
+        model.selectTab(.dodgeBurn)
+        model.selectTab(.crop) // starting a crop closes the brush
+        #expect(model.isCropping && !model.dodgeBurnTool.isActive)
+        model.commitCrop() // back to a step the brush is not in
+        #expect(model.tab == .develop)
+
+        model.selectTab(.dodgeBurn)
+        model.perform(.exitDodgeBurn) // Esc leaves the step
+        #expect(model.tab == .develop && !model.dodgeBurnTool.isActive)
+        model.setDodgeBurnTool(true)
+        #expect(model.tab == .dodgeBurn && model.dodgeBurnTool.isActive)
+        model.cancelWork()
+    }
+
     @Test func doneCommitsAndReturnsToThePreviousTab() async throws {
         let model = try await CropModelTests.makeModel()
         model.selectTab(.develop)

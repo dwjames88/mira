@@ -3,7 +3,7 @@ import MiraUI
 import PhotosUI
 import SwiftUI
 
-enum EditorTab: Hashable { case films, develop, crop }
+enum EditorTab: Hashable, CaseIterable { case crop, films, develop, dodgeBurn }
 
 struct RootView: View {
     @State private var model = EditorViewModel()
@@ -139,12 +139,14 @@ struct RootView: View {
     /// Equal-width 48pt tabs, hairline-underlined; the photo keeps the rest of the screen.
     private var tabBar: some View {
         HStack(spacing: 0) {
-            ForEach([(EditorTab.films, "FILMS"), (.develop, "DEVELOP"), (.crop, "CROP")], id: \.0) { item in
+            ForEach([(EditorTab.crop, "CROP"), (.films, "FILMS"), (.develop, "DEVELOP"), (.dodgeBurn, "DODGE & BURN")], id: \.0) { item in
                 let selected = tab == item.0
                 Button { tab = item.0 } label: {
                     Text(item.1)
                         .ffLabel(size: 11, color: selected ? FieldFramesTheme.paper : FieldFramesTheme.paperDim,
                                  weight: selected ? .medium : .regular)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                         .frame(maxWidth: .infinity, minHeight: 48)
                         .overlay(alignment: .bottom) {
                             Rectangle().fill(selected ? FieldFramesTheme.lichen : .clear).frame(height: 2)
@@ -224,9 +226,10 @@ struct RootView: View {
 
     @ViewBuilder private var controls: some View {
         switch tab {
+        case .crop: CropTab(model: model)
         case .films: FilmsPanel(model: model)
         case .develop: DevelopPanel(model: model)
-        case .crop: CropTab(model: model)
+        case .dodgeBurn: DodgeBurnTab(model: model)
         }
     }
 }
