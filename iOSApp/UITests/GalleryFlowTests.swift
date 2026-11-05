@@ -2,7 +2,7 @@ import XCTest
 
 /// Gallery flow inside the simulator: open the library, filter RAW, open a photo, come back.
 /// Needs Photos access granted (see project.yml) and a seeded library. Screenshots go to MIRA_UITEST_SHOTS if set.
-final class GalleryFlowTests: XCTestCase {
+@MainActor final class GalleryFlowTests: XCTestCase {
     private func shot(_ name: String) {
         let png = XCUIScreen.main.screenshot().pngRepresentation
         let att = XCTAttachment(data: png, uniformTypeIdentifier: "public.png")

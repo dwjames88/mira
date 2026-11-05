@@ -5,8 +5,8 @@ import XCTest
 /// Save-to-Photos round trip inside the simulator's OWN library, on an album named "Emulsion Test" that the
 /// test creates (never a real library). The runner needs Photos access:
 /// xcrun simctl privacy <udid> grant photos com.fieldframes.mira.ios.uitests.xctrunner
-final class SaveRoundTripTests: XCTestCase {
-    private static let albumName = "Emulsion Test"
+@MainActor final class SaveRoundTripTests: XCTestCase {
+    nonisolated private static let albumName = "Emulsion Test"
 
     private func shot(_ name: String) {
         let png = XCUIScreen.main.screenshot().pngRepresentation
@@ -75,7 +75,6 @@ final class SaveRoundTripTests: XCTestCase {
         shot("11-editor")
         // Change something: drag the strength slider.
         let film = app.buttons["Ultra Color 100, AGFA"]; if film.waitForExistence(timeout: 5) { film.tap() }
-        let slider = app.sliders.firstMatch
 
         let save = app.buttons["SAVE"]
         XCTAssertTrue(save.waitForExistence(timeout: 5), "edit did not flag unsaved")
