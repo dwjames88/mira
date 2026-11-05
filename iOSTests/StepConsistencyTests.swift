@@ -427,3 +427,50 @@ extension StepConsistencyTests {
         }
     }
 }
+
+// MARK: RAW redevelop timing and thumbnail invalidation
+
+extension StepConsistencyTests {
+    func testFilmTapRedevelopsAtOnceButRawSlidersDebounce() {
+        var withFilm = Recipe(filmID: "x"); withFilm.pipeline = Recipe.currentPipeline
+        let none = Recipe()
+        XCTAssertEqual(EditorViewModel.rawDevelopDebounce(from: none, to: withFilm), .zero)
+        XCTAssertEqual(EditorViewModel.rawDevelopDebounce(from: withFilm, to: none), .zero)
+        var moved = withFilm; moved.raw.temperature = 4300
+        XCTAssertEqual(EditorViewModel.rawDevelopDebounce(from: withFilm, to: moved), .milliseconds(120))
+    }
+
+    /// The strip's thumbnails are forgotten when a develop with the other film-applied state is adopted, not on the
+    /// draft to full swap of the same state.
+    func testThumbnailsAreInvalidatedOnlyWhenFilmAppliedChanges() async throws {
+        let m = await jpegModel()
+        await m.requestThumbnail(nil)
+        XCTAssertNotNil(m.thumbnails["__original"])
+        let epoch = m.thumbEpoch
+        m.noteThumbnailSource(filmApplied: false)            // same state as opened: draft -> full swap, no churn
+        XCTAssertEqual(m.thumbEpoch, epoch)
+        XCTAssertNotNil(m.thumbnails["__original"])
+        m.noteThumbnailSource(filmApplied: true)             // film toggled on: film-on develop adopted
+        XCTAssertEqual(m.thumbEpoch, epoch + 1)
+        XCTAssertTrue(m.thumbnails.isEmpty)
+        await m.requestThumbnail(nil)
+        XCTAssertNotNil(m.thumbnails["__original"], "visible cards render again from the new develop")
+        m.noteThumbnailSource(filmApplied: true)             // the full develop of the same state
+        XCTAssertEqual(m.thumbEpoch, epoch + 1)
+        XCTAssertNotNil(m.thumbnails["__original"])
+        m.noteThumbnailSource(filmApplied: false)            // film toggled off
+        XCTAssertEqual(m.thumbEpoch, epoch + 2)
+    }
+
+    /// Time to develop the draft the film tap now starts immediately (decode only; the 120 ms wait is gone).
+    func testRawDraftDevelopTimeAfterAFilmTap() throws {
+        let url = Snapshot.root.appendingPathComponent("Fixtures/raw/iphone-xs.dng")
+        guard let off = RawOpener.openDraft(url: url, orientation: nil, settings: .identity, filmApplied: false, cacheKey: nil)
+        else { throw XCTSkip("iphone-xs.dng not present") }
+        let t0 = ContinuousClock.now
+        let draft = off.develop.develop(.identity, filmApplied: true, draft: true, scale: off.develop.previewScale())
+        let ms = (ContinuousClock.now - t0) / .milliseconds(1)
+        print("RAWTIME film tap -> draft developed: \(ms) ms (was 120 ms debounce + this)")
+        XCTAssertNotNil(draft)
+    }
+}
