@@ -139,7 +139,7 @@ public struct FilmCharacter: Codable, Hashable, Sendable {
             bloom = 1.6
             strength *= 0.6; size *= 1.3; chroma = 0.15; center = 0.5; halation = 0.3; latitude = 0.5
             tint = [1.0, 0.5, 0.25]; under = 1; over = 1
-            rms = 10; cloud = 7.5; clump = 0.1; layerCorr = 0.4; shape = .instant
+            rms = 10; cloud = 7.5; clump = 0.1; layerCorr = 0.75; shape = .instant
         case .print:
             bloom = 0.8
             // A print stock on its own: fine-grained positive, moderate shoulder.

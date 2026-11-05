@@ -2031,7 +2031,7 @@
     "file": "Packed/fuji-fp-100c.mlut",
     "png": "HaldCLUT/fuji-fp-100c.png",
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c 3.png",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "fuji-fp-100c-minus-2",
@@ -2047,7 +2047,7 @@
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c 1 --.png",
     "parent": "fuji-fp-100c",
     "variant": "−2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "fuji-fp-100c-minus-1",
@@ -2063,7 +2063,7 @@
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c 2 -.png",
     "parent": "fuji-fp-100c",
     "variant": "−1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "fuji-fp-100c-plus-1",
@@ -2079,7 +2079,7 @@
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c 5 +.png",
     "parent": "fuji-fp-100c",
     "variant": "+1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "fuji-fp-100c-plus-2",
@@ -2095,7 +2095,7 @@
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c 6 ++.png",
     "parent": "fuji-fp-100c",
     "variant": "+2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "fuji-fp-100c-plus-3",
@@ -2111,7 +2111,7 @@
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c 8 +++.png",
     "parent": "fuji-fp-100c",
     "variant": "+3",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "fuji-fp-100c-alt",
@@ -2127,7 +2127,7 @@
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c 4 Alt.png",
     "parent": "fuji-fp-100c",
     "variant": "Alt",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "fuji-fp-100c-plus-2-alt",
@@ -2143,7 +2143,7 @@
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c 7 ++ Alt.png",
     "parent": "fuji-fp-100c",
     "variant": "+2 Alt",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "fuji-fp-100c-cool-minus-2",
@@ -2159,7 +2159,7 @@
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c Cool 1 --.png",
     "parent": "fuji-fp-100c",
     "variant": "Cool −2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "fuji-fp-100c-cool-minus-1",
@@ -2175,7 +2175,7 @@
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c Cool 2 -.png",
     "parent": "fuji-fp-100c",
     "variant": "Cool −1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "fuji-fp-100c-cool",
@@ -2191,7 +2191,7 @@
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c Cool 3.png",
     "parent": "fuji-fp-100c",
     "variant": "Cool",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "fuji-fp-100c-cool-plus-1",
@@ -2207,7 +2207,7 @@
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c Cool 4 +.png",
     "parent": "fuji-fp-100c",
     "variant": "Cool +1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "fuji-fp-100c-cool-plus-2",
@@ -2223,7 +2223,7 @@
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c Cool 5 ++.png",
     "parent": "fuji-fp-100c",
     "variant": "Cool +2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "fuji-fp-100c-negative",
@@ -2237,7 +2237,7 @@
     "file": "Packed/fuji-fp-100c-negative.mlut",
     "png": "HaldCLUT/fuji-fp-100c-negative.png",
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c Negative 3.png",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "fuji-fp-100c-negative-minus-2",
@@ -2253,7 +2253,7 @@
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c Negative 1 --.png",
     "parent": "fuji-fp-100c-negative",
     "variant": "−2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "fuji-fp-100c-negative-minus-1",
@@ -2269,7 +2269,7 @@
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c Negative 2 -.png",
     "parent": "fuji-fp-100c-negative",
     "variant": "−1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "fuji-fp-100c-negative-plus-1",
@@ -2285,7 +2285,7 @@
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c Negative 4 +.png",
     "parent": "fuji-fp-100c-negative",
     "variant": "+1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "fuji-fp-100c-negative-plus-2",
@@ -2301,7 +2301,7 @@
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c Negative 5 ++.png",
     "parent": "fuji-fp-100c-negative",
     "variant": "+2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "fuji-fp-100c-negative-plus-3",
@@ -2317,7 +2317,7 @@
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c Negative 7 +++.png",
     "parent": "fuji-fp-100c-negative",
     "variant": "+3",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "fuji-fp-100c-negative-plus-2-alt",
@@ -2333,7 +2333,7 @@
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c Negative 6 ++ Alt.png",
     "parent": "fuji-fp-100c-negative",
     "variant": "+2 Alt",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "fuji-fp-3000b",
@@ -2349,7 +2349,7 @@
     "png": "HaldCLUT/fuji-fp-3000b.png",
     "source": "HaldCLUT/Black-and-White/Fuji/Fuji FP-3000b 3.png",
     "monochrome": true,
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 1}
   },
   {
     "id": "fuji-fp-3000b-minus-2",
@@ -2366,7 +2366,7 @@
     "parent": "fuji-fp-3000b",
     "variant": "−2",
     "monochrome": true,
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 1}
   },
   {
     "id": "fuji-fp-3000b-minus-1",
@@ -2383,7 +2383,7 @@
     "parent": "fuji-fp-3000b",
     "variant": "−1",
     "monochrome": true,
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 1}
   },
   {
     "id": "fuji-fp-3000b-plus-1",
@@ -2400,7 +2400,7 @@
     "parent": "fuji-fp-3000b",
     "variant": "+1",
     "monochrome": true,
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 1}
   },
   {
     "id": "fuji-fp-3000b-plus-2",
@@ -2417,7 +2417,7 @@
     "parent": "fuji-fp-3000b",
     "variant": "+2",
     "monochrome": true,
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 1}
   },
   {
     "id": "fuji-fp-3000b-plus-3",
@@ -2434,7 +2434,7 @@
     "parent": "fuji-fp-3000b",
     "variant": "+3",
     "monochrome": true,
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 1}
   },
   {
     "id": "fuji-fp-3000b-high-contrast",
@@ -2451,7 +2451,7 @@
     "parent": "fuji-fp-3000b",
     "variant": "High contrast",
     "monochrome": true,
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 1}
   },
   {
     "id": "fuji-fp-3000b-negative",
@@ -2466,7 +2466,7 @@
     "png": "HaldCLUT/fuji-fp-3000b-negative.png",
     "source": "HaldCLUT/Black-and-White/Fuji/Fuji FP-3000b Negative 3.png",
     "monochrome": true,
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 1}
   },
   {
     "id": "fuji-fp-3000b-negative-minus-2",
@@ -2483,7 +2483,7 @@
     "parent": "fuji-fp-3000b-negative",
     "variant": "−2",
     "monochrome": true,
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 1}
   },
   {
     "id": "fuji-fp-3000b-negative-minus-1",
@@ -2500,7 +2500,7 @@
     "parent": "fuji-fp-3000b-negative",
     "variant": "−1",
     "monochrome": true,
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 1}
   },
   {
     "id": "fuji-fp-3000b-negative-plus-1",
@@ -2517,7 +2517,7 @@
     "parent": "fuji-fp-3000b-negative",
     "variant": "+1",
     "monochrome": true,
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 1}
   },
   {
     "id": "fuji-fp-3000b-negative-plus-2",
@@ -2534,7 +2534,7 @@
     "parent": "fuji-fp-3000b-negative",
     "variant": "+2",
     "monochrome": true,
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 1}
   },
   {
     "id": "fuji-fp-3000b-negative-plus-3",
@@ -2551,7 +2551,7 @@
     "parent": "fuji-fp-3000b-negative",
     "variant": "+3",
     "monochrome": true,
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 1}
   },
   {
     "id": "fuji-fp-3000b-negative-early",
@@ -2568,7 +2568,7 @@
     "parent": "fuji-fp-3000b-negative",
     "variant": "Early",
     "monochrome": true,
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 1}
   },
   {
     "id": "polaroid-664",
@@ -2584,7 +2584,7 @@
     "png": "HaldCLUT/polaroid-664.png",
     "source": "HaldCLUT/Black-and-White/Polaroid/Polaroid 664.png",
     "monochrome": true,
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 1}
   },
   {
     "id": "polaroid-665",
@@ -2600,7 +2600,7 @@
     "png": "HaldCLUT/polaroid-665.png",
     "source": "HaldCLUT/Black-and-White/Polaroid/Polaroid 665 3.png",
     "monochrome": true,
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 1}
   },
   {
     "id": "polaroid-665-minus-2",
@@ -2617,7 +2617,7 @@
     "parent": "polaroid-665",
     "variant": "−2",
     "monochrome": true,
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 1}
   },
   {
     "id": "polaroid-665-minus-1",
@@ -2634,7 +2634,7 @@
     "parent": "polaroid-665",
     "variant": "−1",
     "monochrome": true,
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 1}
   },
   {
     "id": "polaroid-665-plus-1",
@@ -2651,7 +2651,7 @@
     "parent": "polaroid-665",
     "variant": "+1",
     "monochrome": true,
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 1}
   },
   {
     "id": "polaroid-665-plus-2",
@@ -2668,7 +2668,7 @@
     "parent": "polaroid-665",
     "variant": "+2",
     "monochrome": true,
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 1}
   },
   {
     "id": "polaroid-665-negative",
@@ -2683,7 +2683,7 @@
     "png": "HaldCLUT/polaroid-665-negative.png",
     "source": "HaldCLUT/Black-and-White/Polaroid/Polaroid 665 Negative 2.png",
     "monochrome": true,
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 1}
   },
   {
     "id": "polaroid-665-negative-minus-1",
@@ -2700,7 +2700,7 @@
     "parent": "polaroid-665-negative",
     "variant": "−1",
     "monochrome": true,
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 1}
   },
   {
     "id": "polaroid-665-negative-plus-1",
@@ -2717,7 +2717,7 @@
     "parent": "polaroid-665-negative",
     "variant": "+1",
     "monochrome": true,
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 1}
   },
   {
     "id": "polaroid-665-negative-high-contrast",
@@ -2734,7 +2734,7 @@
     "parent": "polaroid-665-negative",
     "variant": "High contrast",
     "monochrome": true,
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 1}
   },
   {
     "id": "polaroid-667",
@@ -2751,7 +2751,7 @@
     "source": "HaldCLUT/Black-and-White/Polaroid/Polaroid 667.png",
     "monochrome": true,
     "reciprocity": {"type": "table", "noCorrectionUpTo": 0.1, "rows": [[1, 0.5, null], [10, 1.3, null], [100, 2.4, null]], "source": "https://juneleung.github.io/filmdoc/polaroid/667fds.pdf"},
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 1}
   },
   {
     "id": "polaroid-669",
@@ -2767,7 +2767,7 @@
     "png": "HaldCLUT/polaroid-669.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid 669 3.png",
     "reciprocity": {"type": "table", "noCorrectionUpTo": 0.0083, "rows": [[0.125, 0.68, {"r": 0.0, "g": 0.997, "b": 0.997}], [0.25, 1.0, {"r": 0.0, "g": 0.997, "b": 1.329}], [1, 1.68, {"r": 0.0, "g": 1.329, "b": 1.661}], [10, 3.0, {"r": 0.0, "g": 1.993, "b": 2.325}]], "highIntensity": [[0.000333, 0.32], [0.001, 0]], "source": "https://juneleung.github.io/filmdoc/polaroid/88fds.pdf"},
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-669-minus-2",
@@ -2783,7 +2783,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid 669 1 --.png",
     "parent": "polaroid-669",
     "variant": "−2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-669-minus-1",
@@ -2799,7 +2799,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid 669 2 -.png",
     "parent": "polaroid-669",
     "variant": "−1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-669-plus-1",
@@ -2815,7 +2815,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid 669 4 +.png",
     "parent": "polaroid-669",
     "variant": "+1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-669-plus-2",
@@ -2831,7 +2831,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid 669 5 ++.png",
     "parent": "polaroid-669",
     "variant": "+2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-669-plus-3",
@@ -2847,7 +2847,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid 669 6 +++.png",
     "parent": "polaroid-669",
     "variant": "+3",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-669-cold-minus-2",
@@ -2863,7 +2863,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid 669 Cold 1 --.png",
     "parent": "polaroid-669",
     "variant": "Cold −2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-669-cold-minus-1",
@@ -2879,7 +2879,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid 669 Cold 2 -.png",
     "parent": "polaroid-669",
     "variant": "Cold −1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-669-cold",
@@ -2895,7 +2895,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid 669 Cold 3.png",
     "parent": "polaroid-669",
     "variant": "Cold",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-669-cold-plus-1",
@@ -2911,7 +2911,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid 669 Cold 4 +.png",
     "parent": "polaroid-669",
     "variant": "Cold +1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-672",
@@ -2927,7 +2927,7 @@
     "png": "HaldCLUT/polaroid-672.png",
     "source": "HaldCLUT/Black-and-White/Polaroid/Polaroid 672.png",
     "monochrome": true,
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 1}
   },
   {
     "id": "polaroid-690",
@@ -2942,7 +2942,7 @@
     "file": "Packed/polaroid-690.mlut",
     "png": "HaldCLUT/polaroid-690.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid 690 3.png",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-690-minus-2",
@@ -2958,7 +2958,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid 690 1 --.png",
     "parent": "polaroid-690",
     "variant": "−2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-690-minus-1",
@@ -2974,7 +2974,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid 690 2 -.png",
     "parent": "polaroid-690",
     "variant": "−1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-690-plus-1",
@@ -2990,7 +2990,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid 690 4 +.png",
     "parent": "polaroid-690",
     "variant": "+1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-690-plus-2",
@@ -3006,7 +3006,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid 690 5 ++.png",
     "parent": "polaroid-690",
     "variant": "+2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-690-cold-minus-2",
@@ -3022,7 +3022,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid 690 Cold 1 --.png",
     "parent": "polaroid-690",
     "variant": "Cold −2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-690-cold-minus-1",
@@ -3038,7 +3038,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid 690 Cold 2 -.png",
     "parent": "polaroid-690",
     "variant": "Cold −1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-690-cold",
@@ -3054,7 +3054,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid 690 Cold 3.png",
     "parent": "polaroid-690",
     "variant": "Cold",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-690-cold-plus-1",
@@ -3070,7 +3070,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid 690 Cold 4 +.png",
     "parent": "polaroid-690",
     "variant": "Cold +1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-690-cold-plus-2",
@@ -3086,7 +3086,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid 690 Cold 5 ++.png",
     "parent": "polaroid-690",
     "variant": "Cold +2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-690-warm-minus-2",
@@ -3102,7 +3102,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid 690 Warm 1 --.png",
     "parent": "polaroid-690",
     "variant": "Warm −2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-690-warm-minus-1",
@@ -3118,7 +3118,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid 690 Warm 2 -.png",
     "parent": "polaroid-690",
     "variant": "Warm −1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-690-warm",
@@ -3134,7 +3134,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid 690 Warm 3.png",
     "parent": "polaroid-690",
     "variant": "Warm",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-690-warm-plus-1",
@@ -3150,7 +3150,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid 690 Warm 4 +.png",
     "parent": "polaroid-690",
     "variant": "Warm +1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-690-warm-plus-2",
@@ -3166,7 +3166,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid 690 Warm 5 ++.png",
     "parent": "polaroid-690",
     "variant": "Warm +2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-polachrome",
@@ -3181,7 +3181,7 @@
     "file": "Packed/polaroid-polachrome.mlut",
     "png": "HaldCLUT/polaroid-polachrome.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid Polachrome.png",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-100uv-plus",
@@ -3196,7 +3196,7 @@
     "file": "Packed/polaroid-px-100uv-plus.mlut",
     "png": "HaldCLUT/polaroid-px-100uv-plus.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-100UV+ Warm 3.png",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-100uv-plus-minus-2",
@@ -3212,7 +3212,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-100UV+ Warm 1 --.png",
     "parent": "polaroid-px-100uv-plus",
     "variant": "−2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-100uv-plus-minus-1",
@@ -3228,7 +3228,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-100UV+ Warm 2 -.png",
     "parent": "polaroid-px-100uv-plus",
     "variant": "−1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-100uv-plus-plus-1",
@@ -3244,7 +3244,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-100UV+ Warm 4 +.png",
     "parent": "polaroid-px-100uv-plus",
     "variant": "+1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-100uv-plus-plus-2",
@@ -3260,7 +3260,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-100UV+ Warm 5 ++.png",
     "parent": "polaroid-px-100uv-plus",
     "variant": "+2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-100uv-plus-plus-3",
@@ -3276,7 +3276,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-100UV+ Warm 6 +++.png",
     "parent": "polaroid-px-100uv-plus",
     "variant": "+3",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-100uv-plus-cold-minus-2",
@@ -3292,7 +3292,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-100UV+ Cold 1 --.png",
     "parent": "polaroid-px-100uv-plus",
     "variant": "Cold −2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-100uv-plus-cold-minus-1",
@@ -3308,7 +3308,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-100UV+ Cold 2 -.png",
     "parent": "polaroid-px-100uv-plus",
     "variant": "Cold −1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-100uv-plus-cold",
@@ -3324,7 +3324,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-100UV+ Cold 3.png",
     "parent": "polaroid-px-100uv-plus",
     "variant": "Cold",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-100uv-plus-cold-plus-1",
@@ -3340,7 +3340,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-100UV+ Cold 4 +.png",
     "parent": "polaroid-px-100uv-plus",
     "variant": "Cold +1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-100uv-plus-cold-plus-2",
@@ -3356,7 +3356,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-100UV+ Cold 5 ++.png",
     "parent": "polaroid-px-100uv-plus",
     "variant": "Cold +2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-100uv-plus-cold-plus-3",
@@ -3372,7 +3372,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-100UV+ Cold 6 +++.png",
     "parent": "polaroid-px-100uv-plus",
     "variant": "Cold +3",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-680",
@@ -3387,7 +3387,7 @@
     "file": "Packed/polaroid-px-680.mlut",
     "png": "HaldCLUT/polaroid-px-680.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 3.png",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-680-minus-2",
@@ -3403,7 +3403,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 1 --.png",
     "parent": "polaroid-px-680",
     "variant": "−2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-680-minus-1",
@@ -3419,7 +3419,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 2 -.png",
     "parent": "polaroid-px-680",
     "variant": "−1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-680-plus-1",
@@ -3435,7 +3435,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 4 +.png",
     "parent": "polaroid-px-680",
     "variant": "+1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-680-plus-2",
@@ -3451,7 +3451,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 5 ++.png",
     "parent": "polaroid-px-680",
     "variant": "+2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-680-cold-minus-2",
@@ -3467,7 +3467,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 Cold 1 --.png",
     "parent": "polaroid-px-680",
     "variant": "Cold −2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-680-cold-minus-1",
@@ -3483,7 +3483,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 Cold 2 -.png",
     "parent": "polaroid-px-680",
     "variant": "Cold −1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-680-cold",
@@ -3499,7 +3499,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 Cold 3.png",
     "parent": "polaroid-px-680",
     "variant": "Cold",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-680-cold-plus-1",
@@ -3515,7 +3515,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 Cold 4 +.png",
     "parent": "polaroid-px-680",
     "variant": "Cold +1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-680-cold-plus-2",
@@ -3531,7 +3531,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 Cold 5 ++.png",
     "parent": "polaroid-px-680",
     "variant": "Cold +2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-680-cold-plus-2-alt",
@@ -3547,7 +3547,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 Cold 6 ++ Alt.png",
     "parent": "polaroid-px-680",
     "variant": "Cold +2 Alt",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-680-warm-minus-2",
@@ -3563,7 +3563,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 Warm 1 --.png",
     "parent": "polaroid-px-680",
     "variant": "Warm −2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-680-warm-minus-1",
@@ -3579,7 +3579,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 Warm 2 -.png",
     "parent": "polaroid-px-680",
     "variant": "Warm −1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-680-warm",
@@ -3595,7 +3595,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 Warm 3.png",
     "parent": "polaroid-px-680",
     "variant": "Warm",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-680-warm-plus-1",
@@ -3611,7 +3611,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 Warm 4 +.png",
     "parent": "polaroid-px-680",
     "variant": "Warm +1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-680-warm-plus-2",
@@ -3627,7 +3627,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 Warm 5 ++.png",
     "parent": "polaroid-px-680",
     "variant": "Warm +2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-70",
@@ -3642,7 +3642,7 @@
     "file": "Packed/polaroid-px-70.mlut",
     "png": "HaldCLUT/polaroid-px-70.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 3.png",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-70-minus-2",
@@ -3658,7 +3658,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 1 --.png",
     "parent": "polaroid-px-70",
     "variant": "−2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-70-minus-1",
@@ -3674,7 +3674,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 2 -.png",
     "parent": "polaroid-px-70",
     "variant": "−1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-70-plus-1",
@@ -3690,7 +3690,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 4 +.png",
     "parent": "polaroid-px-70",
     "variant": "+1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-70-plus-2",
@@ -3706,7 +3706,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 5 ++.png",
     "parent": "polaroid-px-70",
     "variant": "+2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-70-plus-3",
@@ -3722,7 +3722,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 6 +++.png",
     "parent": "polaroid-px-70",
     "variant": "+3",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-70-cold-minus-2",
@@ -3738,7 +3738,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 Cold 1 --.png",
     "parent": "polaroid-px-70",
     "variant": "Cold −2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-70-cold-minus-1",
@@ -3754,7 +3754,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 Cold 2 -.png",
     "parent": "polaroid-px-70",
     "variant": "Cold −1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-70-cold",
@@ -3770,7 +3770,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 Cold 3.png",
     "parent": "polaroid-px-70",
     "variant": "Cold",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-70-cold-plus-1",
@@ -3786,7 +3786,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 Cold 4 +.png",
     "parent": "polaroid-px-70",
     "variant": "Cold +1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-70-cold-plus-2",
@@ -3802,7 +3802,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 Cold 5 ++.png",
     "parent": "polaroid-px-70",
     "variant": "Cold +2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-70-warm-minus-2",
@@ -3818,7 +3818,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 Warm 1 --.png",
     "parent": "polaroid-px-70",
     "variant": "Warm −2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-70-warm-minus-1",
@@ -3834,7 +3834,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 Warm 2 -.png",
     "parent": "polaroid-px-70",
     "variant": "Warm −1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-70-warm",
@@ -3850,7 +3850,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 Warm 3.png",
     "parent": "polaroid-px-70",
     "variant": "Warm",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-70-warm-plus-1",
@@ -3866,7 +3866,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 Warm 4 +.png",
     "parent": "polaroid-px-70",
     "variant": "Warm +1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-px-70-warm-plus-2",
@@ -3882,7 +3882,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 Warm 5 ++.png",
     "parent": "polaroid-px-70",
     "variant": "Warm +2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-time-zero-expired",
@@ -3897,7 +3897,7 @@
     "file": "Packed/polaroid-time-zero-expired.mlut",
     "png": "HaldCLUT/polaroid-time-zero-expired.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid Time Zero (Expired) 4.png",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-time-zero-expired-minus-3",
@@ -3913,7 +3913,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid Time Zero (Expired) 1 ---.png",
     "parent": "polaroid-time-zero-expired",
     "variant": "−3",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-time-zero-expired-minus-2",
@@ -3929,7 +3929,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid Time Zero (Expired) 2 --.png",
     "parent": "polaroid-time-zero-expired",
     "variant": "−2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-time-zero-expired-minus-1",
@@ -3945,7 +3945,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid Time Zero (Expired) 3 -.png",
     "parent": "polaroid-time-zero-expired",
     "variant": "−1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-time-zero-expired-plus-1",
@@ -3961,7 +3961,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid Time Zero (Expired) 5 +.png",
     "parent": "polaroid-time-zero-expired",
     "variant": "+1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-time-zero-expired-plus-2",
@@ -3977,7 +3977,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid Time Zero (Expired) 6 ++.png",
     "parent": "polaroid-time-zero-expired",
     "variant": "+2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-time-zero-expired-cold-minus-3",
@@ -3993,7 +3993,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid Time Zero (Expired) Cold 1 ---.png",
     "parent": "polaroid-time-zero-expired",
     "variant": "Cold −3",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-time-zero-expired-cold-minus-2",
@@ -4009,7 +4009,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid Time Zero (Expired) Cold 2 --.png",
     "parent": "polaroid-time-zero-expired",
     "variant": "Cold −2",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-time-zero-expired-cold-minus-1",
@@ -4025,7 +4025,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid Time Zero (Expired) Cold 3 -.png",
     "parent": "polaroid-time-zero-expired",
     "variant": "Cold −1",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "polaroid-time-zero-expired-cold",
@@ -4041,7 +4041,7 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid Time Zero (Expired) Cold 4.png",
     "parent": "polaroid-time-zero-expired",
     "variant": "Cold",
-    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.4}
+    "grain": {"rms": 10, "size": 7.5, "clumping": 0.1, "layerCorrelation": 0.75}
   },
   {
     "id": "vision3-500t",

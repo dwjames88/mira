@@ -38,7 +38,9 @@ STOCKS = {
     "vision3-250d":       (3.8, 3.5, 0.10, 0.90),
 }
 # Instant film: soft, large mottle, weakly chromatic (every instant stock; the instant family default shape).
-INSTANT = (10.0, 7.5, 0.10, 0.40)
+INSTANT = (10.0, 7.5, 0.10, 0.75)
+# Black-and-white instant (Polaroid 664/665/667/672, FP-3000B): one silver image, fully correlated.
+INSTANT_MONO = (10.0, 7.5, 0.10, 1.0)
 
 
 def fmt(v):
@@ -74,7 +76,7 @@ def main():
         if s["id"] in STOCKS:
             wanted[f["id"]] = STOCKS[s["id"]]
         elif s.get("family") == "instant":
-            wanted[f["id"]] = INSTANT
+            wanted[f["id"]] = INSTANT_MONO if (f.get("monochrome") or s.get("monochrome")) else INSTANT
 
     lines = text.split("\n")
     out = []
