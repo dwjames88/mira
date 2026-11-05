@@ -2,6 +2,28 @@
 
 All notable changes to Mira. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.1] - Unreleased
+
+A fix release after a run-through of the whole app on the Mac and on iPhone.
+
+### Fixed
+- **Shadow speckles.** Lifting shadows, blacks, whites, texture, clarity or a luminance curve could turn near-black pixels into saturated orange, red or green specks (seen in dark rock with a film and grain). The luminance change scaled the whole colour by new/old luminance, which explodes where the luminance is tiny. Now only the chroma is scaled, and only where there is luminance to carry it; normal pixels are unchanged.
+- **Black squares on RAW (iPhone).** A single non-finite pixel could spread through the tone stage's blur into a black block (Highlights 0.46 on a ProRAW). Sources and blur inputs are now sanitised (NaN to 0, infinity to the source headroom), and the tone and detail stages fall back to the pixel itself if their blurred base is not finite and keep their output inside half-float range. Not reproduced off the device; fixed by construction.
+- **iPhone preview vs export on RAW with a film.** The iPhone preview proxy was 8-bit and clipped everything above white while still claiming the RAW's headroom, so whites came out dim and hazy, unlike the export. The proxy is now half-float extended linear and keeps the scene range; the preview context uses the same working space and format as the Mac.
+- **Look changed between FILMS and DEVELOP (iPhone).** The preview proxy was sized to the photo on screen and only ever grew, and the grade was rendered into each drawable size, so the same recipe looked different per step and depended on the order of steps. The proxy now has a fixed size from the screen and zoom level, and the grade renders once per change. Applying a film redevelops a RAW at once (no wait), and the film strip refreshes when the develop changes, so cards and photo agree. iPhone film cards now show the film's native grain, halation and bloom, as on the Mac.
+- **Presets on iPhone** no longer reset the photo's own RAW settings (white balance, noise reduction) when applied; applying one preset after another replaces every preset field.
+- **iPhone library:** RAW badge on every RAW type (ARW, CR3, NEF…, not only DNG); album covers refresh when an album's pictures or key photo change; the RAW filter in Hidden and Recently Deleted; a slower earlier open can no longer replace a newer one; edits made while a save runs keep the photo marked unsaved; "1 PHOTO" singular; a failed full RAW develop says so.
+- **Updater (Mac):** cancelling an install and starting another no longer lets the cancelled one reset the new one or delete its download.
+- Mac build warnings (4 to 0); `mira-sheet` no longer flags monochrome instant stocks as colour films without chroma.
+
+### Changed (iPhone editor)
+- The step bar (Crop, Films, Develop, Dodge & Burn) is four icons above the photo.
+- Tapping a film card opens its full options panel (ISO, Variations, push, scan or paper, toning, exposure time and reciprocity, Import, Save Preset, Strength) in place of the strip; FILMS at the top returns to the strip with the film still applied. Chip rows scroll to the selection and labels stay on one line.
+- Curves, Color Mix and the other panels sit under the photo instead of covering it; the photo shrinks to fit. A chevron hides the panel to see the whole photo, per step.
+
+### Tests
+- RAW Develop slider sweep (every slider, with and without a film, three RAW files) for NaN, infinity and black tiles; injected NaN/infinity; shadow speckle across every film family; preview proxy vs export; iOS step consistency (FILMS vs DEVELOP, preset A then B, RAW draft vs full) and layout snapshots at iPhone 16 Pro and iPhone SE sizes; iOS UI tests (`scripts/ios-uitests.sh`); live v1.0.0 release fixture for the updater.
+
 ## [1.0.0] - 2026-11-05
 
 The first release with the film-science pipeline, on the Mac, in the Photos extension and on iPhone and iPad. It rolls up everything from the unreleased 0.5.0 below.
