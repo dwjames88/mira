@@ -6,28 +6,39 @@ private typealias T = FieldFramesTheme
 
 /// The FILMS step. The strip shows one card per stock; tapping a card applies it and swaps the strip
 /// for that stock's full options panel, whose back button returns to the strip.
-struct FilmsPanel: View {
-    @Bindable var model: EditorViewModel
+struct FilmsPanel<M: FilmPanelModel, Extra: View>: View {
+    @Bindable var model: M
     private let hub = PresetHub.shared
+    private let extraRows: Extra
+
+    /// `extraRows` are appended at the end of the options panel (the camera's GRAIN rows); the editor has none.
+    init(model: M, @ViewBuilder extraRows: () -> Extra) {
+        self.model = model
+        self.extraRows = extraRows()
+    }
 
     var body: some View {
         if model.filmsDetail, model.filmID != nil {
-            FilmDetailPanel(model: model, hub: hub)
+            FilmDetailPanel(model: model, hub: hub) { extraRows }
         } else {
             FilmStrip(model: model, hub: hub)
         }
     }
 }
 
+extension FilmsPanel where Extra == EmptyView {
+    init(model: M) { self.init(model: model) { EmptyView() } }
+}
+
 // MARK: Strip
 
-private struct FilmStrip: View {
-    @Bindable var model: EditorViewModel
+private struct FilmStrip<M: FilmPanelModel>: View {
+    @Bindable var model: M
     let hub: PresetHub
 
     /// Header (1.5 rows) + hairline + gap (0.5 row) + FilmCard (4 + thumbnail + title + caption + 4) + padding.
-    private static let stripHeight: CGFloat = T.rows(1.5) + 1 + T.rows(0.5) + FilmCard.thumbnailHeight + 4 + 6 + 22 + T.rows(1) + 4 + 20
-        + T.rows(0.5) + T.rows(1)
+    private static var stripHeight: CGFloat { T.rows(1.5) + 1 + T.rows(0.5) + FilmCard.thumbnailHeight + 4 + 6 + 22 + T.rows(1) + 4 + 20
+        + T.rows(0.5) + T.rows(1) }
 
     private var familyTabs: [(value: FilmFamily?, title: String)] {
         [(value: nil, title: "ALL")] + model.availableFamilies.map { (value: Optional($0), title: $0.displayName.uppercased()) }
@@ -86,9 +97,10 @@ private struct FilmStrip: View {
 
 /// One scrolling panel for the applied stock: title, ISO, variations, film-stage options, preset
 /// actions and strength.
-private struct FilmDetailPanel: View {
-    @Bindable var model: EditorViewModel
+private struct FilmDetailPanel<M: FilmPanelModel, Extra: View>: View {
+    @Bindable var model: M
     let hub: PresetHub
+    @ViewBuilder var extraRows: Extra
 
     var body: some View {
         CappedScroll {
@@ -128,6 +140,7 @@ private struct FilmDetailPanel: View {
                     .simultaneousGesture(TapGesture(count: 2).onEnded { model.strength = 1 })
                     .padding(.horizontal, T.cells(2))
                     .padding(.bottom, T.rows(0.5))
+                extraRows
             }
         }
     }
@@ -173,8 +186,8 @@ private struct FilmDetailPanel: View {
 }
 
 /// Push / pull, scan, paper, exposure time with reciprocity, and (monochrome films) toning for the applied film.
-private struct FilmOptions: View {
-    @Bindable var model: EditorViewModel
+private struct FilmOptions<M: FilmPanelModel>: View {
+    @Bindable var model: M
 
     var body: some View {
         VStack(spacing: 0) {
@@ -215,35 +228,37 @@ private struct FilmOptions: View {
                     .padding(.top, 2)
                     .padding(.bottom, T.rows(0.5))
             }
-            FFSlider("EXPOSURE TIME",
-                     value: Binding(get: { model.exposureTimeSliderValue },
-                                    set: { model.setExposureTime(sliderValue: $0) }),
-                     in: ExposureTimeFormat.range, default: model.exposureTimeResetValue,
-                     snap: ExposureTimeFormat.step, format: { _ in model.exposureTimeReadout })
-                .frame(minHeight: 44)
-                .padding(.horizontal, T.cells(2))
-            ChipRow(label: "RECIP.", selected: model.recipe.reciprocity.displayName) {
-                ForEach(ReciprocityMode.allCases, id: \.self) { mode in
-                    OptionChip(title: mode.displayName, selected: model.recipe.reciprocity == mode) {
-                        model.recipe.reciprocity = mode
-                    }
-                }
-            }
-            if model.recipe.reciprocity != .off {
-                FFSlider("RECIP. STRENGTH", value: model.bind(\.reciprocityStrength), in: 0...2, default: 1,
-                         format: { "\(Int(($0 * 100).rounded())) %" })
+            if model.showsExposureTimeControls {
+                FFSlider("EXPOSURE TIME",
+                         value: Binding(get: { model.exposureTimeSliderValue },
+                                        set: { model.setExposureTime(sliderValue: $0) }),
+                         in: ExposureTimeFormat.range, default: model.exposureTimeResetValue,
+                         snap: ExposureTimeFormat.step, format: { _ in model.exposureTimeReadout })
                     .frame(minHeight: 44)
                     .padding(.horizontal, T.cells(2))
-            }
-            if let readout = model.reciprocityReadout {
-                (Text(readout).foregroundStyle(T.paperMid)
-                    + Text(model.reciprocityExtrapolated ? " \u{00B7} beyond datasheet" : "")
-                        .foregroundStyle(T.paperDim))
-                    .ffLabel(size: 9, color: T.paperMid)
-                    .lineLimit(2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, T.cells(2))
-                    .accessibilityLabel(readout + (model.reciprocityExtrapolated ? ", beyond datasheet" : ""))
+                ChipRow(label: "RECIP.", selected: model.recipe.reciprocity.displayName) {
+                    ForEach(ReciprocityMode.allCases, id: \.self) { mode in
+                        OptionChip(title: mode.displayName, selected: model.recipe.reciprocity == mode) {
+                            model.recipe.reciprocity = mode
+                        }
+                    }
+                }
+                if model.recipe.reciprocity != .off {
+                    FFSlider("RECIP. STRENGTH", value: model.bind(\.reciprocityStrength), in: 0...2, default: 1,
+                             format: { "\(Int(($0 * 100).rounded())) %" })
+                        .frame(minHeight: 44)
+                        .padding(.horizontal, T.cells(2))
+                }
+                if let readout = model.reciprocityReadout {
+                    (Text(readout).foregroundStyle(T.paperMid)
+                        + Text(model.reciprocityExtrapolated ? " \u{00B7} beyond datasheet" : "")
+                            .foregroundStyle(T.paperDim))
+                        .ffLabel(size: 9, color: T.paperMid)
+                        .lineLimit(2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, T.cells(2))
+                        .accessibilityLabel(readout + (model.reciprocityExtrapolated ? ", beyond datasheet" : ""))
+                }
             }
             if model.offersToning {
                 ChipRow(label: "TONING", selected: model.recipe.toning.displayName) {
@@ -311,12 +326,16 @@ struct ChipRow<Content: View>: View {
 struct OptionChip: View {
     let title: String
     let selected: Bool
+    /// Text color while selected (the camera's LOCK chip uses lichen).
+    var selectedColor: Color = T.paper
+    /// VoiceOver label when the title alone is not enough (the camera's white balance chips).
+    var accessibilityLabel: String?
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             Text(title)
-                .ffLabel(size: 10, color: selected ? T.paper : T.paperDim,
+                .ffLabel(size: 10, color: selected ? selectedColor : T.paperDim,
                          weight: selected ? .medium : .regular)
                 .lineLimit(1)
                 .frame(minWidth: 28, minHeight: 36)
@@ -327,6 +346,7 @@ struct OptionChip: View {
         }
         .buttonStyle(.plain)
         .id(title)
+        .accessibilityLabel(accessibilityLabel ?? title)
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }

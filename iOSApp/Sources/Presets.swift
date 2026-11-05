@@ -189,8 +189,8 @@ struct StripGroup<Content: View>: View {
     }
 }
 
-struct PresetGroup: View {
-    @Bindable var model: EditorViewModel
+struct PresetGroup<M: FilmPanelModel>: View {
+    @Bindable var model: M
     let hub: PresetHub
 
     var body: some View {
@@ -206,8 +206,8 @@ struct PresetGroup: View {
     }
 }
 
-struct PresetCardView: View {
-    @Bindable var model: EditorViewModel
+struct PresetCardView<M: FilmPanelModel>: View {
+    @Bindable var model: M
     let hub: PresetHub
     let preset: Preset
 
@@ -261,15 +261,15 @@ private struct PresetEmptySlot: View {
 
 /// SAVE PRESET / RENAME: film name fixed, nickname a mono field, final name previewed.
 /// Laid out like the Mac sheet.
-struct SavePresetSheet: View {
-    let model: EditorViewModel
+struct SavePresetSheet<M: FilmPanelModel>: View {
+    let model: M
     let hub: PresetHub
     let mode: PresetSheet
     @State private var nickname: String
     @State private var error: String?
     @FocusState private var focused: Bool
 
-    init(model: EditorViewModel, hub: PresetHub, mode: PresetSheet, initialNickname: String = "") {
+    init(model: M, hub: PresetHub, mode: PresetSheet, initialNickname: String = "") {
         self.model = model
         self.hub = hub
         self.mode = mode
@@ -286,7 +286,7 @@ struct SavePresetSheet: View {
         return model.currentFilmName
     }
 
-    static let keepsNote = "Presets keep the film and develop settings; dodge & burn strokes stay with the photo."
+    static var keepsNote: String { "Presets keep the film and develop settings; dodge & burn strokes stay with the photo." }
 
     private var trimmed: String { nickname.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var canSave: Bool { !trimmed.isEmpty }
@@ -427,9 +427,9 @@ struct ActivityView: UIViewControllerRepresentable {
 
 // MARK: Presentation (sheets, dialogs, importer, notice) for the whole app
 
-struct PresetPresentations: ViewModifier {
+struct PresetPresentations<M: FilmPanelModel>: ViewModifier {
     let hub: PresetHub
-    let model: EditorViewModel
+    let model: M
 
     func body(content: Content) -> some View {
         @Bindable var hub = hub
@@ -484,14 +484,14 @@ struct PresetPresentations: ViewModifier {
 }
 
 extension View {
-    func presetPresentations(hub: PresetHub, model: EditorViewModel) -> some View {
+    func presetPresentations<M: FilmPanelModel>(hub: PresetHub, model: M) -> some View {
         modifier(PresetPresentations(hub: hub, model: model))
     }
 }
 
 // MARK: Editor glue
 
-extension EditorViewModel {
+extension FilmPanelModel {
     var currentFilmName: String {
         PhotoEngine.filmList.first { $0.id == recipe.filmID }?.displayName ?? Preset.originalName
     }

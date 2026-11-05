@@ -1,5 +1,7 @@
 import SwiftUI
 import MiraCore
+import MiraCameraKit
+import MiraUI
 import XCTest
 @testable import Mira
 
@@ -176,5 +178,144 @@ final class LayoutSnapshotTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(bar.height, 44)
             XCTAssertLessThan(bar.minY, f["photo"]!.minY)
         }
+    }
+
+    // MARK: Camera doors (phase C2)
+
+    /// A camera screen stand-in: the photo area above, the door docked at the bottom on the panel cap the camera would give it.
+    @discardableResult
+    func renderDoor(device: TestDevice, name: String, @ViewBuilder door: () -> some View) async -> [String: CGRect] {
+        let box = FrameBox()
+        let doorView = door()
+        let view = GeometryReader { geo in
+            VStack(spacing: 0) {
+                self.photo().frame(maxWidth: .infinity, maxHeight: .infinity).reportFrame("photo").clipped()
+                FFHairline()
+                doorView.reportFrame("panel").layoutPriority(1)
+            }
+            .environment(\.panelMaxHeight, geo.size.height * 0.5 - 32)
+        }
+        .coordinateSpace(name: EditorScaffoldSpace.name)
+        .onPreferenceChange(EditorFrameKey.self) { frames in MainActor.assumeIsolated { box.frames = frames } }
+        await Snapshot.render(view, device: device, name: name)
+        return box.frames
+    }
+
+    func makeCameraModel() async -> CameraFilmDoorModel {
+        let m = CameraFilmDoorModel()
+        for film in PhotoEngine.filmList {
+            m.select(film.id)
+            if !m.isoChoices.isEmpty && !m.variationChoices.isEmpty { break }
+        }
+        let cg = Self.sample.cgImage!
+        var thumbs: [String: CGImage] = ["__original": cg]
+        for film in m.visibleStocks.prefix(8) { thumbs[film.id] = cg }
+        m.setThumbnails(thumbs)
+        return m
+    }
+
+    func assertDoor(_ f: [String: CGRect], device: TestDevice, file: StaticString = #filePath, line: UInt = #line) {
+        guard let photo = f["photo"], let panel = f["panel"] else { return XCTFail("missing frames: \(f.keys)", file: file, line: line) }
+        XCTAssertLessThanOrEqual(photo.maxY, panel.minY + 1.5, "photo and door do not intersect", file: file, line: line)
+        XCTAssertGreaterThan(photo.height, device.size.height * 0.30, "photo keeps real room", file: file, line: line)
+        XCTAssertLessThanOrEqual(panel.maxY, device.size.height - device.topInset - device.bottomInset + 0.5, "door stays on screen", file: file, line: line)
+    }
+
+    func testCameraFilmDoorStrip() async {
+        for d in TestDevice.all {
+            let m = await makeCameraModel()
+            m.filmsDetail = false
+            let f = await renderDoor(device: d, name: "camera-film-door-strip") {
+                CameraFilmDoor(model: m, grain: .constant(true))
+            }
+            assertDoor(f, device: d)
+            XCTAssertGreaterThan(f["panel"]!.height, 150, "strip has room for cards")
+        }
+    }
+
+    func testCameraFilmDoorOptionsHaveGrainRowsAndNoExposureTime() async {
+        for d in TestDevice.all {
+            let m = await makeCameraModel()
+            m.filmsDetail = true
+            let f = await renderDoor(device: d, name: "camera-film-door-options") {
+                CameraFilmDoor(model: m, grain: .constant(true))
+            }
+            assertDoor(f, device: d)
+            for key in ["label.ISO", "label.PUSH", "label.SCAN"] {
+                XCTAssertNotNil(f[key], "\(key) present like the editor")
+            }
+            XCTAssertNil(f["label.RECIP."], "camera hides the reciprocity row")
+            XCTAssertLessThanOrEqual(f["panel"]!.height, (d.size.height - d.topInset - d.bottomInset) * 0.5 + 40, "panel is capped")
+            // The GRAIN rows sit at the end of a scrolling panel; scroll-free on a tall screen, else cut by the cap.
+            if d.size.height > 800 { XCTAssertNotNil(f["label.FINDER"], "GRAIN rows are in the options panel") }
+        }
+    }
+
+    /// The GRAIN rows on their own, so they are checked even where the options panel scrolls them out of view.
+    func testGrainRowsLayout() async {
+        for d in TestDevice.all {
+            let m = await makeCameraModel()
+            let f = await renderDoor(device: d, name: "camera-grain-rows") {
+                GrainRows(model: m, grain: .constant(true)).ffPanel()
+            }
+            guard let l = f["label.FINDER"] else { XCTFail("no FINDER label"); continue }
+            XCTAssertLessThan(l.height, 15, "FINDER is one line")
+            XCTAssertLessThanOrEqual(l.width, ChipRow<EmptyView>.labelWidth)
+        }
+    }
+
+    func testCameraWBDoor() async {
+        for d in TestDevice.all {
+            var state = WhiteBalanceState()
+            let binding = Binding(get: { state }, set: { state = $0 })
+            let f = await renderDoor(device: d, name: "camera-wb-door") { CameraWBDoor(state: binding) }
+            assertDoor(f, device: d)
+            XCTAssertNotNil(f["label.WB"])
+            XCTAssertLessThan(f["panel"]!.height, 100, "one row plus handle")
+        }
+    }
+
+    func testEditorFilmsPanelIsUnchangedByTheRefactor() async {
+        let m = await makeModel()
+        m.filmsDetail = true
+        let f = await render(m, tab: .films, device: .iPhone16Pro, name: "films-options-unchanged") { FilmsPanel(model: m) }
+        XCTAssertNil(f["label.FINDER"], "editor has no extra rows")
+        XCTAssertNotNil(f["label.ISO"])
+        XCTAssertTrue(m.showsExposureTimeControls)
+    }
+
+    func testCameraSelectAppliesNativeTexture() async {
+        let m = CameraFilmDoorModel(recipe: Recipe())
+        let editor = EditorViewModel()
+        var pushed: [Recipe] = []
+        m.onRecipeChange = { pushed.append($0) }
+        guard let film = PhotoEngine.filmList.first else { return XCTFail("no films") }
+        m.select(film.id)
+        editor.select(film.id)
+        XCTAssertEqual(m.filmID, film.id)
+        XCTAssertEqual(m.recipe.pipeline, Recipe.currentPipeline)
+        XCTAssertEqual(m.recipe, editor.recipe, "same select semantics as the editor")
+        XCTAssertEqual(m.recipe.grainAmount, FilmCharacter.nativeSlider, accuracy: 1e-9)
+        XCTAssertEqual(pushed.last, m.recipe, "recipe change reaches the finder")
+        m.select(nil)
+        XCTAssertNil(m.filmID)
+        XCTAssertEqual(m.recipe.grainAmount, 0)
+        XCTAssertFalse(m.showsExposureTimeControls)
+        XCTAssertTrue(m.hasPhoto)
+    }
+
+    func testCameraThumbnailsWantedDoNotBumpEpoch() async {
+        let m = CameraFilmDoorModel()
+        let epoch = m.thumbEpoch
+        await m.requestThumbnail(nil)
+        await m.requestThumbnail("x")
+        XCTAssertEqual(m.wantedThumbnailIDs, ["__original", "x"])
+        m.setThumbnails(["x": Self.sample.cgImage!])
+        XCTAssertNotNil(m.thumbnails["x"])
+        XCTAssertEqual(m.thumbEpoch, epoch)
+    }
+
+    func testWBDoorChipsMatchSpec() {
+        XCTAssertEqual(WhiteBalancePreset.allCases.map { $0.kelvin.map(String.init) ?? "AUTO" }, ["AUTO", "5500", "6500", "3200", "4000"])
     }
 }

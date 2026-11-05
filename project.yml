@@ -25,6 +25,8 @@ packages:
     path: Packages/MiraCore
   MiraUI:
     path: Packages/MiraUI
+  MiraCamera:
+    path: Packages/MiraCamera
 targets:
   Mira:
     type: application
@@ -168,6 +170,10 @@ targets:
         product: MiraCore
       - package: MiraUI
         product: MiraUI
+      - package: MiraCamera
+        product: MiraCameraKit
+      - package: MiraCamera
+        product: MiraCamera
       - sdk: Photos.framework
       - sdk: PhotosUI.framework
     info:
