@@ -1,3 +1,4 @@
+#if os(macOS)
 import CoreImage
 import MiraCore
 import Observation
@@ -75,3 +76,4 @@ public enum LatitudeFormat {
         return nil
     }
 }
+#endif

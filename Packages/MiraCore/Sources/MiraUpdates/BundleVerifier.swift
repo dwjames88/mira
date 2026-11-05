@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 import Security
 
@@ -57,3 +58,4 @@ public enum BundleVerifier {
         (SecCopyErrorMessageString(status, nil) as String?) ?? "OSStatus \(status)"
     }
 }
+#endif

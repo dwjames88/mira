@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 import os
 
@@ -92,3 +93,5 @@ public final class ExtensionRootFitter {
         """)
     }
 }
+
+#endif

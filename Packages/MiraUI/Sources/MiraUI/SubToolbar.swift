@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 import SwiftUI
 
@@ -136,3 +137,5 @@ struct EditorSubToolbar: View {
 final class ShareButtonAnchor {
     var rect: CGRect?
 }
+
+#endif

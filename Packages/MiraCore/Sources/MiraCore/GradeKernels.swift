@@ -5,8 +5,19 @@ import Foundation
 /// `Kernels/Grade.ci.metal` and ship precompiled as `Resources/Grade.ci.metallib`
 /// (see `scripts/build-kernels.sh`).
 enum GradeKernels {
+    /// A metallib carries its platform in its target triple, so each platform loads its own build.
+    private static var resourceName: String {
+        #if os(iOS) && targetEnvironment(simulator)
+        "Grade.ci.iossim"
+        #elseif os(iOS)
+        "Grade.ci.ios"
+        #else
+        "Grade.ci"
+        #endif
+    }
+
     private static let library: Data? = {
-        guard let url = Bundle.module.url(forResource: "Grade.ci", withExtension: "metallib") else { return nil }
+        guard let url = Bundle.module.url(forResource: resourceName, withExtension: "metallib") else { return nil }
         return try? Data(contentsOf: url)
     }()
 
@@ -66,7 +77,7 @@ enum GradeKernels {
     static var isAvailable: Bool {
         colorMixer != nil && curves != nil && tone != nil && detail != nil && dodgeBurn != nil
             && filmExposure != nil && highlights != nil && halationCombine != nil && grain != nil
-            && scan != nil && toning != nil && lut3D != nil
+            && scan != nil && toning != nil && lut3D != nil && reciprocity != nil
     }
 
     // MARK: Stages

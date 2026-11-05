@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 import MiraCore
 import SwiftUI
@@ -136,3 +137,5 @@ private struct PresetEmptySlot: View {
         .accessibilityLabel("Save a preset")
     }
 }
+
+#endif

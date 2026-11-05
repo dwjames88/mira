@@ -1,3 +1,4 @@
+#if os(macOS)
 import CoreImage
 import ImageIO
 import MiraCore
@@ -179,3 +180,4 @@ extension EditorModel {
         return box?.image
     }
 }
+#endif

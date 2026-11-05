@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "MiraCore",
-    platforms: [.macOS(.v26)],
+    platforms: [.macOS(.v26), .iOS(.v18)],
     products: [
         .library(name: "MiraCore", targets: ["MiraCore"]),
         .executable(name: "mira-sheet", targets: ["MiraSheet"]),
@@ -14,7 +14,11 @@ let package = Package(
         .target(
             name: "MiraCore",
             // Precompiled Core Image kernels (scripts/build-kernels.sh).
-            resources: [.copy("Resources/Grade.ci.metallib")],
+            resources: [
+                .copy("Resources/Grade.ci.metallib"),
+                .copy("Resources/Grade.ci.ios.metallib"),
+                .copy("Resources/Grade.ci.iossim.metallib"),
+            ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .executableTarget(

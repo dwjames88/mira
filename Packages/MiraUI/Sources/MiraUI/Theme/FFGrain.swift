@@ -1,4 +1,8 @@
+#if canImport(AppKit)
 import AppKit
+#elseif canImport(UIKit)
+import UIKit
+#endif
 import SwiftUI
 
 /// Procedural film grain: a seeded, tileable noise tile generated once and cached.

@@ -1,3 +1,4 @@
+#if os(macOS)
 import MiraCore
 import SwiftUI
 
@@ -117,3 +118,5 @@ private struct Triangle: Shape {
         return p
     }
 }
+
+#endif

@@ -1,4 +1,8 @@
+#if canImport(AppKit)
 import AppKit
+#elseif canImport(UIKit)
+import UIKit
+#endif
 import SwiftUI
 
 private typealias T = FieldFramesTheme
@@ -377,13 +381,13 @@ public struct FilmCard: View {
     private let accessibilityTitle: String
     private let caption: String
     private let captionTint: Color?
-    private let image: NSImage?
+    private let image: PlatformImage?
     private let isSelected: Bool
     private let action: () -> Void
     private let onHoverChange: ((Bool) -> Void)?
     @State private var hovering = false
 
-    public init(title: String, caption: String, image: NSImage?, isSelected: Bool,
+    public init(title: String, caption: String, image: PlatformImage?, isSelected: Bool,
                 onHoverChange: ((Bool) -> Void)? = nil, action: @escaping () -> Void) {
         self.init(title: Text(title), secondLine: nil, accessibilityTitle: title, caption: caption,
                   captionTint: nil, image: image, isSelected: isSelected, onHoverChange: onHoverChange, action: action)
@@ -392,7 +396,7 @@ public struct FilmCard: View {
     /// A card with a second title line (a preset's "- nickname") under the film-name line, each on one
     /// line and tail-truncated, with an optional caption colour (a warning mark). Everything else is the film card.
     public init(title: Text, secondLine: Text?, accessibilityTitle: String, caption: String,
-                captionTint: Color?, image: NSImage?, isSelected: Bool,
+                captionTint: Color?, image: PlatformImage?, isSelected: Bool,
                 onHoverChange: ((Bool) -> Void)? = nil, action: @escaping () -> Void) {
         self.onHoverChange = onHoverChange
         self.title = title
@@ -412,7 +416,7 @@ public struct FilmCard: View {
                 ZStack {
                     Rectangle().fill(T.hair)
                     if let image {
-                        Image(nsImage: image)
+                        platformImageView(image)
                             .resizable()
                             .aspectRatio(contentMode: .fill)
                     }
@@ -570,4 +574,13 @@ struct FFScrollView<Content: View>: View {
             ScrollView(axes) { content }
         }
     }
+}
+
+@MainActor
+private func platformImageView(_ image: PlatformImage) -> Image {
+    #if canImport(AppKit)
+    Image(nsImage: image)
+    #else
+    Image(uiImage: image)
+    #endif
 }

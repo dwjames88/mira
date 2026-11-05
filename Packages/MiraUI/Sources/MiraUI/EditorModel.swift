@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 import CoreImage
 import MiraCore
@@ -1056,6 +1057,10 @@ public final class EditorModel {
         cancelPresetWork()
     }
 }
+
+#endif
+
+import MiraCore
 
 /// One entry of the FILMS panel's Variant picker: the stock itself ("Base") or one of its variants.
 public struct FilmVariantChoice: Identifiable, Hashable, Sendable {

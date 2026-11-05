@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 
 /// The user's appearance choice, stored under `mira.appearance` (`"system"` by default). Shared by the
@@ -47,3 +48,5 @@ extension NSAppearance {
         bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
     }
 }
+
+#endif

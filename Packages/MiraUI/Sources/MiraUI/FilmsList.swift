@@ -1,3 +1,4 @@
+#if os(macOS)
 import MiraCore
 import SwiftUI
 
@@ -93,3 +94,5 @@ public struct AttributionFooter: View {
         }
     }
 }
+
+#endif

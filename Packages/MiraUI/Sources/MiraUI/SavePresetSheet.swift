@@ -1,3 +1,4 @@
+#if os(macOS)
 import MiraCore
 import SwiftUI
 
@@ -125,3 +126,5 @@ struct SavePresetSheet: View {
         }
     }
 }
+
+#endif

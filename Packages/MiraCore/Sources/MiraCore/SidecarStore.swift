@@ -25,10 +25,18 @@ public struct SidecarStore: Sendable {
     public static func defaultFallbackDirectory() -> URL {
         let fm = FileManager.default
         let base = (try? fm.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true))
-            ?? fm.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support")
+            ?? Self.homeFallback().appendingPathComponent("Library/Application Support")
         let dir = base.appendingPathComponent("Mira/Sidecars", isDirectory: true)
         try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
+    }
+
+    private static func homeFallback() -> URL {
+        #if os(macOS)
+        FileManager.default.homeDirectoryForCurrentUser
+        #else
+        URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+        #endif
     }
 
     public static func sidecarURL(for imageURL: URL) -> URL {

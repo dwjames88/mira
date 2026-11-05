@@ -1,3 +1,4 @@
+#if os(macOS)
 import MiraCore
 
 extension EditorModel {
@@ -17,3 +18,4 @@ extension EditorModel {
         if paper != .none { recipe.scanProfile = .neutral }
     }
 }
+#endif

@@ -1,3 +1,4 @@
+#if os(macOS)
 import Darwin
 import Foundation
 
@@ -128,3 +129,4 @@ public enum UpdateInstaller {
         }
     }
 }
+#endif

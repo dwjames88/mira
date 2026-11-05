@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 import MiraCore
 import SwiftUI
@@ -172,3 +173,5 @@ struct BrushRing {
         }
     }
 }
+
+#endif

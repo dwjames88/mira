@@ -1,3 +1,4 @@
+#if os(macOS)
 import CryptoKit
 import Foundation
 
@@ -139,3 +140,4 @@ private final class DownloadJob: NSObject, URLSessionDownloadDelegate, @unchecke
         finish(.success(()))
     }
 }
+#endif

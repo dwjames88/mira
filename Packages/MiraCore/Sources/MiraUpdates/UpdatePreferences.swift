@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 
 /// The updater's persisted state: the automatic-check switch, when it last ran, and the skipped version.
@@ -32,3 +33,4 @@ public struct UpdatePreferences: @unchecked Sendable {
         }
     }
 }
+#endif

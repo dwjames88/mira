@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 
 /// A small block-level reading of release-note markdown (headings, bullets, paragraphs). Inline markup
@@ -48,3 +49,4 @@ public enum ReleaseNotes {
         return kept.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
+#endif

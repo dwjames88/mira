@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 
 /// A Semantic Versioning 2.0 version. Lenient on input ("1", "1.2", a leading "v", "+build" metadata)
@@ -114,3 +115,4 @@ public struct SemanticVersion: Comparable, Hashable, Sendable, Codable, CustomSt
         }
     }
 }
+#endif

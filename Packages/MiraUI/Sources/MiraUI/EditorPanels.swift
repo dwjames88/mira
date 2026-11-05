@@ -1,3 +1,4 @@
+#if os(macOS)
 import MiraCore
 import SwiftUI
 
@@ -486,3 +487,5 @@ struct CropPanel: View {
         return "\(Int((r.w * canvas.width).rounded())) \u{00D7} \(Int((r.h * canvas.height).rounded())) px"
     }
 }
+
+#endif

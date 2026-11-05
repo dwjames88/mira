@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "MiraUI",
-    platforms: [.macOS(.v26)],
+    platforms: [.macOS(.v26), .iOS(.v18)],
     products: [
         .library(name: "MiraUI", targets: ["MiraUI"])
     ],
