@@ -37,9 +37,52 @@ public enum PackedLUT {
         public func within(maxError: Float, p999Error: Float) -> Bool { max <= maxError && p999 <= p999Error }
     }
 
-    /// Limits for accepting a smaller cube: max 6/255 and 99.9th percentile 2/255.
-    public static let acceptedMaxError: Float = 6.0 / 255
-    public static let acceptedP999Error: Float = 2.0 / 255
+    /// Limits for accepting a smaller cube, measured on `PackProbe` colours (real image pixels and a synthetic
+    /// sweep): max 4/255 and 99.9th percentile 1.5/255, per channel.
+    public static let acceptedMaxError: Float = 4.0 / 255
+    public static let acceptedP999Error: Float = 1.5 / 255
+
+    /// Trilinear evaluation of `lut` at each colour (encoded sRGB triples in 0...1); returns triples.
+    public static func evaluate(_ lut: LUT, colors: [Float]) -> [Float] {
+        let n = lut.dimension
+        let cube = lut.data.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
+        var out = [Float](repeating: 0, count: colors.count)
+        let scale = Float(n - 1)
+        cube.withUnsafeBufferPointer { c in
+            for k in 0..<(colors.count / 3) {
+                var base = [0, 0, 0], frac: [Float] = [0, 0, 0]
+                for ch in 0..<3 {
+                    let x = Swift.min(Swift.max(colors[k * 3 + ch], 0), 1) * scale
+                    let i = Swift.min(Int(x), n - 2)
+                    base[ch] = i; frac[ch] = x - Float(i)
+                }
+                var acc: (Float, Float, Float) = (0, 0, 0)
+                for db in 0...1 { for dg in 0...1 { for dr in 0...1 {
+                    let w = (dr == 1 ? frac[0] : 1 - frac[0]) * (dg == 1 ? frac[1] : 1 - frac[1]) * (db == 1 ? frac[2] : 1 - frac[2])
+                    let o = (((base[2] + db) * n + base[1] + dg) * n + base[0] + dr) * 4
+                    acc.0 += c[o] * w; acc.1 += c[o + 1] * w; acc.2 += c[o + 2] * w
+                } } }
+                out[k * 3] = acc.0; out[k * 3 + 1] = acc.1; out[k * 3 + 2] = acc.2
+            }
+        }
+        return out
+    }
+
+    /// Error of `candidate` against `original` on the probe colours (a precomputed `evaluate(original, ...)` may be
+    /// passed as `reference`).
+    public static func probeError(reference: [Float], candidate: LUT, colors: [Float]) -> Fidelity {
+        let got = evaluate(candidate, colors: colors)
+        let count = colors.count / 3
+        var worst: Float = 0, p999: Float = 0
+        var errs = [Float](repeating: 0, count: count)
+        for c in 0..<3 {
+            for i in 0..<count { errs[i] = abs(reference[i * 3 + c] - got[i * 3 + c]) }
+            errs.sort()
+            worst = Swift.max(worst, errs[count - 1])
+            p999 = Swift.max(p999, errs[Int(Double(count) * 0.999)])
+        }
+        return Fidelity(max: worst, p999: p999)
+    }
 
     /// The 64^3 RGBA Float cube a Hald image yields in the app (`LUT.loadHald`), from its raw samples.
     public static func original(_ rgb: [UInt16], dimension n: Int) -> LUT {
@@ -64,19 +107,26 @@ public enum PackedLUT {
         return Fidelity(max: worst, p999: p999)
     }
 
-    /// The samples to store for a Hald image: the first of `candidateDimensions` that meets the limits, else the
-    /// 64^3 cube itself. Returns the dimension and samples, and the error of the choice.
+    /// The samples to store for a Hald image: the first of `candidateDimensions` whose probe error (see `PackProbe`)
+    /// meets the limits, else the 64^3 cube itself. Returns the dimension, the samples, the probe error of the choice
+    /// and its lattice error (for information).
     public static func choose(
-        _ rgb: [UInt16], dimension n: Int, maxError: Float = acceptedMaxError, p999Error: Float = acceptedP999Error
-    ) -> (dimension: Int, rgb: [UInt16], fidelity: Fidelity) {
+        _ rgb: [UInt16], dimension n: Int, probe: [Float],
+        maxError: Float = acceptedMaxError, p999Error: Float = acceptedP999Error
+    ) -> (dimension: Int, rgb: [UInt16], probe: Fidelity, lattice: Fidelity) {
         let orig = original(rgb, dimension: n)
+        let reference = evaluate(orig, colors: probe)
         for m in candidateDimensions where m < orig.dimension {
             let samples = resampled(rgb, from: n, to: m)
-            let f = fidelity(original: orig, candidate: LUT(dimension: m, rgb16: samples))
-            if f.within(maxError: maxError, p999Error: p999Error) { return (m, samples, f) }
+            let cube = LUT(dimension: m, rgb16: samples)
+            let f = probeError(reference: reference, candidate: cube, colors: probe)
+            if f.within(maxError: maxError, p999Error: p999Error) {
+                return (m, samples, f, fidelity(original: orig, candidate: cube))
+            }
         }
         let m = orig.dimension
-        return (m, n == m ? rgb : resampled(rgb, from: n, to: m), Fidelity(max: 0, p999: 0))
+        let exact = Fidelity(max: 0, p999: 0)
+        return (m, n == m ? rgb : resampled(rgb, from: n, to: m), exact, exact)
     }
 
     /// Trilinear resample of interleaved 16-bit RGB samples from `n`^3 (via 64^3 when larger) to `m`^3 at lattice points (in Float),
