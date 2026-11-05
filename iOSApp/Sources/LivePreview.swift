@@ -74,6 +74,8 @@ final class LivePreview {
             let plain = Recipe(crop: r.crop)
             return CropGeometry.apply(plain.crop, to: proxy)
         }
-        return renderer.apply(r, to: proxy)
+        // The proxy is a downscaled source: tell the grain stage how far, so it matches the full-resolution look.
+        let scale = source.map { min(1, proxy.extent.width / max($0.extent.width, 1)) } ?? 1
+        return renderer.withPreviewScale(scale).apply(r, to: proxy)
     }
 }
