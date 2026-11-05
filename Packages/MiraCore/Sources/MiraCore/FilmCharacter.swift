@@ -24,6 +24,9 @@ public struct FilmCharacter: Codable, Hashable, Sendable {
     public var grainChroma: Double
     /// sRGB-encoded luminance where grain is most visible.
     public var grainTonalCenter: Double
+    /// Bloom (the soft glow of light scattering in emulsion and optics) relative to an ISO 400 colour
+    /// negative (1.0): slide and instant film glow more, black-and-white and print stock less.
+    public var bloom: Double
     /// Halation strength relative to an unprotected colour negative (1.0).
     public var halationStrength: Double
     /// Halation colour in linear RGB (normalised to unit luminance by the renderer).
@@ -48,7 +51,8 @@ public struct FilmCharacter: Codable, Hashable, Sendable {
     public init(grainStrength: Double, grainSize: Double, grainChroma: Double, grainTonalCenter: Double,
                 halationStrength: Double, halationTint: [Double], halationRadius: Double, latitude: Double,
                 latitudeUnder: Double = 2, latitudeOver: Double = 3, remJet: Bool = false,
-                pushContrastPerStop: Double = 0.08, pushGrainPerStop: Double = 0.25) {
+                pushContrastPerStop: Double = 0.08, pushGrainPerStop: Double = 0.25,
+                bloom: Double = 1.0) {
         self.grainStrength = grainStrength
         self.grainSize = grainSize
         self.grainChroma = grainChroma
@@ -62,7 +66,12 @@ public struct FilmCharacter: Codable, Hashable, Sendable {
         self.remJet = remJet
         self.pushContrastPerStop = pushContrastPerStop
         self.pushGrainPerStop = pushGrainPerStop
+        self.bloom = bloom
     }
+
+    /// The texture-slider position that means "the film's own level" (grain, halation, bloom). Choosing a
+    /// film sets those sliders here (`Recipe.applyingNativeTexture`), so every stock starts at its native look.
+    public static let nativeSlider = 0.5
 
     /// Used when no film is selected: an ISO 400 colour negative.
     public static let generic = defaults(family: .colorNegative, iso: 400, monochrome: false)
@@ -80,32 +89,40 @@ public struct FilmCharacter: Codable, Hashable, Sendable {
         var under = 2.0, over = 3.0
         var remJet = false
         var pushContrast = 0.08, pushGrain = 0.25
+        var bloom = 1.0
         switch family {
         case .colorNegative:
             chroma = 0.3; center = 0.4; halation = 1.0; latitude = 1.0
         case .slide:
+            bloom = 1.4
             strength *= 0.8; chroma = 0.2; center = 0.65; halation = 0.15; latitude = 0.15
             over = 1.5; pushContrast = 0.12
         case .kodachrome:
+            bloom = 1.2
             // K-14: dyes added in development, no dye couplers in the emulsion, so very fine grain.
             strength *= 0.55; chroma = 0.15; center = 0.65; halation = 0.1; latitude = 0.15
             under = 1.5; over = 1; pushContrast = 0.12
         case .motionPicture:
+            bloom = 1.2
             // ECN-2: rem-jet backing suppresses halation until it is removed.
             chroma = 0.3; center = 0.4; halation = 1.2; latitude = 1.0; over = 4; under = 3; remJet = true
         case .blackAndWhite:
+            bloom = 0.4
             strength *= 1.1; chroma = 0; center = 0.4; halation = 0.25; latitude = 0.9
             pushContrast = 0.12; pushGrain = 0.35
         case .instant:
+            bloom = 1.6
             strength *= 0.6; size *= 1.3; chroma = 0.15; center = 0.5; halation = 0.3; latitude = 0.5
             tint = [1.0, 0.5, 0.25]; under = 1; over = 1
         case .print:
+            bloom = 0.8
             // A print stock on its own: fine-grained positive, moderate shoulder.
             strength *= 0.4; chroma = 0.2; center = 0.5; halation = 0.5; latitude = 0.6; over = 2
         }
         if monochrome {
             chroma = 0
             tint = [1, 1, 1]
+            if family == .instant { bloom = 0.8 }
             if family != .blackAndWhite { halation = min(halation, 0.25) }
         }
         strength = min(max(strength, 0.3), 2.5)
@@ -114,7 +131,7 @@ public struct FilmCharacter: Codable, Hashable, Sendable {
                              grainTonalCenter: center, halationStrength: halation, halationTint: tint,
                              halationRadius: 0.006, latitude: latitude, latitudeUnder: under,
                              latitudeOver: over, remJet: remJet, pushContrastPerStop: pushContrast,
-                             pushGrainPerStop: pushGrain)
+                             pushGrainPerStop: pushGrain, bloom: bloom)
     }
 
     /// Any subset of the fields, as written in `films.json`.
@@ -130,11 +147,12 @@ public struct FilmCharacter: Codable, Hashable, Sendable {
         public var latitudeUnder: Double?
         public var latitudeOver: Double?
         public var remJet: Bool?
+        public var bloom: Double?
 
         public init(grainStrength: Double? = nil, grainSize: Double? = nil, grainChroma: Double? = nil,
                     grainTonalCenter: Double? = nil, halationStrength: Double? = nil,
                     halationTint: [Double]? = nil, halationRadius: Double? = nil, latitude: Double? = nil,
-                    latitudeUnder: Double? = nil, latitudeOver: Double? = nil, remJet: Bool? = nil) {
+                    latitudeUnder: Double? = nil, latitudeOver: Double? = nil, remJet: Bool? = nil, bloom: Double? = nil) {
             self.grainStrength = grainStrength
             self.grainSize = grainSize
             self.grainChroma = grainChroma
@@ -146,6 +164,7 @@ public struct FilmCharacter: Codable, Hashable, Sendable {
             self.latitudeUnder = latitudeUnder
             self.latitudeOver = latitudeOver
             self.remJet = remJet
+            self.bloom = bloom
         }
     }
 
@@ -163,6 +182,7 @@ public struct FilmCharacter: Codable, Hashable, Sendable {
         if let v = o.latitudeUnder { c.latitudeUnder = v }
         if let v = o.latitudeOver { c.latitudeOver = v }
         if let v = o.remJet { c.remJet = v }
+        if let v = o.bloom { c.bloom = v }
         return c
     }
 }

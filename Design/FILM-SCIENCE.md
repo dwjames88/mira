@@ -60,6 +60,23 @@ The 500T's gains give the cool-blue daylight cast of a tungsten-balanced stock (
 
 A black-and-white negative is printed on black-and-white paper and toned; Toning covers that. The two Paper looks are colour print stocks and tinted B&W films, so the FILMS panel hides the Paper chips when `selectedFilm.isMonochrome`, and the renderer ignores `recipe.paper` for a monochrome film (so a preset that carries a paper cannot tint one; the Scan profile still applies). The chips are also hidden on the Print cards themselves.
 
+
+### Native texture levels and bloom
+
+Grain, halation and bloom sliders read 50% as "the film's own level". Choosing a film (a card, a variant, a hover preview, the iOS picker) sets grain, halation and bloom to 0.5 and grain size and halation radius to 0.5 through `Recipe.applyingNativeTexture(filmID:)`, so the new film's native values win even if the sliders had been moved; choosing Original sets all three to 0. Film-strip thumbnails render at the same native level. Presets and reopened edits (sidecars, Photos adjustment data) keep their stored values and never go through that helper.
+
+Bloom has a per-film `FilmCharacter.bloom`, relative to an ISO 400 colour negative (1.0). In pipeline 2 the `CIBloom` intensity is `clamp(slider * 2 * bloom * 0.25, 0, 1)`, so a colour negative at 50% is a subtle 0.25. Pipeline 1 still uses the slider directly. A `character.bloom` override in `films.json` replaces the family value.
+
+| Family | Bloom |
+| --- | --- |
+| Colour negative | 1.0 |
+| Slide | 1.4 |
+| Kodachrome | 1.2 |
+| Motion picture | 1.2 |
+| Black and white | 0.4 |
+| Instant | 1.6 (monochrome instant 0.8) |
+| Print | 0.8 |
+
 ## 3. Tuning rationale
 
 These come from visual QA with `mira-sheet --contact-sheet` on `Fixtures/sample.jpg`, judged at 1:1 crops, not on downscaled tiles.

@@ -88,7 +88,7 @@ final class EditorViewModel {
         var r = recipe
         r.filmID = id
         r.pipeline = Recipe.currentPipeline
-        recipe = r
+        recipe = r.applyingNativeTexture(filmID: id)   // grain, halation, bloom at the new film's own level
     }
 
     // MARK: Film picker

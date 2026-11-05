@@ -478,7 +478,7 @@ public final class PreviewEngine: @unchecked Sendable {
                 if i >= ids.count || isCancelled() { return }
                 // The base already carries the crop, so the thumbnail recipe has none. Thumbnails are cached per
                 // picture and film, not per exposure time, so they never simulate reciprocity.
-                if let cg = renderer.render(Recipe(filmID: ids[i], reciprocity: .off), input: box.value, context: context) {
+                if let cg = renderer.render(Recipe(filmID: ids[i], reciprocity: .off).applyingNativeTexture(filmID: ids[i]), input: box.value, context: context) {
                     countThumbnailRender()
                     deliver(ids[i], cg)
                     if let diskCache, let key = keyFor(ids[i]) { diskCache.store(cg, key: key) }

@@ -418,7 +418,7 @@ public final class EditorModel {
         var r = recipe
         r.filmID = id
         r.pipeline = Recipe.currentPipeline
-        recipe = r
+        recipe = r.applyingNativeTexture(filmID: id)   // grain, halation, bloom at the new film's own level
     }
 
     /// Resets every slider to its default (including push, rem-jet, scan and toning) and keeps the selected
