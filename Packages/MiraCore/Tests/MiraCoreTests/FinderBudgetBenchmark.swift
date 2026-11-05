@@ -189,6 +189,43 @@ struct FinderBudgetBenchmark {
             if round >= 2 { thumbs.append(Self.now() - t0) }
         }
         let th = Self.stats(thumbs)
+        // New: the same reading from a 256 px copy made by an affine scale (what the finder does now), and 8 LUT-only
+        // cards from one 240 px materialized copy (no grain, halation or bloom).
+        func shrunk(_ image: CIImage, _ side: CGFloat) -> CIImage {
+            let e = image.extent, k = side / max(e.width, e.height)
+            let w = (e.width * k).rounded(), h = (e.height * k).rounded()
+            return image.transformed(by: CGAffineTransform(scaleX: w / e.width, y: h / e.height)).cropped(to: CGRect(x: 0, y: 0, width: w, height: h))
+        }
+        var latitude256: [Double] = []
+        for i in 0..<(Self.warmup + Self.frames) {
+            let image = Self.frameImage(buffers[0], index: i)
+            let t0 = Self.now()
+            _ = renderer.latitudeReading(recipe, input: shrunk(image, 256), context: context)
+            if i >= Self.warmup { latitude256.append(Self.now() - t0) }
+        }
+        let lat256 = Self.stats(latitude256)
+        let cardIDs = real == nil ? Array(repeating: filmID, count: 8)
+            : Array((library.films.filter { (try? library.lut(for: $0)) != nil }).prefix(8).map(\.id))
+        var cards: [Double] = [], copies: [Double] = []
+        let sRGB = CGColorSpace(name: CGColorSpace.sRGB)!
+        for round in 0..<12 {
+            let t0 = Self.now()
+            let small = shrunk(Self.frameImage(buffers[0], index: round), 240)
+            guard let cg = context.createCGImage(small, from: small.extent, format: .RGBA8, colorSpace: sRGB) else { continue }
+            let base = CIImage(cgImage: cg).withMiraHeadroom(1)
+            let t1 = Self.now()
+            for id in cardIDs {
+                var r = Recipe(filmID: id, reciprocity: .off).applyingNativeTexture(filmID: id)
+                r.grainAmount = 0; r.halationAmount = 0; r.bloomAmount = 0
+                let out = renderer.withPreviewScale(240 / 1920).thumbnail(r, input: base)
+                _ = context.createCGImage(out, from: out.extent, format: .RGBA8, colorSpace: sRGB)
+            }
+            if round >= 2 { cards.append(Self.now() - t1); copies.append(t1 - t0) }
+        }
+        let cd = Self.stats(cards), cp = Self.stats(copies)
+        lines.append("")
+        lines.append(String(format: "latitudeReading from a 256 px frame (affine scale included): median %.2f ms, p95 %.2f ms", lat256.median, lat256.p95))
+        lines.append(String(format: "8 cards, LUT-only, from a 240 px frame: median %.1f ms, p95 %.1f ms (+ one-time 240 px copy %.1f ms)", cd.median, cd.p95, cp.median))
         lines.append("")
         lines.append(String(format: "latitudeReading on 1920x1440: median %.2f ms, p95 %.2f ms (%d runs)", lat.median, lat.p95, Self.frames))
         lines.append(String(format: "8 thumbnail renders at 220 px: median %.1f ms, p95 %.1f ms for the batch (%d films, 10 runs)", th.median, th.p95, ids.count))

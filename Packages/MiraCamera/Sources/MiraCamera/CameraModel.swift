@@ -225,7 +225,7 @@ public final class CameraModel {
     }
 
     private nonisolated static func makeCardsHandler(_ model: CameraModel) -> @Sendable ([String: CGImage]) -> Void {
-        { [weak model] cards in Task { @MainActor in model?.cardThumbnails = cards } }
+        { [weak model] cards in Task { @MainActor in model?.cardThumbnails.merge(cards) { _, new in new } } }
     }
 
     private nonisolated static func makeStatsHandler(_ model: CameraModel) -> @Sendable (FinderStats) -> Void {
@@ -536,7 +536,7 @@ public final class CameraModel {
 
     // MARK: Film door support
 
-    /// Film IDs the door wants thumbnails of (the finder renders them from the live frame at about 2 Hz); empty when closed.
+    /// Film IDs the door wants thumbnails of (the finder renders them from the live frame, each published as it is done, refreshed at about 2 Hz); empty when closed.
     public func setWantedCardIDs(_ ids: [String]) {
         finder?.update { $0.cardFilmIDs = ids }
         if ids.isEmpty { cardThumbnails = [:] }

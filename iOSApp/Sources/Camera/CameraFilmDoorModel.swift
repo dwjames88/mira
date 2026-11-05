@@ -22,7 +22,9 @@ final class CameraFilmDoorModel: FilmPanelModel {
     private(set) var thumbnails: [String: UIImage] = [:]
     let thumbEpoch = 0
     /// Film ids (nil = Original, stored as "__original") the visible cards asked for; the camera's finder renders these.
-    @ObservationIgnored private(set) var wantedThumbnailIDs: Set<String> = []
+    @ObservationIgnored private(set) var wantedThumbnailIDs: [String] = []
+    /// Called when a card asks for a thumbnail it had not asked for yet (the camera forwards the ids to the finder at once).
+    @ObservationIgnored var onWantedChange: (([String]) -> Void)?
     @ObservationIgnored var onRecipeChange: ((Recipe) -> Void)?
 
     /// A frame always exists in the camera, so presets can be saved from the live recipe.
@@ -67,7 +69,28 @@ final class CameraFilmDoorModel: FilmPanelModel {
     /// The door just opened or closed: forget what the old cards asked for.
     func resetWantedThumbnails() { wantedThumbnailIDs = [] }
 
-    func requestThumbnail(_ id: String?) async { wantedThumbnailIDs.insert(id ?? "__original") }
+    func requestThumbnail(_ id: String?) async {
+        let key = id ?? "__original"
+        guard !wantedThumbnailIDs.contains(key) else { return }
+        // Request order is on-screen order: the finder renders the first cards first.
+        wantedThumbnailIDs.append(key)
+        onWantedChange?(prioritizedWantedIDs)
+    }
+
+    /// The wanted ids, the cards around the applied film first (the strip scrolls to it, so those are on screen),
+    /// then by distance. A lazy strip that jumps to the selection instantiates every card before it first, so the
+    /// order the cards asked in is not the order they are seen in.
+    var prioritizedWantedIDs: [String] {
+        let order = ["__original"] + visibleStocks.map(\.id)
+        var index: [String: Int] = [:]
+        for (i, id) in order.enumerated() { index[id] = i }
+        let center = selectedStock.flatMap { stock in visibleStocks.firstIndex { $0.stockID == stock.id } }.map { $0 + 1 } ?? 0
+        return wantedThumbnailIDs.sorted {
+            let a = index[$0] ?? Int.max / 2, b = index[$1] ?? Int.max / 2
+            let da = abs(a - center), db = abs(b - center)
+            return da != db ? da < db : a < b
+        }
+    }
 
     // MARK: Film picker (same rules as the editor)
 
