@@ -15,6 +15,19 @@ static inline float3 miraUnpremultiply(float4 s) {
     return s.a > 0.0 ? s.rgb / s.a : s.rgb;
 }
 
+// Non-finite values. Tested on the bit pattern: Metal's fast-math may fold isnan / isinf / x == x away.
+static inline bool miraNonFinite(float x) { return (as_type<uint>(x) & 0x7f800000u) == 0x7f800000u; }
+
+// NaN -> 0, +inf -> `limit`, -inf -> 0. Finite values (including the legitimate > 1 of a scene-referred
+// source) pass through unchanged.
+static inline float miraFinite(float x, float limit) {
+    if (!miraNonFinite(x)) { return x; }
+    return (as_type<uint>(x) & 0x007fffffu) != 0u ? 0.0 : (x > 0.0 ? limit : 0.0);
+}
+
+// The largest value half-float working storage holds; results are kept inside it so they never become inf.
+constant float miraHalfMax = 65504.0;
+
 static inline float miraEncode1(float x) {
     float a = fabs(x);
     float e = a <= 0.0031308 ? 12.92 * a : 1.055 * pow(a, 1.0 / 2.4) - 0.055;
@@ -48,6 +61,18 @@ static inline float3 miraLookup3(coreimage::sampler lut, float3 v) {
     float4 b = lut.sample(lut.transform(float2(c.b * 1023.0 + 0.5, 0.5)));
     return float3(r.r, g.g, b.b) + (v - c);
 }
+
+extern "C" {
+namespace coreimage {
+
+// Replaces non-finite pixels (NaN -> 0, +inf -> limit, -inf -> 0) and leaves every finite value untouched.
+float4 miraSanitize(coreimage::sample_t s, float limit) {
+    return float4(miraFinite(s.r, limit), miraFinite(s.g, limit), miraFinite(s.b, limit),
+                  clamp(miraFinite(s.a, 1.0), 0.0, 1.0));
+}
+
+} // namespace coreimage
+} // extern "C"
 
 extern "C" {
 namespace coreimage {
@@ -187,10 +212,13 @@ namespace coreimage {
 //   highlights / shadows: smooth masks on the blurred luminance, so they act locally;
 //   whites / blacks: end-point curves y + 0.33 w y^3 and y + 0.2 b (1-y)^4 (monotonic for |w|,|b| <= 1).
 float4 miraTone(coreimage::sample_t s, coreimage::sample_t b, float hl, float sh, float wh, float bl) {
+    s = float4(miraFinite(s.r, 1.0), miraFinite(s.g, 1.0), miraFinite(s.b, 1.0), miraFinite(s.a, 1.0));
     if (s.a <= 0.0) { return s; }
     float3 e = miraEncode(miraUnpremultiply(s));
     float y = miraLuma(e);
+    // A non-finite base (one bad pixel spread by the blur) must not blank a whole block: fall back to the pixel itself.
     float yb = miraLuma(miraEncode(miraUnpremultiply(b)));
+    if (miraNonFinite(yb)) { yb = y; }
     float y2 = y;
     float wS = 1.0 - smoothstep(0.05, 0.65, yb);
     float wH = smoothstep(0.35, 0.95, yb);
@@ -204,21 +232,23 @@ float4 miraTone(coreimage::sample_t s, coreimage::sample_t b, float hl, float sh
     y2 += 0.2 * bl * ic * ic * ic * ic;
     y2 = max(y2, 0.0);
     e = miraRelight(e, y, y2);
-    return float4(miraDecode(e) * s.a, s.a);
+    return float4(clamp(miraDecode(e) * s.a, -miraHalfMax, miraHalfMax), s.a);
 }
 
 // Local contrast: adds `amount` of the difference between the image and its blur to the
 // luminance, weighted toward the midtones when `midtones` > 0.5 (clarity) or flat (texture).
 float4 miraDetail(coreimage::sample_t s, coreimage::sample_t b, float amount, float midtones) {
+    s = float4(miraFinite(s.r, 1.0), miraFinite(s.g, 1.0), miraFinite(s.b, 1.0), miraFinite(s.a, 1.0));
     if (s.a <= 0.0) { return s; }
     float3 e = miraEncode(miraUnpremultiply(s));
     float y = miraLuma(e);
     float yb = miraLuma(miraEncode(miraUnpremultiply(b)));
+    if (miraNonFinite(yb)) { yb = y; }
     float t = 2.0 * clamp(y, 0.0, 1.0) - 1.0;
     float w = midtones > 0.5 ? 1.0 - t * t : 1.0;
     float y2 = max(y + amount * w * (y - yb), 0.0);
     e = miraRelight(e, y, y2);
-    return float4(miraDecode(e) * s.a, s.a);
+    return float4(clamp(miraDecode(e) * s.a, -miraHalfMax, miraHalfMax), s.a);
 }
 
 } // namespace coreimage
