@@ -43,6 +43,27 @@ static inline float miraDecode1(float x) {
 static inline float3 miraEncode(float3 c) { return float3(miraEncode1(c.r), miraEncode1(c.g), miraEncode1(c.b)); }
 static inline float3 miraDecode(float3 c) { return float3(miraDecode1(c.r), miraDecode1(c.g), miraDecode1(c.b)); }
 
+// MARK: Luminance relight
+
+static inline float miraLuma(float3 c) { return dot(c, float3(0.2126, 0.7152, 0.0722)); }
+
+// Applies a new luminance y2 to an sRGB-encoded colour whose luminance is y, keeping hue.
+//
+// The textbook way is e * (y2 / y). That is ill-conditioned in deep shadows: there y is tiny while the
+// colour keeps its (noisy, often wide-gamut and partly negative) chroma, so a lift of 0.3 in luminance
+// at y = 0.003 multiplies every channel by 100 and a near-black colour becomes a saturated orange or
+// green speck. So the colour is split into its luminance and its chroma offset (e - y) and only the
+// chroma is scaled, by the luminance ratio where there is enough luminance to carry it and by 1 (the
+// pure additive change) where there is not. Darkening, and normal pixels (y above ~0.25), are exactly
+// the ratio scale as before; a lift is blended in between, so the chroma of a lifted shadow grows by
+// at most the ratio and never more than the tone it came from can justify.
+static inline float3 miraRelight(float3 e, float y, float y2) {
+    if (y <= 1.0e-4) { return e + (y2 - y); }
+    float ratio = y2 / y;
+    float s = ratio > 1.0 ? 1.0 + (ratio - 1.0) * smoothstep(0.03, 0.25, y) : ratio;
+    return y2 + (e - y) * s;
+}
+
 // MARK: Curves
 
 // Row 0 of `lut` holds the composed RGB master + per-channel curves (one per colour channel),
@@ -85,11 +106,7 @@ float4 miraCurves(coreimage::sampler src, coreimage::sampler lut, float useLuma)
     if (useLuma > 0.5) {
         float y = dot(e, float3(0.2126, 0.7152, 0.0722));
         float y2 = miraLookup(lut, y, 1.0) + (y - clamp(y, 0.0, 1.0));
-        if (y > 1.0e-4) {
-            e *= y2 / y;
-        } else {
-            e += (y2 - y);
-        }
+        e = miraRelight(e, y, y2);
     }
     return float4(miraDecode(e) * s.a, s.a);
 }
@@ -195,14 +212,6 @@ float4 miraColorMixer(coreimage::sample_t s, float4 hue0, float4 hue1, float4 sa
 } // extern "C"
 
 // MARK: Tone (highlights, shadows, whites, blacks)
-
-static inline float miraLuma(float3 c) { return dot(c, float3(0.2126, 0.7152, 0.0722)); }
-
-// Applies a new luminance to an sRGB-encoded colour by scaling it (keeps hue and chroma ratio).
-static inline float3 miraRelight(float3 e, float y, float y2) {
-    if (y > 1.0e-4) { return e * (y2 / y); }
-    return e + (y2 - y);
-}
 
 extern "C" {
 namespace coreimage {
