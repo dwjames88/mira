@@ -5,9 +5,10 @@ import Photos
 import SwiftUI
 
 /// The camera as the app presents it: `CameraView` with the app's pieces (film renderer, the editor-backed print
-/// writer, opening a frame in the editor the gallery already uses).
+/// writer, bringing up the library the camera sits over).
 struct CameraScreen: View {
     let editor: EditorViewModel
+    /// Brings up the library: the header's LIBRARY link and the last-frame thumbnail.
     let onClose: () -> Void
     // Made once on appear: building it in `init` would make a model (Metal device, queues) per parent redraw.
     @State private var model: CameraModel?
@@ -52,13 +53,8 @@ struct CameraScreen: View {
             initialRecipe: initial,
             fixtureURL: Bundle.main.url(forResource: "sample", withExtension: "jpg"),
             printQueue: CameraPrints.queue,
-            onOpenFrame: { [editor, onClose] id in
-                guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil).firstObject else { return }
-                onClose()
-                // Through the gallery's open path (OPENING state, Photos backstop, failure card): a just-captured
-                // asset is exactly the case the backstop covers.
-                editor.pendingLibraryOpen = asset
-            })
+            onOpenLibrary: { [onClose] in onClose() },
+            onFrameSaved: { DevelopStore.shared.add($0) })
     }
 }
 

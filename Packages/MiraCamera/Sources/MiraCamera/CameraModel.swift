@@ -107,7 +107,8 @@ public final class CameraModel {
     private let library: any PhotoLibraryWriting
     private let requestLibraryAccess: @Sendable () async -> LibraryAccess
     private let store: CameraSettingsStore
-    private let onOpenFrame: @MainActor (String) -> Void
+    private let onOpenLibrary: @MainActor () -> Void
+    private let onFrameSaved: @MainActor (String) -> Void
     private let location = CameraLocation()
     private let filmLibrary: FilmLibrary?
 
@@ -137,7 +138,9 @@ public final class CameraModel {
     ///   - backend: the device and frame source; `CameraBackend.make` (real on a phone, fake elsewhere) when nil.
     ///   - fixtureURL: the picture the fake backend shows.
     ///   - printQueue: the app's shared print queue (it drains at launch, even with the camera closed); built here when nil.
-    ///   - onOpenFrame: opens the asset with this local identifier in the editor.
+    ///   - onFrameSaved: called with the local identifier of the asset the user keeps (the developed frame, the baked copy, or the original)
+    ///     as soon as its save completes.
+    ///   - onOpenLibrary: brings up the photo library (the last-frame thumbnail's action).
     public init(
         printWriter: any PrintWriting,
         renderer: Renderer? = nil,
@@ -150,7 +153,8 @@ public final class CameraModel {
         settingsStore: CameraSettingsStore = CameraSettingsStore(),
         pendingDirectory: URL? = nil,
         printQueue: PrintQueue? = nil,
-        onOpenFrame: @escaping @MainActor (String) -> Void = { _ in }
+        onOpenLibrary: @escaping @MainActor () -> Void = {},
+        onFrameSaved: @escaping @MainActor (String) -> Void = { _ in }
     ) {
         let made = backend ?? CameraBackend.make(fixtureURL: fixtureURL)
         device = made.device
@@ -158,7 +162,8 @@ public final class CameraModel {
         self.library = library
         self.requestLibraryAccess = requestLibraryAccess
         store = settingsStore
-        self.onOpenFrame = onOpenFrame
+        self.onOpenLibrary = onOpenLibrary
+        self.onFrameSaved = onFrameSaved
         let loaded = settingsStore.load()
         settings = loaded
         recipe = initialRecipe ?? loaded.lastRecipe ?? Recipe()
@@ -410,6 +415,8 @@ public final class CameraModel {
     private func handle(_ outcome: SaveOutcome) {
         lastAssetID = outcome.assetID
         refreshThumbnail(for: outcome.assetID)
+        // The asset exists by now in every case (a pending print only still lacks its recipe), so a later retry needs no hook.
+        onFrameSaved(outcome.savedAssetID)
         switch outcome {
         case .bakedCopy(let text, _, _), .originalOnly(_, let text): show(notice: text)
         case .developed, .printPending: break
@@ -459,11 +466,8 @@ public final class CameraModel {
         }
     }
 
-    /// Opens the last frame in the editor.
-    public func openLastFrame() {
-        guard let id = lastAssetID else { return }
-        onOpenFrame(id)
-    }
+    /// The last-frame thumbnail: brings up the library (also when nothing was shot yet).
+    public func openLastFrame() { onOpenLibrary() }
 
     // MARK: Exposure, lenses, zoom, white balance
 

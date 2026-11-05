@@ -39,6 +39,15 @@ public enum SaveOutcome: Sendable, Equatable {
         case .originalOnly(let id, _): id
         }
     }
+
+    /// The asset the user ends up with: the developed frame, the baked copy (not the plain original), or the original.
+    public var savedAssetID: String {
+        switch self {
+        case .developed(let id), .printPending(let id): id
+        case .bakedCopy(_, _, let baked): baked
+        case .originalOnly(let id, _): id
+        }
+    }
 }
 
 public enum CaptureSaveError: Error, Sendable, Equatable {

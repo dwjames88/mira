@@ -64,7 +64,7 @@ xcrun simctl privacy "$UDID" reset photos "$BUNDLE_ID" 2>/dev/null || true
 xcrun simctl privacy "$UDID" grant photos-add "$BUNDLE_ID" 2>/dev/null || true
 xcrun simctl privacy "$UDID" grant photos "$BUNDLE_ID" 2>/dev/null || true
 xcrun simctl terminate "$UDID" "$BUNDLE_ID" 2>/dev/null || true
-xcrun simctl launch "$UDID" "$BUNDLE_ID" >/dev/null
+SIMCTL_CHILD_MIRA_LAUNCH_SCREEN=gallery xcrun simctl launch "$UDID" "$BUNDLE_ID" >/dev/null
 sleep "${GALLERY_SETTLE:-6}"
 xcrun simctl io "$UDID" screenshot "$OUT/gallery.png" >/dev/null 2>&1
 echo "$OUT/gallery.png ($(stat -f%z "$OUT/gallery.png") bytes)"
