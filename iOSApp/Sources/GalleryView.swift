@@ -357,7 +357,9 @@ struct AlbumGridView: View {
                             .ffLabel(size: 9, color: FieldFramesTheme.lichen).lineLimit(1)
                     }
                     Spacer(minLength: 0)
-                    FFTabBar([(value: false, title: "ALL"), (value: true, title: "RAW")], selection: $rawOnly,
+                    FFTabBar([(value: false, title: "ALL"),
+                              (value: true, title: album.rawCount.map { "RAW \($0.formatted())" } ?? "RAW")],
+                             selection: $rawOnly,
                              spacing: FieldFramesTheme.cells(2))
                         .accessibilityLabel("Show all photos or RAW only")
                     if gallery.status == .limited {
@@ -373,7 +375,7 @@ struct AlbumGridView: View {
                     Color.clear.frame(maxHeight: .infinity)
                 } else if album.count == 0 {
                     if rawOnly {
-                        FFEmptyState(title: "No RAW photos", subtitle: album.scanProgress != nil
+                        FFEmptyState(title: "No RAW photos", subtitle: album.scanning
                                      ? "SCANNING FOR RAW PHOTOS" : "THIS ALBUM HAS NO RAW PICTURES")
                     } else {
                         FFEmptyState(title: "No photos", subtitle: gallery.status == .limited
@@ -384,7 +386,7 @@ struct AlbumGridView: View {
         }
         .ffNavigationTitle(title)
         .task(id: gallery.revision) { await album.reload(rawOnly: rawOnly, gallery: gallery) }
-        .onChange(of: rawOnly) { _, on in Task { await album.setRawOnly(on) } }
+        .onChange(of: rawOnly) { _, on in album.setRawOnly(on) }
         .onDisappear { album.cancelWork(); album.stopCaching() }
     }
 
