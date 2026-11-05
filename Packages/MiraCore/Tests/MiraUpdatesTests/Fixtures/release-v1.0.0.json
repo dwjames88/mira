@@ -1,0 +1,71 @@
+{
+  "url": "https://api.github.com/repos/dwjames88/mira/releases/433000001",
+  "assets_url": "https://api.github.com/repos/dwjames88/mira/releases/433000001/assets",
+  "upload_url": "https://uploads.github.com/repos/dwjames88/mira/releases/433000001/assets{?name,label}",
+  "html_url": "https://github.com/dwjames88/mira/releases/tag/v1.0.0",
+  "id": 433000001,
+  "author": {
+    "login": "dwjames88",
+    "id": 156497265,
+    "type": "User",
+    "site_admin": false,
+    "html_url": "https://github.com/dwjames88"
+  },
+  "node_id": "RE_kwDOVSV3CM4ZA71l",
+  "tag_name": "v1.0.0",
+  "target_commitish": "main",
+  "name": "Mira 1.0.0",
+  "draft": false,
+  "immutable": false,
+  "prerelease": false,
+  "created_at": "2026-11-05T12:00:00Z",
+  "updated_at": "2026-11-05T12:00:00Z",
+  "published_at": "2026-11-05T12:00:00Z",
+  "assets": [
+    {
+      "url": "https://api.github.com/repos/dwjames88/mira/releases/assets/690000001",
+      "id": 690000001,
+      "node_id": "RA_kwDOVSV3CM4q0001",
+      "name": "Mira-1.0.0.dmg",
+      "label": "",
+      "uploader": {
+        "login": "dwjames88",
+        "id": 156497265,
+        "type": "User",
+        "site_admin": false,
+        "html_url": "https://github.com/dwjames88"
+      },
+      "content_type": "application/x-apple-diskimage",
+      "state": "uploaded",
+      "size": 89100000,
+      "digest": "sha256:c41f9a7e20b8d35640ae7b1f9d2c80e3a5b64d7f1e92c0a8b3d5f6e7041a2b93",
+      "download_count": 0,
+      "created_at": "2026-11-05T12:00:00Z",
+      "updated_at": "2026-11-05T12:00:00Z",
+      "browser_download_url": "https://github.com/dwjames88/mira/releases/download/v1.0.0/Mira-1.0.0.dmg"
+    },
+    {
+      "url": "https://api.github.com/repos/dwjames88/mira/releases/assets/690000002",
+      "id": 690000002,
+      "node_id": "RA_kwDOVSV3CM4q0002",
+      "name": "Mira-1.0.0.zip",
+      "label": "",
+      "uploader": {
+        "login": "dwjames88",
+        "id": 156497265,
+        "type": "User",
+        "site_admin": false,
+        "html_url": "https://github.com/dwjames88"
+      },
+      "content_type": "application/zip",
+      "state": "uploaded",
+      "size": 86500000,
+      "digest": "sha256:3b7e1c0d5f4a8926e1d0c7b94a5f3e28d6c19b07a4e85f2c1d3b6a9087e4f5c2",
+      "download_count": 0,
+      "created_at": "2026-11-05T12:00:00Z",
+      "updated_at": "2026-11-05T12:00:00Z",
+      "browser_download_url": "https://github.com/dwjames88/mira/releases/download/v1.0.0/Mira-1.0.0.zip"
+    }
+  ],
+  "body": "### Added\n\n- Mira 1.0.0.\n\n## Install\n\n1. Download the DMG (or zip) and drag **Mira** to Applications.\n"
+}
