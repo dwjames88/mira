@@ -12,6 +12,9 @@ struct RootView: View {
     private let snapshotMode = ProcessInfo.processInfo.environment["MIRA_SNAPSHOT"] == "1"
 
     private let hub = PresetHub.shared
+    private var snapshotFocus: String {
+        snapshotMode ? (ProcessInfo.processInfo.environment["MIRA_SNAPSHOT_FOCUS"] ?? "exposure") : "exposure"
+    }
 
     var body: some View {
         content
@@ -64,9 +67,11 @@ struct RootView: View {
                     _ = try? hub.save(nickname: "Last Summer", recipe: model.recipe, filmName: model.currentFilmName)
                 }
                 if env["MIRA_SNAPSHOT_SHEET"] == "savepreset" { hub.sheet = .save }
+                if env["MIRA_SNAPSHOT_DETAIL"] == "1" { model.filmsDetail = true }
             } else {
                 tab = .develop
             }
+            if env["MIRA_SNAPSHOT_HIDDEN"] == "1" { model.panelHidden[tab] = true }
         }
         .onChange(of: pickerItem) { _, item in
             guard let item else { return }
@@ -143,231 +148,11 @@ struct RootView: View {
 
     @ViewBuilder private var controls: some View {
         switch tab {
-        case .crop: CropTab(model: model)
+        case .crop: CappedScroll { CropTab(model: model) }
         case .films: FilmsPanel(model: model)
-        case .develop: DevelopPanel(model: model)
-        case .dodgeBurn: DodgeBurnTab(model: model)
+        case .develop: DevelopPanel(model: model, focus: snapshotFocus)
+        case .dodgeBurn: CappedScroll { DodgeBurnTab(model: model) }
         }
-    }
-}
-
-struct FilmsPanel: View {
-    @Bindable var model: EditorViewModel
-    @State private var optionsOpen: Bool
-    private let hub = PresetHub.shared
-
-    init(model: EditorViewModel, optionsOpen: Bool = false) {
-        self.model = model
-        _optionsOpen = State(initialValue: optionsOpen)
-    }
-
-    private var familyTabs: [(value: FilmFamily?, title: String)] {
-        [(value: nil, title: "ALL")] + model.availableFamilies.map { (value: Optional($0), title: $0.displayName.uppercased()) }
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            // Family tabs: ALL plus the families that have stocks, scrolling sideways when they overflow.
-            ScrollView(.horizontal, showsIndicators: false) {
-                FFTabBar(familyTabs, selection: $model.familyFilter, spacing: FieldFramesTheme.cells(2))
-                    .padding(.horizontal, FieldFramesTheme.cells(2))
-            }
-            .frame(height: FieldFramesTheme.rows(2))
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(alignment: .top, spacing: FieldFramesTheme.cells(3)) {
-                    // PRESETS always show; the family tab only narrows FILMS.
-                    PresetGroup(model: model, hub: hub)
-                    StripGroup(title: "FILMS", count: model.visibleStocks.count + 1) {
-                        FilmCard(title: "Original", caption: "NO LOOK", image: model.thumbnails["__original"],
-                                 isSelected: model.filmID == nil) { model.select(nil) }
-                            .task(id: model.thumbEpoch) { await model.requestThumbnail(nil) }
-                        ForEach(model.visibleStocks) { film in
-                            FilmCard(title: film.stockName ?? film.displayName, caption: film.brand.uppercased(),
-                                     image: model.thumbnails[film.id], isSelected: model.selectedStockID == film.stockID) {
-                                model.select(film.id)
-                            }
-                            .task(id: model.thumbEpoch) { await model.requestThumbnail(film.id) }
-                        }
-                    }
-                }
-                .padding(.horizontal, FieldFramesTheme.cells(2))
-                .padding(.vertical, FieldFramesTheme.rows(0.5))
-            }
-            stockChips
-            HStack(spacing: FieldFramesTheme.cells(1)) {
-                Button { withAnimation(.snappy(duration: 0.2)) { optionsOpen.toggle() } } label: {
-                    Text(optionsOpen ? "OPTIONS \u{2212}" : "OPTIONS +").padding(.vertical, 4)
-                }
-                .buttonStyle(.ff)
-                .disabled(model.filmID == nil)
-                Spacer(minLength: 0)
-                Button { hub.importerShown = true } label: { Text("IMPORT").padding(.vertical, 4) }
-                    .buttonStyle(.ff)
-                Button { hub.sheet = .save } label: { Text("SAVE PRESET").padding(.vertical, 4) }
-                    .buttonStyle(.ff)
-                    .disabled(!model.hasPhoto)
-            }
-            .padding(.horizontal, FieldFramesTheme.cells(2))
-            if optionsOpen, model.filmID != nil { FilmOptions(model: model) }
-            // STRENGTH is the one slider in focus; double-tap resets it to full strength.
-            FFSlider("STRENGTH", value: $model.strength, in: 0...1, default: 1)
-                .frame(minHeight: 56)
-                .contentShape(Rectangle())
-                .simultaneousGesture(TapGesture(count: 2).onEnded { model.strength = 1 })
-                .padding(.horizontal, FieldFramesTheme.cells(2))
-                .disabled(model.filmID == nil)
-        }
-        .padding(.bottom, FieldFramesTheme.rows(0.5))
-    }
-
-    /// ISO and VARIATIONS for the applied film's stock; each row is absent when there is only one choice.
-    @ViewBuilder private var stockChips: some View {
-        let isos = model.isoChoices
-        if !isos.isEmpty {
-            ChipRow(label: "ISO") {
-                ForEach(isos) { choice in
-                    OptionChip(title: choice.label, selected: choice.iso == model.selectedFilm?.iso) { model.selectISO(choice.iso) }
-                }
-            }
-        }
-        let variations = model.variationChoices
-        if !variations.isEmpty {
-            ChipRow(label: "VARIATIONS") {
-                ForEach(variations) { choice in
-                    OptionChip(title: choice.label, selected: choice.filmID == model.filmID) { model.select(choice.filmID) }
-                }
-            }
-        }
-    }
-}
-
-/// Push / pull, scan, paper, exposure time with reciprocity, and (monochrome films) toning for the applied film. Compact: one scrolling row each.
-private struct FilmOptions: View {
-    @Bindable var model: EditorViewModel
-
-    var body: some View {
-        VStack(spacing: 0) {
-            if model.recipe.isLegacyPipeline && model.recipe.filmID != nil {
-                Text("Made with an earlier Mira; changing film settings updates it to the current film model")
-                    .ffLabel(size: 9, color: FieldFramesTheme.paperDim)
-                    .lineLimit(2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, FieldFramesTheme.cells(2))
-            }
-            ChipRow(label: "PUSH") {
-                ForEach(FilmBrowsing.pushSteps, id: \.self) { step in
-                    OptionChip(title: FilmBrowsing.pushLabel(step), selected: abs(model.recipe.push - step) < 0.01) {
-                        model.recipe.push = step
-                    }
-                }
-            }
-            ChipRow(label: "SCAN") {
-                ForEach(ScanProfile.allCases, id: \.self) { profile in
-                    OptionChip(title: profile.displayName, selected: model.recipe.scanProfile == profile) {
-                        model.selectScan(profile)
-                    }
-                }
-            }
-            if model.showsPaperChips {
-                ChipRow(label: "PAPER") {
-                    ForEach(PaperProfile.allCases, id: \.self) { paper in
-                        OptionChip(title: paper.displayName, selected: model.recipe.paper == paper) {
-                            model.selectPaper(paper)
-                        }
-                    }
-                }
-                Text("Mira originals, inspired by published print behavior. Replaces Scan.")
-                    .ffLabel(size: 9, color: FieldFramesTheme.paperDim)
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, FieldFramesTheme.cells(2))
-            }
-            FFSlider("EXPOSURE TIME",
-                     value: Binding(get: { model.exposureTimeSliderValue },
-                                    set: { model.setExposureTime(sliderValue: $0) }),
-                     in: ExposureTimeFormat.range, default: model.exposureTimeResetValue,
-                     snap: ExposureTimeFormat.step, format: { _ in model.exposureTimeReadout })
-                .frame(minHeight: 44)
-                .padding(.horizontal, FieldFramesTheme.cells(2))
-            ChipRow(label: "RECIP.") {
-                ForEach(ReciprocityMode.allCases, id: \.self) { mode in
-                    OptionChip(title: mode.displayName, selected: model.recipe.reciprocity == mode) {
-                        model.recipe.reciprocity = mode
-                    }
-                }
-            }
-            if model.recipe.reciprocity != .off {
-                FFSlider("RECIP. STRENGTH", value: model.bind(\.reciprocityStrength), in: 0...2, default: 1,
-                         format: { "\(Int(($0 * 100).rounded())) %" })
-                    .frame(minHeight: 44)
-                    .padding(.horizontal, FieldFramesTheme.cells(2))
-            }
-            if let readout = model.reciprocityReadout {
-                (Text(readout).foregroundStyle(FieldFramesTheme.paperMid)
-                    + Text(model.reciprocityExtrapolated ? " \u{00B7} beyond datasheet" : "")
-                        .foregroundStyle(FieldFramesTheme.paperDim))
-                    .ffLabel(size: 9, color: FieldFramesTheme.paperMid)
-                    .lineLimit(2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, FieldFramesTheme.cells(2))
-                    .accessibilityLabel(readout + (model.reciprocityExtrapolated ? ", beyond datasheet" : ""))
-            }
-            if model.offersToning {
-                ChipRow(label: "TONING") {
-                    ForEach(Toning.allCases, id: \.self) { toning in
-                        OptionChip(title: toning.displayName, selected: model.recipe.toning == toning) {
-                            model.recipe.toning = toning
-                        }
-                    }
-                }
-                if model.recipe.toning != .none {
-                    FFSlider("TONING", value: model.bind(\.toningStrength), in: 0...1, default: 0.5)
-                        .frame(minHeight: 44)
-                        .padding(.horizontal, FieldFramesTheme.cells(2))
-                }
-            }
-        }
-    }
-}
-
-/// A mono label followed by a horizontally scrolling row of chips.
-private struct ChipRow<Content: View>: View {
-    let label: String
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        HStack(spacing: FieldFramesTheme.cells(2)) {
-            Text(label).ffLabel(size: 9, color: FieldFramesTheme.paperDim)
-                .frame(width: 56, alignment: .leading)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: FieldFramesTheme.cells(2)) { content }
-            }
-        }
-        .padding(.horizontal, FieldFramesTheme.cells(2))
-        .frame(height: 36)
-    }
-}
-
-/// A tab-bar-style choice: mono label, paper with a lichen underline when selected.
-private struct OptionChip: View {
-    let title: String
-    let selected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .ffLabel(size: 10, color: selected ? FieldFramesTheme.paper : FieldFramesTheme.paperDim,
-                         weight: selected ? .medium : .regular)
-                .lineLimit(1)
-                .frame(minWidth: 28, minHeight: 36)
-                .overlay(alignment: .bottom) {
-                    Rectangle().fill(selected ? FieldFramesTheme.lichen : .clear).frame(height: 1).padding(.bottom, 6)
-                }
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 

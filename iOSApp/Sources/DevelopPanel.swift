@@ -50,28 +50,48 @@ private struct Adjustment: Identifiable {
 /// Photomator-style develop chrome: one adjustment in focus, picked from a chip strip.
 struct DevelopPanel: View {
     @Bindable var model: EditorViewModel
-    @State private var focus = "exposure"
+    @State private var focus: String
     @State private var showHistogram = false
-    @State private var showingTool = false
+    @Environment(\.panelMaxHeight) private var panelCap
+
+    init(model: EditorViewModel, focus: String = "exposure") {
+        self.model = model
+        _focus = State(initialValue: focus)
+    }
+
+    /// Chip strip height; the rest of the panel cap is the controls'.
+    private static let stripHeight: CGFloat = 48
 
     private var items: [Adjustment] { Adjustment.all }
     private var current: Adjustment { items.first { $0.id == focus } ?? items[0] }
 
     var body: some View {
         VStack(spacing: 0) {
-            if showHistogram {
-                HistogramView(data: model.histogram, height: T.rows(2.5))
-                    .padding(.horizontal, T.cells(2))
-                    .padding(.top, T.rows(0.5))
-            }
-            focusArea
-                .padding(.horizontal, T.cells(2))
-                .padding(.top, T.rows(0.25))
+            controls
             FFHairline()
             chipStrip
         }
-        .ffPanel()
-        .sheet(isPresented: $showingTool) { toolSheet }
+    }
+
+    /// Curves draw straight into the panel (a scroll view would steal the point drags), sized to the
+    /// room the cap leaves; everything else scrolls only when it must.
+    @ViewBuilder private var controls: some View {
+        if case .curves = current.kind {
+            CurvesEditor(model: model, plotHeight: max(120, panelCap - Self.stripHeight - 32 - 56))
+                .padding(.horizontal, T.cells(2))
+        } else {
+            CappedScroll(reserve: Self.stripHeight + 1 + 32) {
+                VStack(spacing: 0) {
+                    if showHistogram {
+                        HistogramView(data: model.histogram, height: T.rows(2.5))
+                            .padding(.top, T.rows(0.5))
+                    }
+                    focusArea
+                        .padding(.top, T.rows(0.25))
+                }
+                .padding(.horizontal, T.cells(2))
+            }
+        }
     }
 
     // MARK: Focused control
@@ -82,12 +102,10 @@ struct DevelopPanel: View {
                 switch current.kind {
                 case let .scalar(kp, range, def):
                     FocusedSlider(label: current.title, value: model.bind(kp), range: range, def: def)
-                case .curves, .mixer:
-                    Button { showingTool = true } label: {
-                        Text("OPEN \(current.title.uppercased())").ffLabel(color: T.lichen)
-                            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
-                    }
-                    .buttonStyle(.plain)
+                case .curves:
+                    EmptyView()
+                case .mixer:
+                    ColorMixerEditor(model: model)
                 case .border:
                     VStack(spacing: 0) {
                         FFToggle("Border", isOn: model.bind(\.borderEnabled))
@@ -99,7 +117,9 @@ struct DevelopPanel: View {
                     }
                 }
             }
-            toolButton(showHistogram ? "HIST \u{2212}" : "HIST +", enabled: true) { showHistogram.toggle() }
+            if case .mixer = current.kind {} else {
+                toolButton(showHistogram ? "HIST \u{2212}" : "HIST +", enabled: true) { showHistogram.toggle() }
+            }
         }
     }
 
@@ -135,15 +155,13 @@ struct DevelopPanel: View {
             toolButton("RESET ALL", enabled: model.canResetDevelop) { model.resetDevelop() }
                 .frame(minWidth: 64)
         }
-        .frame(height: 48)
+        .frame(height: Self.stripHeight)
     }
 
     private func chip(_ item: Adjustment) -> some View {
         let selected = item.id == focus
         return Button {
             focus = item.id
-            if case .curves = item.kind { showingTool = true }
-            if case .mixer = item.kind { showingTool = true }
         } label: {
             Text(item.title.uppercased())
                 .ffLabel(size: 10, color: selected ? T.paper : T.paperMid)
@@ -173,23 +191,6 @@ struct DevelopPanel: View {
         case .mixer: return model.recipe.colorMixer != base.colorMixer
         case .border: return model.recipe.borderEnabled != base.borderEnabled
         }
-    }
-
-    // MARK: Curves / mixer sheet (photo stays live and interactive above it)
-
-    private var toolSheet: some View {
-        ScrollView {
-            Group {
-                if case .mixer = current.kind { ColorMixerEditor(model: model) }
-                else { CurvesEditor(model: model) }
-            }
-            .padding(T.cells(2))
-        }
-        .background(T.ink.ignoresSafeArea())
-        .foregroundStyle(T.paper)
-        .presentationDetents([.height(380), .large])
-        .presentationBackgroundInteraction(.enabled(upThrough: .height(380)))
-        .presentationDragIndicator(.visible)
     }
 }
 
