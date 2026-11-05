@@ -260,8 +260,8 @@ struct FilmsPanel: View {
                                  isSelected: model.filmID == nil) { model.select(nil) }
                             .task(id: model.thumbEpoch) { await model.requestThumbnail(nil) }
                         ForEach(model.visibleStocks) { film in
-                            FilmCard(title: film.displayName, caption: "\(film.brand.uppercased()) · ISO \(film.iso)",
-                                     image: model.thumbnails[film.id], isSelected: model.selectedStockID == film.id) {
+                            FilmCard(title: film.stockName ?? film.displayName, caption: film.brand.uppercased(),
+                                     image: model.thumbnails[film.id], isSelected: model.selectedStockID == film.stockID) {
                                 model.select(film.id)
                             }
                             .task(id: model.thumbEpoch) { await model.requestThumbnail(film.id) }
@@ -271,7 +271,7 @@ struct FilmsPanel: View {
                 .padding(.horizontal, FieldFramesTheme.cells(2))
                 .padding(.vertical, FieldFramesTheme.rows(0.5))
             }
-            variantRow
+            stockChips
             HStack(spacing: FieldFramesTheme.cells(1)) {
                 Button { withAnimation(.snappy(duration: 0.2)) { optionsOpen.toggle() } } label: {
                     Text(optionsOpen ? "OPTIONS \u{2212}" : "OPTIONS +").padding(.vertical, 4)
@@ -298,13 +298,21 @@ struct FilmsPanel: View {
         .padding(.bottom, FieldFramesTheme.rows(0.5))
     }
 
-    /// Base, -1, +1, Cold +1 ... for the applied film's stock; absent when the stock has no variants.
-    @ViewBuilder private var variantRow: some View {
-        let choices = model.variantChoices
-        if !choices.isEmpty {
-            ChipRow(label: "VARIANT") {
-                ForEach(choices) { choice in
-                    OptionChip(title: choice.label, selected: choice.id == model.filmID) { model.select(choice.id) }
+    /// ISO and VARIATIONS for the applied film's stock; each row is absent when there is only one choice.
+    @ViewBuilder private var stockChips: some View {
+        let isos = model.isoChoices
+        if !isos.isEmpty {
+            ChipRow(label: "ISO") {
+                ForEach(isos) { choice in
+                    OptionChip(title: choice.label, selected: choice.iso == model.selectedFilm?.iso) { model.selectISO(choice.iso) }
+                }
+            }
+        }
+        let variations = model.variationChoices
+        if !variations.isEmpty {
+            ChipRow(label: "VARIATIONS") {
+                ForEach(variations) { choice in
+                    OptionChip(title: choice.label, selected: choice.filmID == model.filmID) { model.select(choice.filmID) }
                 }
             }
         }

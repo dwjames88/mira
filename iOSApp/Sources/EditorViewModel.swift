@@ -100,18 +100,38 @@ final class EditorViewModel {
 
     var availableFamilies: [FilmFamily] { PhotoEngine.library.map(FilmBrowsing.families(in:)) ?? [] }
 
-    /// Stock cards for the current tab (variants are chosen in the Variant row, not as cards).
+    /// One card per stock for the current tab, shown as its base film (ISOs and variations are chip rows).
     var visibleStocks: [Film] {
         PhotoEngine.library.map { FilmBrowsing.stocks(in: $0, family: familyFilter) } ?? []
     }
 
     var selectedFilm: Film? { recipe.filmID.flatMap { PhotoEngine.library?.film(id: $0) } }
 
-    /// The stock card that is applied: the film itself, or the parent when a variant is applied.
-    var selectedStockID: String? { selectedFilm?.stockID ?? recipe.filmID }
+    /// The stock of the applied film (any concrete film id resolves to it); nil for Original.
+    var selectedStock: FilmStock? { recipe.filmID.flatMap { PhotoEngine.library?.stock(for: $0) } }
 
-    var variantChoices: [FilmVariantChoice] {
-        PhotoEngine.library.map { FilmVariantChoice.choices(for: recipe.filmID, in: $0) } ?? []
+    var selectedStockID: String? { selectedStock?.id }
+
+    /// ISO chips of the applied film's stock; empty when the stock has a single ISO.
+    var isoChoices: [FilmISOChoice] {
+        guard let stock = selectedStock, let lib = PhotoEngine.library else { return [] }
+        let choices = lib.isoChoices(stockID: stock.id)
+        return choices.count > 1 ? choices : []
+    }
+
+    /// Variations chips at the applied film's ISO; empty when there is only one.
+    var variationChoices: [FilmVariationChoice] {
+        guard let stock = selectedStock, let film = selectedFilm, let lib = PhotoEngine.library else { return [] }
+        let choices = lib.variationChoices(stockID: stock.id, iso: film.iso)
+        return choices.count > 1 ? choices : []
+    }
+
+    /// Applies an ISO chip: that ISO with the current variation where it exists, else Standard.
+    func selectISO(_ iso: Int) {
+        guard let stock = selectedStock,
+              let film = PhotoEngine.library?.film(stockID: stock.id, iso: iso, variation: selectedFilm?.variationLabel)
+        else { return }
+        select(film.id)
     }
 
     var offersToning: Bool { FilmBrowsing.offersToning(selectedFilm) }
