@@ -215,6 +215,22 @@ targets:
         IPHONEOS_DEPLOYMENT_TARGET: "18.0"
         SWIFT_VERSION: "6.0"
         GENERATE_INFOPLIST_FILE: NO
+  # UI tests drive the iOS app inside the simulator only (never the host pointer or keyboard).
+  # Grant Photos first: xcrun simctl privacy <udid> grant photos com.fieldframes.mira.ios
+  MiraiOSUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: iOSApp/UITests
+    dependencies:
+      - target: MiraiOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(MIRA_BUNDLE_PREFIX).mira.ios.uitests
+        TEST_TARGET_NAME: MiraiOS
+        IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+        SWIFT_VERSION: "6.0"
+        GENERATE_INFOPLIST_FILE: YES
 schemes:
   Mira:
     build:
@@ -229,3 +245,6 @@ schemes:
         MiraiOS: all
     run:
       config: Debug
+    test:
+      targets:
+        - MiraiOSUITests

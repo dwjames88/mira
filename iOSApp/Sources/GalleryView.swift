@@ -55,7 +55,7 @@ struct GalleryView: View {
     private var header: some View {
         HStack(spacing: FieldFramesTheme.cells(1)) {
             Text("Mira").font(FieldFramesTheme.display(22, weight: .regular))
-            Text(gallery.hasAccess ? (gallery.libraryCount.map { "\($0) PHOTOS" } ?? "") : editor.status)
+            Text(gallery.hasAccess ? (gallery.libraryCount.map { "\($0) \($0 == 1 ? "PHOTO" : "PHOTOS")" } ?? "") : editor.status)
                 .ffLabel(size: 9, color: FieldFramesTheme.paperDim).lineLimit(1)
             Spacer(minLength: 0)
             if gallery.status == .limited {
@@ -361,7 +361,7 @@ struct AlbumGridView: View {
             FFGroundBackground(grain: 0.07).ignoresSafeArea()
             VStack(spacing: 0) {
                 HStack {
-                    Text("\(album.count) \(rawOnly ? "RAW" : "PHOTOS")").ffLabel(size: 9, color: FieldFramesTheme.paperDim)
+                    Text("\(album.count) \(rawOnly ? "RAW" : (album.count == 1 ? "PHOTO" : "PHOTOS"))").ffLabel(size: 9, color: FieldFramesTheme.paperDim)
                     if let progress = album.scanProgress {
                         Text("SCANNING \(progress.done.formatted()) / \(progress.total.formatted())")
                             .ffLabel(size: 9, color: FieldFramesTheme.lichen).lineLimit(1)
