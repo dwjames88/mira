@@ -43,6 +43,8 @@ public enum RendererError: Error, CustomStringConvertible {
 /// Pipeline 2 (film science, see `FilmCharacter` for the physics): the order follows the light.
 ///  1. Exposure with latitude (`miraFilmExposure`): a gain in linear light whose highlights roll off
 ///     like a negative's shoulder, by the film's latitude, instead of clipping.
+///     A scene-referred source (RAW with extended range) carries a headroom H > 1: the white point
+///     gain x H then maps to 1 through a shoulder with a knee at 0.6, instead of clipping at the LUT.
 ///  2. White balance (warmth / tint): the light the film is exposed to, so before the film.
 ///  3. Dodge and burn, colour mixer, curves (unchanged).
 ///  4. Halation, in the exposure and in linear light: the highlights (`miraHighlights`) are blurred

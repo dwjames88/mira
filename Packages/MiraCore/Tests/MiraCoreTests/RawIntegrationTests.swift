@@ -27,6 +27,10 @@ enum RawSamples {
     static let iphoneXS = url("iphone-xs.dng")
     static let iphone12Pro = url("iphone-12-pro.dng")
 
+    /// RAW tests render on their own context: a RawCamera decode holding the shared context's lock
+    /// while other suites render in parallel is what stalled the full run.
+    static let context = Renderer.makeContext()
+
     static func library() throws -> FilmLibrary {
         try SyntheticFilms.library([.init(id: "neg", family: .colorNegative)])
     }
@@ -41,6 +45,8 @@ enum RawSamples {
     static func srgb(_ v: Double) -> Double { v <= 0.0031308 ? 12.92 * v : 1.055 * pow(v, 1 / 2.4) - 0.055 }
 }
 
+private func rawPixels(_ image: CIImage) -> LinearPixels { LinearPixels(image, context: RawSamples.context) }
+
 private func openDevelop(_ url: URL?) throws -> RawDevelop {
     let url = try #require(url)
     return try #require(RawDevelop(url: url))
@@ -48,7 +54,7 @@ private func openDevelop(_ url: URL?) throws -> RawDevelop {
 
 private func linearSmall(_ develop: RawDevelop, _ settings: RawSettings, film: Bool) throws -> LinearPixels {
     let img = try #require(develop.apply(settings, filmApplied: film, draft: true, scale: 0.1))
-    return LinearPixels(img)
+    return rawPixels(img)
 }
 
 private func channelMeans(_ p: LinearPixels) -> (r: Double, g: Double, b: Double) {
@@ -64,7 +70,7 @@ private func lumas(_ p: LinearPixels) -> [Double] {
     }
 }
 
-@Suite struct RawIntegrationTests {
+@Suite(.serialized) struct RawIntegrationTests {
     // MARK: Decode
 
     @Test(arguments: [RawSamples.sony, RawSamples.iphoneXS, RawSamples.iphone12Pro].compactMap { $0 })
@@ -138,7 +144,7 @@ private func lumas(_ p: LinearPixels) -> [Double] {
     func extendedRangeReportsHeadroomAndKeepsHighlights(url: URL) throws {
         let develop = try openDevelop(url)
         let source = try #require(develop.develop(.identity, filmApplied: true, draft: true, scale: 0.15))
-        let linear = LinearPixels(source.image)
+        let linear = rawPixels(source.image)
         let peak = Double(stride(from: 0, to: linear.rgba.count, by: 4).map { max(linear.rgba[$0], linear.rgba[$0 + 1], linear.rgba[$0 + 2]) }.max() ?? 0)
         print("HEADROOM \(url.lastPathComponent): reported \(source.headroom), peak at probe scale \(peak)")
         #expect(peak > 1, "film + EDR decodes values above 1.0")
@@ -157,7 +163,7 @@ private func lumas(_ p: LinearPixels) -> [Double] {
         let above = over.count
         // Before the film, on the pixels brighter than white: the shoulder keeps their distinct values
         // (16-bit), a clip at white collapses them all.
-        let shoulder = LinearPixels(GradeKernels.applyFilmExposure(gain: 1, latitude: 1, headroom: Double(source.headroom), to: source.image))
+        let shoulder = rawPixels(GradeKernels.applyFilmExposure(gain: 1, latitude: 1, headroom: Double(source.headroom), to: source.image))
         func distinct16(_ p: LinearPixels, clip: Bool) -> Int {
             Set(over.map { Int((Double(clip ? min(maxChannel(p, $0), 1) : maxChannel(p, $0)) * 65535).rounded()) }).count
         }
@@ -167,8 +173,8 @@ private func lumas(_ p: LinearPixels) -> [Double] {
         // Through the film: fewer pixels end up at pure white than when the source is clipped.
         let r = Renderer(library: try RawSamples.library())
         let recipe = Recipe(filmID: "neg")
-        let withHeadroom = LinearPixels(r.apply(recipe, to: source.image))
-        let clipped = LinearPixels(r.apply(recipe, to: source.image, sourceHeadroom: 1))
+        let withHeadroom = rawPixels(r.apply(recipe, to: source.image))
+        let clipped = rawPixels(r.apply(recipe, to: source.image, sourceHeadroom: 1))
         func atWhite(_ p: LinearPixels) -> Int { top.filter { p.rgba[$0 * 4 + 1] >= 0.9995 }.count }
         print("HIGHLIGHTS \(url.lastPathComponent): top 5% = \(top.count) px (threshold \(threshold), \(above) above 1.0); distinct 16-bit values among those before the film: \(a) shoulder vs \(b) clipped; \(beyondWhite) px still above 1 after the shoulder; pixels at white after the film: \(atWhite(withHeadroom)) with headroom vs \(atWhite(clipped)) clipped")
         #expect(atWhite(withHeadroom) <= atWhite(clipped))
@@ -228,15 +234,15 @@ private func lumas(_ p: LinearPixels) -> [Double] {
         let opts: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageIfAbsent: true, kCGImageSourceThumbnailMaxPixelSize: 400,
                                      kCGImageSourceCreateThumbnailWithTransform: true]
         let thumb = try #require(CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary))
-        let previewMean = mean(Pixels(CIImage(cgImage: thumb), context: Renderer.sharedContext).luma)
+        let previewMean = mean(Pixels(CIImage(cgImage: thumb), context: RawSamples.context).luma)
         print("BASELINE mean display luma: Mira \(myMean) vs embedded preview \(previewMean)")
         #expect(abs(myMean - previewMean) < 0.12)
         // And the decoder's own baseline offset is left alone: forcing it to zero changes brightness.
         let flat = try #require(CIRAWFilter(imageURL: url))
         flat.scaleFactor = 0.1
-        let before = flat.outputImage.map { mean(lumas(LinearPixels($0))) } ?? 0
+        let before = flat.outputImage.map { mean(lumas(rawPixels($0))) } ?? 0
         flat.baselineExposure = 0
-        let after = flat.outputImage.map { mean(lumas(LinearPixels($0))) } ?? 0
+        let after = flat.outputImage.map { mean(lumas(rawPixels($0))) } ?? 0
         print("BASELINE linear mean with decoder baseline \(before), forced to 0 \(after)")
         if filter.baselineExposure != 0 { #expect(abs(before - after) > 1e-4) }
     }

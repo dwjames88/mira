@@ -275,6 +275,9 @@ public final class RawDevelop: @unchecked Sendable {
         return min(max(peak, 1), Self.maxHeadroom)
     }
 
+    private static let probeLock = NSLock()
+    private static let probeContext = Renderer.makeContext()
+
     /// Maximum of R, G and B over `image`, in extended linear sRGB.
     static func peak(of image: CIImage) -> CGFloat {
         let f = CIFilter.areaMaximum()
@@ -283,7 +286,10 @@ public final class RawDevelop: @unchecked Sendable {
         guard let out = f.outputImage else { return 1 }
         var px = [Float](repeating: 0, count: 4)
         let space = CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!
-        Renderer.sharedContext.render(out, toBitmap: &px, rowBytes: 16,
+        // A private context, one probe at a time: the probe never queues behind (or holds up) the
+        // shared context's preview renders while RawCamera decodes.
+        probeLock.lock(); defer { probeLock.unlock() }
+        probeContext.render(out, toBitmap: &px, rowBytes: 16,
                                       bounds: CGRect(x: 0, y: 0, width: 1, height: 1), format: .RGBAf, colorSpace: space)
         let m = max(px[0], px[1], px[2])
         return m.isFinite ? CGFloat(m) : 1
