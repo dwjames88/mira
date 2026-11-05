@@ -9,7 +9,7 @@ The first release with the film-science pipeline, on the Mac, in the Photos exte
 ### Highlights
 - Editor steps reordered: Crop, Films, Develop, Dodge & Burn (keys 1–4).
 - **Film science.** A pipeline built in the order of the light: exposure with film latitude, white balance, halation, per-film grain, the film's colour, then the print.
-- **264 looks.** The 260 films of the RawTherapee Film Simulation Collection (Pat David et al., CC BY-SA 4.0) plus 4 Mira originals (500T Tungsten, 250D Daylight, Cinema Print, Color Paper), grouped into 7 families (Color Negative, Slide, Kodachrome, Black and White, Motion Picture, Instant, Print) as stock cards with variants.
+- **264 looks.** The 260 films of the RawTherapee Film Simulation Collection (Pat David et al., CC BY-SA 4.0) plus 4 Mira originals (500T Tungsten, 250D Daylight, Cinema Print, Color Paper), grouped into 7 families (Color Negative, Slide, Kodachrome, Black and White, Motion Picture, Instant, Print) as one card per stock, with ISO and Variations chips in the FILMS panel (51 stocks).
 - **RAW development and headroom.** A RAW group in DEVELOP (white balance, boost, highlight recovery, local tone map, noise reduction, sharpness, lens correction), and scene-referred headroom so RAW and HDR highlights roll off through the film's shoulder instead of clipping.
 - **Reciprocity and exposure time.** An exposure time slider (EXIF time by default) and a Reciprocity mode (Off, Compensated, Uncompensated).
 - **Push and pull** from -2 to +2 stops in thirds, with a **Latitude** readout under the histogram.
