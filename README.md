@@ -215,7 +215,7 @@ scripts/pack-films.sh           # swift run mira-sheet --pack-films FilmSources 
 ```sh
 swift test --package-path Packages/MiraCore   # 398 tests (MiraCore 358 + MiraUpdates 40); 3 skip without FilmSources/ (see below)
 swift test --package-path Packages/MiraUI     # 153 tests (opt-in perf tests skip without MIRA_PERF=1)
-swift test --package-path Packages/MiraCamera # 65 tests (camera pure layer, simulator-free)
+swift test --package-path Packages/MiraCamera # 75 tests (camera pure layer, simulator-free)
 ```
 
 MiraUI also writes headless snapshots to `build/snapshots`. The test list is in [TESTING.md](TESTING.md).

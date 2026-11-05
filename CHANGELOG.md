@@ -26,7 +26,7 @@ Roll 1: a camera for iPhone. Not yet verified on an iPhone (see Notes).
 - MiraCore `Renderer` gains `withGrainSeed` and `withTextureScale` for the finder. Capture and export use the defaults and render as before.
 
 ### Tests
-- New `MiraCamera` package. `swift test --package-path Packages/MiraCamera` runs 65 tests: camera state, capture support, exposure, lens formatting, save and retry, finder quality ladder, pending prints.
+- New `MiraCamera` package: `swift test --package-path Packages/MiraCamera` runs 75 tests (camera state, exposure and readouts, lenses, capture format, white balance, finder quality ladder, finder touch, pending prints, two-step save with fakes). MiraCore adds finder tests (seed override, texture scale parity, finder vs capture parity) and an opt-in finder budget benchmark. iOS: camera layout snapshots (16 Pro, SE, landscape), camera door snapshots, camera model tests with the fake backend, a RAW+HEIC save round trip against the simulator's Photos library, and an opt-in simulator finder benchmark (MiraiOSTests 37).
 
 ### Notes
 - Not yet verified on an iPhone. The first device check is the 30 fps finder gate on an iPhone 16 Pro; see [TESTING.md](TESTING.md).

@@ -98,36 +98,36 @@ What was added to `Renderer` for the live finder (capture and export always use 
 
 Measured with the opt-in `FinderBudgetBenchmark` (`MIRA_PERF=1`): Kodak Portra 400 at native grain, halation and bloom (50 %), `Fixtures/sample.jpg` cover-fitted into an IOSurface BGRA buffer, a Metal-queue `CIContext` with the shared working space (extended linear sRGB, RGBAh, `cacheIntermediates` off), `startTask(toRender:to: CIRenderDestination(mtlTexture:commandBuffer:))` into a bgra8 texture, waited on; a new `CIImage` and grain seed every frame, 90 frames after 20 warm-up; ms per frame, CPU start to GPU complete.
 
-Machine: Apple M1 Pro, macOS (Darwin 27.0.0), release build (`swift test -c release`). **The Mac was swamped by other builds: load average 470 at the first run and 340 at the second**, so the absolute numbers and especially the p95 are inflated and noisy. Two runs are shown; read the ratios between rows, not the milliseconds.
+Machine: Apple M1 Pro, macOS (Darwin 27.0.0), release build (`swift test -c release`), load average about 9 (2026-11-05, a quiet run; two earlier runs at load 340 to 470 were discarded as noise).
 
-Run 1 (ms, median / p95):
+| Case (ms) | 1920x1440 median | p95 | 1206x1809 median | p95 |
+|---|---|---|---|---|
+| full | 9.1 | 10.4 | 9.4 | 10.2 |
+| grain off | 6.9 | 8.9 | 5.9 | 7.4 |
+| textureScale 0.5 | 11.4 | 12.8 | 9.2 | 9.8 |
+| textureScale 0.5 + grain off | 5.6 | 8.4 | 4.0 | 6.8 |
+| renderScale 0.75 | 7.6 | 9.1 | 7.0 | 9.2 |
 
-| Case | 1920x1440 | 1206x1809 |
+Other costs, same run: `latitudeReading` on a 1920x1440 frame 6.2 ms median (6.5 p95), run on a utility queue every 15th frame (2 Hz at 30 fps), so off the frame path but above the plan's 3 ms target; 8 film-door card thumbnails at 220 px 22 ms median (33 p95) per batch, above the plan's 10 ms target, run at most at 2 Hz on a utility queue while the door is open.
+
+iOS simulator (iOS 27.2 "iPhone Duo" type on the same Mac, so the Mac GPU through the simulator's Metal), through the camera's own `FinderRenderer.consume` path (`FinderBudgetSimTests`, `TEST_RUNNER_MIRA_PERF=1`), 1920x1440:
+
+| Case (ms) | median | p95 |
 |---|---|---|
-| full | 67.7 / 914.4 | 33.2 / 117.8 |
-| grain off | 28.4 / 201.8 | 22.7 / 91.9 |
-| textureScale 0.5 | 38.4 / 184.1 | 40.9 / 167.9 |
-| textureScale 0.5 + grain off | 12.7 / 115.5 | 17.3 / 84.4 |
-| renderScale 0.75 | 16.0 / 35.7 | 12.3 / 22.9 |
+| full | 17.5 | 22.3 |
+| half texture (textureScale 0.5) | 19.3 | 23.7 |
+| grain off | 11.8 | 15.2 |
+| reduced (0.75 render scale, half texture, grain off) | 10.1 | 12.9 |
 
-Run 2 (ms, median / p95):
+| Platform | Result |
+|---|---|
+| iPhone 16 Pro (device) | outstanding: the go/no-go (TESTING.md, camera checklist item 1) |
 
-| Case | 1920x1440 | 1206x1809 |
-|---|---|---|
-| full | 80.3 / 497.9 | 107.5 / 364.6 |
-| grain off | 50.5 / 215.4 | 13.2 / 46.9 |
-| textureScale 0.5 | 20.5 / 42.1 | 13.6 / 23.9 |
-| textureScale 0.5 + grain off | 10.4 / 17.3 | 8.8 / 19.3 |
-| renderScale 0.75 | 14.9 / 26.8 | 34.3 / 167.2 |
-
-Other costs on the same runs: `latitudeReading` on a 1920x1440 frame 16.6 ms (run 1) and 12.4 ms (run 2) median; 8 film-strip thumbnails at 220 px 59 ms (run 1) and 426 ms (run 2) median for the batch of 8.
-
-| Platform | Case | Median / p95 |
-|---|---|---|
-| iOS simulator | full / grain off / textureScale 0.5 / textureScale 0.5 + grain off / renderScale 0.75 | to be filled in |
-| iPhone 16 Pro (device) | the same cases | outstanding (the go/no-go) |
-
-Reading: grain is the biggest single stage, and texture scale 0.5 cuts the textured frame by roughly half or more in both runs; if the device cannot hold 30 fps, Roll 1 ships the finder with halation, bloom and grain at half resolution and the capture stays full quality.
+Reading:
+- The full finder grade with native grain, halation and bloom fits a 33 ms (30 fps) frame with room on the Mac (9 ms) and in the simulator (18 ms). The plan's guess for an A18 Pro is 2 to 3x the Mac, about 20 to 30 ms: tight but inside the budget. Only the device can say.
+- Grain is the stage that matters: grain off saves 25 to 35 %.
+- **Half-resolution texture does not save time at finder sizes on these GPUs** (slightly slower: the reduce/enlarge passes cost about what the smaller blurs and grain save, because `softBlur` already downsamples wide blurs). It only pays together with grain off. It is built and switchable at runtime (camera settings, ADVANCED, FINDER QUALITY), and the AUTO ladder steps through it, but if the device shows the same, the ladder should go straight to grain off. Decide on the device.
+- 0.75 render scale is the strongest single step in the simulator.
 
 Reproduce:
 
