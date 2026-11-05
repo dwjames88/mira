@@ -321,12 +321,17 @@ public struct Renderer: Sendable {
                              radius: clamp(recipe.halationRadius, 0, 1), scale: scale)
         }
 
-        // 6. Bloom
+        // 6. Bloom (see `bloomScale`)
         if recipe.bloomAmount > eps {
             let f = CIFilter.bloom()
             f.inputImage = image
             f.radius = Float(min(100, 25 * scale))
-            f.intensity = Float(clamp(recipe.bloomAmount, 0, 1))
+            // Pipeline 1 uses the slider directly. Pipeline 2 scales it by the film's bloom character:
+            // intensity = slider * 2 * character.bloom * 0.25, so the native slider position (0.5) on an
+            // ISO 400 colour negative gives a subtle 0.25 and a slide film (1.4) glows more than B&W (0.4).
+            f.intensity = filmScience
+                ? Float(clamp(recipe.bloomAmount * 2 * character.bloom * Self.bloomScale, 0, 1))
+                : Float(clamp(recipe.bloomAmount, 0, 1))
             image = (f.outputImage ?? image).cropped(to: extent)
         }
 
@@ -492,6 +497,9 @@ public struct Renderer: Sendable {
 
     /// Blurs with at least this sigma (pixels) run at reduced size.
     static let blurReductionThreshold: CGFloat = 8
+    /// Pipeline 2 bloom: intensity = slider * 2 * `FilmCharacter.bloom` * this. Chosen so an ISO 400 colour
+    /// negative at the native slider (0.5) matches the old pipeline-2 bloom at 0.25 (subtle).
+    static let bloomScale = 0.25
 
     private func grain(_ image: CIImage, extent: CGRect, amount: Double, size: Double, scale: CGFloat) -> CIImage {
         // Noise lives on a virtual grid whose cell is `scale * (1 + 2 * size)` image pixels,

@@ -266,3 +266,20 @@ public struct Recipe: Codable, Hashable, Sendable {
         try JSONDecoder().decode(Recipe.self, from: data)
     }
 }
+
+extension Recipe {
+    /// Sets grain, halation and bloom to the film's own level (`FilmCharacter.nativeSlider`), with the
+    /// grain size and halation radius at their defaults (also the native position). With no film
+    /// (Original) there is no film texture, so all three go to 0. Call it only when the user chooses a
+    /// film (or previews one): presets and reopened edits keep their stored values.
+    public func applyingNativeTexture(filmID: String?) -> Recipe {
+        var r = self
+        let level = filmID == nil ? 0 : FilmCharacter.nativeSlider
+        r.grainAmount = level
+        r.halationAmount = level
+        r.bloomAmount = level
+        r.grainSize = FilmCharacter.nativeSlider
+        r.halationRadius = FilmCharacter.nativeSlider
+        return r
+    }
+}

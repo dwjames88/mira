@@ -62,7 +62,8 @@ struct FilmsPanel: View {
             FFHairline()
             FFScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    SpecSliders(model: model, specs: [SliderSpec("strength", "Strength", \.strength, 0...1, default: 1)])
+                    SpecSliders(model: model, specs: [SliderSpec("strength", "Strength", \.strength, 0...1, default: 1,
+                                                                      help: "Choosing a film sets grain, halation and bloom to its own level")])
                         .padding(.top, T.rows(1))
                     variantSection
                     filmControls
@@ -370,7 +371,8 @@ struct DevelopPanel: View {
                    help: "50% is the film's own halation"),
         SliderSpec("halationRadius", "Halation radius", \.halationRadius, 0...1, default: 0.5,
                    help: "50% is the film's own spread"),
-        SliderSpec("bloom", "Bloom", \.bloomAmount, 0...1, default: 0),
+        SliderSpec("bloom", "Bloom", \.bloomAmount, 0...1, default: 0,
+                   help: "50% is the film's own bloom"),
     ]
 
     var body: some View {
