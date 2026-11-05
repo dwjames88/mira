@@ -182,8 +182,7 @@ struct FilmsPanel: View {
                 .help("How strongly the colour cast, contrast and shadow grain of reciprocity failure show; 100 % is the datasheet model")
         }
         if let readout = model.reciprocityReadout {
-            (Text(readout).foregroundStyle(T.paperMid)
-                + Text(model.reciprocityExtrapolated ? " \u{00B7} beyond datasheet" : "").foregroundStyle(T.paperDim))
+            (Text("\(Text(readout).foregroundStyle(T.paperMid))\(Text(model.reciprocityExtrapolated ? " \u{00B7} beyond datasheet" : "").foregroundStyle(T.paperDim))"))
                 .ffLabel(color: T.paperMid)
                 .lineLimit(2)
                 .padding(.top, T.rows(0.5))

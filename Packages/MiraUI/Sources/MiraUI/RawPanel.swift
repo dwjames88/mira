@@ -9,8 +9,12 @@ private typealias T = FieldFramesTheme
 enum OptionalValue {
     static func binding(get: @escaping () -> Double?, set: @escaping (Double?) -> Void,
                         fallback: Double, tolerance: Double = 0.005) -> Binding<Double> {
-        Binding(get: { get() ?? fallback },
-                set: { new in set(abs(new - fallback) <= tolerance ? nil : new) })
+        // Binding's closures are @Sendable in the macOS 26 SDK, but SwiftUI only calls them on the main
+        // actor, which is where the caller's closures (which touch the editor model) live.
+        nonisolated(unsafe) let get = get
+        nonisolated(unsafe) let set = set
+        return Binding(get: { get() ?? fallback },
+                       set: { new in set(abs(new - fallback) <= tolerance ? nil : new) })
     }
 }
 
