@@ -73,8 +73,12 @@ final class PhotoEditingViewController: NSViewController, PHContentEditingContro
 
     // MARK: PHContentEditingController
 
+    /// An extension is only given `fullSizeImageURL` (no PHAsset, so no way to fetch a RAW resource). For a
+    /// RAW+JPEG pair that is the rendered JPEG; for a RAW-only asset it is the RAW itself, and `loadSource`
+    /// then opens it in stages (embedded preview, draft frame, full quality). Edits the app made on the
+    /// RAW of a pair are declined here: continuing them on the JPEG would change their look.
     func canHandle(_ adjustmentData: PHAdjustmentData) -> Bool {
-        MiraAdjustment.canHandle(adjustmentData)
+        MiraAdjustment.canHandleInExtension(adjustmentData)
     }
 
     func startContentEditing(with contentEditingInput: PHContentEditingInput, placeholderImage: NSImage) {

@@ -13,12 +13,14 @@ struct Unchecked<Value>: @unchecked Sendable {
 enum AssetEditError: Error, CustomStringConvertible {
     case inputUnavailable
     case noFullSizeImage
+    case rawOriginalMissing
     case notSaved(String)
 
     var description: String {
         switch self {
         case .inputUnavailable: "Photos could not provide this picture for editing."
         case .noFullSizeImage: "The full-size picture is not available, so it cannot be saved."
+        case .rawOriginalMissing: "This edit was made on the RAW original, which Photos could not provide. Check the connection to iCloud and try again."
         case .notSaved(let why): why
         }
     }
@@ -42,11 +44,18 @@ final class AssetEditSession {
         /// the editor attaches it with `EditorModel.attachRawSource`.
         let rawURL: URL?
         let rawOrientation: CGImagePropertyOrientation?
+        /// The decoder opened for `rawURL` (cached for the session); hand it to `attachRawSource`.
+        let rawDevelop: RawDevelop?
+        /// Why the picture opened from the rendered file although the asset has a RAW; shown in the editor note.
+        let rawNote: String?
     }
 
     private(set) var asset: PHAsset
     private var input: PHContentEditingInput?
     private var isFullSize = false
+    /// The RAW original downloaded as a separate resource (RAW+JPEG pairs, or a RAW whose editing input is
+    /// the rendered file). The editing input stays the base of the saved output; this file is what is developed.
+    private var fetchedRawURL: URL?
 
     var localIdentifier: String { asset.localIdentifier }
     var fullSizeURL: URL? { input?.fullSizeImageURL }
@@ -82,18 +91,72 @@ final class AssetEditSession {
         var full = false
         var rawURL: URL?
         var rawOrientation: CGImagePropertyOrientation?
-        if let url = input.fullSizeImageURL {
-            let orientation = CGImagePropertyOrientation(rawValue: UInt32(input.fullSizeImageOrientation))
-            // RAW input is developed with the saved recipe's RAW settings (draft: this is the preview).
+        var rawDevelop: RawDevelop?
+        var rawNote: String?
+        fetchedRawURL = nil
+
+        let inputURL = input.fullSizeImageURL
+        let inputOrientation = CGImagePropertyOrientation(rawValue: UInt32(input.fullSizeImageOrientation))
+        let inputIsRAW = inputURL.map { ImageSource.isRAW(url: $0) } ?? false
+        let id = asset.localIdentifier
+        // Does the asset carry a RAW original? (A PhotoKit lookup, so off the main actor.)
+        let hasRawResource = inputIsRAW ? true : await Task.detached(priority: .userInitiated) {
+            RawResourceStore.rawResource(forAsset: id) != nil
+        }.value
+        let adjustments = MiraAdjustment.state(of: input.adjustmentData)
+        let plan = RawOpenPolicy.plan(inputIsRAW: inputIsRAW, adjustments: adjustments, hasRawResource: hasRawResource)
+
+        // Where the RAW comes from: the editing input itself, or the asset's RAW resource.
+        var rawSource: (url: URL, orientation: CGImagePropertyOrientation?)?
+        switch plan {
+        case .useInput:
+            if let inputURL { rawSource = (inputURL, inputOrientation) }
+        case .fetchResource:
+            let handler: (@Sendable (Double) -> Void)? = progress.map { progress in
+                { @Sendable value in Task { @MainActor in progress(value) } }
+            }
+            do {
+                // The RAW has its own orientation metadata; Photos' fullSizeImageOrientation describes the rendered file.
+                rawSource = (try await RawResourceStore.fetchRaw(forAsset: id, progress: handler), nil)
+                fetchedRawURL = rawSource?.url
+            } catch {
+                if case .mira(rawBase: true) = adjustments { throw AssetEditError.rawOriginalMissing }
+                rawNote = "The RAW original could not be downloaded, so the rendered picture was opened."
+            }
+        case .rawBaseMissing:
+            throw AssetEditError.rawOriginalMissing
+        case .keepRendered(let reason):
+            switch reason {
+            case .foreignAdjustments:
+                rawNote = "This picture was edited in another app; Photos provides the rendered result, not the RAW, so that is what opens."
+            case .earlierEditOnRenderedFile:
+                rawNote = "This edit was made on the rendered picture, so it keeps that base instead of the RAW."
+            case .noRaw: break
+            }
+        }
+
+        if let raw = rawSource {
+            // RAW: the draft develop at preview size is the first editable frame; the editor replaces it with the
+            // full-quality decode in the background. Cached per asset for the session.
+            let developRecipe = recipe
+            let frame = await Task.detached(priority: .userInitiated) {
+                RawOpener.openDraft(url: raw.url, orientation: raw.orientation, settings: developRecipe.raw,
+                                    filmApplied: developRecipe.filmID != nil, cacheKey: id)
+            }.value
+            if let frame {
+                image = frame.source.image
+                full = true
+                rawURL = raw.url; rawOrientation = raw.orientation; rawDevelop = frame.develop
+            }
+        } else if let url = inputURL {
             let developRecipe = recipe
             let loaded = await Task.detached(priority: .userInitiated) {
-                ImageSource.developedSource(url: url, orientation: orientation, recipe: developRecipe, draft: true)
+                ImageSource.developedSource(url: url, orientation: inputOrientation, recipe: developRecipe, draft: true)
                     .map(Unchecked.init)
             }.value
             if let loaded {
                 image = loaded.value
                 full = true
-                if ImageSource.isRAW(url: url) { rawURL = url; rawOrientation = orientation }
             }
         }
         if image == nil, let cg = input.displaySizeImage?.cgImage(forProposedRect: nil, context: nil, hints: nil) {
@@ -104,7 +167,8 @@ final class AssetEditSession {
         guard let image else { throw AssetEditError.inputUnavailable }
         isFullSize = full
         return Loaded(recipe: recipe, hadOurAdjustments: ours, foreignFormat: foreign,
-                      source: image, isFullSize: full, rawURL: rawURL, rawOrientation: rawOrientation)
+                      source: image, isFullSize: full, rawURL: rawURL, rawOrientation: rawOrientation,
+                      rawDevelop: rawDevelop, rawNote: rawNote)
     }
 
     private func requestInput(progress: (@MainActor (Double) -> Void)?) async throws -> PHContentEditingInput {
@@ -124,9 +188,13 @@ final class AssetEditSession {
         guard isFullSize, let inputURL = input.fullSizeImageURL else { throw AssetEditError.noFullSizeImage }
 
         let output = PHContentEditingOutput(contentEditingInput: input)
-        output.adjustmentData = try MiraAdjustment.adjustmentData(for: recipe)
+        // An edit made on a separately fetched RAW says so, so it reopens on the RAW (and the Photos extension,
+        // which only receives the rendered JPEG of a pair, leaves it alone).
+        output.adjustmentData = try MiraAdjustment.adjustmentData(for: recipe, rawBase: fetchedRawURL != nil)
         let outputURL = output.renderedContentURL
-        let colorSpace = ImageSource.outputColorSpace(url: inputURL, image: source)
+        // The rendered output is upright pixels in the colour space of what was developed (P3 for RAW). Metadata
+        // comes from the editing input, which is the file Photos described (orientation is reset to 1).
+        let colorSpace = ImageSource.outputColorSpace(url: fetchedRawURL ?? inputURL, image: source)
 
         let sourceBox = Unchecked(value: source)
         try await Task.detached(priority: .userInitiated) {

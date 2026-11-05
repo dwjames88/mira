@@ -38,6 +38,10 @@ public final class RawSession {
     @ObservationIgnored var desiredKey: RawDevelopKey?
     @ObservationIgnored var task: Task<Void, Never>?
     @ObservationIgnored var thumbnailTask: Task<Void, Never>?
+    /// The background full-quality (non-draft) decode that replaces the draft frame.
+    @ObservationIgnored var refineTask: Task<Void, Never>?
+    /// Key of the source on screen when it is the full-quality decode (nil while it is a draft).
+    @ObservationIgnored var refinedKey: RawDevelopKey?
     @ObservationIgnored var generation = 0
 
     init() {}
@@ -47,6 +51,9 @@ public final class RawSession {
         task = nil
         thumbnailTask?.cancel()
         thumbnailTask = nil
+        refineTask?.cancel()
+        refineTask = nil
+        refinedKey = nil
         generation += 1
         develop = nil
         url = nil
@@ -74,33 +81,82 @@ extension EditorModel {
 
     // MARK: Loading
 
-    /// Opens a RAW file: a draft, reduced-size develop of the current recipe becomes the source.
+    /// Cache key of a RAW file for the session caches: its path and modification time.
+    nonisolated static func rawCacheKey(url: URL) -> String {
+        let date = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)?.timeIntervalSince1970 ?? 0
+        return "file:\(url.path)@\(date)"
+    }
+
+    /// Opens a RAW file in stages, none of which blocks the main actor for a decode:
+    /// 1. the camera's embedded preview (milliseconds) as a stand-in;
+    /// 2. a draft-mode decode at preview size, cached per file for the session, becomes the first
+    ///    editable frame (instantly on a reopen);
+    /// 3. a full-quality decode replaces it in the background (`scheduleRawRefine`).
+    /// Returns false when the file cannot be read as an image at all.
     func loadRawSource(url: URL, orientation: CGImagePropertyOrientation?) -> Bool {
-        guard let develop = RawDevelop(url: url, orientation: orientation),
-              let image = develop.apply(recipe.raw, filmApplied: recipe.filmID != nil, draft: true,
-                                        scale: develop.previewScale())
-        else { return false }
-        setSource(image)
-        beginRawSession(develop: develop, url: url, orientation: orientation, developedFor: recipe)
+        let cacheKey = Self.rawCacheKey(url: url)
+        let key = RawDevelopKey(recipe)
+        let proxyKey = RawAssetCache.ProxyKey(settings: key.raw, filmApplied: key.filmApplied)
+
+        // Reopen: the cached proxy is the first frame, synchronously.
+        if let develop = RawAssetCache.shared.develop(forKey: cacheKey, url: url, orientation: orientation),
+           let proxy = RawAssetCache.shared.proxy(forKey: cacheKey, proxyKey) {
+            setSource(proxy.image)
+            beginRawSession(develop: develop, url: url, orientation: orientation, developedFor: key)
+            scheduleRawRefine()
+            return true
+        }
+
+        guard let placeholder = ImageSource.loadEmbeddedPreview(url: url, orientation: orientation,
+                                                                 maxPixelSize: Self.standInLongSide) else {
+            // No embedded preview to show: develop before returning, as before.
+            guard let frame = RawOpener.openDraft(url: url, orientation: orientation, settings: key.raw,
+                                                  filmApplied: key.filmApplied, cacheKey: cacheKey)
+            else { return false }
+            setSource(frame.source.image)
+            beginRawSession(develop: frame.develop, url: url, orientation: orientation, developedFor: key)
+            scheduleRawRefine()
+            return true
+        }
+        guard ImageSource.orientedPixelSize(url: url, orientation: orientation) != nil else { return false }
+        setSource(placeholder, isFull: false)
+        let generation = rawSession.generation
+        rawSession.task = Task { [weak self] in
+            let opened = await Task.detached(priority: .userInitiated) {
+                RawOpener.openDraft(url: url, orientation: orientation, settings: key.raw, filmApplied: key.filmApplied,
+                                    cacheKey: cacheKey)
+            }.value
+            guard !Task.isCancelled, let self, self.rawSession.generation == generation else { return }
+            guard let frame = opened else { return }   // stays on the embedded preview
+            self.replaceSource(frame.source.image, isFull: true)
+            // The recipe may have changed while the file decoded (a restored sidecar): develop again if so.
+            self.beginRawSession(develop: frame.develop, url: url, orientation: orientation,
+                                 developedFor: key)
+            self.rawRecipeChanged(from: self.recipe)
+            self.scheduleRawRefine()
+        }
         return true
     }
 
     /// For callers that set the source themselves (Photos editing in the app) from a RAW file that
     /// was developed with `developedFor` (see `ImageSource.developedSource`). Call after
-    /// `setSource` / `replaceSource`, which end any earlier RAW session.
-    public func attachRawSource(url: URL, orientation: CGImagePropertyOrientation?, developedFor: Recipe) {
-        guard ImageSource.isRAW(url: url), let develop = RawDevelop(url: url, orientation: orientation) else { return }
-        beginRawSession(develop: develop, url: url, orientation: orientation, developedFor: developedFor)
+    /// `setSource` / `replaceSource`, which end any earlier RAW session. `develop` reuses a decoder
+    /// already open for this file (e.g. from `RawAssetCache`).
+    public func attachRawSource(url: URL, orientation: CGImagePropertyOrientation?, developedFor: Recipe,
+                                develop existing: RawDevelop? = nil) {
+        guard ImageSource.isRAW(url: url), let develop = existing ?? RawDevelop(url: url, orientation: orientation) else { return }
+        beginRawSession(develop: develop, url: url, orientation: orientation, developedFor: RawDevelopKey(developedFor))
         rawRecipeChanged(from: developedFor)
+        scheduleRawRefine()
     }
 
     private func beginRawSession(develop: RawDevelop, url: URL, orientation: CGImagePropertyOrientation?,
-                                 developedFor: Recipe) {
+                                 developedFor: RawDevelopKey) {
         rawSession.reset()
         rawSession.develop = develop
         rawSession.url = url
         rawSession.orientation = orientation
-        rawSession.shownKey = RawDevelopKey(developedFor)
+        rawSession.shownKey = developedFor
         rawSession.desiredKey = rawSession.shownKey
         rawSession.asShot = develop.asShot
         rawSession.supported = develop.supported
@@ -112,6 +168,7 @@ extension EditorModel {
 
     func cancelRawWork() {
         rawSession.task?.cancel()
+        rawSession.refineTask?.cancel()
         rawSession.thumbnailTask?.cancel()
     }
 
@@ -126,6 +183,8 @@ extension EditorModel {
         guard key != rawSession.desiredKey else { return }
         rawSession.desiredKey = key
         rawSession.task?.cancel()
+        rawSession.refineTask?.cancel()
+        rawSession.refinedKey = nil
         rawSession.generation += 1
         let generation = rawSession.generation
         let scale = develop.previewScale()
@@ -139,6 +198,29 @@ extension EditorModel {
             self.rawSession.shownKey = key
             self.replaceSource(box.image, keepZoom: true)
             self.scheduleThumbnailRefresh()
+            self.scheduleRawRefine()
+        }
+    }
+
+    /// After the draft frame settles, decodes the same settings at full quality (draft mode off, same
+    /// size) off the main actor and swaps it in, keeping the zoom. Any RAW change in the meantime
+    /// abandons it; the next draft schedules it again.
+    func scheduleRawRefine(delay: Duration = .milliseconds(250)) {
+        guard rawSession.isRaw, let develop = rawSession.develop,
+              let key = rawSession.shownKey, key == rawSession.desiredKey, rawSession.refinedKey != key else { return }
+        rawSession.refineTask?.cancel()
+        let generation = rawSession.generation
+        rawSession.refineTask = Task { [weak self] in
+            if delay > .zero { try? await Task.sleep(for: delay) }
+            guard !Task.isCancelled else { return }
+            let box = await Task.detached(priority: .utility) {
+                RawOpener.refine(develop: develop, settings: key.raw, filmApplied: key.filmApplied)
+                    .map { RawImageBox(image: $0.image) }
+            }.value
+            guard !Task.isCancelled, let self, self.rawSession.generation == generation,
+                  self.rawSession.shownKey == key, self.rawSession.desiredKey == key, let box else { return }
+            self.rawSession.refinedKey = key
+            self.replaceSource(box.image, keepZoom: true)
         }
     }
 
