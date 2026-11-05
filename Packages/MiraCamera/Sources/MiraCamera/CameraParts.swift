@@ -62,8 +62,10 @@ struct CameraHeader: View {
 
 // MARK: Meter
 
-/// Needle on a -3...+3 mono scale with a lichen centre tick, and the readout row under it.
+/// Needle on a -3...+3 mono scale with a lichen centre tick (a 15 pt strip, no numerals), and the readout row under it.
 struct MeterView: View {
+    static let scaleHeight: CGFloat = 15
+
     let needle: Double
     let readout: String
     let latitude: LatitudeReadout
@@ -71,12 +73,12 @@ struct MeterView: View {
     var stacked = false
 
     var body: some View {
-        VStack(spacing: 4) {
-            scale.frame(height: 26)
+        VStack(spacing: 2) {
+            scale.frame(height: Self.scaleHeight)
             readoutRow
         }
         .padding(.horizontal, T.cells(2))
-        .padding(.vertical, 6)
+        .padding(.vertical, 3)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Light meter")
         .accessibilityValue("\(readout). \(latitude.text)")
@@ -90,20 +92,16 @@ struct MeterView: View {
                 ForEach(-9...9, id: \.self) { third in
                     let ev = Double(third) / 3
                     let whole = third % 3 == 0
+                    let height: CGFloat = third == 0 ? 9 : (whole ? 6 : 3.5)
                     Rectangle()
                         .fill(third == 0 ? T.lichen : (whole ? T.paperMid : T.paperDim))
-                        .frame(width: third == 0 ? 2 : 1, height: third == 0 ? 10 : (whole ? 7 : 4))
-                        .position(x: x(ev), y: 16)
-                }
-                ForEach([-3, -1, 1, 3], id: \.self) { ev in
-                    Text(ExposureModel.label(Double(ev))).ffLabel(size: 8, color: T.paperDim)
-                        .fixedSize()
-                        .position(x: min(max(x(Double(ev)), 10), w - 10), y: 24)
+                        .frame(width: third == 0 ? 2 : 1, height: height)
+                        .position(x: x(ev), y: Self.scaleHeight - height / 2)
                 }
                 Image(systemName: "arrowtriangle.down.fill")
-                    .font(.system(size: 8))
+                    .font(.system(size: 6))
                     .foregroundStyle(T.paper)
-                    .position(x: x(needle * 3), y: 4)
+                    .position(x: x(needle * 3), y: 3)
                     .animation(.easeOut(duration: 0.15), value: needle)
             }
         }
