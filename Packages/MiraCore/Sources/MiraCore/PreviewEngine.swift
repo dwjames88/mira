@@ -78,6 +78,14 @@ public final class PreviewEngine: @unchecked Sendable {
     private var pools: [PoolKey: CVPixelBufferPool] = [:]
     private var poolOrder: [PoolKey] = []
     private var frameCounter = 0
+    private var sourceHashes: [SourceHashKey: UInt64] = [:]
+    private var thumbnailRenders = 0
+
+    private struct SourceHashKey: Hashable {
+        let generation: Int
+        let crop: CropSettings
+        let longSide: Int
+    }
 
     private struct BaseKey: Hashable {
         let generation: Int
@@ -372,17 +380,71 @@ public final class PreviewEngine: @unchecked Sendable {
         previewBase(crop: crop, canvas: CGSize(width: longSide, height: longSide))
     }
 
+    /// Thumbnails actually graded since this engine was made (disk cache hits are not counted).
+    public var thumbnailRenderCount: Int {
+        lock.lock(); defer { lock.unlock() }
+        return thumbnailRenders
+    }
+
+    /// A cheap, stable hash of the thumbnail base: the cropped picture downscaled to 32 px on its long
+    /// side, 6 bits per channel. Identifies the picture for the thumbnail disk cache (the crop, RAW
+    /// develop settings and orientation are all in the pixels). Memoised per source, crop and size.
+    public func thumbnailSourceHash(crop: CropSettings, longSide: CGFloat) -> UInt64? {
+        let key = SourceHashKey(generation: sourceGeneration, crop: crop, longSide: Int(longSide))
+        lock.lock()
+        if let hit = sourceHashes[key] { lock.unlock(); return hit }
+        lock.unlock()
+        guard let base = thumbnailBase(crop: crop, longSide: longSide) else { return nil }
+        let e = base.extent
+        guard !e.isInfinite, !e.isEmpty else { return nil }
+        let k = 32 / max(e.width, e.height)
+        let w = max(1, Int((e.width * k).rounded())), h = max(1, Int((e.height * k).rounded()))
+        let small = k < 1 ? Self.resample(base, to: CGSize(width: w, height: h)) : base
+        let rw = Int(small.extent.width), rh = Int(small.extent.height)
+        var pixels = [UInt8](repeating: 0, count: rw * rh * 4)
+        context.render(small, toBitmap: &pixels, rowBytes: rw * 4, bounds: CGRect(x: 0, y: 0, width: rw, height: rh),
+                       format: .RGBA8, colorSpace: Self.srgbSpace)
+        for i in pixels.indices { pixels[i] >>= 2 }
+        var hash = ThumbnailHash.fnv1a(pixels)
+        hash = ThumbnailHash.fnv1a(Array("\(rw)x\(rh)".utf8), seed: hash)
+        lock.lock()
+        if sourceHashes.count > 32 { sourceHashes = [:] }
+        sourceHashes[key] = hash
+        lock.unlock()
+        return hash
+    }
+
     /// Renders one thumbnail per id (nil is the untouched picture) from a single small base, up to
     /// `workers` at a time, calling `deliver` from the worker threads as each one lands. Blocks until
-    /// done or `isCancelled` returns true.
+    /// done or `isCancelled` returns true. With a `diskCache`, a thumbnail already on disk is delivered
+    /// without rendering and a rendered one is written to it; `filmSignature` names the film's look inputs.
     public func renderThumbnails(
         ids: [String?], crop: CropSettings, longSide: CGFloat, workers: Int = PreviewEngine.defaultThumbnailWorkers,
+        diskCache: ThumbnailDiskCache? = nil,
+        filmSignature: @escaping @Sendable (String) -> String = { _ in "" },
         isCancelled: @Sendable () -> Bool = { false },
         deliver: @Sendable (String?, CGImage) -> Void
     ) {
         let signpost = Perf.begin("thumbnail batch")
         defer { Perf.end("thumbnail batch", signpost) }
-        guard let base = thumbnailBase(crop: crop, longSide: longSide), !ids.isEmpty else { return }
+        guard !ids.isEmpty else { return }
+        let hash = diskCache == nil ? nil : thumbnailSourceHash(crop: crop, longSide: longSide)
+        let keyFor: @Sendable (String?) -> ThumbnailKey? = { id in
+            hash.map { ThumbnailKey(filmID: id, filmSignature: id.map(filmSignature) ?? "", sourceHash: $0,
+                                    crop: crop, longSide: Int(longSide)) }
+        }
+        // Hits first: they need no base and no GPU work.
+        var misses: [String?] = []
+        if let diskCache, hash != nil {
+            for id in ids {
+                if isCancelled() { return }
+                if let key = keyFor(id), let cg = diskCache.load(key) { deliver(id, cg) } else { misses.append(id) }
+            }
+        } else {
+            misses = ids
+        }
+        let ids = misses
+        guard !ids.isEmpty, let base = thumbnailBase(crop: crop, longSide: longSide) else { return }
         let renderer = renderer, context = context
         let box = UncheckedBox(base)
         let next = NSLock()
@@ -395,10 +457,16 @@ public final class PreviewEngine: @unchecked Sendable {
                 if i >= ids.count || isCancelled() { return }
                 // The base already carries the crop, so the thumbnail recipe has none.
                 if let cg = renderer.render(Recipe(filmID: ids[i]), input: box.value, context: context) {
+                    countThumbnailRender()
                     deliver(ids[i], cg)
+                    if let diskCache, let key = keyFor(ids[i]) { diskCache.store(cg, key: key) }
                 }
             }
         }
+    }
+
+    private func countThumbnailRender() {
+        lock.lock(); thumbnailRenders += 1; lock.unlock()
     }
 
     /// Like `renderThumbnails(ids:...)`, but each tile has its own whole recipe (presets). The recipe's
