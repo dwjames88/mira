@@ -2,7 +2,30 @@
 
 All notable changes to Mira. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.5.0] - 2026-11-05
+## [1.0.0] - 2026-11-05
+
+The first release with the film-science pipeline, on the Mac, in the Photos extension and on iPhone and iPad. It rolls up everything from the unreleased 0.5.0 below.
+
+### Highlights
+- **Film science.** A pipeline built in the order of the light: exposure with film latitude, white balance, halation, per-film grain, the film's colour, then the print.
+- **264 looks.** The 260 films of the RawTherapee Film Simulation Collection (Pat David et al., CC BY-SA 4.0) plus 4 Mira originals (500T Tungsten, 250D Daylight, Cinema Print, Color Paper), grouped into 7 families (Color Negative, Slide, Kodachrome, Black and White, Motion Picture, Instant, Print) as stock cards with variants.
+- **RAW development and headroom.** A RAW group in DEVELOP (white balance, boost, highlight recovery, local tone map, noise reduction, sharpness, lens correction), and scene-referred headroom so RAW and HDR highlights roll off through the film's shoulder instead of clipping.
+- **Reciprocity and exposure time.** An exposure time slider (EXIF time by default) and a Reciprocity mode (Off, Compensated, Uncompensated).
+- **Push and pull** from -2 to +2 stops in thirds, with a **Latitude** readout under the histogram.
+- **Scan and paper.** Neutral, Frontier-like and Noritsu-like scans, plus Cinema Print and Color Paper print stocks after the film.
+- **Toning** for black-and-white films.
+- **Library filter.** An ALL/RAW filter with a count, on the Mac and on iOS.
+- **iOS** gets the film categories and the film options (push/pull, scan, toning, paper, exposure time, reciprocity).
+- **Smaller and faster.** The film cubes are packed (LZMA, 48/56/64 cubes chosen per film by measured error): the app is about 284 MB instead of about 720 MB. Thumbnails are lazy and cached on disk.
+- **Contact-sheet tool.** `mira-sheet --contact-sheet` renders a films x states grid for judging looks.
+
+### Notes
+- The Mac build is signed with an Apple Development certificate and is not notarized. On first launch macOS may refuse to open it: right-click Mira and choose Open.
+- The in-app updater (0.3.0 and later) installs 1.0.0. 0.2.0 has no updater; install 1.0.0 by hand.
+- iOS has no self-updater. Build it from source (supported; see the README), or use the attached development-signed ipa, which installs only on devices registered to the publisher's team.
+- Building from source no longer needs the film PNGs: `scripts/fetch-film-sources.sh` downloads them, and only to rebuild the packed cubes. Your own team and bundle id prefix go in `Local.xcconfig`. A build with another prefix does not self-update, by design.
+
+## [0.5.0] - 2026-11-05 (internal, not released)
 
 Film science: a pipeline built in the order of the light, a smaller film payload, scene-referred RAW, Mira original looks, exposure time and reciprocity. Design notes and the numbers behind them are in [Design/FILM-SCIENCE.md](Design/FILM-SCIENCE.md).
 

@@ -24,16 +24,19 @@ struct LiveUpdateTests {
         let report = await UpdateChecker().check(current: SemanticVersion("0.1.0")!, trigger: .manual, preferences: prefs)
         guard case .available(let release) = report else { Issue.record("expected an update, got \(report)"); return }
         print("LIVE check: \(ms(t)) -> \(release.tag) \"\(release.title)\" \(release.assets.count) assets, notes \(release.notes.count) chars")
-        #expect(release.version == SemanticVersion("0.2.0"))
-        // The same release is not news to a 0.2.0 install.
-        let same = await UpdateChecker().check(current: SemanticVersion("0.2.0")!, trigger: .manual, preferences: prefs)
-        print("LIVE check as 0.2.0 -> \(same)")
-        guard case .upToDate = same else { Issue.record("0.2.0 must be up to date"); return }
+        // Whatever the latest published release is; nothing here pins a version.
+        let latest = release.version
+        let latestText = latest.description
+        #expect(latest > SemanticVersion("0.1.0")!)
+        // The same release is not news to an install of that version.
+        let same = await UpdateChecker().check(current: latest, trigger: .manual, preferences: prefs)
+        print("LIVE check as \(latestText) -> \(same)")
+        guard case .upToDate = same else { Issue.record("\(latestText) must be up to date"); return }
 
         // 2. Asset selection.
         let asset = try #require(release.installableAsset)
         print("LIVE asset: \(asset.name), \(asset.size) bytes, sha256 \(asset.sha256 ?? "(none)")")
-        #expect(asset.name == "Mira-0.2.0.zip")
+        #expect(asset.name == "Mira-\(latestText).zip")
 
         // 3. Real download with progress.
         let zip = root.appendingPathComponent("download/\(asset.name)")
@@ -55,9 +58,9 @@ struct LiveUpdateTests {
 
         // 5. Verify: identifier, version, Apple anchor + Team ID, nested extension, strict.
         t = clock.now
-        try BundleVerifier.verify(bundleAt: app, version: SemanticVersion("0.2.0"))
-        print("LIVE verify: ACCEPTED in \(ms(t)) (id \(BundleVerifier.bundleIdentifier), team \(BundleVerifier.teamIdentifier), version 0.2.0)")
-        #expect(captured(try BundleVerifier.verify(bundleAt: app, version: SemanticVersion("0.3.0"))) != nil)   // wrong version expectation
+        try BundleVerifier.verify(bundleAt: app, version: latest)
+        print("LIVE verify: ACCEPTED in \(ms(t)) (id \(BundleVerifier.bundleIdentifier), team \(BundleVerifier.teamIdentifier), version \(latestText))")
+        #expect(captured(try BundleVerifier.verify(bundleAt: app, version: SemanticVersion(major: latest.major + 1, minor: 0, patch: 0))) != nil)   // wrong version expectation
 
         // 6. Negative: a tampered copy.
         let tampered = try root.appendingPathComponent("tampered").createdDirectory().appendingPathComponent("Mira.app")
@@ -65,7 +68,7 @@ struct LiveUpdateTests {
         let resources = tampered.appendingPathComponent("Contents/Resources")
         let file = try #require(try fm.contentsOfDirectory(at: resources, includingPropertiesForKeys: nil).first { !$0.hasDirectoryPath })
         try Data("tampered".utf8).write(to: file)
-        let rejection = captured(try BundleVerifier.verify(bundleAt: tampered, version: SemanticVersion("0.2.0")))
+        let rejection = captured(try BundleVerifier.verify(bundleAt: tampered, version: latest))
         print("LIVE verify tampered (\(file.lastPathComponent) rewritten): REJECTED -> \(rejection.map { "\($0)" } ?? "NOT REJECTED")")
         guard case .signatureInvalid = rejection else { Issue.record("tampered copy must be rejected, got \(String(describing: rejection))"); return }
 
@@ -74,12 +77,12 @@ struct LiveUpdateTests {
         let old = try makeApp(at: apps, version: "0.1.0", marker: "old")
         t = clock.now
         let installed = try UpdateInstaller.swap(newBundle: app, over: old, disposeOld: .delete) { staged in
-            try BundleVerifier.verify(bundleAt: staged, version: SemanticVersion("0.2.0"))
+            try BundleVerifier.verify(bundleAt: staged, version: latest)
         }
         let version = BundleVerifier.readInfo(ofBundleAt: installed)?["CFBundleShortVersionString"] as? String
         print("LIVE swap (temp dir): \(ms(t)) -> \(installed.path), version \(version ?? "?"), folder now \(try fm.contentsOfDirectory(atPath: apps.path))")
-        #expect(version == "0.2.0")
-        try BundleVerifier.verify(bundleAt: installed, version: SemanticVersion("0.2.0"))
+        #expect(version == latestText)
+        try BundleVerifier.verify(bundleAt: installed, version: latest)
     }
 }
 #endif

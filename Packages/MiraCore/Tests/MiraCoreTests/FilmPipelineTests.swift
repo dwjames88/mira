@@ -268,6 +268,6 @@ enum PipelineFixture {
         #expect(back.recipe.grainAmount == 0.3)
 
         let new = Preset(nickname: "New", recipe: Recipe(filmID: "kodak-portra-400"), filmName: "Portra 400")
-        #expect(try PresetFile.decode(PresetFile.encode(new, appVersion: "0.5.0")).recipe.pipeline == 2)
+        #expect(try PresetFile.decode(PresetFile.encode(new, appVersion: "1.0.0")).recipe.pipeline == 2)
     }
 }
