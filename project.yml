@@ -214,6 +214,21 @@ targets:
         IPHONEOS_DEPLOYMENT_TARGET: "18.0"
         SWIFT_VERSION: "6.0"
         GENERATE_INFOPLIST_FILE: NO
+  MiraiOSTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: iOSTests
+    dependencies:
+      - target: MiraiOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(MIRA_BUNDLE_PREFIX).mira.ios.tests
+        SWIFT_VERSION: "6.0"
+        IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Mira.app/Mira
+        BUNDLE_LOADER: $(TEST_HOST)
 schemes:
   Mira:
     build:
@@ -228,3 +243,7 @@ schemes:
         MiraiOS: all
     run:
       config: Debug
+    test:
+      config: Debug
+      targets:
+        - MiraiOSTests
