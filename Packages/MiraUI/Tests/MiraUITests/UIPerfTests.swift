@@ -153,4 +153,45 @@ struct UIPerfTests {
         model.cancelWork()
         window.contentView = nil
     }
+
+    /// Slider-to-frame latency on a RAW file (the iPhone XS DNG fixture): the develop sliders re-render
+    /// the graded frame from the cached developed source, a RAW slider re-develops it. Skipped without the fixture.
+    @Test func rawSliderLatency() async throws {
+        let dng = SnapshotTests.root.appendingPathComponent("Fixtures/raw/iphone-xs.dng")
+        try #require(FileManager.default.fileExists(atPath: dng.path), "Fixtures/raw/iphone-xs.dng is not present")
+        let library = try FilmLibrary(directory: SnapshotTests.root.appendingPathComponent("Films"))
+        library.prewarmSync()
+        let model = EditorModel(library: library)
+        #expect(model.loadSource(url: dng))
+        model.setCanvas(pixels: CGSize(width: 1500, height: 1000))
+        #expect(await Self.waitUntil { model.isRawSource && model.isSourceFull && model.previewImage != nil && model.isPreviewIdle })
+        #expect(await Self.waitUntil { model.rawSession.refinedKey != nil })
+        model.recipe = Recipe(filmID: "fuji-velvia-50", grainAmount: 0.4, halationAmount: 0.3)
+        #expect(await Self.waitUntil { model.isPreviewIdle })
+        Self.report = ""
+        Self.line("mira UI perf, RAW", "iphone-xs.dng, canvas 1500x1000")
+        var develop: [Double] = []
+        for i in 0..<40 {
+            let before = model.publishedFrames
+            let t0 = ContinuousClock.now
+            model.recipe.exposure = -1 + 2 * Double(i) / 39
+            #expect(await Self.waitUntil { model.publishedFrames > before })
+            if i >= 5 { develop.append(Self.ms(t0)) }
+        }
+        Self.line("RAW: exposure slider -> published frame", String(format: "median %6.1f ms  p95 %6.1f ms", Self.median(develop), Self.p95(develop)))
+        var raw: [Double] = []
+        for i in 0..<12 {
+            let before = model.publishedFrames
+            let t0 = ContinuousClock.now
+            model.recipe.raw.temperature = 4500 + 150 * Double(i)
+            #expect(await Self.waitUntil(60) { model.publishedFrames > before && model.isPreviewIdle
+                && model.rawSession.refinedKey == RawDevelopKey(model.recipe) })
+            raw.append(Self.ms(t0))
+        }
+        Self.line("RAW: white balance slider -> settled frame", String(format: "median %6.1f ms  p95 %6.1f ms", Self.median(raw), Self.p95(raw)))
+        let dir = SnapshotTests.root.appendingPathComponent("build", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try? Self.report.write(to: dir.appendingPathComponent("perf-ui-raw.txt"), atomically: true, encoding: .utf8)
+        model.cancelWork()
+    }
 }
