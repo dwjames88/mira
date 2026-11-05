@@ -503,7 +503,7 @@ extension EditorViewModel {
 
     /// What applying `preset` gives right now: its look, the photo's crop and brushwork (a missing film becomes none).
     func appliedRecipe(for preset: Preset) -> Recipe {
-        var r = preset.recipe(keeping: recipe.crop, dodgeBurn: recipe.dodgeBurn)
+        var r = preset.recipe(keeping: recipe.crop, dodgeBurn: recipe.dodgeBurn, raw: recipe.raw)
         if isFilmMissing(preset) { r.filmID = nil }
         return r
     }

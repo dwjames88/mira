@@ -40,7 +40,7 @@ final class EditorViewModel {
             scheduleHistogram()
             // A film changes how the RAW is developed (automatic boost and range), so develop it again.
             if !isRestoring, rawAsset, (recipe.filmID != nil) != (oldValue.filmID != nil) || recipe.raw != oldValue.raw {
-                scheduleRawDevelop()
+                scheduleRawDevelop(debounce: Self.rawDevelopDebounce(from: oldValue, to: recipe))
             }
         }
     }
@@ -302,6 +302,7 @@ final class EditorViewModel {
                 status = loaded.rawNote ?? ""
             }
             rawAsset = loaded.isRaw
+            thumbnailsFilmApplied = loaded.recipe.filmID != nil
             scheduleHistogram()
             startThumbnails()
             if loaded.isRaw { scheduleRawDevelop(draftFirst: false) }
@@ -313,29 +314,53 @@ final class EditorViewModel {
 
     /// Develops the RAW again for the current recipe off the main actor and swaps it in: a draft at preview
     /// size first (unless `draftFirst` is false), then the full-quality full-size develop. Newer requests win.
-    private func scheduleRawDevelop(draftFirst: Bool = true) {
+    private func scheduleRawDevelop(draftFirst: Bool = true, debounce: Duration = .milliseconds(120)) {
         guard case .asset(let session) = editTarget else { return }
         rawTask?.cancel()
         rawTask = Task { [weak self] in
             guard let self else { return }
             if draftFirst {
-                try? await Task.sleep(for: .milliseconds(120))
+                // A slider drag coalesces; a film tap is one discrete change and starts at once.
+                if debounce > .zero { try? await Task.sleep(for: debounce) }
                 guard !Task.isCancelled else { return }
-                if let draft = await session.rawSource(for: self.recipe, full: false) { await self.adoptRaw(draft, session) }
+                let applied = self.recipe.filmID != nil
+                if let draft = await session.rawSource(for: self.recipe, full: false) {
+                    await self.adoptRaw(draft, session, filmApplied: applied)
+                }
             }
             guard !Task.isCancelled else { return }
+            let applied = self.recipe.filmID != nil
             if let full = await session.rawSource(for: self.recipe, full: true) {
-                await self.adoptRaw(full, session)
+                await self.adoptRaw(full, session, filmApplied: applied)
             } else if !Task.isCancelled, self.hasPhoto {
                 self.status = "RAW DEVELOP FAILED · SHOWING THE LAST PREVIEW"
             }
         }
     }
 
-    private func adoptRaw(_ loaded: LoadedSource, _ session: AssetEditSession) async {
+    /// No wait when the film was toggled (a tap); the usual 120 ms while RAW settings change (a slider drag).
+    static func rawDevelopDebounce(from old: Recipe, to new: Recipe) -> Duration {
+        (old.filmID != nil) != (new.filmID != nil) ? .zero : .milliseconds(120)
+    }
+
+    /// Whether the film thumbnails (and the engine's small source behind them) come from a develop with the film applied.
+    @ObservationIgnored private(set) var thumbnailsFilmApplied = false
+
+    /// A develop with a different film-applied state than the one the thumbnails were rendered from (automatic boost
+    /// and range depend on it) invalidates them, so the strip never mixes film-off and film-on develops. The draft to
+    /// full swap of the same state does not.
+    func noteThumbnailSource(filmApplied: Bool) {
+        guard filmApplied != thumbnailsFilmApplied else { return }
+        thumbnailsFilmApplied = filmApplied
+        thumbnails = [:]
+        startThumbnails()
+    }
+
+    private func adoptRaw(_ loaded: LoadedSource, _ session: AssetEditSession, filmApplied: Bool) async {
         guard !Task.isCancelled, hasPhoto, case .asset(let current) = editTarget, current === session else { return }
         try? await engine.adopt(loaded)
         guard !Task.isCancelled else { return }
+        noteThumbnailSource(filmApplied: filmApplied)
         live.setSource(loaded.image, colorSpace: loaded.colorSpace, size: loaded.size)
         sourcePixelSize = loaded.size
         scheduleHistogram()
@@ -369,6 +394,12 @@ final class EditorViewModel {
         let generation = openGeneration
         let loaded = try await engine.load(data: data)
         guard generation == openGeneration else { return }
+        present(loaded)
+    }
+
+    /// Shows a decoded source as a freshly opened import (default recipe, nothing to save).
+    func present(_ loaded: LoadedSource) {
+        thumbnailsFilmApplied = false
         live.setSource(loaded.image, colorSpace: loaded.colorSpace, size: loaded.size)
         sourceExposureTime = loaded.image.miraExposureTime
         sourcePixelSize = loaded.size

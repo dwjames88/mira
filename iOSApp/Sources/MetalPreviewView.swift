@@ -50,7 +50,6 @@ struct MetalPreviewView: UIViewRepresentable {
         init(live: LivePreview) { self.live = live }
 
         func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
-            live.updateProxyTarget(pixelSize: size, zoom: zoom)
             view.setNeedsDisplay()
         }
 
@@ -60,28 +59,9 @@ struct MetalPreviewView: UIViewRepresentable {
                   let queue = live.commandQueue,
                   let drawable = view.currentDrawable,
                   let cb = queue.makeCommandBuffer() else { return }
-            live.updateProxyTarget(pixelSize: size, zoom: zoom)
-            let bounds = CGRect(origin: .zero, size: size)
-            let space = live.colorSpace
-            var output = CIImage(color: ink).cropped(to: bounds)
-
-            if let graded = live.gradedImage(for: recipe, cropping: cropping, showingOriginal: showingOriginal) {
-                let e = graded.extent
-                if !e.isInfinite, !e.isEmpty, e.width.isFinite, e.height.isFinite {
-                    let fit = min(size.width / e.width, size.height / e.height) * max(zoom, 1)
-                    let scale = view.contentScaleFactor
-                    let w = e.width * fit, h = e.height * fit
-                    let tx = (size.width - w) / 2 + offset.width * scale
-                    let ty = (size.height - h) / 2 - offset.height * scale
-                    var t = CGAffineTransform(translationX: -e.minX, y: -e.minY)
-                    t = t.concatenating(CGAffineTransform(scaleX: fit, y: fit))
-                    t = t.concatenating(CGAffineTransform(translationX: tx, y: ty))
-                    // CIContext.render(to: MTLTexture) already maps Core Image bottom-left space
-                    // onto the drawable upright; no extra flip (an extra one rendered the photo upside down).
-                    output = graded.transformed(by: t).cropped(to: bounds).composited(over: output)
-                }
-            }
-            live.ciContext.render(output, to: drawable.texture, commandBuffer: cb, bounds: bounds, colorSpace: space)
+            live.render(into: drawable.texture, commandBuffer: cb, recipe: recipe, cropping: cropping,
+                        showingOriginal: showingOriginal, zoom: zoom, offset: offset,
+                        contentScale: view.contentScaleFactor, ink: ink)
             cb.present(drawable)
             cb.commit()
         }

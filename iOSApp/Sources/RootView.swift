@@ -121,9 +121,7 @@ struct RootView: View {
             }
             .onEnded { _ in
                 pinchBase = model.zoom
-                let scale = UIScreen.main.scale
-                model.live.updateProxyTarget(
-                    pixelSize: CGSize(width: size.width * scale, height: size.height * scale), zoom: model.zoom)
+                model.live.updateProxyTarget(zoom: model.zoom)
             }
         let pan = DragGesture(minimumDistance: 4)
             .onChanged { value in
