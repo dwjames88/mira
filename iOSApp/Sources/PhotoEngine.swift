@@ -102,7 +102,9 @@ actor PhotoEngine {
 
     func renderThumbnail(filmID: String?) throws -> Data {
         guard let renderer, let thumb else { throw PhotoEngineError.cannotLoad }
-        return try Self.encode(renderer.apply(Recipe(filmID: filmID), to: thumb), colorSpace: colorSpace)
+        // Same card recipe as the Mac strip: the film at its native grain, halation and bloom (what applying it gives).
+        let recipe = Recipe(filmID: filmID, reciprocity: .off).applyingNativeTexture(filmID: filmID)
+        return try Self.encode(renderer.apply(recipe, to: thumb), colorSpace: colorSpace)
     }
 
     /// Full-size export to a temp JPEG; returns its URL.
