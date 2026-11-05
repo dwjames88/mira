@@ -37,6 +37,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.photography</string>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<false/>
 	<key>MiraAppGroup</key>
 	<string>$(DEVELOPMENT_TEAM).$(MIRA_BUNDLE_PREFIX).mira</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

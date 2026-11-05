@@ -87,6 +87,8 @@ final class EditorViewModel {
     /// True while the open library asset is developed from its RAW original.
     @ObservationIgnored private var rawAsset = false
     @ObservationIgnored private var rawTask: Task<Void, Never>?
+    /// Bumped by every open; a load that finishes after a newer one started is dropped.
+    @ObservationIgnored private var openGeneration = 0
     private var histogramTask: Task<Void, Never>?
 
     init() { recipe = Recipe() }
@@ -265,11 +267,15 @@ final class EditorViewModel {
     /// Mira recipe is restored on top, so a saved edit reopens exactly and stays adjustable.
     func openAsset(_ asset: PHAsset) async {
         status = "LOADING"
+        openGeneration += 1
+        let generation = openGeneration
         let session = AssetEditSession(asset: asset)
         do {
             let loaded = try await session.load()
             let adopted = LoadedSource(image: loaded.source, colorSpace: loaded.colorSpace, size: loaded.size)
             try await engine.adopt(adopted)
+            // A newer open (another asset or a picked photo) started while this one loaded: it wins.
+            guard generation == openGeneration else { return }
             live.setSource(loaded.source, colorSpace: loaded.colorSpace, size: loaded.size)
             sourceExposureTime = loaded.source.miraExposureTime
             sourcePixelSize = loaded.size
@@ -295,6 +301,7 @@ final class EditorViewModel {
             startThumbnails()
             if loaded.isRaw { scheduleRawDevelop(draftFirst: false) }
         } catch {
+            guard generation == openGeneration else { return }
             status = "ERROR · \(error.localizedDescription.uppercased())"
         }
     }
@@ -312,7 +319,11 @@ final class EditorViewModel {
                 if let draft = await session.rawSource(for: self.recipe, full: false) { await self.adoptRaw(draft, session) }
             }
             guard !Task.isCancelled else { return }
-            if let full = await session.rawSource(for: self.recipe, full: true) { await self.adoptRaw(full, session) }
+            if let full = await session.rawSource(for: self.recipe, full: true) {
+                await self.adoptRaw(full, session)
+            } else if !Task.isCancelled, self.hasPhoto {
+                self.status = "RAW DEVELOP FAILED · SHOWING THE LAST PREVIEW"
+            }
         }
     }
 
@@ -347,7 +358,10 @@ final class EditorViewModel {
     }
 
     private func ingest(_ data: Data) async throws {
+        openGeneration += 1
+        let generation = openGeneration
         let loaded = try await engine.load(data: data)
+        guard generation == openGeneration else { return }
         live.setSource(loaded.image, colorSpace: loaded.colorSpace, size: loaded.size)
         sourceExposureTime = loaded.image.miraExposureTime
         sourcePixelSize = loaded.size
@@ -403,6 +417,7 @@ final class EditorViewModel {
         guard hasPhoto, saveState != .saving else { return }
         commitCrop()
         let previous = saveState
+        let saving = recipe
         saveState = .saving
         isSaving = true
         status = "SAVING"
@@ -418,7 +433,8 @@ final class EditorViewModel {
                 try await PhotoEngine.saveToLibrary(url)
                 status = "SAVED TO PHOTOS"
             }
-            saveState = .saved
+            // Edits made while the save ran are not in the file: the photo is still unsaved.
+            saveState = recipe == saving ? .saved : .unsaved
         } catch {
             saveState = previous == .saved ? .unsaved : previous
             status = "SAVE FAILED · \(error.localizedDescription.uppercased())"
