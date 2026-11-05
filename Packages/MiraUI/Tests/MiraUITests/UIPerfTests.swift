@@ -114,24 +114,31 @@ struct UIPerfTests {
         host.displayIfNeeded()
         #expect(await Self.waitUntil { model.isPreviewIdle })
         for _ in 0..<3 { host.layoutSubtreeIfNeeded() }
-        var ui: [Double] = []
-        var cards = 0, strips = 0
-        let n = 60
-        for i in 0..<n {
-            let c0 = PerfCounters.filmCard, s0 = PerfCounters.filmStrip
-            let t = ContinuousClock.now
-            model.recipe.contrast = Double(i % 20) / 40
-            host.layoutSubtreeIfNeeded()
-            host.displayIfNeeded()
-            let dt = Self.ms(t)
-            cards += PerfCounters.filmCard - c0; strips += PerfCounters.filmStrip - s0
-            ui.append(dt)
-            // Let the render finish between ticks so renders do not pollute the next measurement.
-            _ = await Self.waitUntil { model.isPreviewIdle }
-            host.layoutSubtreeIfNeeded()
+        // The slider lives on DEVELOP, but the editor opens on FILMS: measure the tick on both tabs.
+        for tab in [EditorTab.develop, EditorTab.films] {
+            model.selectTab(tab)
+            #expect(await Self.waitUntil { model.isPreviewIdle })
+            for _ in 0..<3 { host.layoutSubtreeIfNeeded() }
+            var ui: [Double] = []
+            var cards = 0, strips = 0
+            let n = 60
+            for i in 0..<n {
+                let c0 = PerfCounters.filmCard, s0 = PerfCounters.filmStrip
+                let t = ContinuousClock.now
+                model.recipe.contrast = Double(i % 20) / 40
+                host.layoutSubtreeIfNeeded()
+                host.displayIfNeeded()
+                let dt = Self.ms(t)
+                cards += PerfCounters.filmCard - c0; strips += PerfCounters.filmStrip - s0
+                ui.append(dt)
+                // Let the render finish between ticks so renders do not pollute the next measurement.
+                _ = await Self.waitUntil { model.isPreviewIdle }
+                host.layoutSubtreeIfNeeded()
+            }
+            let name = tab == .develop ? "DEVELOP tab" : "FILMS tab"
+            Self.line("SwiftUI per slider tick, \(name) (mutate + layout + display)", String(format: "median %6.2f ms  p95 %6.2f ms", Self.median(ui), Self.p95(ui)))
+            Self.line("film strip body evaluations per tick, \(name)", String(format: "%.2f strip, %.1f cards", Double(strips) / Double(n), Double(cards) / Double(n)))
         }
-        Self.line("SwiftUI per slider tick (mutate + layout + display)", String(format: "median %6.2f ms  p95 %6.2f ms", Self.median(ui), Self.p95(ui)))
-        Self.line("film strip body evaluations per tick", String(format: "%.2f strip, %.1f cards", Double(strips) / Double(n), Double(cards) / Double(n)))
 
         // Thumbnails arriving one by one: SwiftUI cost of the whole batch.
         // The film strip refilling after a crop: thumbnails arrive one at a time.
