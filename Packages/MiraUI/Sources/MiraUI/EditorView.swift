@@ -82,9 +82,10 @@ public struct EditorView<Footer: View>: View {
 
     @ViewBuilder private var panel: some View {
         switch model.tab {
+        case .crop: CropPanel(model: model)
         case .films: FilmsPanel(model: model)
         case .develop: DevelopPanel(model: model)
-        case .crop: CropPanel(model: model)
+        case .dodgeBurn: DodgeBurnStepPanel(model: model)
         }
     }
 }

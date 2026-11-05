@@ -456,14 +456,14 @@ public final class EditorModel {
     /// (rotated, flipped and straightened) so the box can reach anything.
     public func beginCrop() {
         guard !isCropping, source != nil else { return }
-        setDodgeBurnTool(false)
+        closeBrushTool()
         endHover()
         showOriginal = false
         setImmersive(false)
         resetZoom()
         crop = recipe.crop
         isCropping = true
-        if tab != .crop { tabBeforeCrop = tab }
+        if tab != .crop { tabBeforeCrop = tab == .dodgeBurn ? .develop : tab }
         tab = .crop
         schedulePreview()
     }
@@ -504,12 +504,13 @@ public final class EditorModel {
     /// Switches tab. Entering CROP begins the crop tool; leaving it commits (the same as DONE).
     public func selectTab(_ new: EditorTab) {
         guard new != tab else { return }
-        if new != .develop { setDodgeBurnTool(false) }
+        if new != .dodgeBurn { closeBrushTool() }
         if tab == .crop { commitCrop() }
         if new == .crop {
             beginCrop()
         } else {
             tab = new
+            if new == .dodgeBurn { openBrushTool() }
         }
     }
 

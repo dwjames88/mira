@@ -62,6 +62,33 @@ struct PresetModelTests {
         model.cancelWork()
     }
 
+    @Test func applyingAPresetLeavesCropAndStrokesAlone() async throws {
+        let store = Self.tempStore()
+        let model = try await Self.makeModel(store: store)
+        let film = try #require(model.films.first)
+        model.selectFilm(film.id)
+        model.recipe.exposureTime = 4
+        model.recipe.reciprocity = .uncompensated
+        model.recipe.toning = .sepia
+        let preset = try model.saveCurrentAsPreset(nickname: "Keep")
+        #expect(preset.recipe.exposureTime == 4)
+
+        model.recipe = Recipe(filmID: nil)
+        model.recipe.crop.straighten = -6
+        model.recipe.dodgeBurn.strokes = [DodgeBurnStroke(mode: .burn, points: [StrokePoint(x: 0.3, y: 0.3)])]
+        let crop = model.recipe.crop
+        let strokes = model.recipe.dodgeBurn
+
+        model.applyPreset(preset.id)
+        #expect(model.recipe.crop == crop)
+        #expect(model.recipe.dodgeBurn == strokes)
+        #expect(model.recipe.filmID == film.id)
+        #expect(model.recipe.exposureTime == 4)
+        #expect(model.recipe.reciprocity == .uncompensated)
+        #expect(model.recipe.toning == .sepia)
+        model.cancelWork()
+    }
+
     @Test func missingFilmAppliesDevelopSettingsAndSaysSo() async throws {
         let store = Self.tempStore()
         let model = try await Self.makeModel(store: store)
@@ -141,9 +168,9 @@ struct PresetModelTests {
     }
 
     @Test func presetsHaveNoTabOfTheirOwn() {
-        #expect(EditorTab.allCases == [.films, .develop, .crop])
-        #expect(EditorTab.allCases.map(\.key) == ["1", "2", "3"])
-        #expect(EditorTab.forKey("4") == nil)
+        #expect(EditorTab.allCases == [.crop, .films, .develop, .dodgeBurn])
+        #expect(EditorTab.allCases.map(\.key) == ["1", "2", "3", "4"])
+        #expect(EditorTab.forKey("5") == nil)
     }
 
     @Test func thumbnailsWaitWhileAnotherTabIsOpenAndResumeOnFilms() async throws {
