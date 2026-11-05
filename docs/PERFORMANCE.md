@@ -98,36 +98,42 @@ What was added to `Renderer` for the live finder (capture and export always use 
 
 Measured with the opt-in `FinderBudgetBenchmark` (`MIRA_PERF=1`): Kodak Portra 400 at native grain, halation and bloom (50 %), `Fixtures/sample.jpg` cover-fitted into an IOSurface BGRA buffer, a Metal-queue `CIContext` with the shared working space (extended linear sRGB, RGBAh, `cacheIntermediates` off), `startTask(toRender:to: CIRenderDestination(mtlTexture:commandBuffer:))` into a bgra8 texture, waited on; a new `CIImage` and grain seed every frame, 90 frames after 20 warm-up; ms per frame, CPU start to GPU complete.
 
-Machine: Apple M1 Pro, macOS (Darwin 27.0.0), release build (`swift test -c release`), load average about 9 (2026-11-05, a quiet run; two earlier runs at load 340 to 470 were discarded as noise).
+Machine: Apple M1 Pro, macOS (Darwin 27.0.0), release build (`swift test -c release`). Two runs on 2026-11-05: run A at load average about 9, run B (after the fallback and card changes) at about 14. Earlier runs at load 340 to 470 were discarded as noise.
 
-| Case (ms) | 1920x1440 median | p95 | 1206x1809 median | p95 |
+| Case (ms, median / p95) | 1920x1440 run A | 1920x1440 run B | 1206x1809 run A | 1206x1809 run B |
 |---|---|---|---|---|
-| full | 9.1 | 10.4 | 9.4 | 10.2 |
-| grain off | 6.9 | 8.9 | 5.9 | 7.4 |
-| textureScale 0.5 | 11.4 | 12.8 | 9.2 | 9.8 |
-| textureScale 0.5 + grain off | 5.6 | 8.4 | 4.0 | 6.8 |
-| renderScale 0.75 | 7.6 | 9.1 | 7.0 | 9.2 |
+| full | 9.1 / 10.4 | 11.3 / 14.7 | 9.4 / 10.2 | 10.2 / 11.3 |
+| grain off | 6.9 / 8.9 | 8.9 / 10.8 | 5.9 / 7.4 | 7.6 / 9.9 |
+| textureScale 0.5 | 11.4 / 12.8 | 11.2 / 12.2 | 9.2 / 9.8 | 10.3 / 14.0 |
+| textureScale 0.5 + grain off | 5.6 / 8.4 | 8.0 / 9.4 | 4.0 / 6.8 | 7.3 / 9.9 |
+| renderScale 0.75 (grain on) | 7.6 / 9.1 | 10.4 / 12.7 | 7.0 / 9.2 | 9.8 / 14.5 |
 
-Other costs, same run: `latitudeReading` on a 1920x1440 frame 6.2 ms median (6.5 p95), run on a utility queue every 15th frame (2 Hz at 30 fps), so off the frame path but above the plan's 3 ms target; 8 film-door card thumbnails at 220 px 22 ms median (33 p95) per batch, above the plan's 10 ms target, run at most at 2 Hz on a utility queue while the door is open.
+Meter and film-door cards (run B):
 
-iOS simulator (iOS 27.2 "iPhone Duo" type on the same Mac, so the Mac GPU through the simulator's Metal), through the camera's own `FinderRenderer.consume` path (`FinderBudgetSimTests`, `TEST_RUNNER_MIRA_PERF=1`), 1920x1440:
+| Measure | Before | After | Plan target |
+|---|---|---|---|
+| `latitudeReading` | 6.2 ms (1920x1440 input, Lanczos inside) | 1.36 ms median, 1.46 p95 (256 px affine-scaled input, quickselect percentiles); 4 Hz on a utility queue | under 3 ms |
+| 8 film cards | 22 ms per batch (220 px, full texture) | 6.2 ms median, 6.9 p95 (LUT only, from one 240 px copy made once per batch in 1.1 ms) | under 10 ms |
 
-| Case (ms) | median | p95 |
+iOS simulator (iOS 27.2 "iPhone Duo" type on the same Mac, so the Mac GPU through the simulator's Metal), through the camera's own `FinderRenderer` (`FinderBudgetSimTests`, `TEST_RUNNER_MIRA_PERF=1`), 1920x1440, load about 11 to 17:
+
+| Case (ms, median / p95) | run A | run B |
 |---|---|---|
-| full | 17.5 | 22.3 |
-| half texture (textureScale 0.5) | 19.3 | 23.7 |
-| grain off | 11.8 | 15.2 |
-| reduced (0.75 render scale, half texture, grain off) | 10.1 | 12.9 |
+| full | 17.5 / 22.3 | 15.6 / 17.3 |
+| half texture (manual option only) | 19.3 / 23.7 | 17.3 / 18.6 |
+| grain off (AUTO step 1) | 11.8 / 15.2 | 12.8 / 14.5 |
+| reduced: 0.75 render scale, grain off (AUTO step 2) | n/a | 11.0 / 12.3 |
+
+Film door, cold renderer, simulator: first card 201 ms, all 8 visible-first cards 845 ms, reopening on the same scene 2 ms (memory cache). Before the change the cards took about 15 s on first open (cards were requested in list order from the strip's left edge rather than the visible ones first, went through a 200 ms poll and the 2 Hz gate, waited for a LUT prewarm of every film, and rendered grain, halation and bloom). In the headless app run the cards are on screen about 0.6 s after the door appears.
 
 | Platform | Result |
 |---|---|
 | iPhone 16 Pro (device) | outstanding: the go/no-go (TESTING.md, camera checklist item 1) |
 
 Reading:
-- The full finder grade with native grain, halation and bloom fits a 33 ms (30 fps) frame with room on the Mac (9 ms) and in the simulator (18 ms). The plan's guess for an A18 Pro is 2 to 3x the Mac, about 20 to 30 ms: tight but inside the budget. Only the device can say.
-- Grain is the stage that matters: grain off saves 25 to 35 %.
-- **Half-resolution texture does not save time at finder sizes on these GPUs** (slightly slower: the reduce/enlarge passes cost about what the smaller blurs and grain save, because `softBlur` already downsamples wide blurs). It only pays together with grain off. It is built and switchable at runtime (camera settings, ADVANCED, FINDER QUALITY), but AUTO no longer steps through it (full, grain off, 0.75x, 24 fps). Confirm on the device.
-- 0.75 render scale is the strongest single step in the simulator.
+- The full finder grade with native grain, halation and bloom fits a 33 ms (30 fps) frame with room on the Mac (9 to 11 ms) and in the simulator (16 to 18 ms). The plan's guess for an A18 Pro is 2 to 3x the Mac, about 20 to 35 ms: tight. Only the device can say.
+- Grain is the stage that matters: grain off saves 20 to 30 %.
+- Half-resolution texture does not save time at finder sizes on these GPUs (the reduce and enlarge passes cost about what the smaller blurs and grain save, because `softBlur` already downsamples wide blurs). So AUTO does not use it: the ladder is full, then grain off, then 0.75 render scale with grain off, then 24 fps. Half texture stays as a manual FINDER QUALITY option (Camera settings, ADVANCED) to try on the device.
 
 Reproduce:
 

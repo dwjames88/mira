@@ -23,6 +23,7 @@ Roll 1: a camera for iPhone. Not yet verified on an iPhone (see Notes).
 
 ### Changed
 - `FilmsPanel` is now shared between the editor and the camera.
+- The latitude meter computes its percentiles with a selection instead of a full sort (same values, about 5x faster); the camera reads it from a 256 px frame at 4 Hz.
 - MiraCore `Renderer` gains `withGrainSeed` and `withTextureScale` for the finder. Capture and export use the defaults and render as before.
 
 ### Tests
