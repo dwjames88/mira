@@ -29,6 +29,21 @@ struct ContentView: View {
             }
         }
         .overlay {
+            if let failure = state.openFailure {
+                ZStack {
+                    FieldFramesTheme.ink.opacity(0.72)
+                        .contentShape(Rectangle())
+                        .onTapGesture {}
+                    FFOpenFailureCard(message: failure.message,
+                                      onRetry: { state.retryOpenFailure() },
+                                      onBack: { state.dismissOpenFailure() })
+                        .padding(FieldFramesTheme.cells(4))
+                }
+                .onExitCommand { state.dismissOpenFailure() }
+                .transition(.opacity)
+            }
+        }
+        .overlay {
             if isTargeted {
                 Rectangle()
                     .strokeBorder(FieldFramesTheme.lichen, lineWidth: 1)

@@ -1,6 +1,7 @@
 import AppKit
 import CoreImage
 import MiraCore
+import MiraUI
 import ImageIO
 import Photos
 
@@ -12,6 +13,7 @@ struct Unchecked<Value>: @unchecked Sendable {
 
 enum AssetEditError: Error, CustomStringConvertible {
     case inputUnavailable
+    case photosDidNotDeliver
     case noFullSizeImage
     case rawOriginalMissing
     case notSaved(String)
@@ -19,6 +21,7 @@ enum AssetEditError: Error, CustomStringConvertible {
     var description: String {
         switch self {
         case .inputUnavailable: "Photos could not provide this picture for editing."
+        case .photosDidNotDeliver: FFOpenFailureCard.defaultMessage
         case .noFullSizeImage: "The full-size picture is not available, so it cannot be saved."
         case .rawOriginalMissing: "This edit was made on the RAW original, which Photos could not provide. Check the connection to iCloud and try again."
         case .notSaved(let why): why
@@ -63,16 +66,24 @@ final class AssetEditSession {
     /// True for assets opened from Recently Deleted: viewable, never saved or reverted.
     let isReadOnly: Bool
 
-    init(asset: PHAsset, isReadOnly: Bool = false) {
+    private let policy: EditingInputPolicy
+    private let makeRequester: @Sendable (PHAsset) -> any EditingInputRequesting<PHContentEditingInput>
+
+    init(asset: PHAsset, isReadOnly: Bool = false, policy: EditingInputPolicy = .standard,
+         makeRequester: @escaping @Sendable (PHAsset) -> any EditingInputRequesting<PHContentEditingInput> = { PhotoKitEditingInputRequester(asset: $0) }) {
         self.asset = asset
         self.isReadOnly = isReadOnly
+        self.policy = policy
+        self.makeRequester = makeRequester
     }
 
     // MARK: Open
 
     /// Requests the editing input and decodes the source and recipe.
-    func load(progress: (@MainActor (Double) -> Void)? = nil) async throws -> Loaded {
-        let input = try await requestInput(progress: progress)
+    /// `onEvent` reports `.downloading` and `.retrying` while Photos is asked for the editing input.
+    func load(progress: (@MainActor (Double) -> Void)? = nil,
+              onEvent: (@MainActor (EditingInputEvent) -> Void)? = nil) async throws -> Loaded {
+        let input = try await requestInput(progress: progress, onEvent: onEvent)
         self.input = input
 
         var recipe = Recipe.neutral
@@ -171,13 +182,26 @@ final class AssetEditSession {
                       rawDevelop: rawDevelop, rawNote: rawNote)
     }
 
-    private func requestInput(progress: (@MainActor (Double) -> Void)?) async throws -> PHContentEditingInput {
-        let handler: (@Sendable (Double) -> Void)? = progress.map { progress in
-            { @Sendable value in Task { @MainActor in progress(value) } }
+    /// Goes through `EditingInputFetch`, so a request Photos never answers times out, retries once and then
+    /// fails with `.photosDidNotDeliver` instead of hanging.
+    private func requestInput(progress: (@MainActor (Double) -> Void)?,
+                              onEvent: (@MainActor (EditingInputEvent) -> Void)?) async throws -> PHContentEditingInput {
+        let requester = makeRequester(asset)
+        let handler: @Sendable (EditingInputEvent) -> Void = { event in
+            Task { @MainActor in
+                if case .downloading(let p) = event { progress?(p) }
+                onEvent?(event)
+            }
         }
-        let result = await PhotoKitBridge.requestEditingInput(asset: Unchecked(value: asset), progress: handler)
-        guard let input = result?.value else { throw AssetEditError.inputUnavailable }
-        return input
+        do {
+            return try await EditingInputFetch.fetch(requester, policy: policy, onEvent: handler)
+        } catch {
+            switch error {
+            case .timedOut: throw AssetEditError.photosDidNotDeliver
+            case .unavailable: throw AssetEditError.inputUnavailable
+            case .cancelled: throw CancellationError()
+            }
+        }
     }
 
     // MARK: Save
@@ -222,7 +246,7 @@ final class AssetEditSession {
         if let fresh = PHAsset.fetchAssets(withLocalIdentifiers: [asset.localIdentifier], options: nil).firstObject {
             asset = fresh
         }
-        if input != nil { input = try await requestInput(progress: nil) }
+        if input != nil { input = try await requestInput(progress: nil, onEvent: nil) }
     }
 
     static func fetchAsset(localIdentifier: String) -> PHAsset? {

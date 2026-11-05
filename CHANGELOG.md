@@ -2,6 +2,11 @@
 
 All notable changes to Mira. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased 1.0.2]
+
+### Fixed
+- **Opening a photo can no longer hang on "OPENING" (Mac and iPhone).** If Photos does not hand over the editable original within 8 s (or within 30 s of its last iCloud download progress, shown as "DOWNLOADING FROM ICLOUD · NN%"), the request is cancelled and retried once; if that also fails a card says "Photos didn't hand over this photo." with RETRY and BACK, and other photos open normally. A late or repeated answer from Photos is ignored and never replaces a newer open.
+
 ## [1.0.1] - 2026-11-05
 
 A fix release after a run-through of the whole app on the Mac and on iPhone.
