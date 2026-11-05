@@ -102,7 +102,7 @@ public final class CameraModel {
     private let library: any PhotoLibraryWriting
     private let requestLibraryAccess: @Sendable () async -> LibraryAccess
     private let store: CameraSettingsStore
-    private let onOpenFrame: @MainActor (String) -> Void
+    private let onOpenLibrary: @MainActor () -> Void
     private let location = CameraLocation()
     private let filmLibrary: FilmLibrary?
 
@@ -132,7 +132,7 @@ public final class CameraModel {
     ///   - backend: the device and frame source; `CameraBackend.make` (real on a phone, fake elsewhere) when nil.
     ///   - fixtureURL: the picture the fake backend shows.
     ///   - printQueue: the app's shared print queue (it drains at launch, even with the camera closed); built here when nil.
-    ///   - onOpenFrame: opens the asset with this local identifier in the editor.
+    ///   - onOpenLibrary: brings up the photo library (the last-frame thumbnail's action).
     public init(
         printWriter: any PrintWriting,
         renderer: Renderer? = nil,
@@ -145,7 +145,7 @@ public final class CameraModel {
         settingsStore: CameraSettingsStore = CameraSettingsStore(),
         pendingDirectory: URL? = nil,
         printQueue: PrintQueue? = nil,
-        onOpenFrame: @escaping @MainActor (String) -> Void = { _ in }
+        onOpenLibrary: @escaping @MainActor () -> Void = {}
     ) {
         let made = backend ?? CameraBackend.make(fixtureURL: fixtureURL)
         device = made.device
@@ -153,7 +153,7 @@ public final class CameraModel {
         self.library = library
         self.requestLibraryAccess = requestLibraryAccess
         store = settingsStore
-        self.onOpenFrame = onOpenFrame
+        self.onOpenLibrary = onOpenLibrary
         let loaded = settingsStore.load()
         settings = loaded
         recipe = initialRecipe ?? loaded.lastRecipe ?? Recipe()
@@ -445,11 +445,8 @@ public final class CameraModel {
         }
     }
 
-    /// Opens the last frame in the editor.
-    public func openLastFrame() {
-        guard let id = lastAssetID else { return }
-        onOpenFrame(id)
-    }
+    /// The last-frame thumbnail: brings up the library (also when nothing was shot yet).
+    public func openLastFrame() { onOpenLibrary() }
 
     // MARK: Exposure, lenses, zoom, white balance
 

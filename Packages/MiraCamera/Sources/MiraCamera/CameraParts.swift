@@ -29,6 +29,7 @@ struct CameraHeader: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Back to library")
+            .accessibilityIdentifier("camera.library")
             Spacer(minLength: 0)
             if developing > 0 {
                 Text("DEVELOPING \(developing)").ffLabel(size: 9, color: T.paperDim).lineLimit(1)
@@ -283,8 +284,8 @@ struct LastFrameThumb: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .disabled(image == nil)
-        .accessibilityLabel("Open last frame in the editor")
+        .accessibilityLabel("Open the library")
+        .accessibilityIdentifier("camera.lastFrame")
     }
 }
 
