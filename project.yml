@@ -179,6 +179,7 @@ targets:
         MiraAppGroup: $(DEVELOPMENT_TEAM).$(MIRA_BUNDLE_PREFIX).mira
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSApplicationCategoryType: public.app-category.photography
+        LSSupportsOpeningDocumentsInPlace: false
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait

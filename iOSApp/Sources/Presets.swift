@@ -59,7 +59,7 @@ final class PresetHub {
 
     /// The version written into exported files.
     static var appVersion: String {
-        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "0.4.0"
+        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.0.0"
     }
 
     func refresh() { presets = store.all }
