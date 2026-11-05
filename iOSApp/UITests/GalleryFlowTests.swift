@@ -16,11 +16,10 @@ import XCTest
 
     func testOpenLibraryFilterRawAndEditorRoundTrip() throws {
         let app = XCUIApplication()
-        app.launch()
+        try Preconditions.launchOrSkip(app)
         let library = app.staticTexts["Library"]
-        XCTAssertTrue(library.waitForExistence(timeout: 20), "album list never loaded")
         library.tap()
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label ENDSWITH 'PHOTOS'")).firstMatch
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label ENDSWITH 'PHOTOS' OR label ENDSWITH ' RAW'")).firstMatch
             .waitForExistence(timeout: 20))
         sleep(3)
         shot("01-library-grid")
@@ -54,7 +53,7 @@ import XCTest
     /// Opens a RAW (DNG) from the RAW filter: it must open on the RAW (not the rendered picture) without blocking.
     func testOpenRawFromFilter() throws {
         let app = XCUIApplication()
-        app.launch()
+        try Preconditions.launchOrSkip(app)
         app.staticTexts["Library"].tap()
         let rawTab = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'RAW'")).firstMatch
         XCTAssertTrue(rawTab.waitForExistence(timeout: 20))

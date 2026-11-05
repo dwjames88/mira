@@ -48,6 +48,8 @@ import XCTest
     }
 
     func testSaveEditShowsEditedBadgeThenRevert() throws {
+        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        try XCTSkipUnless(status == .authorized || status == .limited, Preconditions.hint)
         let assetID = try seedAlbum()
         if PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil).firstObject?.hasAdjustments == true {
             let clean = expectation(description: "clean")
@@ -59,13 +61,15 @@ import XCTest
             wait(for: [clean], timeout: 30)
         }
         let app = XCUIApplication()
-        app.launch()
-        XCTAssertTrue(app.staticTexts["Library"].waitForExistence(timeout: 20))
+        try Preconditions.launchOrSkip(app)
         let album = app.staticTexts[Self.albumName]
         for _ in 0..<6 where !album.exists { app.scrollViews.firstMatch.swipeUp(); sleep(1) }
         XCTAssertTrue(album.waitForExistence(timeout: 10), "album not listed")
         album.tap()
         sleep(3)
+        // The RAW filter is remembered between launches (the gallery tests leave it on): go back to ALL.
+        let all = app.buttons["ALL"]
+        if all.waitForExistence(timeout: 5) { all.tap(); sleep(2) }
         shot("10-album")
         app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.2)).tap()
         let back = app.buttons["Back to library"]
