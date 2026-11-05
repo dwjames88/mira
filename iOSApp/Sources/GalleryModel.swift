@@ -503,3 +503,13 @@ final class CoverStore {
     }
     func removeAll() { cache.removeAllObjects(); keysByNode = [:]; assetIDs = [:] }
 }
+
+extension DevelopStore {
+    /// Of these identifiers, the ones Photos still has. Runs off the main actor.
+    nonisolated static func existingIdentifiers(among ids: [String]) -> Set<String> {
+        let result = PHAsset.fetchAssets(withLocalIdentifiers: ids, options: nil)
+        var found = Set<String>()
+        result.enumerateObjects { asset, _, _ in found.insert(asset.localIdentifier) }
+        return found
+    }
+}
