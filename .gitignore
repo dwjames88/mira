@@ -10,3 +10,7 @@ xcuserdata/
 *.zip
 Local.xcconfig
 FilmSources/
+
+# Optional RAW fixtures (download per Fixtures/raw/README.md)
+Fixtures/raw/sony-ilce7m3.arw
+Fixtures/raw/iphone-12-pro.dng
