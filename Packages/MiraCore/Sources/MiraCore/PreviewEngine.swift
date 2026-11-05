@@ -73,6 +73,8 @@ public final class PreviewEngine: @unchecked Sendable {
     private var levels: [Int: CIImage] = [:]
     /// Largest linear value the source holds (`CIImage.miraHeadroom`); derived bases lose the tag.
     private var sourceHeadroom: CGFloat = 1
+    /// The source's EXIF exposure time in seconds (`CIImage.miraExposureTime`), nil when unknown.
+    private var sourceExposureTime: Double?
     private var bases: [BaseKey: CIImage] = [:]
     private var baseOrder: [BaseKey] = []
     private var zoomBases: [ZoomBaseKey: CIImage] = [:]
@@ -139,6 +141,7 @@ public final class PreviewEngine: @unchecked Sendable {
             source = nil
         }
         sourceHeadroom = image?.miraHeadroom ?? 1
+        sourceExposureTime = image?.miraExposureTime
         levels = [:]
         bases = [:]
         baseOrder = []
@@ -163,6 +166,12 @@ public final class PreviewEngine: @unchecked Sendable {
         return sourceHeadroom
     }
 
+    /// The source's EXIF exposure time in seconds; nil when the file has none.
+    public var exposureTime: Double? {
+        lock.lock(); defer { lock.unlock() }
+        return sourceExposureTime
+    }
+
     public var sourceSize: CGSize? {
         lock.lock(); defer { lock.unlock() }
         return source?.extent.size
@@ -182,7 +191,7 @@ public final class PreviewEngine: @unchecked Sendable {
         Perf.interval("preview render") {
             guard let base = previewBase(crop: recipe.crop, canvas: canvas) else { return nil }
             let graded = renderer.grade(recipe, cropped: base, sourceSize: sourceSize, maskOverlay: maskOverlay,
-                                       sourceHeadroom: headroom)
+                                       sourceHeadroom: headroom, sourceExposureTime: exposureTime)
             return renderFrame(graded)
         }
     }
@@ -334,7 +343,8 @@ public final class PreviewEngine: @unchecked Sendable {
             // Dodge and burn masks are built for the region only (a zoomed 24 MP picture is huge).
             let graded = renderer.grade(recipe, cropped: base, sourceSize: sourceSize,
                                         maskRegion: recipe.dodgeBurn.hasVisibleEffect ? ci.insetBy(dx: -2, dy: -2) : nil,
-                                        maskOverlay: maskOverlay, sourceHeadroom: headroom)
+                                        maskOverlay: maskOverlay, sourceHeadroom: headroom,
+                                        sourceExposureTime: exposureTime)
             let extent = graded.extent
             guard !extent.isInfinite, !extent.isEmpty else { return nil }
             return renderFrame(graded, from: ci,

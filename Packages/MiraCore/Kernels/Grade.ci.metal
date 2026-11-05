@@ -327,6 +327,26 @@ float4 miraFilmExposure(coreimage::sample_t s, float g, float latitude, float he
 } // namespace coreimage
 } // extern "C"
 
+// Reciprocity failure (pipeline 2), in linear light right after white balance: a per-channel gain (the
+// uncompensated loss and the colour cast, folded together on the CPU), then, when `contrast` != 1, a power
+// around 18 % grey: y = 0.18 (x / 0.18)^contrast for x >= 0 (negative values only get the gain).
+// Mirrored by FilmMath.reciprocity in Swift.
+extern "C" {
+namespace coreimage {
+
+float4 miraReciprocity(coreimage::sample_t s, float3 gain, float contrast) {
+    if (s.a <= 0.0) { return s; }
+    float3 c = miraUnpremultiply(s) * gain;
+    if (contrast != 1.0) {
+        float3 p = 0.18 * pow(max(c, float3(0.0)) / 0.18, float3(contrast));
+        c = select(c, p, c >= 0.0);
+    }
+    return float4(c * s.a, s.a);
+}
+
+} // namespace coreimage
+} // extern "C"
+
 // Halation. The light that is scattered is taken from the highlights (smoothstep on Rec.709 luma of
 // the non-negative colour) and put back, blurred and tinted, so luminance is redistributed rather than
 // added. `miraHighlights` yields the part to blur; `miraHalationCombine` recomputes it from the source.
@@ -454,7 +474,9 @@ extern "C" {
 namespace coreimage {
 
 // geo = (frame origin x, y, frame diagonal in pixels, grain cell as a fraction of the diagonal)
-// par = (noise standard deviation, chroma, tonal centre, 0)
+// par = (noise standard deviation, chroma, tonal centre, shadow gain)
+// The shadow gain (1 = none; reciprocity failure raises it) multiplies the weight below the tonal centre,
+// smoothly: 1 at and above the centre, the full gain at black (mirrored by FilmMath.shadowWeight).
 float4 miraGrain(coreimage::sample_t s, float4 geo, float4 par, coreimage::destination dest) {
     if (s.a <= 0.0) { return s; }
     float2 q = (dest.coord() - geo.xy) / (geo.z * geo.w);
@@ -469,6 +491,7 @@ float4 miraGrain(coreimage::sample_t s, float4 geo, float4 par, coreimage::desti
     float d = (l - par.z) / 0.3;
     float w = 0.25 + 0.75 * exp(-d * d);
     w *= smoothstep(0.02, 0.08, l) * (1.0 - smoothstep(0.92, 0.98, l));
+    w *= 1.0 + (par.w - 1.0) * (1.0 - smoothstep(0.0, max(par.z, 1e-4), l));
     e += par.x * w * n;
     return float4(e * s.a, s.a);
 }

@@ -34,6 +34,10 @@ enum GradeKernels {
         try? CIColorKernel(functionName: "miraFilmExposure", fromMetalLibraryData: $0)
     }
 
+    static let reciprocity: CIColorKernel? = library.flatMap {
+        try? CIColorKernel(functionName: "miraReciprocity", fromMetalLibraryData: $0)
+    }
+
     static let highlights: CIColorKernel? = library.flatMap {
         try? CIColorKernel(functionName: "miraHighlights", fromMetalLibraryData: $0)
     }
@@ -138,6 +142,13 @@ enum GradeKernels {
         return kernel.apply(extent: image.extent, arguments: [image, Float(gain), Float(latitude), Float(max(headroom, 1))]) ?? image
     }
 
+    /// Reciprocity failure (see `miraReciprocity`): per-channel linear `gain`, then a power `contrast` around 18 % grey.
+    static func applyReciprocity(gain: (r: Double, g: Double, b: Double), contrast: Double, to image: CIImage) -> CIImage {
+        guard let kernel = reciprocity else { return image }
+        return kernel.apply(extent: image.extent,
+                            arguments: [image, CIVector(x: gain.r, y: gain.g, z: gain.b), Float(contrast)]) ?? image
+    }
+
     /// The part of the image that halation scatters (blur this).
     static func halationHighlights(of image: CIImage) -> CIImage {
         guard let kernel = highlights else { return image }
@@ -172,13 +183,14 @@ enum GradeKernels {
     }
 
     /// Film grain on an sRGB-encoded `image`. `cell` is the grain cell as a fraction of `diagonal`; `std`
-    /// the noise standard deviation (encoded units, before the tonal weight).
+    /// the noise standard deviation (encoded units, before the tonal weight); `shadowGain` scales the weight
+    /// below the tonal centre (see `miraGrain`).
     static func applyGrain(std: Double, cell: Double, chroma: Double, tonalCenter: Double,
-                           diagonal: Double, to image: CIImage) -> CIImage {
+                           diagonal: Double, shadowGain: Double = 1, to image: CIImage) -> CIImage {
         guard let kernel = grain else { return image }
         let e = image.extent
         let geo = CIVector(x: e.minX, y: e.minY, z: diagonal, w: cell)
-        let par = CIVector(x: std, y: chroma, z: tonalCenter, w: 0)
+        let par = CIVector(x: std, y: chroma, z: tonalCenter, w: shadowGain)
         return kernel.apply(extent: e, arguments: [image, geo, par]) ?? image
     }
 

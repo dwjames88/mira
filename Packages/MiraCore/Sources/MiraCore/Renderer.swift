@@ -95,11 +95,16 @@ public struct Renderer: Sendable {
     /// `sourceHeadroom` is the largest linear value the source holds (1 for SDR; a RAW developed with
     /// extended range reports its measured peak). nil reads the headroom a developed source carries
     /// (`CIImage.miraHeadroom`, set by `ImageSource.developedSource`), else 1.
-    public func apply(_ recipe: Recipe, to source: CIImage, sourceHeadroom: CGFloat? = nil) -> CIImage {
+    ///
+    /// `sourceExposureTime` is the photo's EXIF exposure time in seconds, for the reciprocity stage; nil reads the
+    /// tag a loaded source carries (`CIImage.miraExposureTime`). `recipe.exposureTime` overrides both.
+    public func apply(_ recipe: Recipe, to source: CIImage, sourceHeadroom: CGFloat? = nil,
+                      sourceExposureTime: Double? = nil) -> CIImage {
         // 0. Crop, rotation, flips and straighten first, so every stage below (and the
         // resolution-independent `scale`) sees the cropped output.
         grade(recipe, cropped: CropGeometry.apply(recipe.crop, to: source), sourceSize: source.extent.size,
-              sourceHeadroom: sourceHeadroom ?? source.miraHeadroom)
+              sourceHeadroom: sourceHeadroom ?? source.miraHeadroom,
+              sourceExposureTime: sourceExposureTime ?? source.miraExposureTime)
     }
 
     /// Everything after the crop: film, tone, colour, halation, bloom, grain, vignette and border.
@@ -117,9 +122,12 @@ public struct Renderer: Sendable {
     /// `sourceHeadroom` (default 1, SDR) is the largest linear value `input` holds. Above 1 the
     /// exposure stage maps the white point (gain x headroom) to 1 through the film's shoulder
     /// instead of clipping at the LUT (pipeline 2 only; see `miraFilmExposure`).
+    ///
+    /// `sourceExposureTime` (seconds, nil = unknown) feeds the reciprocity stage (pipeline 2, with a film):
+    /// the effective time is `recipe.exposureTime ?? sourceExposureTime`; with none the stage is off.
     public func grade(_ recipe: Recipe, cropped input: CIImage, sourceSize: CGSize? = nil,
                       maskRegion: CGRect? = nil, maskOverlay: Bool = false,
-                      sourceHeadroom: CGFloat = 1) -> CIImage {
+                      sourceHeadroom: CGFloat = 1, sourceExposureTime: Double? = nil) -> CIImage {
         let extent = input.extent
         guard !extent.isInfinite, !extent.isEmpty else { return input }
         let scale = min(extent.width, extent.height) / 1000
@@ -131,6 +139,13 @@ public struct Renderer: Sendable {
         // Push / pull (pipeline 2): stops of push development, -2 ... 2.
         let push = filmScience ? clamp(recipe.push, -2, 2) : 0
         let family = film?.family
+        // Reciprocity (pipeline 2, with a film): nil when off, no usable time, or no effect at that time.
+        let reciprocityEffect: ReciprocityEffect? = {
+            guard filmScience, recipe.reciprocity != .off, let film,
+                  let t = recipe.exposureTime ?? sourceExposureTime, t.isFinite, t > 0 else { return nil }
+            let e = Reciprocity.effect(film: film, exposureTime: t)
+            return e.isIdentity ? nil : e
+        }()
 
         // 1. Exposure. Pipeline 2: a gain in linear light with the film's highlight latitude, then
         // white balance (the light the film is exposed to).
@@ -146,6 +161,17 @@ public struct Renderer: Sendable {
                                                        latitude: latitude, headroom: headroom, to: image)
             }
             image = whiteBalance(image, recipe)
+            // 1a'. Reciprocity failure of the exposure time, in the same scene-referred linear light.
+            if let reciprocityEffect {
+                let darkening = recipe.reciprocity == .uncompensated ? -reciprocityEffect.lossStops : 0
+                let gain = (r: exp2(darkening + reciprocityEffect.cast.r), g: exp2(darkening + reciprocityEffect.cast.g),
+                            b: exp2(darkening + reciprocityEffect.cast.b))
+                let contrast = reciprocityEffect.contrastGain
+                if abs(gain.r - 1) > 1e-5 || abs(gain.g - 1) > 1e-5 || abs(gain.b - 1) > 1e-5 || abs(contrast - 1) > 1e-5 {
+                    image = GradeKernels.applyReciprocity(gain: gain, contrast: abs(contrast - 1) > 1e-5 ? contrast : 1,
+                                                          to: image)
+                }
+            }
         } else if abs(recipe.exposure) > eps {
             let f = CIFilter.exposureAdjust()
             f.inputImage = image
@@ -306,7 +332,7 @@ public struct Renderer: Sendable {
                 grainCharacter.grainStrength *= push > 0 ? 1 + character.pushGrainPerStop * push : 1 + 0.15 * push
                 image = filmGrain(image, extent: extent, character: grainCharacter,
                                   amount: clamp(recipe.grainAmount, 0, 1), sizeSlider: clamp(recipe.grainSize, 0, 1),
-                                  diagonal: diagonal)
+                                  diagonal: diagonal, shadowGain: reciprocityEffect?.shadowGrainGain ?? 1)
             }
         } else if recipe.grainAmount > eps {
             image = grain(image, extent: extent, amount: clamp(recipe.grainAmount, 0, 1),
@@ -384,7 +410,7 @@ public struct Renderer: Sendable {
 
     /// Pipeline 2 grain: smooth band-limited noise on the encoded image (see `miraGrain`).
     private func filmGrain(_ image: CIImage, extent: CGRect, character: FilmCharacter, amount: Double,
-                           sizeSlider: Double, diagonal: CGFloat) -> CIImage {
+                           sizeSlider: Double, diagonal: CGFloat, shadowGain: Double = 1) -> CIImage {
         let size = character.grainSize * exp2((sizeSlider - 0.5) * 2)
         // A pixel that averages f x f grains sees 1/f of the variation (f = grain cells per pixel).
         let cellsPerPixel = 1 / (size * diagonal)
@@ -392,7 +418,8 @@ public struct Renderer: Sendable {
         let std = amount * 2 * character.grainStrength * 0.025 * bandLimit
         let encoded = toGamma(image)
         let grained = GradeKernels.applyGrain(std: std, cell: size, chroma: character.grainChroma,
-                                              tonalCenter: character.grainTonalCenter, diagonal: diagonal, to: encoded)
+                                              tonalCenter: character.grainTonalCenter, diagonal: diagonal,
+                                              shadowGain: shadowGain, to: encoded)
         return fromGamma(grained).cropped(to: extent)
     }
 

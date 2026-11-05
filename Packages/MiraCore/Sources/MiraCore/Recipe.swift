@@ -48,10 +48,16 @@ public struct Recipe: Codable, Hashable, Sendable {
     public var toningStrength: Double
     /// Camera RAW decode settings; identity for non-RAW sources.
     public var raw: RawSettings
+    /// Exposure time in seconds the film is exposed for (reciprocity, pipeline 2); nil reads the source's EXIF
+    /// value. The EXIF value itself is a property of the source and is never stored here.
+    public var exposureTime: Double?
+    /// How the film's reciprocity failure is simulated (pipeline 2); `.compensated` by default.
+    public var reciprocity: ReciprocityMode
 
     /// True when any film-science control is set (adjustment-data format version 4).
     public var usesFilmScienceControls: Bool {
         push != 0 || remJetRemoved || scanProfile != .neutral || paper != .none || toning != .none || !raw.isIdentity
+            || exposureTime != nil || reciprocity != .compensated
     }
     /// Crop, rotation, flips and straighten; identity by default.
     public var crop: CropSettings
@@ -96,6 +102,8 @@ public struct Recipe: Codable, Hashable, Sendable {
         toning: Toning = .none,
         toningStrength: Double = 0.5,
         raw: RawSettings = .identity,
+        exposureTime: Double? = nil,
+        reciprocity: ReciprocityMode = .compensated,
         crop: CropSettings = .identity,
         curves: CurvesSettings = .identity,
         colorMixer: ColorMixerSettings = .identity,
@@ -132,6 +140,8 @@ public struct Recipe: Codable, Hashable, Sendable {
         self.toning = toning
         self.toningStrength = toningStrength
         self.raw = raw
+        self.exposureTime = exposureTime
+        self.reciprocity = reciprocity
         self.crop = crop
         self.curves = curves
         self.colorMixer = colorMixer
@@ -143,6 +153,7 @@ public struct Recipe: Codable, Hashable, Sendable {
         case grainAmount, grainSize, halationAmount, halationRadius, bloomAmount
         case vignetteAmount, borderEnabled, borderWidth, version, pipeline, crop
         case push, remJetRemoved, scanProfile, paper, toning, toningStrength, raw, curves, colorMixer, dodgeBurn
+        case exposureTime, reciprocity
         case highlights, shadows, whites, blacks, vibrance, clarity, texture
     }
 
@@ -181,6 +192,8 @@ public struct Recipe: Codable, Hashable, Sendable {
         toning = (try? c.decodeIfPresent(Toning.self, forKey: .toning)) ?? d.toning
         toningStrength = try c.decodeIfPresent(Double.self, forKey: .toningStrength) ?? d.toningStrength
         raw = try c.decodeIfPresent(RawSettings.self, forKey: .raw) ?? .identity
+        exposureTime = try c.decodeIfPresent(Double.self, forKey: .exposureTime)
+        reciprocity = (try? c.decodeIfPresent(ReciprocityMode.self, forKey: .reciprocity)) ?? d.reciprocity
         crop = try c.decodeIfPresent(CropSettings.self, forKey: .crop) ?? .identity
         curves = try c.decodeIfPresent(CurvesSettings.self, forKey: .curves) ?? .identity
         colorMixer = try c.decodeIfPresent(ColorMixerSettings.self, forKey: .colorMixer) ?? .identity
@@ -218,6 +231,8 @@ public struct Recipe: Codable, Hashable, Sendable {
             try c.encode(toningStrength, forKey: .toningStrength)
         }
         if !raw.isIdentity { try c.encode(raw, forKey: .raw) }
+        if let exposureTime { try c.encode(exposureTime, forKey: .exposureTime) }
+        if reciprocity != .compensated { try c.encode(reciprocity, forKey: .reciprocity) }
         try c.encode(crop, forKey: .crop)
         if !curves.isIdentity { try c.encode(curves, forKey: .curves) }
         if !colorMixer.isIdentity { try c.encode(colorMixer, forKey: .colorMixer) }

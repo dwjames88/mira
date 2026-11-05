@@ -59,6 +59,9 @@ public struct Film: Codable, Identifiable, Hashable, Sendable {
     public var monochrome: Bool?
     /// Per-film overrides of the character derived from family and ISO (see `FilmCharacter.defaults`).
     public var character: FilmCharacter.Override?
+    /// Datasheet reciprocity data (long and short exposure failure); nil falls back to the family default
+    /// (`Reciprocity.familyDefault`). `FilmLibrary` fills a variant's from its parent.
+    public var reciprocity: ReciprocityData?
 
     /// True for black-and-white emulsions: monochrome grain, untinted halation.
     /// Prefix of `file` for looks Mira generates in code instead of loading a LUT file, e.g.
@@ -84,7 +87,7 @@ public struct Film: Codable, Identifiable, Hashable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, displayName, brand, family, iso, description, file, png, source, parent, variant, monochrome, character
+        case id, displayName, brand, family, iso, description, file, png, source, parent, variant, monochrome, character, reciprocity
     }
 
     /// `iso` may be a number or a numeric string in `films.json`.
@@ -109,13 +112,14 @@ public struct Film: Codable, Identifiable, Hashable, Sendable {
         variant = try c.decodeIfPresent(String.self, forKey: .variant)
         monochrome = try c.decodeIfPresent(Bool.self, forKey: .monochrome)
         character = try c.decodeIfPresent(FilmCharacter.Override.self, forKey: .character)
+        reciprocity = try c.decodeIfPresent(ReciprocityData.self, forKey: .reciprocity)
     }
 
     public init(
         id: String, displayName: String, brand: String, family: FilmFamily,
         iso: Int, description: String, file: String, png: String? = nil, source: String? = nil,
         parent: String? = nil, variant: String? = nil, monochrome: Bool? = nil,
-        character: FilmCharacter.Override? = nil
+        character: FilmCharacter.Override? = nil, reciprocity: ReciprocityData? = nil
     ) {
         self.id = id
         self.displayName = displayName
@@ -130,5 +134,6 @@ public struct Film: Codable, Identifiable, Hashable, Sendable {
         self.variant = variant
         self.monochrome = monochrome
         self.character = character
+        self.reciprocity = reciprocity
     }
 }

@@ -32,4 +32,19 @@ enum FilmMath {
         let shoulder = x * (g + x) / (1 + g * x)
         return (1 - latitude) * (g * x) + latitude * shoulder
     }
+
+    /// Reciprocity on one linear channel value (kernel `miraReciprocity`): a gain `gain`, then, when
+    /// `contrast` != 1, a power around 18 % grey: 0.18 (x / 0.18)^contrast for x >= 0.
+    static func reciprocity(_ x: Double, gain: Double, contrast: Double) -> Double {
+        let y = x * gain
+        guard contrast != 1, y >= 0 else { return y }
+        return 0.18 * pow(y / 0.18, contrast)
+    }
+
+    /// Weight of the shadow grain gain at sRGB-encoded luminance `l` for tonal centre `center`
+    /// (kernel `miraGrain`): 1 at and above the centre, 0 at black, smooth in between.
+    static func shadowWeight(luma l: Double, center: Double) -> Double {
+        let t = min(max(l / max(center, 1e-6), 0), 1)
+        return 1 - t * t * (3 - 2 * t)
+    }
 }
