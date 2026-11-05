@@ -50,12 +50,46 @@ public enum MiraAdjustment {
         return try? Recipe.decode(data)
     }
 
-    public static func adjustmentData(for recipe: Recipe) throws -> PHAdjustmentData {
+    public static func adjustmentData(for recipe: Recipe, rawBase: Bool = false) throws -> PHAdjustmentData {
         PHAdjustmentData(
             formatIdentifier: formatIdentifier,
             formatVersion: formatVersion(for: recipe),
-            data: try encode(recipe)
+            data: rawBase ? try encodeMarkingRawBase(recipe) : try encode(recipe)
         )
+    }
+
+    // MARK: RAW base
+
+    /// Top-level key added to the payload of an edit made on the RAW original (not on the rendered
+    /// JPEG of a RAW+JPEG pair). `Recipe` decoding ignores it, so every build still reads the recipe;
+    /// only builds that know the key rebuild the edit on the RAW.
+    static let rawBaseKey = "miraBase"
+    static let rawBaseValue = "raw"
+
+    static func encodeMarkingRawBase(_ recipe: Recipe) throws -> Data {
+        var object = try JSONSerialization.jsonObject(with: encode(recipe)) as? [String: Any] ?? [:]
+        object[rawBaseKey] = rawBaseValue
+        return try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+    }
+
+    /// True when `payload` (the adjustment data bytes) was written for a RAW base.
+    public static func isRawBase(payload: Data) -> Bool {
+        guard let object = try? JSONSerialization.jsonObject(with: payload) as? [String: Any] else { return false }
+        return object[rawBaseKey] as? String == rawBaseValue
+    }
+
+    public static func isRawBase(_ data: PHAdjustmentData) -> Bool { isRawBase(payload: data.data) }
+
+    /// What the asset's adjustment data means for opening it.
+    public static func state(of data: PHAdjustmentData?) -> AssetAdjustmentState {
+        guard let data else { return .none }
+        return recipe(from: data) != nil ? .mira(rawBase: isRawBase(data)) : .foreign
+    }
+
+    /// For the Photos extension: it is only given the rendered JPEG of a RAW+JPEG pair, so it cannot
+    /// continue an edit that was made on the RAW. Declining makes Photos hand it the rendered result.
+    public static func canHandleInExtension(_ data: PHAdjustmentData) -> Bool {
+        canHandle(data) && !isRawBase(data)
     }
 
     public static func recipe(from data: PHAdjustmentData) -> Recipe? {

@@ -89,6 +89,25 @@ public enum ImageSource {
         }
     }
 
+    /// The preview JPEG a camera writes into its RAW file (ARW, NEF, CR2/3, DNG preview ...), upright, no
+    /// RAW decode: a few milliseconds. The placeholder shown while the draft decode runs. nil when the
+    /// file has no embedded preview or is not RAW. It is ImageIO's thumbnail (embedded image used when
+    /// present; ImageIO may decode when absent, so callers run it off the main actor).
+    public static func loadEmbeddedPreview(
+        url: URL, orientation: CGImagePropertyOrientation? = nil, maxPixelSize: CGFloat = 1600
+    ) -> CIImage? {
+        guard isRAW(url: url), let src = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
+            kCGImageSourceCreateThumbnailWithTransform: false,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+            kCGImageSourceShouldCacheImmediately: true,
+        ]
+        guard let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, options as CFDictionary) else { return nil }
+        return CIImage(cgImage: cg).oriented(effectiveOrientation(src, override: orientation))
+            .withMiraExposureTime(exposureTime(from: src))
+    }
+
     /// Pixel size of the first image after orientation, read from the header only.
     public static func orientedPixelSize(url: URL, orientation: CGImagePropertyOrientation? = nil) -> CGSize? {
         guard let src = CGImageSourceCreateWithURL(url as CFURL, nil),

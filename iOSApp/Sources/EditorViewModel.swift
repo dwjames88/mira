@@ -33,6 +33,10 @@ final class EditorViewModel {
             if !isRestoring { recipe.upgradePipelineIfFilmScienceChanged(from: oldValue) }
             if !isRestoring, saveState != .saving { saveState = .unsaved }
             scheduleHistogram()
+            // A film changes how the RAW is developed (automatic boost and range), so develop it again.
+            if !isRestoring, rawAsset, (recipe.filmID != nil) != (oldValue.filmID != nil) || recipe.raw != oldValue.raw {
+                scheduleRawDevelop()
+            }
         }
     }
 
@@ -80,6 +84,9 @@ final class EditorViewModel {
     }
 
     private let engine = PhotoEngine()
+    /// True while the open library asset is developed from its RAW original.
+    @ObservationIgnored private var rawAsset = false
+    @ObservationIgnored private var rawTask: Task<Void, Never>?
     private var histogramTask: Task<Void, Never>?
 
     init() { recipe = Recipe() }
@@ -261,13 +268,41 @@ final class EditorViewModel {
             } else if let foreign = loaded.foreignFormat {
                 status = "EDITED IN ANOTHER APP (\(foreign)) · STARTING FROM ORIGINAL"
             } else {
-                status = ""
+                status = loaded.rawNote ?? ""
             }
+            rawAsset = loaded.isRaw
             scheduleHistogram()
             startThumbnails()
+            if loaded.isRaw { scheduleRawDevelop(draftFirst: false) }
         } catch {
             status = "ERROR · \(error.localizedDescription.uppercased())"
         }
+    }
+
+    /// Develops the RAW again for the current recipe off the main actor and swaps it in: a draft at preview
+    /// size first (unless `draftFirst` is false), then the full-quality full-size develop. Newer requests win.
+    private func scheduleRawDevelop(draftFirst: Bool = true) {
+        guard case .asset(let session) = editTarget else { return }
+        rawTask?.cancel()
+        rawTask = Task { [weak self] in
+            guard let self else { return }
+            if draftFirst {
+                try? await Task.sleep(for: .milliseconds(120))
+                guard !Task.isCancelled else { return }
+                if let draft = await session.rawSource(for: self.recipe, full: false) { await self.adoptRaw(draft, session) }
+            }
+            guard !Task.isCancelled else { return }
+            if let full = await session.rawSource(for: self.recipe, full: true) { await self.adoptRaw(full, session) }
+        }
+    }
+
+    private func adoptRaw(_ loaded: LoadedSource, _ session: AssetEditSession) async {
+        guard !Task.isCancelled, hasPhoto, case .asset(let current) = editTarget, current === session else { return }
+        try? await engine.adopt(loaded)
+        guard !Task.isCancelled else { return }
+        live.setSource(loaded.image, colorSpace: loaded.colorSpace, size: loaded.size)
+        sourcePixelSize = loaded.size
+        scheduleHistogram()
     }
 
     func fail(_ message: String) { status = message }
@@ -275,6 +310,8 @@ final class EditorViewModel {
     /// Returns to the gallery, discarding the open photo's edit state.
     func closePhoto() {
         commitCrop()
+        rawTask?.cancel()
+        rawAsset = false
         hasPhoto = false
         isCropping = false
         zoom = 1; offset = .zero; showingOriginal = false
