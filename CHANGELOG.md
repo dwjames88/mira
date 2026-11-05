@@ -2,25 +2,31 @@
 
 All notable changes to Mira. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.5.0] - 2026-11-05
 
-### Changed
-- Film payload: the Hald PNGs moved to `FilmSources/HaldCLUT/` (kept for provenance, not bundled); the app and the Photos extension now bundle `Films/Packed/<id>.mlut`, LZMA-compressed 16-bit cubes whose dimension is chosen per film by measured error on real image colours (pixels of the sample JPEG and the iPhone DNG fixture plus a neutral ramp and an HSV sweep): 48³ or 56³ when within 4/255 (max) and 1.5/255 (99.9th percentile) of the 64³ original, else the exact 64³ (124, 45 and 91 films). 125.6 MB per copy instead of 361 MB. `mira-sheet --pack-films FilmSources Films` regenerates them and prints a summary. Packed films skip the LUT disk cache.
+Film science: a pipeline built in the order of the light, a smaller film payload, scene-referred RAW, Mira original looks, exposure time and reciprocity. Design notes and the numbers behind them are in [Design/FILM-SCIENCE.md](Design/FILM-SCIENCE.md).
 
 ### Added
-- 260 film looks (from 31): the full RawTherapee Film Simulation Collection (Pat David et al., CC BY-SA 4.0), shown as 82 stock cards (Color Negative 26, Slide 15, Kodachrome 3, Black & White 22, Instant 16). The 178 push/pull, tone and alternate variants are chosen with a Variant picker in the FILMS panel. Motion Picture (ECN-2) and Print families exist but have no stocks (no freely licensed data), so their tabs are hidden.
-- Film science (pipeline 2): exposure with film latitude, white balance before the film, energy-conserving halation in the exposure (rem-jet for motion-picture stocks), per-film grain (density dependent, chroma for colour films, frame-relative and band-limited so previews match exports), per-film character from family and ISO. Grain and Halation sliders read 50% as the film's own amount.
-- FILMS panel: Push/Pull (±2 stops in thirds), Scan (Neutral, Frontier-like, Noritsu-like), Toning for monochrome films, and a rem-jet toggle for motion-picture stocks. A Latitude readout under the histogram and in FILMS.
+- 264 film looks (from 31): the full RawTherapee Film Simulation Collection (Pat David et al., CC BY-SA 4.0), 260 looks, plus 4 Mira originals, shown as 86 stock cards (Color Negative 26, Slide 15, Kodachrome 3, Black & White 22, Instant 16, Motion Picture 2, Print 2). The 178 push/pull, tone and alternate variants are chosen with a Variant picker in the FILMS panel. All seven family tabs are populated.
+- Mira original looks, generated in code (`ProceduralLooks`, no LUT file, no affiliation with Kodak or Fujifilm): 500T Tungsten and 250D Daylight (Motion Picture) and Cinema Print and Color Paper (Print).
+- Paper: a print stock after the film. Cinema Print and Color Paper chips in the FILMS panel replace the Scan profile (choosing one sets Scan to Neutral); push contrast and black lift still apply. Hidden on the Print cards themselves and on monochrome films (a black-and-white negative is printed on black-and-white paper; Toning covers that), where the renderer also ignores a paper carried by a preset.
+- Exposure time and reciprocity failure: an EXPOSURE TIME slider (log scale, EXIF time by default, double-click the label to return to it) and a Reciprocity mode (Off, Compensated, Uncompensated) in the FILMS panel. Datasheet data for 41 stocks from Ilford, Kodak, Fuji, Agfa and Polaroid (with source URLs in `films.json`) and family defaults for the rest: loss of speed, colour cast from the inverse of the recommended filter, contrast, and shadow grain. A readout says what the time does to the film and when it is beyond the datasheet. Exposure time is read from EXIF for files and RAW and is part of the recipe (`Recipe.exposureTime`, `Recipe.reciprocity`).
+- Film science (pipeline 2): exposure with film latitude, white balance before the film, halation in the exposure (rem-jet for motion-picture stocks), per-film grain (density dependent, chroma for colour films, frame-relative and band-limited so previews match exports), per-film character from family and ISO. Grain and Halation sliders read 50% as the film's own amount.
+- FILMS panel: Push/Pull (±2 stops in thirds), Scan (Neutral, Frontier-like, Noritsu-like), Toning for monochrome films, a rem-jet toggle for motion-picture stocks, and a Latitude readout under the histogram and in FILMS.
 - RAW development: a RAW group in DEVELOP (white balance as shot or kelvin/tint, boost, highlight recovery, local tone map, noise reduction, sharpness, lens correction) through `CIRAWFilter`, with draft previews and full-quality export. An ALL / RAW toggle beside Filter in the Mac library.
+- Scene-referred headroom for RAW and HDR sources: the measured peak of an extended-range decode is mapped to white through the film's shoulder (knee at 0.6) before the LUT, instead of clipping.
+- Real RAW fixtures for tests (`Fixtures/raw`): an Apple iPhone XS DNG (CC0, raw.pixls.us) is committed; a Sony ILCE-7M3 ARW and an iPhone 12 Pro DNG are listed with URLs and SHA-256 for download (kept out of the repository to keep its history small). `RawIntegrationTests` skip any file that is absent.
+- `mira-sheet --contact-sheet`: a headless films x states grid for judging looks (states include `halation-max`, `paper-cinema`, `paper-color`, `toning-selenium`; `--exposure-time` and `--reciprocity`), with 1:1 highlight and midtone crops for grain and halation.
 
 ### Changed
+- Film payload: the Hald PNGs moved to `FilmSources/HaldCLUT/` (361 MB, kept for provenance, not bundled); the app and the Photos extension now bundle `Films/Packed/<id>.mlut`, LZMA-compressed 16-bit cubes whose dimension is chosen per film by measured error on real image colours (pixels of the sample JPEG and the iPhone DNG fixture plus a neutral ramp and an HSV sweep): 48³ or 56³ when within 4/255 (max) and 1.5/255 (99.9th percentile) of the 64³ original, else the exact 64³ (124, 45 and 91 films). Films is 126 MB per copy (125.6 MB of cubes) instead of 361 MB, and the app is 284 MB instead of about 720 MB. `mira-sheet --pack-films FilmSources Films` regenerates them and prints a summary. Packed films skip the LUT disk cache.
+- The LUT stage of pipeline 2 uses a float tetrahedral Core Image kernel (`miraLUT3D`) instead of `CIColorCube`, which quantized an identity cube to about 257 levels; it now gives at least 3,000 levels on a 4,000-step ramp, within 1/255 of the old result on real colours, about 30% more time on that stage. Pipeline 1 is unchanged.
+- Halation retuned: clipped point lights no longer get a grey hole (only 20% of the scattered light is taken out of the source, as on film where the core sits on the shoulder), threshold `smoothstep(0.7, 1.0)`, radius 0.006 of the diagonal plus a tighter component so the fringe hugs the light.
+- Film strip thumbnails are lazy and cached on disk: only the cards on screen and six on each side are rendered, and tiles are kept as JPEGs in a 200 MB least-recently-used cache. Measured with 82 stocks and Original (release, medians of 3, on a heavily loaded machine): the first 8 thumbnails take 177 ms before, 138 ms on a cold cache and 73 ms on a warm one; the initial window of 15 tiles 154 ms cold (the old code rendered every card, 1789 ms); the whole strip 166 ms warm with no renders. See [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
 - Choosing a film opts a recipe into pipeline 2 and saves Photos adjustment data as format version 4, which older builds refuse; versions 1 to 3 still read. Legacy recipes (no `pipeline` key) render exactly as before.
 - Presets keep only boost, tone map and highlight recovery from the RAW settings, not white balance or per-camera values.
 - Kodak Elite Color 200 and 400 are classed as color negative, not slide; Kodachrome stocks have their own family.
 - The in-memory LUT cache is an LRU of 64 cubes; the launch prewarm loads stock cards only.
-
-### Notes
-- Known issue (fixed in Unreleased): `Films/HaldCLUT` grew from 38 MB to about 361 MB and was copied into both the app and the Photos extension.
 
 ## [0.4.0] - 2026-10-23
 
