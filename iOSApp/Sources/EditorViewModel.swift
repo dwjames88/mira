@@ -25,6 +25,11 @@ final class EditorViewModel {
     /// Crop being edited while `isCropping`; committed to `recipe.crop` by `commitCrop()`.
     var workingCrop = CropSettings.identity
 
+    /// Steps whose control panel the user folded away to see the whole photo. Per step, kept while editing, not persisted.
+    var panelHidden: [EditorTab: Bool] = [:]
+    /// FILMS step: true while the applied stock's full options panel replaces the card strip.
+    var filmsDetail = false
+
     /// Single source of truth for every edit.
     var recipe: Recipe {
         didSet {
@@ -35,7 +40,7 @@ final class EditorViewModel {
             scheduleHistogram()
             // A film changes how the RAW is developed (automatic boost and range), so develop it again.
             if !isRestoring, rawAsset, (recipe.filmID != nil) != (oldValue.filmID != nil) || recipe.raw != oldValue.raw {
-                scheduleRawDevelop()
+                scheduleRawDevelop(debounce: Self.rawDevelopDebounce(from: oldValue, to: recipe))
             }
         }
     }
@@ -87,6 +92,8 @@ final class EditorViewModel {
     /// True while the open library asset is developed from its RAW original.
     @ObservationIgnored private var rawAsset = false
     @ObservationIgnored private var rawTask: Task<Void, Never>?
+    /// Bumped by every open; a load that finishes after a newer one started is dropped.
+    @ObservationIgnored private var openGeneration = 0
     private var histogramTask: Task<Void, Never>?
 
     init() { recipe = Recipe() }
@@ -195,7 +202,7 @@ final class EditorViewModel {
     var exposureTimeReadout: String {
         if let t = recipe.exposureTime { return ExposureTimeFormat.label(t) }
         if let t = sourceExposureTime { return ExposureTimeFormat.label(t) + " \u{00B7} EXIF" }
-        return "No EXIF"
+        return "NO EXIF"   // caps like every other readout (the Mac shows "No EXIF")
     }
 
     /// Binding into the recipe for DEVELOP controls; writes flow through `recipe`'s didSet.
@@ -265,11 +272,15 @@ final class EditorViewModel {
     /// Mira recipe is restored on top, so a saved edit reopens exactly and stays adjustable.
     func openAsset(_ asset: PHAsset) async {
         status = "LOADING"
+        openGeneration += 1
+        let generation = openGeneration
         let session = AssetEditSession(asset: asset)
         do {
             let loaded = try await session.load()
             let adopted = LoadedSource(image: loaded.source, colorSpace: loaded.colorSpace, size: loaded.size)
             try await engine.adopt(adopted)
+            // A newer open (another asset or a picked photo) started while this one loaded: it wins.
+            guard generation == openGeneration else { return }
             live.setSource(loaded.source, colorSpace: loaded.colorSpace, size: loaded.size)
             sourceExposureTime = loaded.source.miraExposureTime
             sourcePixelSize = loaded.size
@@ -291,35 +302,65 @@ final class EditorViewModel {
                 status = loaded.rawNote ?? ""
             }
             rawAsset = loaded.isRaw
+            thumbnailsFilmApplied = loaded.recipe.filmID != nil
             scheduleHistogram()
             startThumbnails()
             if loaded.isRaw { scheduleRawDevelop(draftFirst: false) }
         } catch {
+            guard generation == openGeneration else { return }
             status = "ERROR · \(error.localizedDescription.uppercased())"
         }
     }
 
     /// Develops the RAW again for the current recipe off the main actor and swaps it in: a draft at preview
     /// size first (unless `draftFirst` is false), then the full-quality full-size develop. Newer requests win.
-    private func scheduleRawDevelop(draftFirst: Bool = true) {
+    private func scheduleRawDevelop(draftFirst: Bool = true, debounce: Duration = .milliseconds(120)) {
         guard case .asset(let session) = editTarget else { return }
         rawTask?.cancel()
         rawTask = Task { [weak self] in
             guard let self else { return }
             if draftFirst {
-                try? await Task.sleep(for: .milliseconds(120))
+                // A slider drag coalesces; a film tap is one discrete change and starts at once.
+                if debounce > .zero { try? await Task.sleep(for: debounce) }
                 guard !Task.isCancelled else { return }
-                if let draft = await session.rawSource(for: self.recipe, full: false) { await self.adoptRaw(draft, session) }
+                let applied = self.recipe.filmID != nil
+                if let draft = await session.rawSource(for: self.recipe, full: false) {
+                    await self.adoptRaw(draft, session, filmApplied: applied)
+                }
             }
             guard !Task.isCancelled else { return }
-            if let full = await session.rawSource(for: self.recipe, full: true) { await self.adoptRaw(full, session) }
+            let applied = self.recipe.filmID != nil
+            if let full = await session.rawSource(for: self.recipe, full: true) {
+                await self.adoptRaw(full, session, filmApplied: applied)
+            } else if !Task.isCancelled, self.hasPhoto {
+                self.status = "RAW DEVELOP FAILED · SHOWING THE LAST PREVIEW"
+            }
         }
     }
 
-    private func adoptRaw(_ loaded: LoadedSource, _ session: AssetEditSession) async {
+    /// No wait when the film was toggled (a tap); the usual 120 ms while RAW settings change (a slider drag).
+    static func rawDevelopDebounce(from old: Recipe, to new: Recipe) -> Duration {
+        (old.filmID != nil) != (new.filmID != nil) ? .zero : .milliseconds(120)
+    }
+
+    /// Whether the film thumbnails (and the engine's small source behind them) come from a develop with the film applied.
+    @ObservationIgnored private(set) var thumbnailsFilmApplied = false
+
+    /// A develop with a different film-applied state than the one the thumbnails were rendered from (automatic boost
+    /// and range depend on it) invalidates them, so the strip never mixes film-off and film-on develops. The draft to
+    /// full swap of the same state does not.
+    func noteThumbnailSource(filmApplied: Bool) {
+        guard filmApplied != thumbnailsFilmApplied else { return }
+        thumbnailsFilmApplied = filmApplied
+        thumbnails = [:]
+        startThumbnails()
+    }
+
+    private func adoptRaw(_ loaded: LoadedSource, _ session: AssetEditSession, filmApplied: Bool) async {
         guard !Task.isCancelled, hasPhoto, case .asset(let current) = editTarget, current === session else { return }
         try? await engine.adopt(loaded)
         guard !Task.isCancelled else { return }
+        noteThumbnailSource(filmApplied: filmApplied)
         live.setSource(loaded.image, colorSpace: loaded.colorSpace, size: loaded.size)
         sourcePixelSize = loaded.size
         scheduleHistogram()
@@ -334,6 +375,8 @@ final class EditorViewModel {
         rawAsset = false
         hasPhoto = false
         isCropping = false
+        panelHidden = [:]
+        filmsDetail = false
         zoom = 1; offset = .zero; showingOriginal = false
         isRestoring = true
         recipe = Recipe()
@@ -347,7 +390,16 @@ final class EditorViewModel {
     }
 
     private func ingest(_ data: Data) async throws {
+        openGeneration += 1
+        let generation = openGeneration
         let loaded = try await engine.load(data: data)
+        guard generation == openGeneration else { return }
+        present(loaded)
+    }
+
+    /// Shows a decoded source as a freshly opened import (default recipe, nothing to save).
+    func present(_ loaded: LoadedSource) {
+        thumbnailsFilmApplied = false
         live.setSource(loaded.image, colorSpace: loaded.colorSpace, size: loaded.size)
         sourceExposureTime = loaded.image.miraExposureTime
         sourcePixelSize = loaded.size
@@ -403,6 +455,7 @@ final class EditorViewModel {
         guard hasPhoto, saveState != .saving else { return }
         commitCrop()
         let previous = saveState
+        let saving = recipe
         saveState = .saving
         isSaving = true
         status = "SAVING"
@@ -418,7 +471,8 @@ final class EditorViewModel {
                 try await PhotoEngine.saveToLibrary(url)
                 status = "SAVED TO PHOTOS"
             }
-            saveState = .saved
+            // Edits made while the save ran are not in the file: the photo is still unsaved.
+            saveState = recipe == saving ? .saved : .unsaved
         } catch {
             saveState = previous == .saved ? .unsaved : previous
             status = "SAVE FAILED · \(error.localizedDescription.uppercased())"

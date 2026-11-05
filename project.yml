@@ -18,8 +18,8 @@ settings:
     CODE_SIGN_IDENTITY: "Apple Development"
     ENABLE_HARDENED_RUNTIME: YES
     ENABLE_USER_SCRIPT_SANDBOXING: YES
-    MARKETING_VERSION: "1.0.0"
-    CURRENT_PROJECT_VERSION: "7"
+    MARKETING_VERSION: "1.0.1"
+    CURRENT_PROJECT_VERSION: "8"
 packages:
   MiraCore:
     path: Packages/MiraCore
@@ -179,6 +179,7 @@ targets:
         MiraAppGroup: $(DEVELOPMENT_TEAM).$(MIRA_BUNDLE_PREFIX).mira
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSApplicationCategoryType: public.app-category.photography
+        LSSupportsOpeningDocumentsInPlace: false
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
@@ -214,6 +215,37 @@ targets:
         IPHONEOS_DEPLOYMENT_TARGET: "18.0"
         SWIFT_VERSION: "6.0"
         GENERATE_INFOPLIST_FILE: NO
+  # UI tests drive the iOS app inside the simulator only (never the host pointer or keyboard).
+  # Grant Photos first: xcrun simctl privacy <udid> grant photos com.fieldframes.mira.ios
+  MiraiOSUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: iOSApp/UITests
+    dependencies:
+      - target: MiraiOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(MIRA_BUNDLE_PREFIX).mira.ios.uitests
+        TEST_TARGET_NAME: MiraiOS
+        IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+        SWIFT_VERSION: "6.0"
+        GENERATE_INFOPLIST_FILE: YES
+  MiraiOSTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: iOSTests
+    dependencies:
+      - target: MiraiOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(MIRA_BUNDLE_PREFIX).mira.ios.tests
+        SWIFT_VERSION: "6.0"
+        IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Mira.app/Mira
+        BUNDLE_LOADER: $(TEST_HOST)
 schemes:
   Mira:
     build:
@@ -228,3 +260,8 @@ schemes:
         MiraiOS: all
     run:
       config: Debug
+    test:
+      config: Debug
+      targets:
+        - MiraiOSTests
+        - MiraiOSUITests

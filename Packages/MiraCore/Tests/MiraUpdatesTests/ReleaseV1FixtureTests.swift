@@ -60,6 +60,46 @@ struct ReleaseV1FixtureTests {
                                          preferences: UpdatePreferences(defaults: scratchDefaults()))
         #expect(report == .upToDate(current: SemanticVersion("1.0.0")!, latest: SemanticVersion("1.0.0")!))
     }
+
+    // MARK: As actually published
+
+    /// `Fixtures/release-v1.0.0-published.json` is the unedited API response for the release as it went out
+    /// (captured 2026-11-05). Unlike the hand-made fixture above it carries the development-signed iOS ipa next
+    /// to the dmg and zip, and the real sizes and digests.
+    private func published() throws -> Release { try Release.decode(Fixture.data("release-v1.0.0-published")) }
+
+    @Test func publishedReleaseKeepsTheIPAOutOfTheMacUpdate() throws {
+        let release = try published()
+        #expect(release.assets.map(\.name).sorted() == ["Mira-1.0.0-iOS-development.ipa", "Mira-1.0.0.dmg", "Mira-1.0.0.zip"])
+        let zip = try #require(release.installableAsset)
+        #expect(zip.name == "Mira-1.0.0.zip" && zip.isZip)
+        #expect(zip.size == 275_179_690)
+        #expect(zip.sha256 == "0ec015f0983bb2dbdb0265b305dad9f855a86aecda817d21e8218fed1286b463")
+        #expect(release.diskImageAsset?.name == "Mira-1.0.0.dmg")
+        #expect(release.assets.allSatisfy { Release.isTrustedDownloadURL($0.downloadURL) && $0.sha256?.count == 64 })
+    }
+
+    @Test func withoutTheZipThePublishedReleaseFallsBackToTheDmgNeverTheIPA() throws {
+        var release = try published()
+        release.assets.removeAll { $0.isZip }
+        #expect(release.zipAsset == nil)
+        #expect(release.installableAsset?.name == "Mira-1.0.0.dmg")
+        release.assets.removeAll { $0.isDiskImage }
+        #expect(release.installableAsset == nil)   // an ipa is not a Mac update
+    }
+
+    @Test func publishedReleaseIsOfferedTo0_5_0AndNotTo1_0_0() async throws {
+        let body = try Fixture.data("release-v1.0.0-published")
+        StubProtocol.install { _ in .data(body, status: 200) }
+        let checker = UpdateChecker(session: StubProtocol.session, userAgent: "Mira-Updater/test")
+        let preferences = UpdatePreferences(defaults: scratchDefaults())
+        guard case .available(let found) = await checker.check(current: SemanticVersion("0.5.0")!, trigger: .manual, preferences: preferences) else {
+            Issue.record("0.5.0 must be offered 1.0.0"); return
+        }
+        #expect(found.installableAsset?.name == "Mira-1.0.0.zip")
+        let same = await checker.check(current: SemanticVersion("1.0.0")!, trigger: .manual, preferences: preferences)
+        #expect(same == .upToDate(current: SemanticVersion("1.0.0")!, latest: SemanticVersion("1.0.0")!))
+    }
 }
 }
 #endif

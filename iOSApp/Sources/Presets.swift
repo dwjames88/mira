@@ -59,7 +59,7 @@ final class PresetHub {
 
     /// The version written into exported files.
     static var appVersion: String {
-        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "0.4.0"
+        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.0.0"
     }
 
     func refresh() { presets = store.all }
@@ -503,7 +503,7 @@ extension EditorViewModel {
 
     /// What applying `preset` gives right now: its look, the photo's crop and brushwork (a missing film becomes none).
     func appliedRecipe(for preset: Preset) -> Recipe {
-        var r = preset.recipe(keeping: recipe.crop, dodgeBurn: recipe.dodgeBurn)
+        var r = preset.recipe(keeping: recipe.crop, dodgeBurn: recipe.dodgeBurn, raw: recipe.raw)
         if isFilmMissing(preset) { r.filmID = nil }
         return r
     }

@@ -88,6 +88,8 @@ private enum PointEditing {
 
 struct CurvesEditor: View {
     @Bindable var model: EditorViewModel
+    /// When set, the editor is the compact in-panel form: tabs and Reset share a row and the plot is this tall and full width.
+    var plotHeight: CGFloat?
     @State private var channel: CurveChannel = .rgb
     @State private var selected: Int?
     @State private var dragging: Int?
@@ -99,8 +101,10 @@ struct CurvesEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            FFSectionLabel("Curves")
-            tabs
+            if plotHeight == nil { FFSectionLabel("Curves") }
+            if plotHeight == nil { tabs } else {
+                HStack(spacing: 0) { tabs; resetButton }
+            }
             GeometryReader { geo in
                 Canvas { context, size in draw(&context, size) }
                     .background(T.backdrop)
@@ -108,24 +112,39 @@ struct CurvesEditor: View {
                     .contentShape(Rectangle())
                     .gesture(drag(geo.size))
             }
-            .aspectRatio(1, contentMode: .fit)
+            .modifier(PlotSize(height: plotHeight))
             .padding(.top, 4)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("\(channel.fullName) curve editor")
             .accessibilityValue("\(points.count) points")
-            HStack {
-                Text(channel.fullName).ffLabel(color: T.paperDim)
-                Spacer()
-                Button {
-                    model.recipe.curves[channel] = CurvesSettings.identityPoints
-                    selected = nil
-                } label: {
-                    Text("Reset").ffLabel(color: isIdentity ? T.paperDim.opacity(0.5) : T.lichen)
-                        .frame(minHeight: 44)
+            if plotHeight == nil {
+                HStack {
+                    Text(channel.fullName).ffLabel(color: T.paperDim)
+                    Spacer()
+                    resetButton
                 }
-                .buttonStyle(.plain)
-                .disabled(isIdentity)
+            } else {
+                Spacer().frame(height: 8)
             }
+        }
+    }
+
+    private var resetButton: some View {
+        Button {
+            model.recipe.curves[channel] = CurvesSettings.identityPoints
+            selected = nil
+        } label: {
+            Text("Reset").ffLabel(color: isIdentity ? T.paperDim.opacity(0.5) : T.lichen)
+                .frame(minHeight: 44)
+        }
+        .buttonStyle(.plain)
+        .disabled(isIdentity)
+    }
+
+    private struct PlotSize: ViewModifier {
+        let height: CGFloat?
+        func body(content: Content) -> some View {
+            if let height { content.frame(height: height) } else { content.aspectRatio(1, contentMode: .fit) }
         }
     }
 

@@ -29,6 +29,10 @@ enum GradeKernels {
         try? CIKernel(functionName: "miraCurves", fromMetalLibraryData: $0)
     }
 
+    static let sanitize: CIColorKernel? = library.flatMap {
+        try? CIColorKernel(functionName: "miraSanitize", fromMetalLibraryData: $0)
+    }
+
     static let tone: CIColorKernel? = library.flatMap {
         try? CIColorKernel(functionName: "miraTone", fromMetalLibraryData: $0)
     }
@@ -77,10 +81,18 @@ enum GradeKernels {
     static var isAvailable: Bool {
         colorMixer != nil && curves != nil && tone != nil && detail != nil && dodgeBurn != nil
             && filmExposure != nil && highlights != nil && halationCombine != nil && grain != nil
-            && scan != nil && toning != nil && lut3D != nil && reciprocity != nil
+            && scan != nil && toning != nil && lut3D != nil && reciprocity != nil && sanitize != nil
     }
 
     // MARK: Stages
+
+    /// NaN -> 0, +inf -> `limit`, -inf -> 0; every finite value (also above 1) is untouched. Run where a source
+    /// enters the pipeline and before a blur: one non-finite pixel through a separable Gaussian becomes a
+    /// block of them, which the tone stage then shows as a black square.
+    static func applySanitize(limit: Double = 1, to image: CIImage) -> CIImage {
+        guard let kernel = sanitize else { return image }
+        return kernel.apply(extent: image.extent, arguments: [image, Float(max(limit, 1))]) ?? image
+    }
 
     static func applyColorMixer(_ settings: ColorMixerSettings, to image: CIImage) -> CIImage {
         guard let kernel = colorMixer else { return image }

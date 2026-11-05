@@ -149,6 +149,9 @@ public struct Renderer: Sendable {
         let film = recipe.filmID.flatMap { library.film(id: $0) }
         let character = film?.resolvedCharacter ?? .generic
         let diagonal = hypot(extent.width, extent.height)
+        // A non-finite pixel in the developed source (a decoder overflow, a half-float inf) would spread through
+        // every blur below; replace it where it enters. Finite values, including scene values above 1, pass.
+        image = GradeKernels.applySanitize(limit: Double(max(sourceHeadroom, 1)), to: image)
         // Push / pull (pipeline 2): stops of push development, -2 ... 2.
         let push = filmScience ? clamp(recipe.push, -2, 2) : 0
         let family = film?.family
@@ -493,6 +496,8 @@ public struct Renderer: Sendable {
     /// detail left, so blurring at 1/4 (or 1/2) size and enlarging with bilinear filtering gives the
     /// same picture for a fraction of the work. Small radii blur at full size.
     static func softBlur(_ image: CIImage, extent: CGRect, sigma: CGFloat) -> CIImage {
+        // Whatever earlier stages produced, the blur never sees a non-finite pixel (it would grow into a block).
+        let image = GradeKernels.applySanitize(limit: 65504, to: image)
         let factor: CGFloat = sigma >= blurReductionThreshold ? 4 : (sigma >= blurReductionThreshold / 2 ? 2 : 1)
         let blur = CIFilter.gaussianBlur()
         guard factor > 1 else {

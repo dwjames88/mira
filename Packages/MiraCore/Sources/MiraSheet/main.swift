@@ -253,10 +253,12 @@ for film in selected {
     var warnings: [String] = []
     if s.luma < 0.08 { warnings.append(String(format: "mean luma %.4f < 0.08 (too dark)", s.luma)) }
     if s.luma > 0.95 { warnings.append(String(format: "mean luma %.4f > 0.95 (blown out)", s.luma)) }
-    if film.family == .blackAndWhite, s.chroma > 0.02 {
-        warnings.append(String(format: "black & white film has chroma %.4f > 0.02", s.chroma))
+    // `isMonochrome`, not the family: the black-and-white instant stocks (FP-3000B, Polaroid 664/665/667/672)
+    // are in the Instant family but are monochrome films.
+    if film.isMonochrome, s.chroma > 0.02 {
+        warnings.append(String(format: "monochrome film has chroma %.4f > 0.02", s.chroma))
     }
-    if film.family != .blackAndWhite, s.chroma < 0.005 {
+    if !film.isMonochrome, s.chroma < 0.005 {
         warnings.append(String(format: "colour film has chroma %.4f < 0.005", s.chroma))
     }
     for w in warnings { print("WARN \(film.id): \(w)"); warnCount += 1 }

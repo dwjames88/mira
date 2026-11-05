@@ -15,6 +15,19 @@ static inline float3 miraUnpremultiply(float4 s) {
     return s.a > 0.0 ? s.rgb / s.a : s.rgb;
 }
 
+// Non-finite values. Tested on the bit pattern: Metal's fast-math may fold isnan / isinf / x == x away.
+static inline bool miraNonFinite(float x) { return (as_type<uint>(x) & 0x7f800000u) == 0x7f800000u; }
+
+// NaN -> 0, +inf -> `limit`, -inf -> 0. Finite values (including the legitimate > 1 of a scene-referred
+// source) pass through unchanged.
+static inline float miraFinite(float x, float limit) {
+    if (!miraNonFinite(x)) { return x; }
+    return (as_type<uint>(x) & 0x007fffffu) != 0u ? 0.0 : (x > 0.0 ? limit : 0.0);
+}
+
+// The largest value half-float working storage holds; results are kept inside it so they never become inf.
+constant float miraHalfMax = 65504.0;
+
 static inline float miraEncode1(float x) {
     float a = fabs(x);
     float e = a <= 0.0031308 ? 12.92 * a : 1.055 * pow(a, 1.0 / 2.4) - 0.055;
@@ -29,6 +42,32 @@ static inline float miraDecode1(float x) {
 
 static inline float3 miraEncode(float3 c) { return float3(miraEncode1(c.r), miraEncode1(c.g), miraEncode1(c.b)); }
 static inline float3 miraDecode(float3 c) { return float3(miraDecode1(c.r), miraDecode1(c.g), miraDecode1(c.b)); }
+
+// MARK: Luminance relight
+
+static inline float miraLuma(float3 c) { return dot(c, float3(0.2126, 0.7152, 0.0722)); }
+
+// Applies a new luminance y2 to an sRGB-encoded colour whose luminance is y, keeping hue.
+//
+// The textbook way is e * (y2 / y): split into luminance and chroma offset (e - y) it is y2 + (e - y) * (y2 / y).
+// That chroma gain is ill-conditioned in deep shadows: y is tiny while the colour keeps its (noisy, often
+// wide-gamut and partly negative) chroma, so a lift of 0.3 at y = 0.003 multiplies the chroma by 100 and a
+// near-black colour becomes a saturated orange or green speck. So the chroma gain on a lift is capped by
+// sMax(y) = 1 + (y / 0.02)^2: about 1 for truly tiny luma (0.003 -> 1.02), 2 at 0.02, 5 at 0.04 and 17 at
+// 0.08, i.e. the full ratio for any legitimately dark colour (a lift never gains more than ~y2 / y = 4 above
+// y = 0.1) while it cannot explode below ~0.03. Channels below zero (out of gamut, where luma cancels) divide
+// the cap further. Darkening (ratio <= 1) and every pixel the cap does not bind are exactly the ratio scale.
+static inline float3 miraRelight(float3 e, float y, float y2) {
+    if (y <= 1.0e-4) { return e + (y2 - y); }
+    float ratio = y2 / y;
+    float s = ratio;
+    if (ratio > 1.0) {
+        float q = y * 50.0;
+        float neg = max(-min(e.r, min(e.g, e.b)), 0.0);
+        s = min(ratio, (1.0 + q * q) / (1.0 + 8.0 * neg / y));
+    }
+    return y2 + (e - y) * s;
+}
 
 // MARK: Curves
 
@@ -52,6 +91,18 @@ static inline float3 miraLookup3(coreimage::sampler lut, float3 v) {
 extern "C" {
 namespace coreimage {
 
+// Replaces non-finite pixels (NaN -> 0, +inf -> limit, -inf -> 0) and leaves every finite value untouched.
+float4 miraSanitize(coreimage::sample_t s, float limit) {
+    return float4(miraFinite(s.r, limit), miraFinite(s.g, limit), miraFinite(s.b, limit),
+                  clamp(miraFinite(s.a, 1.0), 0.0, 1.0));
+}
+
+} // namespace coreimage
+} // extern "C"
+
+extern "C" {
+namespace coreimage {
+
 float4 miraCurves(coreimage::sampler src, coreimage::sampler lut, float useLuma) {
     float4 s = src.sample(src.coord());
     if (s.a <= 0.0) { return s; }
@@ -60,11 +111,7 @@ float4 miraCurves(coreimage::sampler src, coreimage::sampler lut, float useLuma)
     if (useLuma > 0.5) {
         float y = dot(e, float3(0.2126, 0.7152, 0.0722));
         float y2 = miraLookup(lut, y, 1.0) + (y - clamp(y, 0.0, 1.0));
-        if (y > 1.0e-4) {
-            e *= y2 / y;
-        } else {
-            e += (y2 - y);
-        }
+        e = miraRelight(e, y, y2);
     }
     return float4(miraDecode(e) * s.a, s.a);
 }
@@ -171,14 +218,6 @@ float4 miraColorMixer(coreimage::sample_t s, float4 hue0, float4 hue1, float4 sa
 
 // MARK: Tone (highlights, shadows, whites, blacks)
 
-static inline float miraLuma(float3 c) { return dot(c, float3(0.2126, 0.7152, 0.0722)); }
-
-// Applies a new luminance to an sRGB-encoded colour by scaling it (keeps hue and chroma ratio).
-static inline float3 miraRelight(float3 e, float y, float y2) {
-    if (y > 1.0e-4) { return e * (y2 / y); }
-    return e + (y2 - y);
-}
-
 extern "C" {
 namespace coreimage {
 
@@ -187,10 +226,13 @@ namespace coreimage {
 //   highlights / shadows: smooth masks on the blurred luminance, so they act locally;
 //   whites / blacks: end-point curves y + 0.33 w y^3 and y + 0.2 b (1-y)^4 (monotonic for |w|,|b| <= 1).
 float4 miraTone(coreimage::sample_t s, coreimage::sample_t b, float hl, float sh, float wh, float bl) {
+    s = float4(miraFinite(s.r, 1.0), miraFinite(s.g, 1.0), miraFinite(s.b, 1.0), miraFinite(s.a, 1.0));
     if (s.a <= 0.0) { return s; }
     float3 e = miraEncode(miraUnpremultiply(s));
     float y = miraLuma(e);
+    // A non-finite base (one bad pixel spread by the blur) must not blank a whole block: fall back to the pixel itself.
     float yb = miraLuma(miraEncode(miraUnpremultiply(b)));
+    if (miraNonFinite(yb)) { yb = y; }
     float y2 = y;
     float wS = 1.0 - smoothstep(0.05, 0.65, yb);
     float wH = smoothstep(0.35, 0.95, yb);
@@ -204,21 +246,23 @@ float4 miraTone(coreimage::sample_t s, coreimage::sample_t b, float hl, float sh
     y2 += 0.2 * bl * ic * ic * ic * ic;
     y2 = max(y2, 0.0);
     e = miraRelight(e, y, y2);
-    return float4(miraDecode(e) * s.a, s.a);
+    return float4(clamp(miraDecode(e) * s.a, -miraHalfMax, miraHalfMax), s.a);
 }
 
 // Local contrast: adds `amount` of the difference between the image and its blur to the
 // luminance, weighted toward the midtones when `midtones` > 0.5 (clarity) or flat (texture).
 float4 miraDetail(coreimage::sample_t s, coreimage::sample_t b, float amount, float midtones) {
+    s = float4(miraFinite(s.r, 1.0), miraFinite(s.g, 1.0), miraFinite(s.b, 1.0), miraFinite(s.a, 1.0));
     if (s.a <= 0.0) { return s; }
     float3 e = miraEncode(miraUnpremultiply(s));
     float y = miraLuma(e);
     float yb = miraLuma(miraEncode(miraUnpremultiply(b)));
+    if (miraNonFinite(yb)) { yb = y; }
     float t = 2.0 * clamp(y, 0.0, 1.0) - 1.0;
     float w = midtones > 0.5 ? 1.0 - t * t : 1.0;
     float y2 = max(y + amount * w * (y - yb), 0.0);
     e = miraRelight(e, y, y2);
-    return float4(miraDecode(e) * s.a, s.a);
+    return float4(clamp(miraDecode(e) * s.a, -miraHalfMax, miraHalfMax), s.a);
 }
 
 } // namespace coreimage
