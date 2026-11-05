@@ -69,4 +69,16 @@ import XCTest
         try? app.debugDescription.write(toFile: "/private/tmp/claude-501/uishots/raw-hierarchy.txt", atomically: true, encoding: .utf8)
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'ERROR' OR label CONTAINS 'FAILED'")).firstMatch.exists)
     }
+
+    /// The app opens to the camera; its LIBRARY link brings up the library, whose top card is DEVELOP.
+    func testLibraryFromCameraShowsDevelopCard() throws {
+        let app = XCUIApplication()
+        app.launch()
+        try Preconditions.openLibraryFromCamera(app)
+        let card = app.descendants(matching: .any)["library.developCard"]
+        XCTAssertTrue(card.waitForExistence(timeout: 20), "DEVELOP card missing from the library")
+        XCTAssertTrue(card.label.contains("DEVELOP"), "label was \(card.label)")
+        card.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["develop.queue"].waitForExistence(timeout: 10), "queue view never opened")
+    }
 }

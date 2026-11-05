@@ -8,6 +8,8 @@ import SwiftUI
 enum AlbumRoute: Hashable {
     case folder(id: String, title: String)
     case album(id: String, title: String)
+    /// The DEVELOP queue.
+    case develop
 }
 
 struct GalleryView: View {
@@ -27,6 +29,7 @@ struct GalleryView: View {
                         switch route {
                         case let .folder(id, title): FolderListView(gallery: gallery, folderID: id, title: title)
                         case let .album(id, title): AlbumGridView(gallery: gallery, editor: editor, nodeID: id, title: title)
+                        case .develop: DevelopQueueView(gallery: gallery, editor: editor)
                         }
                     }
             }
@@ -49,7 +52,10 @@ struct GalleryView: View {
                     .padding(FieldFramesTheme.cells(2))
             }
         }
-        .task { await gallery.start() }
+        .task {
+            await gallery.start()
+            await DevelopStore.shared.pruneMissing(fullAccess: gallery.status == .authorized)
+        }
         .onChange(of: editor.pendingLibraryOpen) { _, asset in
             guard let asset else { return }
             editor.pendingLibraryOpen = nil
@@ -103,8 +109,11 @@ struct GalleryView: View {
             if !gallery.loadedSections {
                 Color.clear.frame(maxHeight: .infinity)
             } else if gallery.sections.isEmpty {
-                FFEmptyState(title: "No photos", subtitle: gallery.status == .limited
-                             ? "NO PHOTOS IN YOUR SELECTION" : "YOUR LIBRARY HAS NO PICTURES")
+                VStack(spacing: 0) {
+                    DevelopCard(gallery: gallery)
+                    FFEmptyState(title: "No photos", subtitle: gallery.status == .limited
+                                 ? "NO PHOTOS IN YOUR SELECTION" : "YOUR LIBRARY HAS NO PICTURES")
+                }
             } else {
                 AlbumListView(gallery: gallery, sections: gallery.sections)
             }
@@ -135,6 +144,7 @@ private struct AlbumListView: View {
             let side = floor((geo.size.width - margin * 2 - gap) / 2)
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
+                    DevelopCard(gallery: gallery)
                     ForEach(sections) { section in
                         sectionHeader(section.title)
                         let nodes = SidebarModel.visible(section.nodes)
@@ -371,6 +381,7 @@ struct AlbumGridView: View {
     /// Persisted ALL / RAW choice, shared by every album.
     @AppStorage("gallery.rawOnly") private var rawOnly = false
     @Environment(\.displayScale) private var displayScale
+    private let develop = DevelopStore.shared
 
     private let columns = 3
     private let gutter: CGFloat = 1
@@ -438,6 +449,13 @@ struct AlbumGridView: View {
                             GalleryCell(album: album, asset: asset, index: index)
                                 .aspectRatio(1, contentMode: .fit)
                                 .onTapGesture { Task { await gallery.open(asset, in: editor) } }
+                                .contextMenu {
+                                    let queued = develop.contains(asset.localIdentifier)
+                                    Button { develop.toggle(asset.localIdentifier) } label: {
+                                        Label(queued ? "Remove from Develop" : "Add to Develop",
+                                              systemImage: queued ? "minus.circle" : "plus.circle")
+                                    }
+                                }
                         }
                     }
                 }
@@ -448,7 +466,7 @@ struct AlbumGridView: View {
     }
 }
 
-private extension View {
+extension View {
     /// Inline Cormorant title over a transparent bar; the back control keeps the lichen tint.
     func ffNavigationTitle(_ title: String) -> some View {
         self
