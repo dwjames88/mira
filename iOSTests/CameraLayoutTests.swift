@@ -5,6 +5,11 @@ import SwiftUI
 import XCTest
 @testable import Mira
 
+private struct TestOriginKey: PreferenceKey {
+    static let defaultValue: [String: CGRect] = [:]
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) { value.merge(nextValue()) { $1 } }
+}
+
 @MainActor
 final class CameraLayoutTests: XCTestCase {
     func makeModel() -> CameraModel {
@@ -85,5 +90,48 @@ final class CameraLayoutTests: XCTestCase {
         assertNoOverlap(f, ["header", "meter", "lenses", "ev"])
         XCTAssertLessThanOrEqual(f["ev"]!.maxY, usable.height + 0.5)
         XCTAssertLessThanOrEqual(shutter.maxY, usable.height + 0.5)
+    }
+
+    /// The header (and everything else) sits below the status bar / Dynamic Island: hosted with a real top safe-area
+    /// inset (not padding), the content must respect it while the background may extend under it.
+    func testChromeClearsTheTopSafeArea() async {
+        for d in [TestDevice.iPhone16Pro] {
+            let box = FrameBox()
+            let model = makeModel()
+            let origin = FrameBox()
+            let view = CameraView(model: model, filmName: "Kodak Portra 400", onClose: {}, onLayout: { box.frames = $0 }) { _ in
+                Color.clear
+            } wbDoor: { _ in
+                Color.clear
+            }
+            // The camera view's own frame in window coordinates; the part frames are relative to it.
+            .background(GeometryReader { geo in
+                Color.clear.preference(key: TestOriginKey.self, value: ["self": geo.frame(in: .global)])
+            })
+            .onPreferenceChange(TestOriginKey.self) { frames in
+                MainActor.assumeIsolated { if let r = frames["self"] { origin.frames = ["self": r] } }
+            }
+            let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+            let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: CGRect(origin: .zero, size: d.size))
+            window.frame = CGRect(origin: .zero, size: d.size)
+            let host = UIHostingController(rootView: view)
+            host.additionalSafeAreaInsets = UIEdgeInsets(top: d.topInset, left: 0, bottom: d.bottomInset, right: 0)
+            host.view.frame = window.bounds
+            window.rootViewController = host
+            window.makeKeyAndVisible()
+            host.view.layoutIfNeeded()
+            try? await Task.sleep(for: .milliseconds(1200))
+            host.view.layoutIfNeeded()
+            let f = box.frames
+            window.isHidden = true
+            await model.stop()
+            XCTAssertGreaterThan(host.view.safeAreaInsets.top, d.topInset - 0.5, "the host carries the inset")
+            let top = host.view.safeAreaInsets.top
+            guard let base = origin.frames["self"] else { return XCTFail("no camera view frame") }
+            for id in ["header", "meter", "finder"] {
+                guard let r = f[id] else { return XCTFail("missing \(id): \(f.keys.sorted())") }
+                XCTAssertGreaterThanOrEqual(base.minY + r.minY, top - 0.5, "\(id) starts below the top safe area (\(top)) on \(d.name)")
+            }
+        }
     }
 }
