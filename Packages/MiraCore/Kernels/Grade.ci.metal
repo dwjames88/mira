@@ -332,7 +332,7 @@ float4 miraFilmExposure(coreimage::sample_t s, float g, float latitude, float he
 // added. `miraHighlights` yields the part to blur; `miraHalationCombine` recomputes it from the source.
 static inline float3 miraHighlightPart(float3 c) {
     float3 p = max(c, float3(0.0));
-    return p * smoothstep(0.75, 1.1, miraLuma(p));
+    return p * smoothstep(0.7, 1.0, miraLuma(p));
 }
 
 extern "C" {
@@ -343,15 +343,80 @@ float4 miraHighlights(coreimage::sample_t s) {
     return float4(h * s.a, s.a);
 }
 
-// out = src - amount * h + amount * tint / luma(tint) * luma(blurred h)
-float4 miraHalationCombine(coreimage::sample_t s, coreimage::sample_t b, float amount, float4 tint) {
+// out = src - amount * comp * h + amount * tint / luma(tint) * luma(blurred h)
+// `comp` (0.2) is the partial compensation: only that share of the scattered light is taken out of the
+// source. On film the clipped core sits on the shoulder of the characteristic curve, so removing light
+// there is invisible; full energy conservation produced a visible grey hole in the light.
+float4 miraHalationCombine(coreimage::sample_t s, coreimage::sample_t b, float amount, float4 tint, float comp) {
     if (s.a <= 0.0) { return s; }
     float3 c = miraUnpremultiply(s);
     float3 h = miraHighlightPart(c);
     float3 t = tint.rgb / max(miraLuma(tint.rgb), 1.0e-6);
     float lb = miraLuma(miraUnpremultiply(b));
-    c = c - amount * h + amount * t * lb;
+    c = c - amount * comp * h + amount * t * lb;
     return float4(c * s.a, s.a);
+}
+
+} // namespace coreimage
+} // extern "C"
+
+// MARK: Float 3D LUT (pipeline 2)
+
+// The cube is a 2D atlas (width dim*dim, height dim, RGBAf, no colour space, sampled nearest): texel
+// (r, g, b) lives at x = b*dim + r, y = g. Reading exact texel centres and interpolating tetrahedrally in
+// float keeps the full precision CIColorCube loses (it quantises its output to about 8 bits).
+// The input is encoded to sRGB and clamped to 0...1 first, the result decoded again, as
+// CIColorCubeWithColorSpace(sRGB) did.
+static inline float3 miraCubeTexel(coreimage::sampler lut, float dim, float3 i) {
+    return lut.sample(lut.transform(float2(i.b * dim + i.r + 0.5, i.g + 0.5))).rgb;
+}
+
+extern "C" {
+namespace coreimage {
+
+float4 miraLUT3D(coreimage::sampler src, coreimage::sampler lut, float dim) {
+    float4 s = src.sample(src.coord());
+    if (s.a <= 0.0) { return s; }
+    float3 e = clamp(miraEncode(miraUnpremultiply(s)), 0.0, 1.0);
+    float3 p = e * (dim - 1.0);
+    float3 i0 = min(floor(p), dim - 2.0);
+    float3 f = p - i0;
+    float3 i1 = i0 + 1.0;
+    float3 c000 = miraCubeTexel(lut, dim, i0);
+    float3 c111 = miraCubeTexel(lut, dim, i1);
+    float3 c;
+    // Walk from c000 to c111 along the axes in order of decreasing fraction.
+    float3 cA, cB;
+    if (f.r >= f.g) {
+        if (f.g >= f.b) {            // r >= g >= b
+            cA = miraCubeTexel(lut, dim, float3(i1.r, i0.g, i0.b));
+            cB = miraCubeTexel(lut, dim, float3(i1.r, i1.g, i0.b));
+            c = c000 + f.r * (cA - c000) + f.g * (cB - cA) + f.b * (c111 - cB);
+        } else if (f.r >= f.b) {     // r >= b > g
+            cA = miraCubeTexel(lut, dim, float3(i1.r, i0.g, i0.b));
+            cB = miraCubeTexel(lut, dim, float3(i1.r, i0.g, i1.b));
+            c = c000 + f.r * (cA - c000) + f.b * (cB - cA) + f.g * (c111 - cB);
+        } else {                     // b > r >= g
+            cA = miraCubeTexel(lut, dim, float3(i0.r, i0.g, i1.b));
+            cB = miraCubeTexel(lut, dim, float3(i1.r, i0.g, i1.b));
+            c = c000 + f.b * (cA - c000) + f.r * (cB - cA) + f.g * (c111 - cB);
+        }
+    } else {
+        if (f.r >= f.b) {            // g > r >= b
+            cA = miraCubeTexel(lut, dim, float3(i0.r, i1.g, i0.b));
+            cB = miraCubeTexel(lut, dim, float3(i1.r, i1.g, i0.b));
+            c = c000 + f.g * (cA - c000) + f.r * (cB - cA) + f.b * (c111 - cB);
+        } else if (f.g >= f.b) {     // g >= b > r
+            cA = miraCubeTexel(lut, dim, float3(i0.r, i1.g, i0.b));
+            cB = miraCubeTexel(lut, dim, float3(i0.r, i1.g, i1.b));
+            c = c000 + f.g * (cA - c000) + f.b * (cB - cA) + f.r * (c111 - cB);
+        } else {                     // b > g > r
+            cA = miraCubeTexel(lut, dim, float3(i0.r, i0.g, i1.b));
+            cB = miraCubeTexel(lut, dim, float3(i0.r, i1.g, i1.b));
+            c = c000 + f.b * (cA - c000) + f.g * (cB - cA) + f.r * (c111 - cB);
+        }
+    }
+    return float4(miraDecode(c) * s.a, s.a);
 }
 
 } // namespace coreimage
