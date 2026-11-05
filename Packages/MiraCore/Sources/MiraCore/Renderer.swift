@@ -344,11 +344,11 @@ public struct Renderer: Sendable {
         // 7. Grain
         if filmScience {
             if recipe.grainAmount > eps {
-                var grainCharacter = character
-                grainCharacter.grainStrength *= push > 0 ? 1 + character.pushGrainPerStop * push : 1 + 0.15 * push
-                image = filmGrain(image, extent: extent, character: grainCharacter,
+                let boost = push > 0 ? 1 + character.pushGrainPerStop * push : 1 + 0.15 * push
+                image = filmGrain(image, extent: extent, character: character,
                                   amount: clamp(recipe.grainAmount, 0, 1), sizeSlider: clamp(recipe.grainSize, 0, 1),
-                                  diagonal: diagonal, shadowGain: reciprocityEffect?.shadowGrainGain ?? 1)
+                                  uncroppedFull: uncroppedFullSize(recipe, input: extent, sourceSize: sourceSize),
+                                  gainBoost: boost, shadowGain: reciprocityEffect?.shadowGrainGain ?? 1)
             }
         } else if recipe.grainAmount > eps {
             image = grain(image, extent: extent, amount: clamp(recipe.grainAmount, 0, 1),
@@ -424,25 +424,33 @@ public struct Renderer: Sendable {
             .cropped(to: extent)
     }
 
-    /// Pipeline 2 grain: smooth band-limited noise on the encoded image (see `miraGrain`).
+    /// Size in full-resolution pixels of the uncropped frame that `input` (already cropped, shown at `previewScale`)
+    /// was cut from; `sourceSize` supplies the crop's proportion (nil = `input` is the whole frame).
+    private func uncroppedFullSize(_ recipe: Recipe, input: CGRect, sourceSize: CGSize?) -> CGSize {
+        let s = CGFloat(max(previewScale, 0.001))
+        let full = CGSize(width: input.width / s, height: input.height / s)
+        guard let sourceSize, !recipe.crop.isIdentity else { return full }
+        let cut = CropGeometry.outputExtent(for: recipe.crop, imageExtent: CGRect(origin: .zero, size: sourceSize)).size
+        guard cut.width > 0, cut.height > 0 else { return full }
+        let f = max(full.width, full.height) / max(cut.width, cut.height)
+        return CGSize(width: sourceSize.width * f, height: sourceSize.height * f)
+    }
+
+    /// Pipeline 2 grain: the density-domain Gaussian field of `miraGrain`, in frame micrometres. The uncropped
+    /// photo spans 36 mm on its long side; a render shown at `previewScale` of full size has its pixel pitch from that
+    /// (the footprint, and with it the per-pixel statistics, follow the output resolution, so a preview, a zoom and an
+    /// export each get the model's own statistics at their scale).
     private func filmGrain(_ image: CIImage, extent: CGRect, character: FilmCharacter, amount: Double,
-                           sizeSlider: Double, diagonal: CGFloat, shadowGain: Double = 1) -> CIImage {
-        let size = character.grainSize * exp2((sizeSlider - 0.5) * 2)
-        // Cell size in full-resolution pixels (grain size is relative to the full frame's diagonal), then at
-        // the displayed scale. A pixel that averages f x f grains sees 1/f of the variation (f = cells per
-        // pixel), so the std follows the downsampled full-resolution render; below one pixel the cell is
-        // clamped to 1 px and keeps that std.
-        let s = max(previewScale, 0.001)
-        let fullPx = size * Double(diagonal) / Double(s)
-        let shownPx = fullPx * Double(s)
-        let cellPx = max(1.0, shownPx)
-        let bandLimit = min(1, shownPx)
-        let std = amount * 2 * character.grainStrength * 0.025 * bandLimit
-        let encoded = toGamma(image)
-        let grained = GradeKernels.applyGrain(std: std, cell: cellPx / Double(diagonal), chroma: character.grainChroma,
-                                              tonalCenter: character.grainTonalCenter, diagonal: diagonal,
-                                              shadowGain: shadowGain, to: encoded)
-        return fromGamma(grained).cropped(to: extent)
+                           sizeSlider: Double, uncroppedFull: CGSize, gainBoost: Double, shadowGain: Double = 1) -> CIImage {
+        let s = Double(max(previewScale, 0.001))
+        let longOut = Double(max(uncroppedFull.width, uncroppedFull.height)) * s
+        let params = GrainModel.parameters(for: character, sliderAmount: amount, sizeSlider: sizeSlider,
+                                           gainBoost: gainBoost, pitch: GrainModel.pitch(uncroppedLongSidePixels: longOut))
+        let seed = GrainModel.seed(uncroppedWidth: Double(uncroppedFull.width), height: Double(uncroppedFull.height))
+        return GradeKernels.applyGrain(params, seed: seed, clumping: character.grainClumping,
+                                       layerCorrelation: character.grainLayerCorrelation,
+                                       shape: character.grainDensityShape, shadowGain: shadowGain,
+                                       shadowCenter: character.grainTonalCenter, to: image).cropped(to: extent)
     }
 
     private func halation(_ image: CIImage, extent: CGRect, amount: Double, radius: Double, scale: CGFloat) -> CIImage {

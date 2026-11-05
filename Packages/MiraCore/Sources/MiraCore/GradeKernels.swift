@@ -193,16 +193,18 @@ enum GradeKernels {
                             arguments: [image, atlas, Float(lut.dimension)])
     }
 
-    /// Film grain on an sRGB-encoded `image`. `cell` is the grain cell as a fraction of `diagonal`; `std`
-    /// the noise standard deviation (encoded units, before the tonal weight); `shadowGain` scales the weight
-    /// below the tonal centre (see `miraGrain`).
-    static func applyGrain(std: Double, cell: Double, chroma: Double, tonalCenter: Double,
-                           diagonal: Double, shadowGain: Double = 1, to image: CIImage) -> CIImage {
-        guard let kernel = grain else { return image }
+    /// Film grain on a linear `image` (see `miraGrain`): `params` are the model's tap size, lattice and amplitude
+    /// for this output pixel pitch (`GrainModel.parameters`), `seed` the photo's seed, `shadowGain` the reciprocity
+    /// gain below `shadowCenter` (sRGB-encoded luminance).
+    static func applyGrain(_ params: GrainModel.Parameters, seed: Double, clumping: Double, layerCorrelation: Double,
+                           shape: GrainDensityShape, shadowGain: Double = 1, shadowCenter: Double = 0.4,
+                           to image: CIImage) -> CIImage {
+        guard let kernel = grain, params.amplitude > 0 else { return image }
         let e = image.extent
-        let geo = CIVector(x: e.minX, y: e.minY, z: diagonal, w: cell)
-        let par = CIVector(x: std, y: chroma, z: tonalCenter, w: shadowGain)
-        return kernel.apply(extent: e, arguments: [image, geo, par]) ?? image
+        let geo = CIVector(x: e.minX, y: e.minY, z: params.pitch, w: seed)
+        let a = CIVector(x: params.tau, y: params.lattice, z: params.amplitude, w: min(max(clumping, 0), 0.6))
+        let b = CIVector(x: layerCorrelation, y: Double(shape.rawValue), z: shadowGain, w: shadowCenter)
+        return kernel.apply(extent: e, arguments: [image, geo, a, b]) ?? image
     }
 
     /// Colour and tone transform after the film (see `miraScan`), on an sRGB-encoded `image`.

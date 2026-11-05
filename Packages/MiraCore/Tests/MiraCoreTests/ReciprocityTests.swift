@@ -184,12 +184,14 @@ import UniformTypeIdentifiers
     @Test func shadowGainOnlyRaisesGrainInShadows() throws {
         // The kernel adds noise to whatever values it is given; feed it values already in the 0...1 "encoded" range.
         let input = PipelineFixture.linearImage(width: 1000, height: 400) { x, _ in
-            let v: Float = x < 500 ? 0.12 : 0.75
+            let v: Float = x < 500 ? 0.04 : 0.55
             return (v, v, v)
         }
         func stds(_ gain: Double) -> (Double, Double) {
-            let out = LinearPixels(GradeKernels.applyGrain(std: 0.04, cell: 0.0006, chroma: 0, tonalCenter: 0.4,
-                                                           diagonal: 1077, shadowGain: gain, to: input))
+            // Negative shape: noise in the shadows needs the clear base behind it, so use mid-dark (0.25) and light (0.75).
+            let params = GrainModel.Parameters(tau: 8, lattice: 10, amplitude: 0.1, pitch: 6)
+            let out = LinearPixels(GradeKernels.applyGrain(params, seed: 7, clumping: 0, layerCorrelation: 1,
+                                                           shape: .negative, shadowGain: gain, shadowCenter: 0.6, to: input))
             func sd(_ xs: Range<Int>) -> Double {
                 var v: [Double] = []
                 for y in 20..<380 { for x in xs { v.append(out.value(x, y, 1)) } }

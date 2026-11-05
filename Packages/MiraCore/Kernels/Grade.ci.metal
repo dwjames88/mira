@@ -442,57 +442,126 @@ float4 miraLUT3D(coreimage::sampler src, coreimage::sampler lut, float dim) {
 } // namespace coreimage
 } // extern "C"
 
-// Film grain: smooth value noise (hashed integer lattice, quintic interpolation, two octaves) in
-// coordinates relative to the frame, so the pattern scales with the picture. Works on sRGB-encoded
-// values: the input is already encoded (the caller wraps the kernel in the encode / decode curves).
-static inline float miraGrainHash(int2 p, uint seed) {
-    uint x = uint(p.x) * 0x8da6b343u ^ uint(p.y) * 0xd8163841u ^ seed * 0xcb1ab31fu;
-    x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16;
-    return float(x >> 8) * (2.0 / 16777216.0) - 1.0;
+// Film grain (pipeline 2): a density-domain Gaussian field in film-frame micrometres (Design/GRAIN.md).
+//
+// The frame is mapped to 36 mm on its long side, so positions are in um and the same photo gets the same
+// grain at every zoom and export size. The noise is zero-mean unit-variance Gaussian-kernel-filtered white
+// noise, evaluated on a sparse hashed lattice (spacing l0, fixed per stock so the realisation does not change
+// with the sliders or the zoom) with Gaussian taps of std tau (the grain cloud s plus the scan footprint), so
+// its autocorrelation is exp(-r^2 / (4 tau^2)). When tau outgrows the lattice (a small export or a fit-to-window
+// preview: the footprint is wider than a pixel is long) it cross-fades to per-pixel hashed noise, which is white
+// at that scale anyway. The noise is added to the print density of each channel: D' = D + amp * g(y) * n, i.e.
+// the linear value is multiplied by 10^(-amp g n), so black stays black and a bright speck can never appear
+// in a shadow.
+
+static inline uint4 miraPcg4d(uint4 v) {
+    v = v * 1664525u + 1013904223u;
+    v.x += v.y * v.w; v.y += v.z * v.x; v.z += v.x * v.y; v.w += v.y * v.z;
+    v ^= v >> 16u;
+    v.x += v.y * v.w; v.y += v.z * v.x; v.z += v.x * v.y; v.w += v.y * v.z;
+    return v;
 }
 
-static inline float miraValueNoise(float2 q, uint seed) {
+// Four independent unit-variance uniforms (zero mean) from one hash.
+static inline float4 miraGrainUnit(uint4 key) {
+    uint4 h = miraPcg4d(key);
+    return (float4(h >> 8u) * (1.0 / 16777216.0) - 0.5) * 3.4641016;
+}
+
+// Lattice Gaussian noise: four unit-variance channels (common, r, g, b) at position x (um).
+// `tau` is the tap std, `l0` the lattice spacing, `layer` separates the octaves.
+static inline float4 miraGrainLattice(float2 x, float tau, float l0, uint seed, uint layer) {
+    float2 q = x / l0;
     float2 f0 = floor(q);
-    float2 f = q - f0;
-    float2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
-    int2 i = int2(f0);
-    float a = miraGrainHash(i, seed);
-    float b = miraGrainHash(i + int2(1, 0), seed);
-    float c = miraGrainHash(i + int2(0, 1), seed);
-    float d = miraGrainHash(i + int2(1, 1), seed);
-    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+    int2 i0 = int2(f0);
+    int n = tau * 2.25 / l0 > 2.0 ? 3 : 2;
+    float wx[6], wy[6];
+    float sx = 0.0, sy = 0.0;
+    float inv = -0.5 / (tau * tau);
+    for (int k = 0; k < 6; k++) {
+        if (k >= 2 * n) { wx[k] = 0.0; wy[k] = 0.0; continue; }
+        float2 d = x - (f0 + float(k - n + 1)) * l0;
+        wx[k] = exp(d.x * d.x * inv);
+        wy[k] = exp(d.y * d.y * inv);
+        sx += wx[k] * wx[k]; sy += wy[k] * wy[k];
+    }
+    float4 acc = float4(0.0);
+    for (int j = 0; j < 2 * n; j++) {
+        for (int k = 0; k < 2 * n; k++) {
+            int2 node = i0 + int2(k - n + 1, j - n + 1);
+            uint4 key = uint4(uint(node.x + 65536), uint(node.y + 65536), seed, layer);
+            acc += (wx[k] * wy[j]) * miraGrainUnit(key);
+        }
+    }
+    return acc * rsqrt(sx * sy);
 }
 
-// Two octaves (the second at twice the frequency, half the weight), scaled to a standard deviation of
-// about 1 (measured: 0.506 before the scale).
-static inline float miraGrainNoise(float2 q, uint seed) {
-    float n = miraValueNoise(q, seed) + 0.5 * miraValueNoise(q * 2.0 + float2(37.1, 17.3), seed);
-    return n * 1.977;
+// Per-pixel white noise with the same unit variance, for footprints wider than the lattice.
+static inline float4 miraGrainWhite(float2 pixel, uint seed, uint layer) {
+    int2 p = int2(floor(pixel));
+    return miraGrainUnit(uint4(uint(p.x + 65536), uint(p.y + 65536), seed ^ 0x9e3779b9u, layer + 17u));
+}
+
+static inline float4 miraGrainField(float2 x, float2 pixel, float tau, float l0, uint seed, uint layer) {
+    float r = tau / l0;
+    float wLat = 1.0 - smoothstep(0.9, 1.4, r);
+    float4 white = miraGrainWhite(pixel, seed, layer);
+    if (wLat <= 0.0) { return white; }
+    float4 lat = miraGrainLattice(x, tau, l0, seed, layer);
+    // Variance preserving cross-fade of two independent unit-variance fields.
+    float a = sqrt(wLat), b = sqrt(1.0 - wLat);
+    return a * lat + b * white;
+}
+
+// Density shape g(y, Y): how the density noise varies with the tone of the print, 0 where the film is clear.
+// shape 0 colour negative, 1 slide, 2 black-and-white negative, 3 instant. y = sRGB-encoded luminance.
+static inline float miraGrainShape(int shape, float y, float lum) {
+    float clearBase = smoothstep(0.02, 0.30, y);
+    if (shape == 1) {
+        // Reversal: grain follows the positive's density, so shadows and midtones carry it and clear highlights do not.
+        float d = -log10(max(lum, 1e-4));
+        return min(sqrt(max(d, 0.0)), 1.45) * smoothstep(0.0, 0.05, y);
+    }
+    if (shape == 2) { return clearBase * (1.0 - 0.55 * smoothstep(0.6, 1.0, y)); }
+    if (shape == 3) { return (0.55 + 0.45 * clearBase * (1.0 - 0.5 * smoothstep(0.65, 1.0, y))) * smoothstep(0.0, 0.08, y); }
+    return clearBase * (1.0 - 0.45 * smoothstep(0.6, 1.0, y));
 }
 
 extern "C" {
 namespace coreimage {
 
-// geo = (frame origin x, y, frame diagonal in pixels, grain cell as a fraction of the diagonal)
-// par = (noise standard deviation, chroma, tonal centre, shadow gain)
-// The shadow gain (1 = none; reciprocity failure raises it) multiplies the weight below the tonal centre,
+// geo = (frame origin x, y in pixels, um per output pixel, seed)
+// a   = (tau um, lattice spacing um, density noise std at g = 1, clumping weight)
+// b   = (layer correlation, density shape, shadow gain, tonal centre of the shadow gain)
+// The shadow gain (1 = none; reciprocity failure raises it) multiplies the amplitude below the tonal centre,
 // smoothly: 1 at and above the centre, the full gain at black (mirrored by FilmMath.shadowWeight).
-float4 miraGrain(coreimage::sample_t s, float4 geo, float4 par, coreimage::destination dest) {
+float4 miraGrain(coreimage::sample_t s, float4 geo, float4 a, float4 b, coreimage::destination dest) {
     if (s.a <= 0.0) { return s; }
-    float2 q = (dest.coord() - geo.xy) / (geo.z * geo.w);
-    float chroma = clamp(par.y, 0.0, 1.0);
-    float n0 = miraGrainNoise(q, 0u);
-    float3 nc = float3(miraGrainNoise(q, 1u), miraGrainNoise(q, 2u), miraGrainNoise(q, 3u));
-    float norm = rsqrt(chroma * chroma + (1.0 - chroma) * (1.0 - chroma));
-    float3 n = (chroma * nc + (1.0 - chroma) * n0) * norm;
-
     float3 e = miraUnpremultiply(s);
-    float l = miraLuma(e);
-    float d = (l - par.z) / 0.3;
-    float w = 0.25 + 0.75 * exp(-d * d);
-    w *= smoothstep(0.02, 0.08, l) * (1.0 - smoothstep(0.92, 0.98, l));
-    w *= 1.0 + (par.w - 1.0) * (1.0 - smoothstep(0.0, max(par.z, 1e-4), l));
-    e += par.x * w * n;
+    float lum = miraLuma(e);
+    float y = miraEncode1(max(lum, 0.0));
+    float amp = a.z * miraGrainShape(int(b.y + 0.5), y, lum);
+    amp *= 1.0 + (b.z - 1.0) * (1.0 - smoothstep(0.0, max(b.w, 1e-4), y));
+    // Black stays black and clipped white stays white.
+    amp *= smoothstep(0.004, 0.03, y) * (1.0 - smoothstep(0.985, 1.0, y));
+    if (amp < 1e-6) { return s; }
+
+    float2 pixel = dest.coord() - geo.xy;
+    float2 x = pixel * geo.z;
+    uint seed = uint(geo.w);
+    float tau = a.x, l0 = a.y;
+    float4 n = miraGrainField(x, pixel, tau, l0, seed, 0u);
+    float common = n.x;
+    if (a.w > 0.001) {
+        // Clumping: a coarser octave of the common (luminance) field.
+        float4 coarse = miraGrainField(x, pixel, tau * 2.4, l0 * 2.4, seed, 1u);
+        common = sqrt(1.0 - a.w) * common + sqrt(a.w) * coarse.x;
+    }
+    float rho = clamp(b.x, 0.0, 1.0);
+    float3 nc = sqrt(rho) * common + sqrt(1.0 - rho) * n.yzw;
+    // log2 of the linear gain for a density change of amp * nc: 10^(-d) = 2^(-3.3219 d).
+    float3 dd = clamp(amp * nc, -0.4, 0.4);
+    e *= exp2(-3.3219281 * dd);
     return float4(e * s.a, s.a);
 }
 

@@ -16,14 +16,23 @@ import Foundation
 /// - Latitude: negative film records several stops above a normal exposure on its long shoulder, so
 ///   overexposure rolls highlights off; slide film clips like a digital sensor.
 public struct FilmCharacter: Codable, Hashable, Sendable {
-    /// Grain visibility relative to an ISO 400 colour negative (1.0).
+    /// Legacy value-noise grain model (unused by the density-domain grain; kept so saved overrides still decode).
     public var grainStrength: Double
-    /// Grain feature size as a fraction of the frame diagonal (resolution independent).
     public var grainSize: Double
-    /// 0 monochrome grain, 1 fully independent per-channel grain.
     public var grainChroma: Double
-    /// sRGB-encoded luminance where grain is most visible.
+    /// sRGB-encoded luminance below which the reciprocity shadow-grain gain applies in full.
     public var grainTonalCenter: Double
+    /// RMS granularity x 1000 at a net density of 1.0 through a 48 um aperture (the datasheet number; see
+    /// `Design/GRAIN.md`). The grain model's amplitude.
+    public var grainRMS: Double
+    /// Grain cloud size, the Gaussian std of one dye cloud / crystal clump in frame micrometres.
+    public var grainCorrelationMicrons: Double
+    /// Weight (0...0.5) of a second, coarser octave of luminance grain: clumpy for Tri-X and HP5, nil for tabular grain.
+    public var grainClumping: Double
+    /// How much of the grain is shared between the colour layers (1 = neutral, black-and-white).
+    public var grainLayerCorrelation: Double
+    /// How the density noise varies with tone.
+    public var grainDensityShape: GrainDensityShape
     /// Bloom (the soft glow of light scattering in emulsion and optics) relative to an ISO 400 colour
     /// negative (1.0): slide and instant film glow more, black-and-white and print stock less.
     public var bloom: Double
@@ -49,6 +58,8 @@ public struct FilmCharacter: Codable, Hashable, Sendable {
     public var pushGrainPerStop: Double
 
     public init(grainStrength: Double, grainSize: Double, grainChroma: Double, grainTonalCenter: Double,
+                grainRMS: Double = 4.4, grainCorrelationMicrons: Double = 4, grainClumping: Double = 0.15,
+                grainLayerCorrelation: Double = 0.88, grainDensityShape: GrainDensityShape = .negative,
                 halationStrength: Double, halationTint: [Double], halationRadius: Double, latitude: Double,
                 latitudeUnder: Double = 2, latitudeOver: Double = 3, remJet: Bool = false,
                 pushContrastPerStop: Double = 0.08, pushGrainPerStop: Double = 0.25,
@@ -57,6 +68,11 @@ public struct FilmCharacter: Codable, Hashable, Sendable {
         self.grainSize = grainSize
         self.grainChroma = grainChroma
         self.grainTonalCenter = grainTonalCenter
+        self.grainRMS = grainRMS
+        self.grainCorrelationMicrons = grainCorrelationMicrons
+        self.grainClumping = grainClumping
+        self.grainLayerCorrelation = grainLayerCorrelation
+        self.grainDensityShape = grainDensityShape
         self.halationStrength = halationStrength
         self.halationTint = halationTint
         self.halationRadius = halationRadius
@@ -90,10 +106,16 @@ public struct FilmCharacter: Codable, Hashable, Sendable {
         var remJet = false
         var pushContrast = 0.08, pushGrain = 0.25
         var bloom = 1.0
+        // Grain (see Design/GRAIN.md 6.7): RMS granularity x1000, cloud size um, clumping, layer correlation, shape.
+        var rms = 4.4 * pow(rel, 0.3), cloud = 4.0 * pow(rel, 0.12)
+        var clump = 0.15, layerCorr = 0.88
+        var shape = GrainDensityShape.negative
         switch family {
         case .colorNegative:
             chroma = 0.3; center = 0.4; halation = 1.0; latitude = 1.0
         case .slide:
+            rms = 8.0 * pow(speed / 100, 0.2); cloud = 2.9 * pow(speed / 100, 0.1); clump = 0.08; layerCorr = 0.9
+            shape = .slide
             bloom = 1.4
             strength *= 0.8; chroma = 0.2; center = 0.65; halation = 0.15; latitude = 0.15
             over = 1.5; pushContrast = 0.12
@@ -101,26 +123,32 @@ public struct FilmCharacter: Codable, Hashable, Sendable {
             bloom = 1.2
             // K-14: dyes added in development, no dye couplers in the emulsion, so very fine grain.
             strength *= 0.55; chroma = 0.15; center = 0.65; halation = 0.1; latitude = 0.15
+            rms = 6.5; cloud = 2.6; clump = 0.05; layerCorr = 0.9; shape = .slide
             under = 1.5; over = 1; pushContrast = 0.12
         case .motionPicture:
             bloom = 1.2
             // ECN-2: rem-jet backing suppresses halation until it is removed.
             chroma = 0.3; center = 0.4; halation = 1.2; latitude = 1.0; over = 4; under = 3; remJet = true
+            rms = 4.0 * pow(speed / 250, 0.3); cloud = 3.6 * pow(speed / 250, 0.12)
         case .blackAndWhite:
             bloom = 0.4
             strength *= 1.1; chroma = 0; center = 0.4; halation = 0.25; latitude = 0.9
             pushContrast = 0.12; pushGrain = 0.35
+            rms = 14 * pow(rel, 0.4); cloud = 2.7 * pow(rel, 0.15); clump = 0.3; layerCorr = 1; shape = .blackAndWhite
         case .instant:
             bloom = 1.6
             strength *= 0.6; size *= 1.3; chroma = 0.15; center = 0.5; halation = 0.3; latitude = 0.5
             tint = [1.0, 0.5, 0.25]; under = 1; over = 1
+            rms = 10; cloud = 7.5; clump = 0.1; layerCorr = 0.4; shape = .instant
         case .print:
             bloom = 0.8
             // A print stock on its own: fine-grained positive, moderate shoulder.
             strength *= 0.4; chroma = 0.2; center = 0.5; halation = 0.5; latitude = 0.6; over = 2
+            rms = 3.0; cloud = 3.5
         }
         if monochrome {
             chroma = 0
+            layerCorr = 1
             tint = [1, 1, 1]
             if family == .instant { bloom = 0.8 }
             if family != .blackAndWhite { halation = min(halation, 0.25) }
@@ -128,10 +156,42 @@ public struct FilmCharacter: Codable, Hashable, Sendable {
         strength = min(max(strength, 0.3), 2.5)
         size = min(max(size, 0.0002), 0.0012)
         return FilmCharacter(grainStrength: strength, grainSize: size, grainChroma: chroma,
-                             grainTonalCenter: center, halationStrength: halation, halationTint: tint,
+                             grainTonalCenter: center, grainRMS: rms, grainCorrelationMicrons: cloud,
+                             grainClumping: clump, grainLayerCorrelation: layerCorr, grainDensityShape: shape,
+                             halationStrength: halation, halationTint: tint,
                              halationRadius: 0.006, latitude: latitude, latitudeUnder: under,
                              latitudeOver: over, remJet: remJet, pushContrastPerStop: pushContrast,
                              pushGrainPerStop: pushGrain, bloom: bloom)
+    }
+
+    /// The per-stock grain block of `films.json` (`"grain": { "rms": 17, "size": 3, ... }`), written by
+    /// `scripts/apply-grain-params.py`. Any subset.
+    public struct GrainOverride: Codable, Hashable, Sendable {
+        /// Datasheet RMS granularity x 1000.
+        public var rms: Double?
+        /// Cloud size (Gaussian std), micrometres.
+        public var size: Double?
+        public var clumping: Double?
+        public var layerCorrelation: Double?
+        /// Density shape name: "negative", "slide", "bw" or "instant".
+        public var shape: String?
+
+        public init(rms: Double? = nil, size: Double? = nil, clumping: Double? = nil,
+                    layerCorrelation: Double? = nil, shape: String? = nil) {
+            self.rms = rms; self.size = size; self.clumping = clumping
+            self.layerCorrelation = layerCorrelation; self.shape = shape
+        }
+    }
+
+    public func applying(_ g: GrainOverride?) -> FilmCharacter {
+        guard let g else { return self }
+        var c = self
+        if let v = g.rms { c.grainRMS = v }
+        if let v = g.size { c.grainCorrelationMicrons = v }
+        if let v = g.clumping { c.grainClumping = v }
+        if let v = g.layerCorrelation { c.grainLayerCorrelation = v }
+        if let n = g.shape, let s = GrainDensityShape(name: n) { c.grainDensityShape = s }
+        return c
     }
 
     /// Any subset of the fields, as written in `films.json`.

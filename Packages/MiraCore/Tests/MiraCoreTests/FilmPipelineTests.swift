@@ -142,10 +142,10 @@ enum PipelineFixture {
             return (stddev(PipelineFixture.rect(out, x: 100..<400, y: 100..<900)),
                     stddev(PipelineFixture.rect(out, x: 600..<900, y: 100..<900)))
         }
-        let neg = stds("neg", 0.4, 0.9)
-        #expect(neg.0 > neg.1 * 1.5, "negative: shadows/mids \(neg.0) vs highlights \(neg.1)")
-        let slide = stds("slide", 0.15, 0.65)
-        #expect(slide.1 > slide.0 * 1.5, "slide: light mids \(slide.1) vs shadows \(slide.0)")
+        let neg = stds("neg", 0.45, 0.03)
+        #expect(neg.0 > neg.1 * 3, "negative: mids \(neg.0) vs clear base \(neg.1)")
+        let slide = stds("slide", 0.35, 0.92)
+        #expect(slide.0 > slide.1 * 1.5, "slide: dense areas \(slide.0) vs highlights \(slide.1)")
     }
 
     @Test func monochromeGrainIsNeutralAndColourGrainIsNot() throws {
