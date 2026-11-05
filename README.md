@@ -197,7 +197,7 @@ scripts/pack-films.sh           # swift run mira-sheet --pack-films FilmSources 
 ## Tests
 
 ```sh
-swift test --package-path Packages/MiraCore   # 380 tests (MiraCore 345 + MiraUpdates 35)
+swift test --package-path Packages/MiraCore   # 398 tests (MiraCore 358 + MiraUpdates 40); 3 skip without FilmSources/ (see below)
 swift test --package-path Packages/MiraUI     # 153 tests (opt-in perf tests skip without MIRA_PERF=1)
 ```
 
