@@ -77,7 +77,7 @@ enum GradeKernels {
     static var isAvailable: Bool {
         colorMixer != nil && curves != nil && tone != nil && detail != nil && dodgeBurn != nil
             && filmExposure != nil && highlights != nil && halationCombine != nil && grain != nil
-            && scan != nil && toning != nil && lut3D != nil
+            && scan != nil && toning != nil && lut3D != nil && reciprocity != nil
     }
 
     // MARK: Stages
