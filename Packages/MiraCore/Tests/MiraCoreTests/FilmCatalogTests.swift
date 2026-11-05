@@ -143,27 +143,27 @@ import Testing
 
     // MARK: stock / variant grouping
 
-    @Test func variantsOfListsStockFirst() throws {
+    @Test func variantsOfListsBaseFirst() throws {
         let lib = try Self.library()
         #expect(!lib.stocks.contains { $0.isVariant })
+        #expect(lib.stocks.count == lib.filmStocks.count)
         #expect(lib.stocks.count < lib.films.count)
-        var checkedVariants = 0
-        for stock in lib.stocks {
-            let list = lib.variants(of: stock.id)
-            #expect(list.first?.id == stock.id)
-            #expect(list.dropFirst().allSatisfy { $0.parent == stock.id })
-            #expect(list.count == 1 + lib.films.filter { $0.parent == stock.id }.count)
+        var checked = 0
+        for stock in lib.filmStocks {
+            let list = lib.variants(of: stock.baseFilmID)
+            #expect(list.first?.id == stock.baseFilmID)
+            #expect(list.count == stock.films.count)
             for v in list.dropFirst() {
                 #expect(lib.variants(of: v.id).map(\.id) == list.map(\.id))
-                checkedVariants += 1
+                checked += 1
             }
         }
-        #expect(checkedVariants == lib.films.count - lib.stocks.count)
+        #expect(checked == lib.films.count - lib.stocks.count)
         #expect(lib.variants(of: "nope").isEmpty)
 
         let portra = lib.variants(of: "kodak-portra-400").map(\.id)
         #expect(portra.first == "kodak-portra-400")
-        #expect(portra.contains("kodak-portra-400-minus-1") && portra.contains("kodak-portra-400-plus-1"))
+        #expect(portra.contains("kodak-portra-400-minus-1") && portra.contains("kodak-portra-800"))
         #expect(portra.firstIndex(of: "kodak-portra-400-minus-1")! < portra.firstIndex(of: "kodak-portra-400-plus-1")!)
     }
 
@@ -220,8 +220,9 @@ import Testing
             #expect(f.resolvedCharacter.halationTint == [1, 1, 1], "\(f.id)")
         }
         // Variants carry their stock's character.
-        for f in lib.films where f.isVariant {
-            let stock = try #require(lib.film(id: f.stockID))
+        for f in lib.films {
+            guard let parent = f.parent else { continue }
+            let stock = try #require(lib.film(id: parent))
             #expect(f.resolvedCharacter == stock.resolvedCharacter, "\(f.id)")
         }
         // Overrides stay modest.

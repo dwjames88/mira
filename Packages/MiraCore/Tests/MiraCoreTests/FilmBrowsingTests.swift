@@ -11,7 +11,7 @@ import Testing
         #expect(!families.isEmpty)
     }
 
-    @Test func stockCardsExcludeVariants() throws {
+    @Test func stockCardsAreBaseFilms() throws {
         let lib = try FilmCatalogTests.library()
         let all = FilmBrowsing.stocks(in: lib, family: nil)
         #expect(all.count == lib.stocks.count)

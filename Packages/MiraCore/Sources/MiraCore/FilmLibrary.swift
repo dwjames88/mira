@@ -23,6 +23,9 @@ public final class FilmLibrary: @unchecked Sendable {
     private var cacheOrder: [String] = []
     private var filmLocks: [String: NSLock] = [:]
     private let index: [String: Film]
+    /// Every stock in card order, and each film id's position in it.
+    public let filmStocks: [FilmStock]
+    private let stockIndex: [String: FilmStock]
 
     public init(directory: URL, cacheDirectory: URL? = nil) throws {
         self.directory = directory
@@ -36,18 +39,77 @@ public final class FilmLibrary: @unchecked Sendable {
         }
         self.films = films
         self.index = Dictionary(films.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let stocks = FilmStock.group(films)
+        self.filmStocks = stocks
+        self.stockIndex = Dictionary(stocks.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
     public func film(id: String) -> Film? { index[id] }
 
-    /// The films shown as cards: every entry that is not a variant, in `films.json` order.
-    public var stocks: [Film] { films.filter { !$0.isVariant } }
+    /// The base film of every stock: the films shown as cards, in card order.
+    public var stocks: [Film] { filmStocks.compactMap { index[$0.baseFilmID] } }
 
-    /// The stock `id` belongs to (itself when it is a stock), then its variants in `films.json`
-    /// order. Empty when `id` is unknown; a single element when the stock has no variants.
+    /// The stock `filmID` belongs to; nil when the film is unknown.
+    public func stock(for filmID: String) -> FilmStock? {
+        index[filmID].flatMap { stockIndex[$0.stockID] }
+    }
+
+    public func stock(id: String) -> FilmStock? { stockIndex[id] }
+
+    /// The stock's entries (base first, then the rest in `films.json` order). Empty when `id` is unknown.
+    /// A single element when the stock has one entry.
     public func variants(of id: String) -> [Film] {
-        guard let film = index[id], let stock = index[film.stockID] else { return [] }
-        return [stock] + films.filter { $0.parent == stock.id }
+        guard let stock = stock(for: id), let base = index[stock.baseFilmID] else { return [] }
+        return [base] + stock.films.filter { $0.id != base.id }
+    }
+
+    /// The stock's ISOs in ascending order, each with its chip label.
+    public func isoChoices(stockID: String) -> [FilmISOChoice] {
+        guard let stock = stockIndex[stockID] else { return [] }
+        var labels: [Int: String] = [:]
+        for f in stock.films where labels[f.iso] == nil || f.isoLabel != nil { labels[f.iso] = f.isoChipLabel }
+        return labels.keys.sorted().map { FilmISOChoice(iso: $0, label: labels[$0] ?? String($0)) }
+    }
+
+    /// The Variations choices at `iso`: Standard (the plain film, when the stock has one at that ISO), then
+    /// push / pull steps from the most negative to the most positive, then each other label group
+    /// ("Cold", "NC", ...) in catalog order with its steps ascending.
+    public func variationChoices(stockID: String, iso: Int) -> [FilmVariationChoice] {
+        guard let stock = stockIndex[stockID] else { return [] }
+        let entries = stock.films.filter { $0.iso == iso }
+        let plain = entries.filter { $0.variationLabel == nil }.map {
+            FilmVariationChoice(variation: nil, filmID: $0.id)
+        }
+        let labelled = entries.compactMap { f in f.variationLabel.map { FilmVariationChoice(variation: $0, filmID: f.id) } }
+        // "+1", "Cold \u{2212}2": an optional leading prefix and a trailing push / pull step.
+        func split(_ label: String) -> (prefix: String, step: Int?) {
+            var words = label.split(separator: " ").map(String.init)
+            guard let last = words.last, last.count == 2, let n = Int(last.dropFirst()),
+                  last.first == "+" || last.first == "\u{2212}" else { return (label, nil) }
+            words.removeLast()
+            return (words.joined(separator: " "), last.first == "+" ? n : -n)
+        }
+        let parsed = labelled.map { (choice: $0, parts: split($0.variation ?? "")) }
+        var groupOrder: [String] = []
+        for p in parsed where p.parts.prefix != "" && !groupOrder.contains(p.parts.prefix) { groupOrder.append(p.parts.prefix) }
+        let bare = parsed.filter { $0.parts.prefix.isEmpty }.sorted { ($0.parts.step ?? 0) < ($1.parts.step ?? 0) }
+        let rest = parsed.filter { !$0.parts.prefix.isEmpty }.sorted {
+            let (a, b) = (groupOrder.firstIndex(of: $0.parts.prefix)!, groupOrder.firstIndex(of: $1.parts.prefix)!)
+            return a != b ? a < b : ($0.parts.step ?? 0) < ($1.parts.step ?? 0)
+        }
+        return Array(plain.prefix(1)) + (bare + rest).map(\.choice)
+    }
+
+    /// The concrete film for a stock, ISO and variation (nil = the plain film). Falls back to the plain film at
+    /// that ISO, then the first film at that ISO, then the stock's base film, so switching ISO while a
+    /// variation is chosen keeps it where that ISO has it and otherwise drops to Standard.
+    public func film(stockID: String, iso: Int, variation: String?) -> Film? {
+        guard let stock = stockIndex[stockID] else { return nil }
+        let atISO = stock.films.filter { $0.iso == iso }
+        return atISO.first { $0.variationLabel == variation }
+            ?? atISO.first { $0.variationLabel == nil }
+            ?? atISO.first
+            ?? index[stock.baseFilmID]
     }
 
     /// Number of cubes currently held in memory (at most `memoryCacheLimit`).
