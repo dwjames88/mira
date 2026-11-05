@@ -227,6 +227,10 @@ scripts/contact-sheet.sh [input.jpg]
 
 Writes `build/contact-sheet.png` (every film) and `build/contact-sheet-effects.png` (first six films with grain, halation, bloom and vignette). Inspect them by eye.
 
+### Camera
+
+`MiraCameraKit` has 65 tests in `Packages/MiraCamera/Tests`: `CameraStateTests`, `CaptureSupportTests`, `ExposureTests`, `LensFormatTests`, `SaveTests`, `SettingsFinderTests` and more (retry queue, pending prints, fallback ladder). Run `swift test --package-path Packages/MiraCamera`. The device checklist is under "Camera (iPhone, device only)".
+
 ## Manual checklist
 
 | Case | What to check | Result |
@@ -243,6 +247,27 @@ Writes `build/contact-sheet.png` (every film) and `build/contact-sheet-effects.p
 | Border, grain, halation | Visible in the saved result at full resolution, not only in the preview | |
 | App edit reopened in the extension | Film and sliders restored, and the reverse | |
 | Revert in Photos | Photo returns to the original; no EDITED badge in the app | |
+
+## Camera (iPhone, device only)
+
+The camera cannot be fully tested in the simulator. Simulator tests: `swift test --package-path Packages/MiraCamera` (pure layer), and `xcodebuild test -scheme MiraiOS -only-testing:MiraiOSTests` with `MIRA_CAMERA_FAKE=1` for the screen. Everything below needs a real iPhone.
+
+- [ ] **30 fps gate (first).** On an iPhone 16 Pro, run the finder for 10 minutes with grain LIVE. Read frame time from the Instruments "finder frame" signpost, or from the `MIRA_CAMERA_STATS=1` readout. Record median, p95 and thermal state. Pass is 30 fps sustained. If it fails, make AUTO's half-texture level the default.
+- [ ] Capture on a ProRAW phone. Photos shows the edit, Revert to Original works, and the asset is a RAW+HEIC pair.
+- [ ] Tap the last-frame thumbnail. The editor opens on that film with the recipe. Reopen the photo from the gallery and it does the same.
+- [ ] Non-ProRAW phone: the HEIC-only path saves and opens the same way.
+- [ ] Limited Photos access: you get the original, a baked copy and a notice.
+- [ ] Volume buttons, the Action button and Camera Control fire on release.
+- [ ] Haptics fire on capture.
+- [ ] The silent shutter toggle appears only where the system supports it, and is off by default.
+- [ ] Rotation: readouts rotate, chrome stays.
+- [ ] Interruptions: a call, Control Center and backgrounding. The finder resumes.
+- [ ] Lens chips and pinch labels match the phone's own (13/24/48/120 on an iPhone 16 Pro).
+- [ ] WB presets and WB lock hold.
+- [ ] AE/AF lock holds until released.
+- [ ] Meter: against a bright sky, the needle and UNDER/OVER behave differently on slide film than on negative film.
+- [ ] Quit the app between capture and developed. The next launch attaches the recipe (pending prints).
+- [ ] Memory stays flat while switching films.
 
 ## Known gaps and unverified
 

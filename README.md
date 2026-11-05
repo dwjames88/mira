@@ -145,6 +145,22 @@ Because the swapped-in app is quarantined and this build is development-signed (
 
 The logic lives in `Packages/MiraCore/Sources/MiraUpdates` (versions, release JSON, throttle and skip, download, verifier, swap; linked by the app only), the window in `Packages/MiraUI/Sources/MiraUI/UpdateNoticeView.swift`, and the controller in `App/Sources/Updates/`. `MIRA_LIVE_UPDATE=1 swift test --package-path Packages/MiraCore --filter LiveUpdateTests` runs the whole check, download, verify and swap against the real release in temp directories.
 
+## Camera (iOS)
+
+The iOS app has a camera. It shows a live finder with your chosen film applied through MiraCore, so what you see is the look you get. Hold the finder to see the bare scene. It has an EV dial, tap focus and meter, AE/AF lock, white balance presets and a film-aware meter. It saves ProRAW plus HEIC where the phone has ProRAW, and HEIC elsewhere, at 12 MP. The saved photo carries the film recipe, so it opens in the editor with the same look.
+
+Where the code lives:
+
+- `Packages/MiraCamera/Sources/MiraCameraKit`: the pure layer (state, exposure, lenses, white balance, save and retry, finder quality, pending prints). It is tested with `swift test --package-path Packages/MiraCamera`.
+- `Packages/MiraCamera/Sources/MiraCamera`: the platform layer (AVFoundation capture, the Metal finder, PhotoKit).
+- `iOSApp/Sources/Camera`: the app pieces (the screen and the film and WB doors). The film door reuses `FilmsPanel` from the editor.
+
+**Simulator.** The simulator has no camera. Set `MIRA_CAMERA_FAKE=1` for a fake frame source. `MIRA_SNAPSHOT=1 MIRA_SNAPSHOT_TAB=camera` renders the camera screen for a snapshot.
+
+**Privacy.** The camera asks for camera permission only. Location is opt-in and off by default. There is no microphone use and no network.
+
+**Finder quality.** If the phone runs hot or the finder falls behind, AUTO steps down a ladder: half-resolution texture, then grain off, then 0.75x, then 24 fps. You can pin a level in camera settings. See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for the Mac proxy numbers.
+
 ## Build and run the Mac app
 
 Prerequisites: macOS 26 or later, Xcode 27 (built with Xcode 27.0, build 27A5209h; Swift 6, strict concurrency) and [XcodeGen](https://github.com/yonaskolb/XcodeGen), which generates `Mira.xcodeproj` from `project.yml` (the project file is git-ignored).
@@ -199,6 +215,7 @@ scripts/pack-films.sh           # swift run mira-sheet --pack-films FilmSources 
 ```sh
 swift test --package-path Packages/MiraCore   # 398 tests (MiraCore 358 + MiraUpdates 40); 3 skip without FilmSources/ (see below)
 swift test --package-path Packages/MiraUI     # 153 tests (opt-in perf tests skip without MIRA_PERF=1)
+swift test --package-path Packages/MiraCamera # 65 tests (camera pure layer, simulator-free)
 ```
 
 MiraUI also writes headless snapshots to `build/snapshots`. The test list is in [TESTING.md](TESTING.md).
