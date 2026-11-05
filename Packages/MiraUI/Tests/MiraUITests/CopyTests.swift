@@ -25,4 +25,8 @@ struct CopyTests {
     @Test func versionLineHasShortVersionAndBuild() {
         #expect(AboutView.bundleVersion().hasPrefix("VERSION "))
     }
+
+    @Test func openFailureCopy() {
+        #expect(FFOpenFailureCard.defaultMessage == "Photos didn't hand over this photo.")
+    }
 }
