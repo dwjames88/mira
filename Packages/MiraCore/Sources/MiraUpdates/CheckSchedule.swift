@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 
 public struct CheckSchedule: Sendable {
@@ -16,3 +17,4 @@ public struct CheckSchedule: Sendable {
         return elapsed >= interval
     }
 }
+#endif

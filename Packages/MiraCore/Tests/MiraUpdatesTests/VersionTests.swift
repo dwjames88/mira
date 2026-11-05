@@ -1,3 +1,4 @@
+#if os(macOS)
 import Testing
 @testable import MiraUpdates
 
@@ -39,3 +40,4 @@ struct VersionTests {
         #expect(beta10 < release)
     }
 }
+#endif

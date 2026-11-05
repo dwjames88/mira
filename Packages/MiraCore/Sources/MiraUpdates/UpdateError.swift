@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 
 /// Why an update step could not complete. `userMessage` is the sentence shown in the update window;
@@ -58,3 +59,4 @@ public enum UpdateError: Error, Equatable, Sendable, CustomStringConvertible {
         }
     }
 }
+#endif

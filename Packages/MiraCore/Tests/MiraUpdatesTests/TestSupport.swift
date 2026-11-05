@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 import Testing
 @testable import MiraUpdates
@@ -106,3 +107,4 @@ func shell(_ path: String, _ arguments: [String]) throws -> Int32 {
     process.waitUntilExit()
     return process.terminationStatus
 }
+#endif

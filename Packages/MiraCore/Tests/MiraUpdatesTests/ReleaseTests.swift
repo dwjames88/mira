@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 import Testing
 @testable import MiraUpdates
@@ -69,3 +70,4 @@ struct ReleaseTests {
                 [.paragraph("Plain line one line two"), .bullet("a wrapped")])
     }
 }
+#endif

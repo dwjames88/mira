@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 import os
 
@@ -83,3 +84,4 @@ public struct UpdateChecker: Sendable {
         return .available(release)
     }
 }
+#endif

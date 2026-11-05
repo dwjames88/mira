@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 
 /// One downloadable file of a GitHub release.
@@ -115,3 +116,4 @@ public struct Release: Sendable, Equatable {
     /// What the updater downloads: the zip, else the dmg.
     public var installableAsset: ReleaseAsset? { zipAsset ?? diskImageAsset }
 }
+#endif

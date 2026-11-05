@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 import Testing
 @testable import MiraUpdates
@@ -81,3 +82,4 @@ struct LiveUpdateTests {
         try BundleVerifier.verify(bundleAt: installed, version: SemanticVersion("0.2.0"))
     }
 }
+#endif

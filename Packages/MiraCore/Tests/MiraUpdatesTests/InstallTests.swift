@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 import Testing
 @testable import MiraUpdates
@@ -206,3 +207,4 @@ extension URL {
         return self
     }
 }
+#endif
