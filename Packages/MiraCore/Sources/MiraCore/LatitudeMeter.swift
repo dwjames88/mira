@@ -64,17 +64,40 @@ extension Renderer {
         var buffer = [Float](repeating: 0, count: w * h * 4)
         context.render(image, toBitmap: &buffer, rowBytes: w * 16, bounds: extent, format: .RGBAf,
                        colorSpace: CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!)
-        var lumas = [Double](repeating: 0, count: w * h)
-        for i in 0..<(w * h) {
-            lumas[i] = 0.2126 * Double(buffer[i * 4]) + 0.7152 * Double(buffer[i * 4 + 1]) + 0.0722 * Double(buffer[i * 4 + 2])
-        }
         let low = 0.18 * exp2(-character.latitudeUnder), high = 0.18 * exp2(character.latitudeOver)
-        let n = Double(lumas.count)
-        let under = Double(lumas.filter { $0 < low }.count) / n
-        let over = Double(lumas.filter { $0 > high }.count) / n
-        lumas.sort()
-        let p01 = max(lumas[Int(n * 0.01)], 1e-6), p99 = max(lumas[min(lumas.count - 1, Int(n * 0.99))], 1e-6)
+        let count = w * h
+        let n = Double(count)
+        var lumas = [Double](repeating: 0, count: count)
+        var underCount = 0, overCount = 0
+        buffer.withUnsafeBufferPointer { px in
+            for i in 0..<count {
+                let l = 0.2126 * Double(px[i * 4]) + 0.7152 * Double(px[i * 4 + 1]) + 0.0722 * Double(px[i * 4 + 2])
+                lumas[i] = l
+                if l < low { underCount += 1 } else if l > high { overCount += 1 }
+            }
+        }
+        let under = Double(underCount) / n
+        let over = Double(overCount) / n
+        // The 1st and 99th percentile by selection (same values a full sort gives, without sorting 50k+ samples).
+        let i01 = Int(n * 0.01), i99 = min(count - 1, Int(n * 0.99))
+        let p01 = max(Self.select(&lumas, at: i01), 1e-6), p99 = max(Self.select(&lumas, at: i99), 1e-6)
         return LatitudeReading(under: under, over: over,
                                underStops: max(0, log2(low / p01)), overStops: max(0, log2(p99 / high)))
+    }
+
+    /// The element that would be at index `k` after sorting `a` (quickselect; reorders `a`).
+    static func select(_ a: inout [Double], at k: Int) -> Double {
+        var lo = 0, hi = a.count - 1
+        while lo < hi {
+            let pivot = a[(lo + hi) / 2]
+            var i = lo, j = hi
+            while i <= j {
+                while a[i] < pivot { i += 1 }
+                while a[j] > pivot { j -= 1 }
+                if i <= j { a.swapAt(i, j); i += 1; j -= 1 }
+            }
+            if k <= j { hi = j } else if k >= i { lo = i } else { return a[k] }
+        }
+        return a[k]
     }
 }

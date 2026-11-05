@@ -50,6 +50,8 @@ shoot films-options films "" 1
 shoot films-hidden films "" "" "" 1
 shoot develop-curves develop "" "" curves
 shoot develop-curves-hidden develop "" "" curves 1
+# Camera with the fake source (no camera permission prompt). Landscape cannot be shot headless (no rotation without input).
+shoot camera camera
 
 # Gallery: grant Photos headlessly (no taps), launch normally, let thumbnails load.
 # photos-add first, then full photos last: the later grant wins (the reverse leaves add-only + a prompt).

@@ -79,6 +79,31 @@ public struct Renderer: Sendable {
         return copy
     }
 
+    /// Replaces the photo's deterministic grain seed (pipeline 2) when set. For the live finder, which draws a new
+    /// grain field every frame. nil (the default) keeps the seed derived from the frame size. Never part of `Recipe`.
+    public var grainSeedOverride: Double?
+
+    /// A copy of this renderer whose grain uses `seed` (nil = the photo's own seed). The seed is reduced to an
+    /// integer below 2^24 so it stays exact in a Float.
+    public func withGrainSeed(_ seed: Double?) -> Renderer {
+        var copy = self
+        copy.grainSeedOverride = seed
+        return copy
+    }
+
+    /// Fraction of the image's resolution at which halation, bloom and grain do their work (1...0.25; 1 = full, the
+    /// graph is then exactly the unscaled one). Below 1 each of those stages runs on a reduced copy and its
+    /// contribution is enlarged and combined at full size, so the finder trades texture resolution for frame time.
+    /// Capture and export always use 1.
+    public var textureScale: CGFloat = 1
+
+    /// A copy of this renderer with its texture stages at `scale` of the image's resolution (clamped to 0.25...1).
+    public func withTextureScale(_ scale: CGFloat) -> Renderer {
+        var copy = self
+        copy.textureScale = scale.isFinite ? min(max(scale, 0.25), 1) : 1
+        return copy
+    }
+
     public init(library: FilmLibrary) {
         self.library = library
     }
@@ -332,16 +357,29 @@ public struct Renderer: Sendable {
 
         // 6. Bloom (see `bloomScale`)
         if recipe.bloomAmount > eps {
-            let f = CIFilter.bloom()
-            f.inputImage = image
-            f.radius = Float(min(100, 25 * scale))
+            let radius = Float(min(100, 25 * scale))
             // Pipeline 1 uses the slider directly. Pipeline 2 scales it by the film's bloom character:
             // intensity = slider * 2 * character.bloom * 0.25, so the native slider position (0.5) on an
             // ISO 400 colour negative gives a subtle 0.25 and a slide film (1.4) glows more than B&W (0.4).
-            f.intensity = filmScience
+            let intensity = filmScience
                 ? Float(clamp(recipe.bloomAmount * 2 * character.bloom * Self.bloomScale, 0, 1))
                 : Float(clamp(recipe.bloomAmount, 0, 1))
-            image = (f.outputImage ?? image).cropped(to: extent)
+            func bloom(_ input: CIImage, radius: Float) -> CIImage {
+                let f = CIFilter.bloom()
+                f.inputImage = input
+                f.radius = radius
+                f.intensity = intensity
+                return f.outputImage ?? input
+            }
+            if let reduction = Self.reduced(image, extent: extent, factor: textureScale) {
+                // Bloom the reduced copy, enlarge only what bloom added and add it at full size.
+                let small = reduction.image
+                let bloomed = bloom(small, radius: radius * Float(reduction.sigmaFactor)).cropped(to: reduction.extent)
+                let delta = Self.difference(bloomed, small, extent: reduction.extent)
+                image = Self.adding(Self.enlarged(delta, from: reduction, to: extent), to: image, extent: extent)
+            } else {
+                image = bloom(image, radius: radius).cropped(to: extent)
+            }
         }
 
         // 7. Grain
@@ -412,9 +450,18 @@ public struct Renderer: Sendable {
     private func filmHalation(_ image: CIImage, extent: CGRect, amount: Double, character: FilmCharacter,
                               radiusSlider: Double, diagonal: CGFloat) -> CIImage {
         let sigma = character.halationRadius * diagonal * exp2((radiusSlider - 0.5) * 2)
-        let h = GradeKernels.halationHighlights(of: image)
-        let wide = Self.softBlur(h, extent: extent, sigma: sigma)
-        let tight = Self.softBlur(h, extent: extent, sigma: sigma / 3)
+        var h = GradeKernels.halationHighlights(of: image)
+        // Texture scale below 1: blur at that fraction of the size (sigma scales with it) and enlarge the glow.
+        let reduction = Self.reduced(h, extent: extent, factor: textureScale)
+        var workExtent = extent
+        var workSigma = sigma
+        if let reduction {
+            h = reduction.image
+            workExtent = reduction.extent
+            workSigma = sigma * reduction.sigmaFactor
+        }
+        let wide = Self.softBlur(h, extent: workExtent, sigma: workSigma)
+        let tight = Self.softBlur(h, extent: workExtent, sigma: workSigma / 3)
         let mix = CIFilter.additionCompositing()
         mix.inputImage = tight.applyingFilter("CIColorMatrix", parameters: [
             "inputRVector": CIVector(x: 0.35, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: 0.35, z: 0, w: 0),
@@ -422,7 +469,9 @@ public struct Renderer: Sendable {
         mix.backgroundImage = wide.applyingFilter("CIColorMatrix", parameters: [
             "inputRVector": CIVector(x: 0.65, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: 0.65, z: 0, w: 0),
             "inputBVector": CIVector(x: 0, y: 0, z: 0.65, w: 0), "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)])
-        let blurred = (mix.outputImage ?? wide).cropped(to: extent)
+        var blurred = (mix.outputImage ?? wide).cropped(to: workExtent)
+        if let reduction { blurred = Self.enlarged(blurred, from: reduction, to: extent) }
+        blurred = blurred.cropped(to: extent)
         return GradeKernels.applyHalation(amount: amount, tint: character.halationTint, to: image, blurred: blurred)
             .cropped(to: extent)
     }
@@ -446,14 +495,91 @@ public struct Renderer: Sendable {
     private func filmGrain(_ image: CIImage, extent: CGRect, character: FilmCharacter, amount: Double,
                            sizeSlider: Double, uncroppedFull: CGSize, gainBoost: Double, shadowGain: Double = 1) -> CIImage {
         let s = Double(max(previewScale, 0.001))
-        let longOut = Double(max(uncroppedFull.width, uncroppedFull.height)) * s
-        let params = GrainModel.parameters(for: character, sliderAmount: amount, sizeSlider: sizeSlider,
-                                           gainBoost: gainBoost, pitch: GrainModel.pitch(uncroppedLongSidePixels: longOut))
-        let seed = GrainModel.seed(uncroppedWidth: Double(uncroppedFull.width), height: Double(uncroppedFull.height))
-        return GradeKernels.applyGrain(params, seed: seed, clumping: character.grainClumping,
-                                       layerCorrelation: character.grainLayerCorrelation,
-                                       shape: character.grainDensityShape, shadowGain: shadowGain,
-                                       shadowCenter: character.grainTonalCenter, to: image).cropped(to: extent)
+        let seed = grainSeedOverride.map(Self.exactSeed)
+            ?? GrainModel.seed(uncroppedWidth: Double(uncroppedFull.width), height: Double(uncroppedFull.height))
+        func parameters(pitchScale: Double) -> GrainModel.Parameters {
+            let longOut = Double(max(uncroppedFull.width, uncroppedFull.height)) * pitchScale
+            return GrainModel.parameters(for: character, sliderAmount: amount, sizeSlider: sizeSlider,
+                                         gainBoost: gainBoost, pitch: GrainModel.pitch(uncroppedLongSidePixels: longOut))
+        }
+        func grained(_ input: CIImage, pitchScale: Double, amplitudeFrom: GrainModel.Parameters? = nil) -> CIImage {
+            var params = parameters(pitchScale: pitchScale)
+            if let amplitudeFrom { params.amplitude = amplitudeFrom.amplitude }
+            return GradeKernels.applyGrain(params, seed: seed, clumping: character.grainClumping,
+                                           layerCorrelation: character.grainLayerCorrelation,
+                                           shape: character.grainDensityShape, shadowGain: shadowGain,
+                                           shadowCenter: character.grainTonalCenter, to: input)
+        }
+        // Texture scale below 1: grain the reduced copy at the same pitch in frame terms (its pixels are bigger, so
+        // the pitch is computed from the reduced size), then enlarge only the grain (grained - plain) and add it.
+        if let reduction = Self.reduced(image, extent: extent, factor: textureScale) {
+            let small = reduction.image
+            // The model's footprint grows with the pixel pitch, which would quieten the reduced field below what the
+            // full-size render has; its amplitude is taken from the full-size pitch so the strength matches.
+            let delta = Self.difference(grained(small, pitchScale: s * Double(reduction.sigmaFactor),
+                                                amplitudeFrom: parameters(pitchScale: s)), small, extent: reduction.extent)
+            return Self.adding(Self.enlarged(delta, from: reduction, to: extent), to: image, extent: extent)
+        }
+        return grained(image, pitchScale: s).cropped(to: extent)
+    }
+
+    /// A seed that is exact in a Float: an integer in 0..<2^24 (non-finite becomes 0).
+    static func exactSeed(_ value: Double) -> Double {
+        guard value.isFinite else { return 0 }
+        let m = 16_777_216.0
+        let r = value.rounded(.down).truncatingRemainder(dividingBy: m)
+        return r < 0 ? r + m : r
+    }
+
+    // MARK: Reduced-resolution texture stages
+
+    /// A copy of an image at a fraction of its size, for the texture stages (see `textureScale`).
+    struct Reduction {
+        var image: CIImage
+        /// The reduced image's extent (origin zero).
+        var extent: CGRect
+        /// The reduced size over the full size (their geometric mean when the two axes round differently).
+        var sigmaFactor: CGFloat
+    }
+
+    /// `image` reduced by `factor` (nil when `factor` is 1 or more, so callers keep the exact full-size graph). The
+    /// input is sanitised first: a non-finite pixel must not spread through the reduction.
+    static func reduced(_ image: CIImage, extent: CGRect, factor: CGFloat) -> Reduction? {
+        guard factor < 1, extent.width >= 2, extent.height >= 2, extent.width.isFinite, extent.height.isFinite else { return nil }
+        let size = CGSize(width: max(1, (extent.width * factor).rounded()), height: max(1, (extent.height * factor).rounded()))
+        let safe = GradeKernels.applySanitize(limit: 65504, to: image)
+        let down = CGAffineTransform(scaleX: size.width / extent.width, y: size.height / extent.height)
+        let small = safe.transformed(by: CGAffineTransform(translationX: -extent.minX, y: -extent.minY)).clampedToExtent()
+            .transformed(by: down, highQualityDownsample: true)
+            .cropped(to: CGRect(origin: .zero, size: size))
+        let k = ((size.width / extent.width) * (size.height / extent.height)).squareRoot()
+        return Reduction(image: small, extent: CGRect(origin: .zero, size: size), sigmaFactor: k)
+    }
+
+    /// A reduced result enlarged back over `extent` (bilinear).
+    static func enlarged(_ small: CIImage, from reduction: Reduction, to extent: CGRect) -> CIImage {
+        let up = CGAffineTransform(scaleX: extent.width / reduction.extent.width, y: extent.height / reduction.extent.height)
+            .concatenating(CGAffineTransform(translationX: extent.minX, y: extent.minY))
+        return small.cropped(to: reduction.extent).transformed(by: up, highQualityDownsample: false).cropped(to: extent)
+    }
+
+    /// `a - b` as a signed contribution (rgb only meaningful; the alpha is fixed by `adding`).
+    static func difference(_ a: CIImage, _ b: CIImage, extent: CGRect) -> CIImage {
+        let neg = b.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": CIVector(x: -1, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: -1, z: 0, w: 0),
+            "inputBVector": CIVector(x: 0, y: 0, z: -1, w: 0), "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)])
+        let sum = CIFilter.additionCompositing()
+        sum.inputImage = neg
+        sum.backgroundImage = a
+        return (sum.outputImage ?? a).cropped(to: extent)
+    }
+
+    /// `base + delta` (premultiplied add), with the alpha put back to 1.
+    static func adding(_ delta: CIImage, to base: CIImage, extent: CGRect) -> CIImage {
+        let sum = CIFilter.additionCompositing()
+        sum.inputImage = delta
+        sum.backgroundImage = base
+        return (sum.outputImage ?? base).cropped(to: extent).settingAlphaOne(in: extent)
     }
 
     private func halation(_ image: CIImage, extent: CGRect, amount: Double, radius: Double, scale: CGFloat) -> CIImage {
@@ -474,7 +600,13 @@ public struct Renderer: Sendable {
         clampF.maxComponents = CIVector(x: 1, y: 1, z: 1, w: 1)
         var mask = clampF.outputImage ?? image
 
-        mask = Self.softBlur(mask, extent: extent, sigma: (8 + 40 * radius) * scale)
+        let sigma = (8 + 40 * radius) * scale
+        if let reduction = Self.reduced(mask, extent: extent, factor: textureScale) {
+            let blurred = Self.softBlur(reduction.image, extent: reduction.extent, sigma: sigma * reduction.sigmaFactor)
+            mask = Self.enlarged(blurred, from: reduction, to: extent)
+        } else {
+            mask = Self.softBlur(mask, extent: extent, sigma: sigma)
+        }
 
         // Tint warm red-orange, scaled by amount.
         let a = CGFloat(amount) * 0.9

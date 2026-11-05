@@ -12,6 +12,8 @@ enum AlbumRoute: Hashable {
 
 struct GalleryView: View {
     @Bindable var editor: EditorViewModel
+    /// Opens the camera (the CAMERA control next to IMPORT).
+    var onCamera: () -> Void = {}
     @State private var gallery = GalleryModel()
     @State private var path: [AlbumRoute] = []
     @State private var pickerItem: PhotosPickerItem?
@@ -48,6 +50,11 @@ struct GalleryView: View {
             }
         }
         .task { await gallery.start() }
+        .onChange(of: editor.pendingLibraryOpen) { _, asset in
+            guard let asset else { return }
+            editor.pendingLibraryOpen = nil
+            Task { await gallery.open(asset, in: editor) }
+        }
         .onChange(of: pickerItem) { _, item in
             guard let item else { return }
             Task { await editor.pick(item); pickerItem = nil }
@@ -77,6 +84,11 @@ struct GalleryView: View {
                     Text("ADD MORE").ffLabel(size: 11, color: FieldFramesTheme.lichen).frame(minHeight: 44)
                 }.buttonStyle(.plain)
             }
+            Button(action: onCamera) {
+                CameraLabel().frame(minWidth: 44, minHeight: 44)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Open the camera")
             PhotosPicker(selection: $pickerItem, matching: .images) {
                 ImportLabel().frame(minWidth: 44, minHeight: 44)
             }
@@ -501,6 +513,10 @@ private struct GalleryCell: View {
             await MainActor.run { badges = found }
         }
     }
+}
+
+struct CameraLabel: View {
+    var body: some View { Text("CAMERA").ffLabel(size: 11, color: FieldFramesTheme.paperDim) }
 }
 
 struct ImportLabel: View {

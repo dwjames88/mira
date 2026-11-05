@@ -87,6 +87,62 @@ cd Packages/MiraUI && MIRA_PERF=1 swift test -c release -Xswiftc -enable-testing
 
 (writes `build/perf-thumbnails.txt`).
 
+## Camera finder (Roll 1 proxy, Mac)
+
+**These are proxies. The Roll 1 go/no-go measurement (30 fps sustained on a real iPhone 16 Pro, see `Design/CAMERA.md` section 6) is still outstanding.** A Mac GPU is not an A18 Pro; use these only to compare the cases with each other and to size the plan, not as a pass or fail.
+
+What was added to `Renderer` for the live finder (capture and export always use the defaults, which render exactly as before):
+
+- `withGrainSeed(_:)` / `grainSeedOverride`: a per-frame grain seed (integer below 2^24) instead of the photo's own. Never part of `Recipe`.
+- `withTextureScale(_:)` / `textureScale` (0.25...1, default 1): halation (both pipelines), bloom and pipeline-2 grain do their work on a copy at that fraction of the resolution. Halation blurs the reduced highlights (sigma scales with the size) and enlarges the glow; bloom and grain run on the reduced copy and only what they added (result minus input) is enlarged and added at full size. The grain keeps its pitch in frame terms and takes its amplitude from the full-size pitch, so strength matches. Measured against textureScale 1 on a synthetic scene with strong halation, bloom and grain: mean colour within 0.1 %, halation energy within 1.5 %, grain RMS within 2 %.
+
+Measured with the opt-in `FinderBudgetBenchmark` (`MIRA_PERF=1`): Kodak Portra 400 at native grain, halation and bloom (50 %), `Fixtures/sample.jpg` cover-fitted into an IOSurface BGRA buffer, a Metal-queue `CIContext` with the shared working space (extended linear sRGB, RGBAh, `cacheIntermediates` off), `startTask(toRender:to: CIRenderDestination(mtlTexture:commandBuffer:))` into a bgra8 texture, waited on; a new `CIImage` and grain seed every frame, 90 frames after 20 warm-up; ms per frame, CPU start to GPU complete.
+
+Machine: Apple M1 Pro, macOS (Darwin 27.0.0), release build (`swift test -c release`). Two runs on 2026-11-05: run A at load average about 9, run B (after the fallback and card changes) at about 14. Earlier runs at load 340 to 470 were discarded as noise.
+
+| Case (ms, median / p95) | 1920x1440 run A | 1920x1440 run B | 1206x1809 run A | 1206x1809 run B |
+|---|---|---|---|---|
+| full | 9.1 / 10.4 | 11.3 / 14.7 | 9.4 / 10.2 | 10.2 / 11.3 |
+| grain off | 6.9 / 8.9 | 8.9 / 10.8 | 5.9 / 7.4 | 7.6 / 9.9 |
+| textureScale 0.5 | 11.4 / 12.8 | 11.2 / 12.2 | 9.2 / 9.8 | 10.3 / 14.0 |
+| textureScale 0.5 + grain off | 5.6 / 8.4 | 8.0 / 9.4 | 4.0 / 6.8 | 7.3 / 9.9 |
+| renderScale 0.75 (grain on) | 7.6 / 9.1 | 10.4 / 12.7 | 7.0 / 9.2 | 9.8 / 14.5 |
+
+Meter and film-door cards (run B):
+
+| Measure | Before | After | Plan target |
+|---|---|---|---|
+| `latitudeReading` | 6.2 ms (1920x1440 input, Lanczos inside) | 1.36 ms median, 1.46 p95 (256 px affine-scaled input, quickselect percentiles); 4 Hz on a utility queue | under 3 ms |
+| 8 film cards | 22 ms per batch (220 px, full texture) | 6.2 ms median, 6.9 p95 (LUT only, from one 240 px copy made once per batch in 1.1 ms) | under 10 ms |
+
+iOS simulator (iOS 27.2 "iPhone Duo" type on the same Mac, so the Mac GPU through the simulator's Metal), through the camera's own `FinderRenderer` (`FinderBudgetSimTests`, `TEST_RUNNER_MIRA_PERF=1`), 1920x1440, load about 11 to 17:
+
+| Case (ms, median / p95) | run A | run B |
+|---|---|---|
+| full | 17.5 / 22.3 | 15.6 / 17.3 |
+| half texture (manual option only) | 19.3 / 23.7 | 17.3 / 18.6 |
+| grain off (AUTO step 1) | 11.8 / 15.2 | 12.8 / 14.5 |
+| reduced: 0.75 render scale, grain off (AUTO step 2) | n/a | 11.0 / 12.3 |
+
+Film door, cold renderer, simulator: first card 201 ms, all 8 visible-first cards 845 ms, reopening on the same scene 2 ms (memory cache). Before the change the cards took about 15 s on first open (cards were requested in list order from the strip's left edge rather than the visible ones first, went through a 200 ms poll and the 2 Hz gate, waited for a LUT prewarm of every film, and rendered grain, halation and bloom). In the headless app run the cards are on screen about 0.6 s after the door appears.
+
+| Platform | Result |
+|---|---|
+| iPhone 16 Pro (device) | outstanding: the go/no-go (TESTING.md, camera checklist item 1) |
+
+Reading:
+- The full finder grade with native grain, halation and bloom fits a 33 ms (30 fps) frame with room on the Mac (9 to 11 ms) and in the simulator (16 to 18 ms). The plan's guess for an A18 Pro is 2 to 3x the Mac, about 20 to 35 ms: tight. Only the device can say.
+- Grain is the stage that matters: grain off saves 20 to 30 %.
+- Half-resolution texture does not save time at finder sizes on these GPUs (the reduce and enlarge passes cost about what the smaller blurs and grain save, because `softBlur` already downsamples wide blurs). So AUTO does not use it: the ladder is full, then grain off, then 0.75 render scale with grain off, then 24 fps. Half texture stays as a manual FINDER QUALITY option (Camera settings, ADVANCED) to try on the device.
+
+Reproduce:
+
+```
+MIRA_PERF=1 swift test -c release -Xswiftc -enable-testing --package-path Packages/MiraCore --filter FinderBudgetBenchmark
+```
+
+(prints the table to stdout; `-Xswiftc -enable-testing` is needed because the suite uses `@testable import`; record `sysctl -n machdep.cpu.brand_string` and `uptime` with the numbers.)
+
 ## What each change was
 
 1. **Narrower observation (`EditorModel.selectedFilmID`).** `FilmStrip.body` read `model.recipe.filmID`, and `recipe` is one observed property, so every slider tick re-evaluated the strip and its 32 cards. The model now keeps a stored `selectedFilmID` that changes only when the film does, and the strip reads that. Result: 0 strip evaluations per tick, SwiftUI cost per tick 4.0 to 2.3 ms.
