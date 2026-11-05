@@ -190,6 +190,8 @@ swift test --package-path Packages/MiraCore
 swift test --package-path Packages/MiraUI
 ```
 
+**Tests that need `FilmSources/`.** The Hald PNGs are not in git (run `scripts/fetch-film-sources.sh` to get them). Without them, three MiraCore tests skip with a printed note (`FilmSources/ is absent (clean clone)...`) and everything else runs: `everySourcePNGIsReferencedOnceAndValid` (every PNG referenced once and a valid Hald CLUT), `packedCubesMeetTheErrorLimitsOrAreExact` (each packed cube within the error limits of, or equal to, its PNG) and `cacheHitMatchesAndCorruptFileIsTolerated` (the LUT disk cache, which needs one real PNG). With `FilmSources/` present they all run.
+
 With presets the suites hold 186 (MiraCore) and 87 (MiraUI) tests (new: `PresetTests`, `PresetStoreTests` incl. two stores on one directory, `PresetModelTests`, `PresetSnapshotTests` writing `presets-tab-*.png` and `save-preset-sheet-*.png`). Before that, as of the editor-workflow change the suites hold 170 (MiraCore) and 68 (MiraUI) tests; the lists below are the original groups. New: `ZoomTests` (click, step, pan, clamping, viewport-to-image rect with crop, zoomed render pixels), `EditorTabTests`, `ViewingKeysTests` (key map table, zoom model, compare key, full screen), `ExtensionHostingTests` (editor fills a resizing window), plus the `editor-tab-*.png`, `editor-zoom-100.png` and `editor-immersive.png` snapshots.
 
 MiraCore has 36 tests:

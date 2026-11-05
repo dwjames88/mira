@@ -171,7 +171,8 @@ import Testing
 }
 
 @Suite struct LUTCacheTests {
-    @Test func cacheHitMatchesAndCorruptFileIsTolerated() throws {
+    @Test(.enabled(if: FilmCatalogTests.haveSources, Comment(rawValue: FilmCatalogTests.missingSourcesNote)))
+    func cacheHitMatchesAndCorruptFileIsTolerated() throws {
         let cache = FileManager.default.temporaryDirectory.appendingPathComponent("mira-luts-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: cache) }
         // The disk cache serves Hald PNG libraries (packed films are never cached): copy one PNG into a temp library.

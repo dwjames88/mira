@@ -10,7 +10,7 @@ Status: v1.0.0. See [CHANGELOG.md](CHANGELOG.md) for what changed. See [TESTING.
 
 1. Download `Mira-1.0.0.dmg` (or the `.zip`) from the release page and drag **Mira** to Applications.
 2. Mira is signed with a free Personal Team development certificate. There is no Developer ID and it is not notarized, so on other Macs macOS blocks the first launch. Right-click Mira, choose Open, then Open again. Or try to open it once, then go to System Settings ▸ Privacy & Security and click "Open Anyway".
-3. Development-signed builds may refuse to run at all on a Mac that is not registered to the signing team. If so, build from source: `scripts/install.sh` (needs Xcode, XcodeGen and your own team ID in `project.yml`).
+3. Development-signed builds may refuse to run at all on a Mac that is not registered to the signing team. If so, build from source (see Build and run the Mac app: Xcode, XcodeGen and your own team ID in `Local.xcconfig`) and run `scripts/install.sh`.
 4. Enable the extension in System Settings ▸ General ▸ Login Items & Extensions ▸ Photos Editing ▸ Mira, and grant Photos access on first launch.
 5. The free-team signature expires after 7 days; after that the app and extension may stop loading until you rebuild.
 
@@ -65,9 +65,11 @@ PhotosExtension/         Photos editing extension (PHContentEditingController)
 Packages/MiraCore/   Pipeline: Recipe, Film, FilmLibrary, LUT, Renderer, MiraAdjustment, ImageSource, SidecarStore; MiraUpdates (updater logic); tests; mira-sheet CLI
 Packages/MiraUI/     Shared SwiftUI editor (EditorView, EditorModel, FilmsBrowserView) and FieldFramesTheme with bundled fonts
 Films/                   Bundled (126 MB per copy): films.json, Packed/*.mlut (260 cubes, 48^3, 56^3 or 64^3), ATTRIBUTION.md, LICENSE-LUTS
-FilmSources/             HaldCLUT/*.png originals (361 MB, provenance only, not bundled); `mira-sheet --pack-films FilmSources Films` rebuilds Films/Packed
+FilmSources/             Not in git (git-ignored): HaldCLUT/*.png originals (361 MB, provenance only, not bundled), fetched by scripts/fetch-film-sources.sh and listed in FilmSources.sha256; scripts/pack-films.sh rebuilds Films/Packed
+Config/                  Base.xcconfig: team and bundle id prefix defaults; an untracked Local.xcconfig (see Local.xcconfig.example) overrides them
+iOSApp/                  iPhone and iPad app (SwiftUI, shares MiraCore and MiraUI)
 Fixtures/                sample.jpg (CC0), SOURCE.md, raw/ (iPhone XS DNG committed; Sony ARW and iPhone 12 Pro DNG listed for download)
-scripts/                 run.sh, install.sh, contact-sheet.sh
+scripts/                 run.sh, install.sh, release.sh, contact-sheet.sh, fetch-film-sources.sh, pack-films.sh
 Design/                  THEME.md (Field Frames theme), FILM-SCIENCE.md (pipeline, parameters, reciprocity, packed payload, adding a film)
 docs/                    ROADMAP.md
 project.yml              XcodeGen spec (the .xcodeproj is generated and git-ignored)
@@ -143,22 +145,54 @@ Because the swapped-in app is quarantined and this build is development-signed (
 
 The logic lives in `Packages/MiraCore/Sources/MiraUpdates` (versions, release JSON, throttle and skip, download, verifier, swap; linked by the app only), the window in `Packages/MiraUI/Sources/MiraUI/UpdateNoticeView.swift`, and the controller in `App/Sources/Updates/`. `MIRA_LIVE_UPDATE=1 swift test --package-path Packages/MiraCore --filter LiveUpdateTests` runs the whole check, download, verify and swap against the real release in temp directories.
 
-## Requirements
+## Build and run the Mac app
 
-- macOS 26 or later
-- Xcode 27 (Swift 6, strict concurrency)
-- [XcodeGen](https://github.com/yonaskolb/XcodeGen), used only during development to generate `Mira.xcodeproj` from `project.yml`
-- An Apple Development signing identity (the project is set up for a Personal Team; change `DEVELOPMENT_TEAM` in `project.yml` to your own)
-
-## Build, run and install
+Prerequisites: macOS 26 or later, Xcode 27 (built with Xcode 27.0, build 27A5209h; Swift 6, strict concurrency) and [XcodeGen](https://github.com/yonaskolb/XcodeGen), which generates `Mira.xcodeproj` from `project.yml` (the project file is git-ignored).
 
 ```sh
-scripts/run.sh               # xcodegen, Debug build into build/DerivedData, opens the app
-scripts/install.sh           # Release build, installs to /Applications, registers the Photos extension
-scripts/contact-sheet.sh     # renders build/contact-sheet.png and build/contact-sheet-effects.png
+brew install xcodegen
+git clone https://github.com/dwjames88/mira.git && cd mira
+cp Local.xcconfig.example Local.xcconfig     # then put your own team ID in it (see Signing below)
+xcodegen generate
+open Mira.xcodeproj                          # scheme "Mira": builds the app and the Photos extension
 ```
 
-`scripts/contact-sheet.sh` takes an optional input path (default `Fixtures/sample.jpg`). After installing, follow [TESTING.md](TESTING.md) to enable the extension in Photos.
+Press Run in Xcode, or from the command line `scripts/run.sh` (Debug build into `build/DerivedData`, opens the app) and `scripts/install.sh` (Release build, installs to `/Applications`, registers the Photos extension). `scripts/contact-sheet.sh [image]` renders `build/contact-sheet.png`. To enable the Photos extension (System Settings, Login Items & Extensions, Photos Editing, Mira) follow [TESTING.md](TESTING.md#enable-in-photos-macos-2627).
+
+**Signing.** `Config/Base.xcconfig` (tracked) holds the publisher's defaults, `DEVELOPMENT_TEAM = VF945J28YU` and `MIRA_BUNDLE_PREFIX = com.fieldframes`, then includes an optional, untracked `Local.xcconfig` at the repository root. Copy `Local.xcconfig.example` to `Local.xcconfig` and set your own `DEVELOPMENT_TEAM` (a free Personal Team works). If your team cannot register `com.fieldframes.*`, also set `MIRA_BUNDLE_PREFIX` (for example `com.example`): the bundle ids become `<prefix>.mira`, `<prefix>.mira.photos` and `<prefix>.mira.ios`. With no `Local.xcconfig` the project builds exactly as published. Run `xcodegen generate` again after changing it, or check the result with `xcodebuild -project Mira.xcodeproj -target Mira -configuration Release -showBuildSettings | grep -E 'PRODUCT_BUNDLE_IDENTIFIER|DEVELOPMENT_TEAM'`.
+
+**App Group.** The app and the Photos extension share presets through the App Group `<team>.<prefix>.mira` (`VF945J28YU.com.fieldframes.mira` for the publisher). It is built from the same two settings, written to the entitlements, and read at run time from the `MiraAppGroup` Info.plist key, so nothing else needs editing. With a free Personal Team Xcode registers the group for you on the first build.
+
+**Updater.** The in-app updater only installs releases whose app is `com.fieldframes.mira` signed by team `VF945J28YU`; that is the publisher's identity and is deliberately not configurable. A copy you build with another prefix or team does not self-update, which is correct: update it by pulling and rebuilding.
+
+## Build and run the iOS app
+
+Prerequisites: the same Xcode 27 and XcodeGen, and the iOS 18 or later SDK (the app targets iOS 18.0; the simulator runtimes used here are 26.x). Set up `Local.xcconfig` as above, then:
+
+```sh
+xcodegen generate
+open Mira.xcodeproj                          # scheme "MiraiOS"
+```
+
+Choose an iPhone or iPad simulator and Run, or a connected device (needs your team in `Local.xcconfig`, a trusted developer profile on the device, and Developer Mode on). From the command line:
+
+```sh
+xcodebuild -project Mira.xcodeproj -scheme MiraiOS -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
+xcodebuild -project Mira.xcodeproj -scheme MiraiOS -destination 'generic/platform=iOS' -configuration Release build   # signed for devices
+```
+
+The iOS app has no Photos extension and no self-updater. It uses the same packed films and the same MiraCore and MiraUI packages as the Mac app. Free-team installs expire after 7 days.
+
+## Rebuilding the film LUTs
+
+The apps bundle the packed cubes in `Films/Packed`, so you never need the original PNGs to build or run. `FilmSources/` (360 MB of Hald PNGs) is not in git. To regenerate the cubes, or to run the tests that compare them with their PNGs:
+
+```sh
+scripts/fetch-film-sources.sh   # downloads HaldCLUT.zip (about 420 MB), checks its SHA-256, copies each film's PNG to FilmSources/HaldCLUT/<id>.png and checks every file against FilmSources.sha256
+scripts/pack-films.sh           # swift run mira-sheet --pack-films FilmSources Films: rewrites Films/Packed (deterministic)
+```
+
+`MIRA_FILM_SOURCES_DIR` changes where the PNGs go and `MIRA_HALDCLUT_ZIP` points at a local copy of the archive (still checked). The source, licence and the file behind every look are in [Films/ATTRIBUTION.md](Films/ATTRIBUTION.md).
 
 ## Tests
 
@@ -186,7 +220,7 @@ The test asset stays in the library; delete it by hand. `--selftest-sidecar` run
 ## Licensing
 
 - **Code:** [PolyForm Noncommercial License 1.0.0](LICENSE). Free for noncommercial use; see the file for the exact terms.
-- **Film LUTs:** the files in `FilmSources/HaldCLUT/` are from the RawTherapee Film Simulation Collection (2015-09-20) by Pat David, with Pavlov Dmitry and Michael Ezra credited in the archive, and are licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). Full attribution, the source URL and the mapping from each file to its original name are in [Films/ATTRIBUTION.md](Films/ATTRIBUTION.md). The PNG files in `FilmSources/` are unmodified, byte for byte, only renamed; the app bundles each look as a packed cube, resampled to 48³ or 56³ where the error stays small (an adaptation under the same licence). Derivative works of the LUTs must be shared under the same licence.
+- **Film LUTs:** the PNG files fetched into `FilmSources/HaldCLUT/` (not in git; see Rebuilding the film LUTs) are from the RawTherapee Film Simulation Collection (2015-09-20) by Pat David, with Pavlov Dmitry and Michael Ezra credited in the archive, and are licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). Full attribution, the source URL and the mapping from each file to its original name are in [Films/ATTRIBUTION.md](Films/ATTRIBUTION.md). The PNG files in `FilmSources/` are unmodified, byte for byte, only renamed; the app bundles each look as a packed cube, resampled to 48³ or 56³ where the error stays small (an adaptation under the same licence). Derivative works of the LUTs must be shared under the same licence.
 - **Trademarks:** film stock names are used for information only. Mira is not affiliated with, or endorsed by, any film maker or the trademark owners.
 - **Fonts:** Cormorant Garamond and IBM Plex Mono are bundled in `Packages/MiraUI/Sources/MiraUI/Resources/Fonts/` under the SIL Open Font License 1.1. The licence texts are alongside (`OFL-CormorantGaramond.txt`, `OFL-IBMPlexMono.txt`).
 - **Sample photo:** `Fixtures/sample.jpg` is "Outdoor portrait" by Anthony Ginsbrook (Unsplash), CC0 1.0, downscaled to 2400x1600. See [Fixtures/SOURCE.md](Fixtures/SOURCE.md).

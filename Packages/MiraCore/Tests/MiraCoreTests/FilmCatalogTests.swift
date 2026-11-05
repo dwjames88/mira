@@ -69,8 +69,17 @@ import Testing
     }
 
     static let sources = Self.dir.deletingLastPathComponent().appendingPathComponent("FilmSources", isDirectory: true)
+    /// FilmSources/ is not in git (run scripts/fetch-film-sources.sh); tests that read the PNGs skip without it.
+    static let haveSources = FileManager.default.fileExists(
+        atPath: sources.appendingPathComponent("HaldCLUT", isDirectory: true).path)
+    static let missingSourcesNote = "FilmSources/ is absent (clean clone): run scripts/fetch-film-sources.sh to enable this test"
 
-    @Test func everySourcePNGIsReferencedOnceAndValid() throws {
+    @Test func noteWhenFilmSourcesAreAbsent() {
+        if !Self.haveSources { print("NOTE: \(Self.missingSourcesNote); the PNG comparison tests are skipped") }
+    }
+
+    @Test(.enabled(if: FilmCatalogTests.haveSources, Comment(rawValue: FilmCatalogTests.missingSourcesNote)))
+    func everySourcePNGIsReferencedOnceAndValid() throws {
         let films = try Self.library().films.filter { $0.proceduralID == nil }
         let hald = Self.sources.appendingPathComponent("HaldCLUT", isDirectory: true)
         let onDisk = try FileManager.default.contentsOfDirectory(atPath: hald.path).filter { !$0.hasPrefix(".") }
@@ -102,7 +111,8 @@ import Testing
     /// 1.5/255 of its 64^3 original, or is the 64^3 cube itself, equal to what `LUT.loadHald` reads from the PNG
     /// (exactly, up to 16-bit rounding for the few Hald images larger than 64^3, which `loadHald` resamples in Float).
     /// `mira-sheet --pack-films` picks the smallest dimension that passes.
-    @Test func packedCubesMeetTheErrorLimitsOrAreExact() throws {
+    @Test(.enabled(if: FilmCatalogTests.haveSources, Comment(rawValue: FilmCatalogTests.missingSourcesNote)))
+    func packedCubesMeetTheErrorLimitsOrAreExact() throws {
         let films = try Self.library().films.filter { $0.proceduralID == nil }
         let fixtures = Self.dir.deletingLastPathComponent().appendingPathComponent("Fixtures", isDirectory: true)
         let probe = PackProbe.colors(fixturesDirectory: fixtures)
