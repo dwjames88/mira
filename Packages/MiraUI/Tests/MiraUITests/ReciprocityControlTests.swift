@@ -54,12 +54,12 @@ struct ReciprocityControlTests {
         #expect(model.reciprocityReadout == nil)
         model.setSource(Self.source(exposure: 1.0 / 250))
         #expect(model.exposureTimeReadout == "1/250 s \u{00B7} EXIF")
-        #expect(model.reciprocityReadout == nil)   // no effect at 1/250 s
+        #expect(model.reciprocityReadout == "No change at this speed")   // no effect at 1/250 s
         model.setExposureTime(sliderValue: log2(2.0))
         #expect(model.recipe.exposureTime == 2 && model.exposureTimeReadout == "2 s")
         model.setExposureTime(sliderValue: log2(30.0))
         #expect(model.exposureTimeReadout == "30 s")
-        #expect(model.reciprocityReadout?.hasPrefix("Reciprocity \u{2212}") == true)
+        #expect(model.reciprocityReadout?.hasPrefix("\u{2212}") == true)
     }
 
     @Test func resetReturnsToExif() throws {
@@ -84,9 +84,10 @@ struct ReciprocityControlTests {
     @Test func readoutDescribesTheEffect() throws {
         let model = EditorModel(library: try Self.library(), recipe: Recipe(filmID: "fuji-velvia-50", exposureTime: 30))
         let line = try #require(model.reciprocityReadout)
-        #expect(line.contains("Reciprocity \u{2212}1 stop") || line.contains("Reciprocity \u{2212}\u{2154} stops") || line.contains("stops"))
-        #expect(line.contains("cast +G"), "\(line)")
+        #expect(line.contains("stops (compensated)") || line.contains("stop (compensated)"), "\(line)")
+        #expect(line.contains("cast ") && line.contains(" st"), "\(line)")
         #expect(line.contains("contrast +"), "\(line)")
+        #expect(line.contains("shadow grain +"), "\(line)")
         #expect(!model.reciprocityExtrapolated)
         model.recipe.exposureTime = 60
         #expect(model.reciprocityExtrapolated)   // Velvia 50 is rated to 32 s
@@ -105,6 +106,62 @@ struct ReciprocityControlTests {
         #expect(ReciprocityFormat.castName(ChannelStops(r: 0.01, g: 0, b: -0.01)) == nil)
         let e = ReciprocityEffect(lossStops: 4.0 / 3, cast: ChannelStops(r: -0.3, g: 0.12, b: -0.3), contrastGain: 1.07,
                                   shadowGrainGain: 1.5, beyondDatasheet: false)
-        #expect(ReciprocityFormat.readout(e) == "Reciprocity \u{2212}1\u{2153} stops \u{00B7} cast +G \u{00B7} contrast +7%")
+        #expect(ReciprocityFormat.readout(e) == "\u{2212}1\u{2153} stops (compensated) \u{00B7} cast G +0.42 st \u{00B7} contrast +7 % \u{00B7} shadow grain +50 %")
+        #expect(ReciprocityFormat.readout(e, mode: .uncompensated).contains("(uncompensated)"))
+    }
+
+    // MARK: Legacy pipeline
+
+    static func bytes(_ image: CIImage) -> [UInt8] {
+        let r = image.extent
+        var buf = [UInt8](repeating: 0, count: Int(r.width) * Int(r.height) * 4)
+        Renderer.sharedContext.render(image, toBitmap: &buf, rowBytes: Int(r.width) * 4, bounds: r, format: .RGBA8,
+                                      colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
+        return buf
+    }
+
+    @Test func legacyRecipeUpgradesWhenAFilmScienceControlChanges() throws {
+        let legacy = Recipe(filmID: "fuji-velvia-50", pipeline: Recipe.legacyPipeline)
+        let model = EditorModel(library: try Self.library(), recipe: legacy)
+        let image = Self.source(exposure: nil)
+        model.setSource(image)
+        #expect(model.isLegacyPipeline)
+        #expect(model.reciprocityReadout == nil, "a pipeline 1 recipe does not claim an effect it does not render")
+        // Nothing touched: still legacy, so it reopens as it was made.
+        #expect(model.recipe.pipeline == Recipe.legacyPipeline)
+        let before = Self.bytes(model.renderer.apply(model.recipe, to: image))
+        // A legacy control (strength) keeps the pipeline.
+        model.recipe.strength = 0.8
+        #expect(model.recipe.pipeline == Recipe.legacyPipeline)
+        model.recipe.strength = 1
+        model.setExposureTime(sliderValue: log2(30.0))
+        #expect(model.recipe.pipeline == Recipe.currentPipeline, "exposure time upgrades in the same edit")
+        #expect(!model.isLegacyPipeline)
+        model.recipe.reciprocity = .uncompensated
+        let after = Self.bytes(model.renderer.apply(model.recipe, to: image))
+        #expect(zip(before, after).map { abs(Int($0) - Int($1)) }.max()! > 4)
+        #expect(model.reciprocityReadout?.contains("uncompensated") == true)
+    }
+
+    @Test(arguments: [0, 1, 2, 3, 4, 5, 6])
+    func everyFilmScienceControlUpgradesALegacyRecipe(which: Int) throws {
+        let model = EditorModel(library: try Self.library(), recipe: Recipe(filmID: "kodak-tri-x-400", pipeline: Recipe.legacyPipeline))
+        switch which {
+        case 0: model.recipe.push = 1
+        case 1: model.selectScan(.frontier)
+        case 2: model.recipe.toning = .selenium
+        case 3: model.recipe.reciprocity = .uncompensated
+        case 4: model.recipe.reciprocityStrength = 1.5
+        case 5: model.recipe.remJetRemoved = true
+        default: model.selectPaper(.cinemaPrint)
+        }
+        #expect(model.recipe.pipeline == Recipe.currentPipeline)
+    }
+
+    @Test func strengthZeroSaysNoChange() throws {
+        let model = EditorModel(library: try Self.library(), recipe: Recipe(filmID: "fuji-velvia-50", exposureTime: 30))
+        #expect(model.reciprocityReadout?.contains("stops") == true || model.reciprocityReadout?.contains("stop ") == true)
+        model.recipe.reciprocityStrength = 0
+        #expect(model.reciprocityReadout == "No change at this speed")
     }
 }

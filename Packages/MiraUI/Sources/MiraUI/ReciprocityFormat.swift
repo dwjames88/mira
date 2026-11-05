@@ -59,12 +59,33 @@ public enum ReciprocityFormat {
         return names[Int(((degrees + 30) / 60).rounded(.down)) % 6]
     }
 
-    public static func readout(_ e: ReciprocityEffect) -> String {
+    /// The size of the cast in stops (distance from neutral in the R-G-B chroma plane).
+    public static func castMagnitude(_ c: ChannelStops) -> Double {
+        let x = c.r - 0.5 * (c.g + c.b), y = 0.8660254 * (c.g - c.b)
+        return (x * x + y * y).squareRoot()
+    }
+
+    /// "\u{2212}1\u{2153} stops (compensated) \u{00B7} cast G +0.12 st \u{00B7} contrast +7 % \u{00B7} shadow grain +38 %".
+    public static func readout(_ e: ReciprocityEffect, mode: ReciprocityMode = .compensated) -> String {
         let magnitude = abs(e.lossStops)
-        var parts = ["Reciprocity \(stops(e.lossStops)) \(abs(magnitude - 1) < 1e-9 ? "stop" : "stops")"]
-        if let name = castName(e.cast) { parts.append("cast +\(name)") }
+        var parts = ["\(stops(e.lossStops)) \(abs(magnitude - 1) < 1e-9 ? "stop" : "stops") (\(mode == .uncompensated ? "uncompensated" : "compensated"))"]
+        if let name = castName(e.cast) { parts.append("cast \(name) +" + String(format: "%.2f", castMagnitude(e.cast)) + " st") }
         let pct = Int(((e.contrastGain - 1) * 100).rounded())
-        if pct != 0 { parts.append("contrast \(pct > 0 ? "+" : "\u{2212}")\(abs(pct))%") }
+        if pct != 0 { parts.append("contrast \(pct > 0 ? "+" : "\u{2212}")\(abs(pct)) %") }
+        let grain = Int(((e.shadowGrainGain - 1) * 100).rounded())
+        if grain != 0 { parts.append("shadow grain \(grain > 0 ? "+" : "\u{2212}")\(abs(grain)) %") }
         return parts.joined(separator: " \u{00B7} ")
+    }
+
+    /// What the reciprocity readout under the exposure-time control says for a recipe, shared by the Mac and iOS
+    /// editors. nil when there is nothing to say (mode Off, a legacy-pipeline recipe, no film, no time);
+    /// "No change at this speed" when the time (or strength 0) has no effect.
+    public static func summary(recipe: Recipe, film: Film?, sourceExposureTime: Double?) -> (text: String, beyondDatasheet: Bool)? {
+        guard recipe.reciprocity != .off, !recipe.isLegacyPipeline, let film,
+              recipe.exposureTime ?? sourceExposureTime != nil else { return nil }
+        guard let e = Reciprocity.effect(for: recipe, film: film, sourceExposureTime: sourceExposureTime) else {
+            return ("No change at this speed", false)
+        }
+        return (readout(e, mode: recipe.reciprocity), e.beyondDatasheet)
     }
 }

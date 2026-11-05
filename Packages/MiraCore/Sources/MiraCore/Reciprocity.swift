@@ -101,6 +101,20 @@ public struct ReciprocityEffect: Equatable, Sendable {
     public static let none = ReciprocityEffect(lossStops: 0, cast: .zero, contrastGain: 1, shadowGrainGain: 1,
                                                beyondDatasheet: false)
 
+    /// The effect at a user strength `s` (0...2, 1 = the datasheet model): scales the cast, the contrast and
+    /// shadow-grain residue (gain - 1) and, in Uncompensated mode only, the loss (the loss in Compensated mode
+    /// is what the photographer added back, so it stays the datasheet's number).
+    public func scaled(by s: Double, mode: ReciprocityMode) -> ReciprocityEffect {
+        guard abs(s - 1) > 1e-9 else { return self }
+        let k = min(max(s, 0), 2)
+        var e = self
+        e.cast = ChannelStops(r: cast.r * k, g: cast.g * k, b: cast.b * k)
+        e.contrastGain = max(0.1, 1 + (contrastGain - 1) * k)
+        e.shadowGrainGain = max(0.1, 1 + (shadowGrainGain - 1) * k)
+        if mode == .uncompensated { e.lossStops = lossStops * k }
+        return e
+    }
+
     /// True when the effect changes nothing.
     public var isIdentity: Bool {
         abs(lossStops) < 1e-6 && abs(cast.r) < 1e-6 && abs(cast.g) < 1e-6 && abs(cast.b) < 1e-6
@@ -191,6 +205,22 @@ public enum Reciprocity {
         // A monochrome film has no colour layers to fail unequally.
         if film.isMonochrome { e.cast = .zero }
         return e
+    }
+
+    /// The effect a recipe asks for, or nil when reciprocity is off, the recipe is on the legacy pipeline, there
+    /// is no usable time (`recipe.exposureTime ?? sourceExposureTime`), or the time has no effect. The one place
+    /// the renderer, the editors' readouts and the tests agree on.
+    public static func effect(for recipe: Recipe, film: Film?, sourceExposureTime: Double?,
+                              requiresFilmScience: Bool = true) -> ReciprocityEffect? {
+        guard !requiresFilmScience || recipe.pipeline >= Recipe.currentPipeline,
+              recipe.reciprocity != .off, let film,
+              let t = recipe.exposureTime ?? sourceExposureTime, t.isFinite, t > 0 else { return nil }
+        let e = effect(film: film, exposureTime: t).scaled(by: recipe.reciprocityStrength, mode: recipe.reciprocity)
+        // Compensated keeps the brightness: the datasheet loss alone shows nothing.
+        let visible = recipe.reciprocity == .uncompensated ? !e.isIdentity
+            : !(ReciprocityEffect(lossStops: 0, cast: e.cast, contrastGain: e.contrastGain,
+                                  shadowGrainGain: e.shadowGrainGain, beyondDatasheet: false).isIdentity)
+        return visible ? e : nil
     }
 
     /// The loss in stops at `t` and whether it is extrapolated (`beyondDatasheet`), before cast and contrast.
