@@ -155,7 +155,7 @@ private struct FilmDetailPanel: View {
     @ViewBuilder private var stockChips: some View {
         let isos = model.isoChoices
         if !isos.isEmpty {
-            ChipRow(label: "ISO") {
+            ChipRow(label: "ISO", selected: isos.first { $0.iso == model.selectedFilm?.iso }?.label) {
                 ForEach(isos) { choice in
                     OptionChip(title: choice.label, selected: choice.iso == model.selectedFilm?.iso) { model.selectISO(choice.iso) }
                 }
@@ -163,7 +163,7 @@ private struct FilmDetailPanel: View {
         }
         let variations = model.variationChoices
         if !variations.isEmpty {
-            ChipRow(label: "VARIATIONS") {
+            ChipRow(label: "VARIATIONS", selected: variations.first { $0.filmID == model.filmID }?.label) {
                 ForEach(variations) { choice in
                     OptionChip(title: choice.label, selected: choice.filmID == model.filmID) { model.select(choice.filmID) }
                 }
@@ -185,14 +185,14 @@ private struct FilmOptions: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, T.cells(2))
             }
-            ChipRow(label: "PUSH") {
+            ChipRow(label: "PUSH", selected: FilmBrowsing.pushSteps.first { abs(model.recipe.push - $0) < 0.01 }.map(FilmBrowsing.pushLabel)) {
                 ForEach(FilmBrowsing.pushSteps, id: \.self) { step in
                     OptionChip(title: FilmBrowsing.pushLabel(step), selected: abs(model.recipe.push - step) < 0.01) {
                         model.recipe.push = step
                     }
                 }
             }
-            ChipRow(label: "SCAN") {
+            ChipRow(label: "SCAN", selected: model.recipe.scanProfile.displayName) {
                 ForEach(ScanProfile.allCases, id: \.self) { profile in
                     OptionChip(title: profile.displayName, selected: model.recipe.scanProfile == profile) {
                         model.selectScan(profile)
@@ -200,7 +200,7 @@ private struct FilmOptions: View {
                 }
             }
             if model.showsPaperChips {
-                ChipRow(label: "PAPER") {
+                ChipRow(label: "PAPER", selected: model.recipe.paper.displayName) {
                     ForEach(PaperProfile.allCases, id: \.self) { paper in
                         OptionChip(title: paper.displayName, selected: model.recipe.paper == paper) {
                             model.selectPaper(paper)
@@ -209,9 +209,11 @@ private struct FilmOptions: View {
                 }
                 Text("Mira originals, inspired by published print behavior. Replaces Scan.")
                     .ffLabel(size: 9, color: T.paperDim)
-                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, T.cells(2))
+                    .padding(.top, 2)
+                    .padding(.bottom, T.rows(0.5))
             }
             FFSlider("EXPOSURE TIME",
                      value: Binding(get: { model.exposureTimeSliderValue },
@@ -220,7 +222,7 @@ private struct FilmOptions: View {
                      snap: ExposureTimeFormat.step, format: { _ in model.exposureTimeReadout })
                 .frame(minHeight: 44)
                 .padding(.horizontal, T.cells(2))
-            ChipRow(label: "RECIP.") {
+            ChipRow(label: "RECIP.", selected: model.recipe.reciprocity.displayName) {
                 ForEach(ReciprocityMode.allCases, id: \.self) { mode in
                     OptionChip(title: mode.displayName, selected: model.recipe.reciprocity == mode) {
                         model.recipe.reciprocity = mode
@@ -244,7 +246,7 @@ private struct FilmOptions: View {
                     .accessibilityLabel(readout + (model.reciprocityExtrapolated ? ", beyond datasheet" : ""))
             }
             if model.offersToning {
-                ChipRow(label: "TONING") {
+                ChipRow(label: "TONING", selected: model.recipe.toning.displayName) {
                     ForEach(Toning.allCases, id: \.self) { toning in
                         OptionChip(title: toning.displayName, selected: model.recipe.toning == toning) {
                             model.recipe.toning = toning
@@ -266,6 +268,8 @@ private struct FilmOptions: View {
 /// stacks above its chips instead.
 struct ChipRow<Content: View>: View {
     let label: String
+    /// Id (the chip's title) of the selected chip; the row scrolls it into view when it appears.
+    var selected: String?
     @ViewBuilder var content: Content
     @Environment(\.dynamicTypeSize) private var typeSize
 
@@ -292,8 +296,13 @@ struct ChipRow<Content: View>: View {
     }
 
     private var chips: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: T.cells(2)) { content }
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: T.cells(2)) { content }
+                    .padding(.trailing, T.cells(1))
+            }
+            .onAppear { if let selected { DispatchQueue.main.async { proxy.scrollTo(selected, anchor: .center) } } }
+            .onChange(of: selected) { _, id in if let id { withAnimation { proxy.scrollTo(id, anchor: .center) } } }
         }
     }
 }
@@ -317,6 +326,7 @@ struct OptionChip: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .id(title)
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }

@@ -1,4 +1,5 @@
 import SwiftUI
+import MiraCore
 import XCTest
 @testable import Mira
 
@@ -97,6 +98,19 @@ final class LayoutSnapshotTests: XCTestCase {
             m.panelHidden[.films] = true
             let hidden = await render(m, tab: .films, device: d, name: "films-options-hidden") { FilmsPanel(model: m) }
             assertLayout(hidden, device: d, hidden: true)
+        }
+    }
+
+    /// Chip rows scroll their selected chip into view: with the last push step and a toned monochrome film, every row still renders and the labels hold.
+    func testFilmsOptionsChipRowsReachSelection() async {
+        for d in TestDevice.all {
+            let m = await makeModel()
+            if let mono = PhotoEngine.filmList.first(where: { f in m.select(f.id); return m.offersToning }) { m.select(mono.id) }
+            m.recipe.push = FilmBrowsing.pushSteps.last ?? 0
+            m.filmsDetail = true
+            let f = await render(m, tab: .films, device: d, name: "films-options-push-max") { FilmsPanel(model: m) }
+            assertLayout(f, device: d, hidden: false)
+            XCTAssertNotEqual(m.exposureTimeReadout, "No EXIF", "readout is caps like the rest of the UI")
         }
     }
 

@@ -200,7 +200,7 @@ final class EditorViewModel {
     var exposureTimeReadout: String {
         if let t = recipe.exposureTime { return ExposureTimeFormat.label(t) }
         if let t = sourceExposureTime { return ExposureTimeFormat.label(t) + " \u{00B7} EXIF" }
-        return "No EXIF"
+        return "NO EXIF"   // caps like every other readout (the Mac shows "No EXIF")
     }
 
     /// Binding into the recipe for DEVELOP controls; writes flow through `recipe`'s didSet.
