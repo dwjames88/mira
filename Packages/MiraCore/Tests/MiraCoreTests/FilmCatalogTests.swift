@@ -97,13 +97,16 @@ import Testing
         #expect(procedural.png == nil)
     }
 
-    /// Every packed cube is 48^3 or 56^3 and within max 6/255 and 99.9th percentile 2/255 of its 64^3 original, or is
-    /// the 64^3 cube itself, equal to what `LUT.loadHald` reads from the PNG (exactly, up to 16-bit rounding for the
-    /// few Hald images larger than 64^3, which `loadHald` resamples in Float). Headers and sizes are checked for every
-    /// film; the error measurement runs on every film too (it takes a few seconds per 10 films in debug builds).
+    /// Every packed cube is 48^3 or 56^3 and, on the `PackProbe` colours (pixels of `Fixtures/sample.jpg` and
+    /// `Fixtures/raw/iphone-xs.dng` plus a neutral ramp and an HSV sweep), within max 4/255 and 99.9th percentile
+    /// 1.5/255 of its 64^3 original, or is the 64^3 cube itself, equal to what `LUT.loadHald` reads from the PNG
+    /// (exactly, up to 16-bit rounding for the few Hald images larger than 64^3, which `loadHald` resamples in Float).
     /// `mira-sheet --pack-films` picks the smallest dimension that passes.
     @Test func packedCubesMeetTheErrorLimitsOrAreExact() throws {
         let films = try Self.library().films.filter { $0.proceduralID == nil }
+        let fixtures = Self.dir.deletingLastPathComponent().appendingPathComponent("Fixtures", isDirectory: true)
+        let probe = PackProbe.colors(fixturesDirectory: fixtures)
+        #expect(probe.count / 3 > 50_000, "probe fixtures missing")
         var counts: [Int: Int] = [:]
         for f in films {
             let data = try Data(contentsOf: Self.dir.appendingPathComponent(f.file))
@@ -120,7 +123,7 @@ import Testing
                 let tolerance: Float = n == 64 ? 0 : 0.5 / 65535 + 1e-7
                 #expect(zip(a, b).allSatisfy { abs($0 - $1) <= tolerance }, "\(f.id): 64^3 cube differs from its PNG")
             } else {
-                let fid = PackedLUT.fidelity(original: orig, candidate: packed)
+                let fid = PackedLUT.probeError(reference: PackedLUT.evaluate(orig, colors: probe), candidate: packed, colors: probe)
                 #expect(fid.within(maxError: PackedLUT.acceptedMaxError, p999Error: PackedLUT.acceptedP999Error),
                         "\(f.id): \(packed.dimension)^3 max \(fid.max * 255)/255 p99.9 \(fid.p999 * 255)/255")
             }

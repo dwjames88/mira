@@ -26,6 +26,7 @@ struct Options {
     var bench = false
     var benchDir = "build/bench"
     var fixture = "Fixtures/sample.jpg"
+    var fixtureDirectory = "Fixtures"
     var packFilms: (String, String)?
     var contactSheet = false
     var cropOnly = false
@@ -63,6 +64,7 @@ func parseArguments() -> Options {
         case "--bench": o.bench = true
         case "--bench-dir": o.benchDir = next(flag)
         case "--fixture": o.fixture = next(flag)
+        case "--fixtures-dir": o.fixtureDirectory = next(flag)
         case "--pack-films": let a = next(flag); o.packFilms = (a, next(flag))
         case "--contact-sheet": o.contactSheet = true
         case "--crop-only": o.cropOnly = true
@@ -112,7 +114,7 @@ func timeLUTs(filmsPath: String) -> Never {
     } catch { fail("time-luts failed: \(error)") }
 }
 if let (sources, films) = opts.packFilms {
-    do { try PackFilms.run(sources: sources, films: films); exit(0) } catch { fail("pack-films failed: \(error)") }
+    do { try PackFilms.run(sources: sources, films: films, fixtures: opts.fixtureDirectory); exit(0) } catch { fail("pack-films failed: \(error)") }
 }
 if opts.timeLUTs {
     guard let p = opts.films else { fail("--time-luts needs --films <dir>") }
