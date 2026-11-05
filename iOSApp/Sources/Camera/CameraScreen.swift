@@ -76,26 +76,18 @@ private struct FilmDoorHost: View {
             onClose: context.close,
             maxHeight: context.maxHeight)
             .onAppear {
-                doors.resetWantedThumbnails()
+                // Cards may have asked before this ran (children appear first): forward what they asked for now.
+                let model = camera
+                doors.onWantedChange = { [weak model] ids in model?.setWantedCardIDs(ids) }
+                if !doors.wantedThumbnailIDs.isEmpty { camera.setWantedCardIDs(doors.prioritizedWantedIDs) }
                 doors.setThumbnails(camera.cardThumbnails)
             }
             .onDisappear {
+                doors.onWantedChange = nil
                 camera.setWantedCardIDs([])
                 doors.resetWantedThumbnails()
             }
-            // The cards ask for their thumbnails as they appear; forward the set to the finder when it changes.
-            .task {
-                var sent: Set<String> = []
-                while !Task.isCancelled {
-                    let wanted = doors.wantedThumbnailIDs
-                    if wanted != sent {
-                        sent = wanted
-                        camera.setWantedCardIDs(wanted.sorted())
-                    }
-                    try? await Task.sleep(for: .milliseconds(200))
-                }
-            }
-            // The finder renders new card images about twice a second (CGImages are classes: compare identities).
+            // The finder publishes each card as it is rendered and refreshes them about twice a second (CGImages are classes: compare identities).
             .onChange(of: camera.cardThumbnails.mapValues { ObjectIdentifier($0) }) {
                 doors.setThumbnails(camera.cardThumbnails)
             }

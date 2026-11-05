@@ -30,4 +30,17 @@ final class FinderBudgetSimTests: XCTestCase {
         }
         print("\n\(table)")
     }
+
+    /// Time to the first card and to 8 cards through the real finder card path, from a cold renderer (no LUT prewarm).
+    func testCardLatencyCold() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["MIRA_PERF"] == "1", "set TEST_RUNNER_MIRA_PERF=1")
+        let library = try XCTUnwrap(PhotoEngine.library)
+        let renderer = Renderer(library: library)
+        let ids = Array(FilmBrowsing.stocks(in: library, family: nil).prefix(8).map(\.id))
+        XCTAssertEqual(ids.count, 8)
+        let picture = try XCTUnwrap(CIImage(contentsOf: CameraFixtures.sampleURL))
+        let fit = picture.transformed(by: CGAffineTransform(scaleX: 1920 / picture.extent.width, y: 1920 / picture.extent.width))
+        let result = try XCTUnwrap(FinderBenchmark.cardLatency(frame: fit, ids: ids, renderer: renderer), "no Metal device or cards never arrived")
+        print(String(format: "\nCARDS cold: first %.0f ms, 8 cards %.0f ms, same scene reopened %.0f ms\n", result.firstMS, result.allMS, result.cachedAllMS))
+    }
 }
