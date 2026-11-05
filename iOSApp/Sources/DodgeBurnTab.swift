@@ -27,7 +27,7 @@ struct DodgeBurnTab: View {
                     .ffLabel(size: 10, color: T.paperDim)
                     .padding(.horizontal, T.cells(2))
             } else {
-                ScrollView {
+                Group {
                     VStack(spacing: 0) {
                         ForEach(Array(strokes.enumerated()), id: \.element.id) { index, stroke in
                             HStack(spacing: 8) {

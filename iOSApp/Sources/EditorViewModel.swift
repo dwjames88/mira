@@ -25,6 +25,11 @@ final class EditorViewModel {
     /// Crop being edited while `isCropping`; committed to `recipe.crop` by `commitCrop()`.
     var workingCrop = CropSettings.identity
 
+    /// Steps whose control panel the user folded away to see the whole photo. Per step, kept while editing, not persisted.
+    var panelHidden: [EditorTab: Bool] = [:]
+    /// FILMS step: true while the applied stock's full options panel replaces the card strip.
+    var filmsDetail = false
+
     /// Single source of truth for every edit.
     var recipe: Recipe {
         didSet {
@@ -197,7 +202,7 @@ final class EditorViewModel {
     var exposureTimeReadout: String {
         if let t = recipe.exposureTime { return ExposureTimeFormat.label(t) }
         if let t = sourceExposureTime { return ExposureTimeFormat.label(t) + " \u{00B7} EXIF" }
-        return "No EXIF"
+        return "NO EXIF"   // caps like every other readout (the Mac shows "No EXIF")
     }
 
     /// Binding into the recipe for DEVELOP controls; writes flow through `recipe`'s didSet.
@@ -345,6 +350,8 @@ final class EditorViewModel {
         rawAsset = false
         hasPhoto = false
         isCropping = false
+        panelHidden = [:]
+        filmsDetail = false
         zoom = 1; offset = .zero; showingOriginal = false
         isRestoring = true
         recipe = Recipe()

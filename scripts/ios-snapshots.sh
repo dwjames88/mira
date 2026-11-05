@@ -31,9 +31,10 @@ xcrun simctl boot "$UDID" 2>/dev/null || true
 xcrun simctl bootstatus "$UDID" -b >/dev/null
 xcrun simctl install "$UDID" "$APP"
 
-shoot() { # name [tab] [sheet]
+shoot() { # name [tab] [sheet] [detail] [focus] [hidden]
   xcrun simctl terminate "$UDID" "$BUNDLE_ID" 2>/dev/null || true
   SIMCTL_CHILD_MIRA_SNAPSHOT=1 SIMCTL_CHILD_MIRA_SNAPSHOT_TAB="${2:-develop}" SIMCTL_CHILD_MIRA_SNAPSHOT_SHEET="${3:-}" \
+    SIMCTL_CHILD_MIRA_SNAPSHOT_DETAIL="${4:-}" SIMCTL_CHILD_MIRA_SNAPSHOT_FOCUS="${5:-}" SIMCTL_CHILD_MIRA_SNAPSHOT_HIDDEN="${6:-}" \
     xcrun simctl launch "$UDID" "$BUNDLE_ID" >/dev/null
   sleep "$SETTLE"
   xcrun simctl io "$UDID" screenshot "$OUT/$1.png" >/dev/null 2>&1
@@ -45,6 +46,10 @@ shoot editor-develop develop
 shoot editor-films films
 shoot films-presets films
 shoot save-preset films savepreset
+shoot films-options films "" 1
+shoot films-hidden films "" "" "" 1
+shoot develop-curves develop "" "" curves
+shoot develop-curves-hidden develop "" "" curves 1
 
 # Gallery: grant Photos headlessly (no taps), launch normally, let thumbnails load.
 # photos-add first, then full photos last: the later grant wins (the reverse leaves add-only + a prompt).
