@@ -27,7 +27,7 @@ extension CIImage {
     }
 
     /// A copy tagged with `headroom` (an untagged copy for headroom <= 1).
-    func withMiraHeadroom(_ headroom: CGFloat) -> CIImage {
+    public func withMiraHeadroom(_ headroom: CGFloat) -> CIImage {
         guard headroom > 1 || miraHeadroom > 1 else { return self }
         return settingProperties(properties.merging([Self.miraHeadroomKey: Double(max(1, headroom))]) { $1 })
     }

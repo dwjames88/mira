@@ -55,8 +55,8 @@ actor PhotoEngine {
         sourceURL = url
         source = loaded.image
         colorSpace = loaded.colorSpace
-        histogramSource = renderer.previewImage(from: loaded.image, maxPixelSize: 480)
-        thumb = renderer.previewImage(from: loaded.image, maxPixelSize: 220)
+        histogramSource = Self.tagged(renderer.previewImage(from: loaded.image, maxPixelSize: 480), like: loaded.image)
+        thumb = Self.tagged(renderer.previewImage(from: loaded.image, maxPixelSize: 220), like: loaded.image)
         let space = loaded.colorSpace
         return LoadedSource(image: loaded.image, colorSpace: space, size: loaded.image.extent.size)
     }
@@ -69,8 +69,13 @@ actor PhotoEngine {
         sourceURL = nil
         source = loaded.image
         colorSpace = loaded.colorSpace
-        histogramSource = renderer.previewImage(from: loaded.image, maxPixelSize: 480)
-        thumb = renderer.previewImage(from: loaded.image, maxPixelSize: 220)
+        histogramSource = Self.tagged(renderer.previewImage(from: loaded.image, maxPixelSize: 480), like: loaded.image)
+        thumb = Self.tagged(renderer.previewImage(from: loaded.image, maxPixelSize: 220), like: loaded.image)
+    }
+
+    /// A derived image keeps the source's EXIF exposure time and headroom (the reciprocity and exposure stages read them).
+    private static func tagged(_ image: CIImage, like source: CIImage) -> CIImage {
+        image.withMiraExposureTime(source.miraExposureTime).withMiraHeadroom(source.miraHeadroom)
     }
 
     /// Histogram of the graded small preview. Called throttled, never per frame.

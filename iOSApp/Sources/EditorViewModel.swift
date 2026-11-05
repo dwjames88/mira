@@ -114,6 +114,59 @@ final class EditorViewModel {
 
     var offersToning: Bool { FilmBrowsing.offersToning(selectedFilm) }
 
+    // MARK: Paper (Mira originals; same rules as the Mac panel)
+
+    /// Paper is offered for every film except the print cards and monochrome films.
+    var showsPaperChips: Bool { selectedFilm.map { $0.family != .print && !$0.isMonochrome } ?? false }
+
+    /// Scan and Paper are mutually exclusive: choosing a scan other than Neutral clears the paper.
+    func selectScan(_ scan: ScanProfile) {
+        recipe.scanProfile = scan
+        if scan != .neutral { recipe.paper = .none }
+    }
+
+    func selectPaper(_ paper: PaperProfile) {
+        recipe.paper = paper
+        if paper != .none { recipe.scanProfile = .neutral }
+    }
+
+    // MARK: Exposure time and reciprocity
+
+    /// The open photo's EXIF exposure time in seconds; nil when it has none.
+    private(set) var sourceExposureTime: Double?
+
+    var effectiveExposureTime: Double? { recipe.exposureTime ?? sourceExposureTime }
+
+    var reciprocityEffect: ReciprocityEffect? {
+        guard recipe.reciprocity != .off, let film = selectedFilm, let t = effectiveExposureTime else { return nil }
+        let e = Reciprocity.effect(film: film, exposureTime: t)
+        return e.isIdentity ? nil : e
+    }
+    var reciprocityReadout: String? { reciprocityEffect.map(ReciprocityFormat.readout) }
+    var reciprocityExtrapolated: Bool { reciprocityEffect?.beyondDatasheet ?? false }
+
+    var exposureTimeSliderValue: Double { log2(effectiveExposureTime ?? ExposureTimeFormat.neutral) }
+
+    /// The slider position of "no override": the standard speed nearest the EXIF time (1/125 s without EXIF).
+    var exposureTimeResetValue: Double {
+        log2(sourceExposureTime.map { ExposureTimeFormat.standard(nearestTo: $0) } ?? ExposureTimeFormat.neutral)
+    }
+
+    func setExposureTime(sliderValue v: Double) {
+        let t = ExposureTimeFormat.standard(nearestTo: exp2(v))
+        let unchanged = sourceExposureTime.map { ExposureTimeFormat.standard(nearestTo: $0) } ?? ExposureTimeFormat.neutral
+        let newValue: Double? = t == unchanged ? nil : t
+        if recipe.exposureTime != newValue { recipe.exposureTime = newValue }
+    }
+
+    func resetExposureTime() { recipe.exposureTime = nil }
+
+    var exposureTimeReadout: String {
+        if let t = recipe.exposureTime { return ExposureTimeFormat.label(t) }
+        if let t = sourceExposureTime { return ExposureTimeFormat.label(t) + " \u{00B7} EXIF" }
+        return "No EXIF"
+    }
+
     /// Binding into the recipe for DEVELOP controls; writes flow through `recipe`'s didSet.
     func bind<V>(_ keyPath: WritableKeyPath<Recipe, V>) -> Binding<V> {
         Binding(get: { self.recipe[keyPath: keyPath] }, set: { self.recipe[keyPath: keyPath] = $0 })
@@ -187,6 +240,7 @@ final class EditorViewModel {
             let adopted = LoadedSource(image: loaded.source, colorSpace: loaded.colorSpace, size: loaded.size)
             try await engine.adopt(adopted)
             live.setSource(loaded.source, colorSpace: loaded.colorSpace, size: loaded.size)
+            sourceExposureTime = loaded.source.miraExposureTime
             sourcePixelSize = loaded.size
             zoom = 1; offset = .zero; showingOriginal = false
             hasPhoto = true
@@ -234,6 +288,7 @@ final class EditorViewModel {
     private func ingest(_ data: Data) async throws {
         let loaded = try await engine.load(data: data)
         live.setSource(loaded.image, colorSpace: loaded.colorSpace, size: loaded.size)
+        sourceExposureTime = loaded.image.miraExposureTime
         sourcePixelSize = loaded.size
         zoom = 1; offset = .zero; showingOriginal = false
         hasPhoto = true

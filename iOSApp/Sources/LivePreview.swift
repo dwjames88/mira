@@ -53,7 +53,11 @@ final class LivePreview {
         if wanted >= sourceLongest {
             proxy = source
         } else if let cg = ciContext.createCGImage(scaled, from: extent, format: .RGBA8, colorSpace: colorSpace) {
+            // A bitmap-backed image has no properties: carry the source's EXIF exposure time and headroom over
+            // so the reciprocity and exposure stages see them on the proxy too.
             proxy = CIImage(cgImage: cg, options: [.colorSpace: colorSpace])
+                .withMiraExposureTime(source.miraExposureTime)
+                .withMiraHeadroom(source.miraHeadroom)
         } else {
             proxy = scaled
         }

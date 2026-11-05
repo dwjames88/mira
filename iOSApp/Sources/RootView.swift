@@ -308,7 +308,7 @@ struct FilmsPanel: View {
     }
 }
 
-/// Push / pull, scan and (monochrome films) toning for the applied film. Compact: one scrolling row each.
+/// Push / pull, scan, paper, exposure time with reciprocity, and (monochrome films) toning for the applied film. Compact: one scrolling row each.
 private struct FilmOptions: View {
     @Bindable var model: EditorViewModel
 
@@ -324,9 +324,47 @@ private struct FilmOptions: View {
             ChipRow(label: "SCAN") {
                 ForEach(ScanProfile.allCases, id: \.self) { profile in
                     OptionChip(title: profile.displayName, selected: model.recipe.scanProfile == profile) {
-                        model.recipe.scanProfile = profile
+                        model.selectScan(profile)
                     }
                 }
+            }
+            if model.showsPaperChips {
+                ChipRow(label: "PAPER") {
+                    ForEach(PaperProfile.allCases, id: \.self) { paper in
+                        OptionChip(title: paper.displayName, selected: model.recipe.paper == paper) {
+                            model.selectPaper(paper)
+                        }
+                    }
+                }
+                Text("Mira originals, inspired by published print behavior. Replaces Scan.")
+                    .ffLabel(size: 9, color: FieldFramesTheme.paperDim)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, FieldFramesTheme.cells(2))
+            }
+            FFSlider("EXPOSURE TIME",
+                     value: Binding(get: { model.exposureTimeSliderValue },
+                                    set: { model.setExposureTime(sliderValue: $0) }),
+                     in: ExposureTimeFormat.range, default: model.exposureTimeResetValue,
+                     snap: ExposureTimeFormat.step, format: { _ in model.exposureTimeReadout })
+                .frame(minHeight: 44)
+                .padding(.horizontal, FieldFramesTheme.cells(2))
+            ChipRow(label: "RECIP.") {
+                ForEach(ReciprocityMode.allCases, id: \.self) { mode in
+                    OptionChip(title: mode.displayName, selected: model.recipe.reciprocity == mode) {
+                        model.recipe.reciprocity = mode
+                    }
+                }
+            }
+            if let readout = model.reciprocityReadout {
+                (Text(readout).foregroundStyle(FieldFramesTheme.paperMid)
+                    + Text(model.reciprocityExtrapolated ? " \u{00B7} beyond datasheet" : "")
+                        .foregroundStyle(FieldFramesTheme.paperDim))
+                    .ffLabel(size: 9, color: FieldFramesTheme.paperMid)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, FieldFramesTheme.cells(2))
+                    .accessibilityLabel(readout + (model.reciprocityExtrapolated ? ", beyond datasheet" : ""))
             }
             if model.offersToning {
                 ChipRow(label: "TONING") {
