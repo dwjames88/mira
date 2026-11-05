@@ -8,6 +8,11 @@ The first release with the film-science pipeline, on the Mac, in the Photos exte
 
 ### Highlights
 - Editor steps reordered: Crop, Films, Develop, Dodge & Burn (keys 1–4).
+- **Silver grain.** Grain is now modelled as film grain, not noise: a density-domain field defined in micrometres on the 36 x 24 mm frame, sized and scaled from each stock's published RMS granularity (Tri-X and HP5 gritty, Portra and Ektar fine, Velvia nearly invisible, instant soft), mostly luminance, clean in the blacks, with the same structure in the preview, at 100 % and in any export size. See Design/GRAIN.md.
+- **Native texture on film choice.** Choosing a film sets Grain, Halation and Bloom to that film's own level (50 %); bloom is now per film too. Presets keep their stored values.
+- **Exposure time that you can see.** Reciprocity strength (0–200 %) and a numeric readout (loss in stops, cast, contrast, shadow grain); editing any film setting moves an older edit onto the current film model.
+- **Opens the RAW.** For Photos assets with a RAW original the editor develops the RAW: the embedded preview appears at once, an editable draft follows, full quality replaces it in the background, and reopening is instant.
+- **Faster library.** Leaving the editor no longer rebuilds the grid or re-requests thumbnails (0 requests for unchanged photos); only an edited photo's thumbnail refreshes; scroll position is kept. On iOS too.
 - **Film science.** A pipeline built in the order of the light: exposure with film latitude, white balance, halation, per-film grain, the film's colour, then the print.
 - **264 looks.** The 260 films of the RawTherapee Film Simulation Collection (Pat David et al., CC BY-SA 4.0) plus 4 Mira originals (500T Tungsten, 250D Daylight, Cinema Print, Color Paper), grouped into 7 families (Color Negative, Slide, Kodachrome, Black and White, Motion Picture, Instant, Print) as one card per stock, with ISO and Variations chips in the FILMS panel (51 stocks).
 - **RAW development and headroom.** A RAW group in DEVELOP (white balance, boost, highlight recovery, local tone map, noise reduction, sharpness, lens correction), and scene-referred headroom so RAW and HDR highlights roll off through the film's shoulder instead of clipping.
