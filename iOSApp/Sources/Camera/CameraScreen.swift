@@ -55,7 +55,8 @@ struct CameraScreen: View {
             initialRecipe: initial,
             fixtureURL: Bundle.main.url(forResource: "sample", withExtension: "jpg"),
             printQueue: CameraPrints.queue,
-            onOpenLibrary: { [onClose] in onClose() })
+            onOpenLibrary: { [onClose] in onClose() },
+            onFrameSaved: { DevelopStore.shared.add($0) })
     }
 }
 

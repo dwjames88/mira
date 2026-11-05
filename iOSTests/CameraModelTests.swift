@@ -6,7 +6,8 @@ import XCTest
 
 @MainActor
 final class CameraModelTests: XCTestCase {
-    func makeModel(access: LibraryAccess = .full, log: CallRecorder = CallRecorder()) -> CameraModel {
+    func makeModel(access: LibraryAccess = .full, log: CallRecorder = CallRecorder(),
+                   onFrameSaved: @escaping @MainActor (String) -> Void = { _ in }) -> CameraModel {
         let defaults = UserDefaults(suiteName: "mira.camera.tests.\(UUID().uuidString)")!
         return CameraModel(
             printWriter: StubPrintWriter(log: log), renderer: nil, initialRecipe: Recipe(),
@@ -14,7 +15,8 @@ final class CameraModelTests: XCTestCase {
             library: StubLibrary(level: access, log: log), baker: StubBaker(),
             requestLibraryAccess: { access },
             settingsStore: CameraSettingsStore(defaults: defaults),
-            pendingDirectory: FileManager.default.temporaryDirectory.appendingPathComponent("cam-\(UUID().uuidString)"))
+            pendingDirectory: FileManager.default.temporaryDirectory.appendingPathComponent("cam-\(UUID().uuidString)"),
+            onFrameSaved: onFrameSaved)
     }
 
     func until(_ what: String, timeout: Double = 5, _ condition: @MainActor () async -> Bool) async {
@@ -94,5 +96,19 @@ final class CameraModelTests: XCTestCase {
         let attached = await log.attached
         XCTAssertTrue(attached.isEmpty)
         await model.stop()
+    }
+
+    /// Auto-add hook: the developed frame's id on full access, the baked copy's (not the original's) on limited.
+    func testFrameSavedReportsTheKeptAsset() async {
+        for (access, expected) in [(LibraryAccess.full, "stub-asset"), (.limited, "stub-baked")] {
+            var saved: [String] = []
+            let model = makeModel(access: access, onFrameSaved: { saved.append($0) })
+            await model.start()
+            await until("ready") { model.readiness == .ready && model.state.canCapture }
+            model.shutter()
+            await until("frame saved") { !saved.isEmpty }
+            XCTAssertEqual(saved, [expected])
+            await model.stop()
+        }
     }
 }
