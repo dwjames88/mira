@@ -103,8 +103,6 @@ final class CameraLayoutTests: XCTestCase {
             let origin = FrameBox()
             let view = CameraView(model: model, filmName: "Kodak Portra 400", onClose: {}, onLayout: { box.frames = $0 }) { _ in
                 Color.clear
-            } wbDoor: { _ in
-                Color.clear
             }
             // The camera view's own frame in window coordinates; the part frames are relative to it.
             .background(GeometryReader { geo in
