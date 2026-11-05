@@ -520,7 +520,7 @@ static inline float miraGrainShape(int shape, float y, float lum) {
     if (shape == 1) {
         // Reversal: grain follows the positive's density, so shadows and midtones carry it and clear highlights do not.
         float d = -log10(max(lum, 1e-4));
-        return min(sqrt(max(d, 0.0)), 1.45) * smoothstep(0.0, 0.05, y);
+        return min(1.08 * pow(max(d, 0.0), 0.75), 1.6) * smoothstep(0.0, 0.05, y);
     }
     if (shape == 2) { return clearBase * (1.0 - 0.55 * smoothstep(0.6, 1.0, y)); }
     if (shape == 3) { return (0.55 + 0.45 * clearBase * (1.0 - 0.5 * smoothstep(0.65, 1.0, y))) * smoothstep(0.0, 0.08, y); }

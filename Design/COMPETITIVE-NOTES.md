@@ -1,5 +1,7 @@
 # Competitive notes: Photomator 3.4.15 and Latent Manager 1.1.7 (for Mira)
 
+**How Mira differs.** Mira's grain is its own model: a density-domain Gaussian field in film-frame micrometres, with amplitude from datasheet RMS granularity (Selwyn's law), per-stock sizes, clumping and layer correlation, evaluated analytically at each output pixel pitch so preview, zoom and export agree. It is validated against a Boolean-model reference (`GrainModelTests`) and uses no textures, tables or parameter sets from any other app. See `Design/GRAIN.md` and `Design/FILM-SCIENCE.md` ("Grain model").
+
 Method: names, sizes, formats, Info.plist keys, entitlement keys, `otool -L` library names only. No files copied, no apps launched, no strings/disassembly, no JSON/data read.
 Binding rule: ideas, architecture and vocabulary only. Nothing here is to be copied: no assets, LUTs, textures, tables, strings, UI copy, preset names or parameter sets. Each takeaway carries a "Mira way".
 
