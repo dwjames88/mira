@@ -41,8 +41,8 @@ extension CIImage {
         return v
     }
 
-    /// A copy tagged with `seconds` (unchanged for nil).
-    func withMiraExposureTime(_ seconds: Double?) -> CIImage {
+    /// A copy tagged with `seconds` (unchanged for nil or a non-positive value).
+    public func withMiraExposureTime(_ seconds: Double?) -> CIImage {
         guard let seconds, seconds.isFinite, seconds > 0 else { return self }
         return settingProperties(properties.merging([Self.miraExposureTimeKey: seconds]) { $1 })
     }

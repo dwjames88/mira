@@ -183,12 +183,15 @@ public final class RawDevelop: @unchecked Sendable {
     public let supported: RawSupportedControls
     /// Pixel size of the full decode (before orientation).
     public let nativeSize: CGSize
+    /// The file's EXIF exposure time in seconds; every developed image is tagged with it.
+    public let exposureTime: Double?
     /// Neutral temperature and tint the camera recorded, in kelvin and tint units.
     public var asShot: (temperature: Double, tint: Double) { (Double(initial.temperature), Double(initial.tint)) }
 
     /// `orientation` (Photos' `fullSizeImageOrientation`) overrides the file's own; nil keeps it.
     public init?(url: URL, orientation: CGImagePropertyOrientation? = nil) {
         guard let f = CIRAWFilter(imageURL: url) else { return nil }
+        exposureTime = ImageSource.exposureTime(url: url)
         filter = f
         if let orientation { f.orientation = orientation }
         initial = RawInitialValues(of: f)
@@ -199,6 +202,9 @@ public final class RawDevelop: @unchecked Sendable {
     /// For Photos editing input handed over as data; `typeHint` is a UTI such as "com.adobe.raw-image".
     public init?(data: Data, typeHint: String?, orientation: CGImagePropertyOrientation? = nil) {
         guard let f = CIRAWFilter(imageData: data, identifierHint: typeHint) else { return nil }
+        exposureTime = CGImageSourceCreateWithData(data as CFData, nil)
+            .flatMap { CGImageSourceCopyPropertiesAtIndex($0, 0, nil) as? [CFString: Any] }
+            .flatMap(ImageSource.exposureTime(properties:))
         filter = f
         if let orientation { f.orientation = orientation }
         initial = RawInitialValues(of: f)
@@ -256,7 +262,7 @@ public final class RawDevelop: @unchecked Sendable {
         RawSettingsMapper.apply(settings, filmApplied: filmApplied, draft: draft, scale: scale,
                                 initial: initial, to: filter)
         guard let image = filter.outputImage else { return nil }
-        return DevelopedSource(image: image, headroom: headroom)
+        return DevelopedSource(image: image.withMiraExposureTime(exposureTime), headroom: headroom)
     }
 
     /// Decodes a reduced draft (long side ~`headroomProbeSide`) with `settings` and returns its

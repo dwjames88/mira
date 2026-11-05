@@ -92,6 +92,12 @@ public struct ReciprocityEffect: Equatable, Sendable {
     /// True when the time lies outside what the datasheet covers (extrapolated).
     public var beyondDatasheet: Bool
 
+    public init(lossStops: Double, cast: ChannelStops, contrastGain: Double, shadowGrainGain: Double,
+                beyondDatasheet: Bool) {
+        self.lossStops = lossStops; self.cast = cast; self.contrastGain = contrastGain
+        self.shadowGrainGain = shadowGrainGain; self.beyondDatasheet = beyondDatasheet
+    }
+
     public static let none = ReciprocityEffect(lossStops: 0, cast: .zero, contrastGain: 1, shadowGrainGain: 1,
                                                beyondDatasheet: false)
 

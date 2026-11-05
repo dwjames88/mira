@@ -93,10 +93,11 @@ final class PhotoEditingViewController: NSViewController, PHContentEditingContro
         let orientation = CGImagePropertyOrientation(rawValue: UInt32(contentEditingInput.fullSizeImageOrientation))
         if let url = contentEditingInput.fullSizeImageURL, model.loadSource(url: url, orientation: orientation) { return }
         // Fall back to the display-size image so the editor is never blank.
+        let exposure = contentEditingInput.fullSizeImageURL.flatMap { ImageSource.exposureTime(url: $0) }
         if let cg = contentEditingInput.displaySizeImage?.cgImage(forProposedRect: nil, context: nil, hints: nil) {
-            model.setSource(CIImage(cgImage: cg))
+            model.setSource(CIImage(cgImage: cg).withMiraExposureTime(exposure))
         } else if let cg = placeholderImage.cgImage(forProposedRect: nil, context: nil, hints: nil) {
-            model.setSource(CIImage(cgImage: cg))
+            model.setSource(CIImage(cgImage: cg).withMiraExposureTime(exposure))
         }
     }
 

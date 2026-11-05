@@ -83,8 +83,13 @@ public enum ContactSheet {
         public var cropOnly: Bool
         public var cropSize: Int
         public var outDir: URL
+        /// Exposure time in seconds and reciprocity mode for every tile (nil: the source's EXIF time, compensated).
+        public var exposureTime: Double?
+        public var reciprocity: ReciprocityMode?
         public init(films: [String] = ContactSheetState.defaultFilmIDs, states: [ContactSheetState] = ContactSheetState.defaults,
-                    tileWidth: Int = 900, cropOnly: Bool = false, cropSize: Int = 300, outDir: URL) {
+                    tileWidth: Int = 900, cropOnly: Bool = false, cropSize: Int = 300, outDir: URL,
+                    exposureTime: Double? = nil, reciprocity: ReciprocityMode? = nil) {
+            self.exposureTime = exposureTime; self.reciprocity = reciprocity
             self.films = films; self.states = states; self.tileWidth = tileWidth
             self.cropOnly = cropOnly; self.cropSize = cropSize; self.outDir = outDir
         }
@@ -134,7 +139,9 @@ public enum ContactSheet {
             var crops: [CGImage] = []
             var cropByState: [ContactSheetState: [CGImage]] = [:]
             for state in ContactSheetState.allCases where renderStates.contains(state) {
-                let recipe = state.recipe(filmID: id)
+                var recipe = state.recipe(filmID: id)
+                if let t = config.exposureTime { recipe.exposureTime = t }
+                if let m = config.reciprocity { recipe.reciprocity = m }
                 guard let src = source(recipe) else { throw SheetError.renderFailed("\(id)/\(state.rawValue) source") }
                 let out = renderer.apply(recipe, to: src)
                 guard let full = context.createCGImage(out, from: out.extent, format: .RGBA8, colorSpace: srgb)
