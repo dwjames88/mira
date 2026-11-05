@@ -67,6 +67,17 @@ public struct Renderer: Sendable {
     public let library: FilmLibrary
     /// Rasterised dodge and burn masks, shared by every copy of this renderer.
     let maskCache = DodgeBurnMaskCache()
+    /// Display pixels per full-resolution pixel (at most 1; 1 for export and 100% zoom). A preview renders a
+    /// downsampled source, so the grain stage sizes its cells from the full-resolution frame and
+    /// then maps them to this scale (see `filmGrain`).
+    public var previewScale: CGFloat = 1
+
+    /// A copy of this renderer that grades a picture shown at `scale` of its full size (shares the mask cache).
+    public func withPreviewScale(_ scale: CGFloat) -> Renderer {
+        var copy = self
+        copy.previewScale = min(max(scale, 0.001), 1)
+        return copy
+    }
 
     public init(library: FilmLibrary) {
         self.library = library
@@ -417,12 +428,18 @@ public struct Renderer: Sendable {
     private func filmGrain(_ image: CIImage, extent: CGRect, character: FilmCharacter, amount: Double,
                            sizeSlider: Double, diagonal: CGFloat, shadowGain: Double = 1) -> CIImage {
         let size = character.grainSize * exp2((sizeSlider - 0.5) * 2)
-        // A pixel that averages f x f grains sees 1/f of the variation (f = grain cells per pixel).
-        let cellsPerPixel = 1 / (size * diagonal)
-        let bandLimit = min(1, 1 / cellsPerPixel)
+        // Cell size in full-resolution pixels (grain size is relative to the full frame's diagonal), then at
+        // the displayed scale. A pixel that averages f x f grains sees 1/f of the variation (f = cells per
+        // pixel), so the std follows the downsampled full-resolution render; below one pixel the cell is
+        // clamped to 1 px and keeps that std.
+        let s = max(previewScale, 0.001)
+        let fullPx = size * Double(diagonal) / Double(s)
+        let shownPx = fullPx * Double(s)
+        let cellPx = max(1.0, shownPx)
+        let bandLimit = min(1, shownPx)
         let std = amount * 2 * character.grainStrength * 0.025 * bandLimit
         let encoded = toGamma(image)
-        let grained = GradeKernels.applyGrain(std: std, cell: size, chroma: character.grainChroma,
+        let grained = GradeKernels.applyGrain(std: std, cell: cellPx / Double(diagonal), chroma: character.grainChroma,
                                               tonalCenter: character.grainTonalCenter, diagonal: diagonal,
                                               shadowGain: shadowGain, to: encoded)
         return fromGamma(grained).cropped(to: extent)

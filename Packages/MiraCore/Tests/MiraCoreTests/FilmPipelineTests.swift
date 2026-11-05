@@ -88,6 +88,40 @@ enum PipelineFixture {
         #expect(abs(mean(down.channel(1)) - 0.45) < 0.01)
     }
 
+    /// Std of (image - 2 px Gaussian blur of it), green channel, away from the edges: the grain's high-frequency energy.
+    private func highPassStd(_ image: CIImage) -> Double {
+        let e = image.extent
+        let blurred = image.clampedToExtent().applyingGaussianBlur(sigma: 2).cropped(to: e)
+        let diff = image.applyingFilter("CIDifferenceBlendMode", parameters: [kCIInputBackgroundImageKey: blurred])
+        let p = Pixels(diff.cropped(to: e.insetBy(dx: 20, dy: 20)), context: context)
+        return stddev(p.channel(1))
+    }
+
+    @Test func previewGrainIsVisibleAndMatchesDownsampledFullRes() throws {
+        let r = Renderer(library: try emptyLibrary())
+        let full = PipelineFixture.flat(0.45, width: 4000, height: 3000)
+        for amount in [0.5, 1.0] {
+            let recipe = Recipe(grainAmount: amount)
+            let down = r.previewImage(from: r.apply(recipe, to: full), maxPixelSize: 1000)
+            let reference = highPassStd(down)
+            let small = r.previewImage(from: full, maxPixelSize: 1000)
+            let preview = highPassStd(r.withPreviewScale(0.25).apply(recipe, to: small))
+            let none = highPassStd(r.withPreviewScale(0.25).apply(Recipe(grainAmount: 0), to: small))
+            #expect(preview / max(none, 1e-6) > 1.3, "amount \(amount): preview \(preview) vs none \(none)")
+            #expect(preview > 0.65 * reference && preview < 1.35 * reference,
+                    "amount \(amount): preview \(preview) vs downsampled full-res \(reference)")
+        }
+    }
+
+    @Test func previewScaleOneEqualsExport() throws {
+        let r = Renderer(library: try emptyLibrary())
+        let input = PipelineFixture.flat(0.45, width: 600, height: 400)
+        let recipe = Recipe(grainAmount: 0.7)
+        let a = Pixels(r.apply(recipe, to: input), context: context)
+        let b = Pixels(r.withPreviewScale(1).apply(recipe, to: input), context: context)
+        #expect(a.rgba == b.rgba)
+    }
+
     @Test func grainIsDeterministicAndZeroMean() throws {
         let r = Renderer(library: try emptyLibrary())
         let recipe = Recipe(grainAmount: 0.6)

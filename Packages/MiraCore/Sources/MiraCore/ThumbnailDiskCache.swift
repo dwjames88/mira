@@ -7,7 +7,7 @@ import UniformTypeIdentifiers
 /// film LUT decoding, the output colour space, or the thumbnail encoding. Old files are then simply
 /// never asked for again and age out of the cache.
 public enum ThumbnailCacheVersion {
-    public static let renderer = 3
+    public static let renderer = 4
 }
 
 /// Everything a film-strip thumbnail depends on. A thumbnail is the default recipe of one film

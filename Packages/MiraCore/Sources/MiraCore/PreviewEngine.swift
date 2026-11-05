@@ -190,7 +190,8 @@ public final class PreviewEngine: @unchecked Sendable {
     public func render(_ recipe: Recipe, canvas: CGSize?, maskOverlay: Bool = false) -> PreviewFrame? {
         Perf.interval("preview render") {
             guard let base = previewBase(crop: recipe.crop, canvas: canvas) else { return nil }
-            let graded = renderer.grade(recipe, cropped: base, sourceSize: sourceSize, maskOverlay: maskOverlay,
+            let graded = renderer.withPreviewScale(previewScale(crop: recipe.crop, base: base))
+                .grade(recipe, cropped: base, sourceSize: sourceSize, maskOverlay: maskOverlay,
                                        sourceHeadroom: headroom, sourceExposureTime: exposureTime)
             return renderFrame(graded)
         }
@@ -223,6 +224,14 @@ public final class PreviewEngine: @unchecked Sendable {
     }
 
     // MARK: Bases
+
+    /// Display pixels per full-resolution pixel of `base` (a preview or thumbnail base of `crop`), at most 1.
+    func previewScale(crop: CropSettings, base: CIImage) -> CGFloat {
+        guard let size = sourceSize else { return 1 }
+        let full = CropGeometry.outputExtent(for: crop, imageExtent: CGRect(origin: .zero, size: size)).size
+        guard full.width > 0 else { return 1 }
+        return min(1, base.extent.width / full.width)
+    }
 
     /// The cropped picture scaled to the size `canvas` calls for, as a small bitmap.
     public func previewBase(crop: CropSettings, canvas: CGSize?) -> CIImage? {
@@ -341,7 +350,8 @@ public final class PreviewEngine: @unchecked Sendable {
             // Core Image's origin is bottom left; the region's is top left.
             let ci = CGRect(x: baseExtent.minX + r.minX, y: baseExtent.maxY - r.maxY, width: r.width, height: r.height)
             // Dodge and burn masks are built for the region only (a zoomed 24 MP picture is huge).
-            let graded = renderer.grade(recipe, cropped: base, sourceSize: sourceSize,
+            let graded = renderer.withPreviewScale(CGFloat(min(region.scale, 1)))
+                .grade(recipe, cropped: base, sourceSize: sourceSize,
                                         maskRegion: recipe.dodgeBurn.hasVisibleEffect ? ci.insetBy(dx: -2, dy: -2) : nil,
                                         maskOverlay: maskOverlay, sourceHeadroom: headroom,
                                         sourceExposureTime: exposureTime)
@@ -466,7 +476,7 @@ public final class PreviewEngine: @unchecked Sendable {
         }
         let ids = misses
         guard !ids.isEmpty, let base = thumbnailBase(crop: crop, longSide: longSide) else { return }
-        let renderer = renderer, context = context
+        let renderer = renderer.withPreviewScale(previewScale(crop: crop, base: base)), context = context
         let box = UncheckedBox(base)
         let next = NSLock()
         nonisolated(unsafe) var cursor = 0
@@ -500,7 +510,7 @@ public final class PreviewEngine: @unchecked Sendable {
         deliver: @Sendable (String, CGImage) -> Void
     ) {
         guard let base = thumbnailBase(crop: crop, longSide: longSide), !recipes.isEmpty else { return }
-        let renderer = renderer, context = context
+        let renderer = renderer.withPreviewScale(previewScale(crop: crop, base: base)), context = context
         let box = UncheckedBox(base)
         let next = NSLock()
         nonisolated(unsafe) var cursor = 0

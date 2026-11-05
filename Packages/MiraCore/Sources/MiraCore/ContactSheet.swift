@@ -10,6 +10,7 @@ import UniformTypeIdentifiers
 public enum ContactSheetState: String, CaseIterable, Sendable {
     case original, film, grain, halation
     case halationMax = "halation-max"
+    case grainMax = "grain-max"
     case pushFrontier = "push-frontier"
     case paperCinema = "paper-cinema"
     case paperColor = "paper-color"
@@ -29,6 +30,7 @@ public enum ContactSheetState: String, CaseIterable, Sendable {
         switch self {
         case .original, .film: break
         case .grain: r.grainAmount = 0.5
+        case .grainMax: r.grainAmount = 1.0
         case .halation: r.halationAmount = 0.5
         case .halationMax: r.halationAmount = 1.0; r.halationRadius = 0.5
         case .pushFrontier: r.push = 1; r.scanProfile = .frontier
@@ -98,7 +100,7 @@ public enum ContactSheet {
     public enum SheetError: Error { case renderFailed(String), noFilms, writeFailed(URL) }
 
     static let srgb = CGColorSpace(name: CGColorSpace.sRGB)!
-    static let cropStates: [ContactSheetState] = [.grain, .halation, .halationMax]
+    static let cropStates: [ContactSheetState] = [.grain, .grainMax, .halation, .halationMax]
 
     /// Renders the sheets. `source` supplies the developed source for a recipe (RAW needs a different
     /// decode with a film than without); it is called once per film/state and should cache.
