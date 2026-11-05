@@ -280,18 +280,40 @@ float4 miraDodgeBurn(coreimage::sample_t s, coreimage::sample_t m, float ev, flo
 
 // MARK: Film science (pipeline 2)
 
-// Film exposure with latitude, per channel in linear light. For a gain g > 1 the highlights roll off
-// toward white instead of clipping, by `latitude` (0 plain gain, 1 full negative-film shoulder):
-// x (g + x) / (1 + g x) is the identity at g = 1, maps 1 to 1 and has slope g at 0. For g <= 1 (and for
-// negative values) it is a plain gain. Mirrored by FilmMath.exposure in Swift.
+// Film exposure with latitude, per channel in linear light, g = gain (exposure and push).
+//
+// SDR source (headroom H = 1): for g > 1 the highlights roll off toward white instead of clipping, by
+// `latitude` (0 plain gain, 1 full negative-film shoulder): x (g + x) / (1 + g x) is the identity at
+// g = 1, maps 1 to 1 and has slope g at 0. For g <= 1 (and for negative values) it is a plain gain.
+//
+// Scene-referred source (H > 1: RAW decoded with extended range, HDR): values reach H, so the white
+// point after the gain is W = g H. When W > 1 the shoulder instead maps W to 1 and is the identity
+// below a knee k = 0.6. With u = g x:
+//     u <= k:  y = u
+//     u >  k:  y = k + (1 - k) f(t),  t = (u - k) / (W - k),  f(t) = t (1 + a) / (1 + a t),
+//              a = (W - 1) / (1 - k)
+// f(0) = 0, f(1) = 1, f is monotone and concave, and f'(0) (1 - k) / (W - k) = 1, so the curve is
+// C1 at the knee (slope 1). The result is blended with the plain gain u by `latitude`, as in the SDR
+// case: y = mix(u, shoulder, latitude). Slide films (low latitude) therefore still clip hard.
+// Mirrored by FilmMath.exposure in Swift.
 extern "C" {
 namespace coreimage {
 
-float4 miraFilmExposure(coreimage::sample_t s, float g, float latitude) {
+float4 miraFilmExposure(coreimage::sample_t s, float g, float latitude, float headroom) {
     if (s.a <= 0.0) { return s; }
     float3 c = miraUnpremultiply(s);
     float3 plain = c * g;
-    if (g > 1.0) {
+    float W = g * headroom;
+    if (headroom > 1.0 && W > 1.0) {
+        const float k = 0.6;
+        float a = (W - 1.0) / (1.0 - k);
+        float3 u = max(c, float3(0.0)) * g;
+        float3 t = (u - k) / (W - k);
+        float3 f = t * (1.0 + a) / (1.0 + a * t);
+        float3 shoulder = select(k + (1.0 - k) * f, u, u <= k);
+        float3 y = mix(u, shoulder, latitude);
+        c = float3(c.r >= 0.0 ? y.r : plain.r, c.g >= 0.0 ? y.g : plain.g, c.b >= 0.0 ? y.b : plain.b);
+    } else if (g > 1.0) {
         float3 x = max(c, float3(0.0));
         float3 shoulder = x * (float3(g) + x) / (float3(1.0) + g * x);
         float3 y = mix(g * x, shoulder, latitude);
@@ -305,12 +327,32 @@ float4 miraFilmExposure(coreimage::sample_t s, float g, float latitude) {
 } // namespace coreimage
 } // extern "C"
 
+// Reciprocity failure (pipeline 2), in linear light right after white balance: a per-channel gain (the
+// uncompensated loss and the colour cast, folded together on the CPU), then, when `contrast` != 1, a power
+// around 18 % grey: y = 0.18 (x / 0.18)^contrast for x >= 0 (negative values only get the gain).
+// Mirrored by FilmMath.reciprocity in Swift.
+extern "C" {
+namespace coreimage {
+
+float4 miraReciprocity(coreimage::sample_t s, float3 gain, float contrast) {
+    if (s.a <= 0.0) { return s; }
+    float3 c = miraUnpremultiply(s) * gain;
+    if (contrast != 1.0) {
+        float3 p = 0.18 * pow(max(c, float3(0.0)) / 0.18, float3(contrast));
+        c = select(c, p, c >= 0.0);
+    }
+    return float4(c * s.a, s.a);
+}
+
+} // namespace coreimage
+} // extern "C"
+
 // Halation. The light that is scattered is taken from the highlights (smoothstep on Rec.709 luma of
 // the non-negative colour) and put back, blurred and tinted, so luminance is redistributed rather than
 // added. `miraHighlights` yields the part to blur; `miraHalationCombine` recomputes it from the source.
 static inline float3 miraHighlightPart(float3 c) {
     float3 p = max(c, float3(0.0));
-    return p * smoothstep(0.75, 1.1, miraLuma(p));
+    return p * smoothstep(0.7, 1.0, miraLuma(p));
 }
 
 extern "C" {
@@ -321,15 +363,80 @@ float4 miraHighlights(coreimage::sample_t s) {
     return float4(h * s.a, s.a);
 }
 
-// out = src - amount * h + amount * tint / luma(tint) * luma(blurred h)
-float4 miraHalationCombine(coreimage::sample_t s, coreimage::sample_t b, float amount, float4 tint) {
+// out = src - amount * comp * h + amount * tint / luma(tint) * luma(blurred h)
+// `comp` (0.2) is the partial compensation: only that share of the scattered light is taken out of the
+// source. On film the clipped core sits on the shoulder of the characteristic curve, so removing light
+// there is invisible; full energy conservation produced a visible grey hole in the light.
+float4 miraHalationCombine(coreimage::sample_t s, coreimage::sample_t b, float amount, float4 tint, float comp) {
     if (s.a <= 0.0) { return s; }
     float3 c = miraUnpremultiply(s);
     float3 h = miraHighlightPart(c);
     float3 t = tint.rgb / max(miraLuma(tint.rgb), 1.0e-6);
     float lb = miraLuma(miraUnpremultiply(b));
-    c = c - amount * h + amount * t * lb;
+    c = c - amount * comp * h + amount * t * lb;
     return float4(c * s.a, s.a);
+}
+
+} // namespace coreimage
+} // extern "C"
+
+// MARK: Float 3D LUT (pipeline 2)
+
+// The cube is a 2D atlas (width dim*dim, height dim, RGBAf, no colour space, sampled nearest): texel
+// (r, g, b) lives at x = b*dim + r, y = g. Reading exact texel centres and interpolating tetrahedrally in
+// float keeps the full precision CIColorCube loses (it quantises its output to about 8 bits).
+// The input is encoded to sRGB and clamped to 0...1 first, the result decoded again, as
+// CIColorCubeWithColorSpace(sRGB) did.
+static inline float3 miraCubeTexel(coreimage::sampler lut, float dim, float3 i) {
+    return lut.sample(lut.transform(float2(i.b * dim + i.r + 0.5, i.g + 0.5))).rgb;
+}
+
+extern "C" {
+namespace coreimage {
+
+float4 miraLUT3D(coreimage::sampler src, coreimage::sampler lut, float dim) {
+    float4 s = src.sample(src.coord());
+    if (s.a <= 0.0) { return s; }
+    float3 e = clamp(miraEncode(miraUnpremultiply(s)), 0.0, 1.0);
+    float3 p = e * (dim - 1.0);
+    float3 i0 = min(floor(p), dim - 2.0);
+    float3 f = p - i0;
+    float3 i1 = i0 + 1.0;
+    float3 c000 = miraCubeTexel(lut, dim, i0);
+    float3 c111 = miraCubeTexel(lut, dim, i1);
+    float3 c;
+    // Walk from c000 to c111 along the axes in order of decreasing fraction.
+    float3 cA, cB;
+    if (f.r >= f.g) {
+        if (f.g >= f.b) {            // r >= g >= b
+            cA = miraCubeTexel(lut, dim, float3(i1.r, i0.g, i0.b));
+            cB = miraCubeTexel(lut, dim, float3(i1.r, i1.g, i0.b));
+            c = c000 + f.r * (cA - c000) + f.g * (cB - cA) + f.b * (c111 - cB);
+        } else if (f.r >= f.b) {     // r >= b > g
+            cA = miraCubeTexel(lut, dim, float3(i1.r, i0.g, i0.b));
+            cB = miraCubeTexel(lut, dim, float3(i1.r, i0.g, i1.b));
+            c = c000 + f.r * (cA - c000) + f.b * (cB - cA) + f.g * (c111 - cB);
+        } else {                     // b > r >= g
+            cA = miraCubeTexel(lut, dim, float3(i0.r, i0.g, i1.b));
+            cB = miraCubeTexel(lut, dim, float3(i1.r, i0.g, i1.b));
+            c = c000 + f.b * (cA - c000) + f.r * (cB - cA) + f.g * (c111 - cB);
+        }
+    } else {
+        if (f.r >= f.b) {            // g > r >= b
+            cA = miraCubeTexel(lut, dim, float3(i0.r, i1.g, i0.b));
+            cB = miraCubeTexel(lut, dim, float3(i1.r, i1.g, i0.b));
+            c = c000 + f.g * (cA - c000) + f.r * (cB - cA) + f.b * (c111 - cB);
+        } else if (f.g >= f.b) {     // g >= b > r
+            cA = miraCubeTexel(lut, dim, float3(i0.r, i1.g, i0.b));
+            cB = miraCubeTexel(lut, dim, float3(i0.r, i1.g, i1.b));
+            c = c000 + f.g * (cA - c000) + f.b * (cB - cA) + f.r * (c111 - cB);
+        } else {                     // b > g > r
+            cA = miraCubeTexel(lut, dim, float3(i0.r, i0.g, i1.b));
+            cB = miraCubeTexel(lut, dim, float3(i0.r, i1.g, i1.b));
+            c = c000 + f.b * (cA - c000) + f.g * (cB - cA) + f.r * (c111 - cB);
+        }
+    }
+    return float4(miraDecode(c) * s.a, s.a);
 }
 
 } // namespace coreimage
@@ -367,7 +474,9 @@ extern "C" {
 namespace coreimage {
 
 // geo = (frame origin x, y, frame diagonal in pixels, grain cell as a fraction of the diagonal)
-// par = (noise standard deviation, chroma, tonal centre, 0)
+// par = (noise standard deviation, chroma, tonal centre, shadow gain)
+// The shadow gain (1 = none; reciprocity failure raises it) multiplies the weight below the tonal centre,
+// smoothly: 1 at and above the centre, the full gain at black (mirrored by FilmMath.shadowWeight).
 float4 miraGrain(coreimage::sample_t s, float4 geo, float4 par, coreimage::destination dest) {
     if (s.a <= 0.0) { return s; }
     float2 q = (dest.coord() - geo.xy) / (geo.z * geo.w);
@@ -382,6 +491,7 @@ float4 miraGrain(coreimage::sample_t s, float4 geo, float4 par, coreimage::desti
     float d = (l - par.z) / 0.3;
     float w = 0.25 + 0.75 * exp(-d * d);
     w *= smoothstep(0.02, 0.08, l) * (1.0 - smoothstep(0.92, 0.98, l));
+    w *= 1.0 + (par.w - 1.0) * (1.0 - smoothstep(0.0, max(par.z, 1e-4), l));
     e += par.x * w * n;
     return float4(e * s.a, s.a);
 }

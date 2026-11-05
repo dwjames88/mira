@@ -7,7 +7,7 @@ Related pages named in the README: http://rawpedia.rawtherapee.com/Film_Simulati
 
 **Licence:** Creative Commons Attribution-ShareAlike. The archive README states "CC BY-SA 4.0" (https://creativecommons.org/licenses/by-sa/4.0/). The collection is also commonly cited as CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/); the version the archive itself declares is 4.0, which is what applies here. See LICENSE-LUTS.
 
-The PNG files in HaldCLUT/ are redistributed **unmodified**, byte for byte, only renamed. Derivative works of the LUTs must be shared under the same licence.
+The original PNG files are kept **unmodified**, byte for byte, only renamed, in `FilmSources/HaldCLUT/` of the source repository. The app does not bundle the PNGs: it ships each look compressed into `Packed/<id>.mlut`, resampled (16-bit, trilinear) from 64³ to 48³ or 56³ where the colours of real photographs and a synthetic sweep stay within 4/255 (max) and 1.5/255 (99.9th percentile) of the original, and kept at the exact 64³ otherwise, regenerated deterministically from the PNGs with `mira-sheet --pack-films FilmSources Films`. The packed files are an adaptation of the collection and are distributed under the same CC BY-SA 4.0 licence; derivative works of the LUTs must be shared under the same licence.
 
 Film stock names are used for information only; no affiliation with or endorsement by the trademark owners (from the archive README disclaimer).
 
@@ -273,3 +273,12 @@ Film stock names are used for information only; no affiliation with or endorseme
 | polaroid-time-zero-expired-cold-minus-2 | HaldCLUT/Color/Polaroid/Polaroid Time Zero (Expired) Cold 2 --.png |
 | polaroid-time-zero-expired-cold-minus-1 | HaldCLUT/Color/Polaroid/Polaroid Time Zero (Expired) Cold 3 -.png |
 | polaroid-time-zero-expired-cold | HaldCLUT/Color/Polaroid/Polaroid Time Zero (Expired) Cold 4.png |
+
+## Mira original looks
+
+These four looks are generated in code (`ProceduralLooks`) from Mira's own parametric transforms (tone curves, hue and saturation matrices, split colour balance). They are not derived from the collection above and are not part of the CC BY-SA material; they are covered by the app's own licence, PolyForm Noncommercial 1.0.0 (see LICENSE). They are inspired by published characteristic behavior of cinema negative, cinema print film and colour paper; no affiliation with Kodak or Fujifilm.
+
+- vision3-500t (500T Tungsten)
+- vision3-250d (250D Daylight)
+- cinema-print (Cinema Print)
+- color-paper (Color Paper)

@@ -45,12 +45,20 @@ enum GradeKernels {
         try? CIColorKernel(functionName: "miraFilmExposure", fromMetalLibraryData: $0)
     }
 
+    static let reciprocity: CIColorKernel? = library.flatMap {
+        try? CIColorKernel(functionName: "miraReciprocity", fromMetalLibraryData: $0)
+    }
+
     static let highlights: CIColorKernel? = library.flatMap {
         try? CIColorKernel(functionName: "miraHighlights", fromMetalLibraryData: $0)
     }
 
     static let halationCombine: CIColorKernel? = library.flatMap {
         try? CIColorKernel(functionName: "miraHalationCombine", fromMetalLibraryData: $0)
+    }
+
+    static let lut3D: CIKernel? = library.flatMap {
+        try? CIKernel(functionName: "miraLUT3D", fromMetalLibraryData: $0)
     }
 
     static let grain: CIColorKernel? = library.flatMap {
@@ -69,7 +77,7 @@ enum GradeKernels {
     static var isAvailable: Bool {
         colorMixer != nil && curves != nil && tone != nil && detail != nil && dodgeBurn != nil
             && filmExposure != nil && highlights != nil && halationCombine != nil && grain != nil
-            && scan != nil && toning != nil
+            && scan != nil && toning != nil && lut3D != nil
     }
 
     // MARK: Stages
@@ -139,9 +147,17 @@ enum GradeKernels {
     // MARK: Film science stages (pipeline 2)
 
     /// Exposure gain `gain` (linear) with the film's highlight latitude.
-    static func applyFilmExposure(gain: Double, latitude: Double, to image: CIImage) -> CIImage {
+    /// `headroom` is the largest linear value the source holds (1 for SDR); see `miraFilmExposure`.
+    static func applyFilmExposure(gain: Double, latitude: Double, headroom: Double = 1, to image: CIImage) -> CIImage {
         guard let kernel = filmExposure else { return image }
-        return kernel.apply(extent: image.extent, arguments: [image, Float(gain), Float(latitude)]) ?? image
+        return kernel.apply(extent: image.extent, arguments: [image, Float(gain), Float(latitude), Float(max(headroom, 1))]) ?? image
+    }
+
+    /// Reciprocity failure (see `miraReciprocity`): per-channel linear `gain`, then a power `contrast` around 18 % grey.
+    static func applyReciprocity(gain: (r: Double, g: Double, b: Double), contrast: Double, to image: CIImage) -> CIImage {
+        guard let kernel = reciprocity else { return image }
+        return kernel.apply(extent: image.extent,
+                            arguments: [image, CIVector(x: gain.r, y: gain.g, z: gain.b), Float(contrast)]) ?? image
     }
 
     /// The part of the image that halation scatters (blur this).
@@ -150,22 +166,42 @@ enum GradeKernels {
         return kernel.apply(extent: image.extent, arguments: [image]) ?? image
     }
 
-    /// Removes `amount` of the highlights from `image` and adds the same luminance back from `blurred`
-    /// (the blurred highlights), coloured by `tint` (linear RGB, normalised to unit luminance here).
+    /// Share of the scattered light that is taken out of the source (the rest stays: the clipped core sits on
+    /// the shoulder of the film curve, so removing light there is invisible on film).
+    static let halationCompensation: Float = 0.2
+
+    /// Removes `halationCompensation * amount` of the highlights from `image` and adds `amount` times the
+    /// luminance of `blurred` (the blurred highlights), coloured by `tint` (linear RGB, normalised to unit
+    /// luminance here).
     static func applyHalation(amount: Double, tint: [Double], to image: CIImage, blurred: CIImage) -> CIImage {
         guard let kernel = halationCombine, tint.count == 3 else { return image }
         let t = CIVector(x: tint[0], y: tint[1], z: tint[2], w: 0)
-        return kernel.apply(extent: image.extent, arguments: [image, blurred, Float(amount), t]) ?? image
+        return kernel.apply(extent: image.extent, arguments: [image, blurred, Float(amount), t, halationCompensation]) ?? image
+    }
+
+    // MARK: Float 3D LUT (pipeline 2)
+
+    /// Applies `lut` (sRGB-encoded cube) to a working-space `image` in float with tetrahedral
+    /// interpolation (`miraLUT3D`); `cacheKey` names the cube for the atlas cache ("film:<id>").
+    /// Falls back to `CIColorCubeWithColorSpace` if the kernel is missing.
+    static func applyLUT3D(_ lut: LUT, cacheKey: String, to image: CIImage) -> CIImage? {
+        guard let kernel = lut3D else { return nil }
+        let atlas = LUTAtlasCache.shared.atlas(for: lut, key: cacheKey)
+        let atlasExtent = atlas.extent
+        return kernel.apply(extent: image.extent,
+                            roiCallback: { index, rect in index == 1 ? atlasExtent : rect },
+                            arguments: [image, atlas, Float(lut.dimension)])
     }
 
     /// Film grain on an sRGB-encoded `image`. `cell` is the grain cell as a fraction of `diagonal`; `std`
-    /// the noise standard deviation (encoded units, before the tonal weight).
+    /// the noise standard deviation (encoded units, before the tonal weight); `shadowGain` scales the weight
+    /// below the tonal centre (see `miraGrain`).
     static func applyGrain(std: Double, cell: Double, chroma: Double, tonalCenter: Double,
-                           diagonal: Double, to image: CIImage) -> CIImage {
+                           diagonal: Double, shadowGain: Double = 1, to image: CIImage) -> CIImage {
         guard let kernel = grain else { return image }
         let e = image.extent
         let geo = CIVector(x: e.minX, y: e.minY, z: diagonal, w: cell)
-        let par = CIVector(x: std, y: chroma, z: tonalCenter, w: 0)
+        let par = CIVector(x: std, y: chroma, z: tonalCenter, w: shadowGain)
         return kernel.apply(extent: e, arguments: [image, geo, par]) ?? image
     }
 
@@ -222,5 +258,83 @@ extension Toning {
         case .cyanotype: ([0.7, 0.9, 1.15], [0.8, 1.0, 1.1])
         case .copper: ([1.1, 0.9, 0.8], [1.25, 0.95, 0.75])
         }
+    }
+}
+
+/// Float cube atlases (width `dim * dim`, height `dim`; texel (r, g, b) at x = b * dim + r, y = g), one per
+/// film or print look id, so a cube is rearranged and uploaded once. Bounded (least recently used goes
+/// first) and thread safe, like the LUT cache in `FilmLibrary`. An entry is reused only while the cube it
+/// was built from still looks the same (size and a strided fingerprint), so a reloaded library with new
+/// data under the same id never serves a stale atlas.
+final class LUTAtlasCache: @unchecked Sendable {
+    static let shared = LUTAtlasCache()
+    static let limit = 64
+
+    private struct Entry { var fingerprint: [Float]; var image: CIImage }
+    private let lock = NSLock()
+    private var entries: [String: Entry] = [:]
+    private var order: [String] = []
+
+    var count: Int { lock.lock(); defer { lock.unlock() }; return entries.count }
+
+    func atlas(for lut: LUT, key: String) -> CIImage {
+        let print = Self.fingerprint(lut)
+        lock.lock()
+        if let hit = entries[key], hit.fingerprint == print {
+            touch(key)
+            lock.unlock()
+            return hit.image
+        }
+        lock.unlock()
+        let made = Self.makeAtlas(lut)   // built outside the lock
+        lock.lock(); defer { lock.unlock() }
+        entries[key] = Entry(fingerprint: print, image: made)
+        touch(key)
+        while order.count > Self.limit { entries[order.removeFirst()] = nil }
+        return made
+    }
+
+    private func touch(_ key: String) {
+        if let i = order.lastIndex(of: key) { order.remove(at: i) }
+        order.append(key)
+    }
+
+    private static func fingerprint(_ lut: LUT) -> [Float] {
+        let floats = lut.data.count / 4
+        var out: [Float] = [Float(lut.dimension), Float(floats)]
+        guard floats > 0 else { return out }
+        lut.data.withUnsafeBytes { raw in
+            let p = raw.bindMemory(to: Float.self)
+            let step = max(1, floats / 509)
+            var i = 0
+            while i < floats { out.append(p[i]); i += step }
+            out.append(p[floats - 1])
+        }
+        return out
+    }
+
+    static func makeAtlas(_ lut: LUT) -> CIImage {
+        let n = lut.dimension
+        var out = [Float](repeating: 0, count: n * n * n * 4)
+        lut.data.withUnsafeBytes { raw in
+            let src = raw.bindMemory(to: Float.self)
+            let width = n * n
+            for b in 0..<n {
+                for g in 0..<n {
+                    // CIImage row 0 is the top, so cube row g goes to bitmap row n - 1 - g.
+                    let row = (n - 1 - g) * width
+                    for r in 0..<n {
+                        let from = ((b * n + g) * n + r) * 4
+                        let to = (row + b * n + r) * 4
+                        out[to] = src[from]; out[to + 1] = src[from + 1]
+                        out[to + 2] = src[from + 2]; out[to + 3] = 1
+                    }
+                }
+            }
+        }
+        let data = out.withUnsafeBufferPointer { Data(buffer: $0) }
+        // No colour space: the cube holds raw values. Nearest sampling so reads at texel centres are exact.
+        return CIImage(bitmapData: data, bytesPerRow: n * n * 16, size: CGSize(width: n * n, height: n),
+                       format: .RGBAf, colorSpace: nil).samplingNearest()
     }
 }

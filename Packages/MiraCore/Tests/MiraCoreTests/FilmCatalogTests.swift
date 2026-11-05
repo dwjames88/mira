@@ -15,8 +15,24 @@ import Testing
         #expect(Set(films.map(\.id)).count == films.count, "duplicate ids")
         #expect(Set(films.map(\.file)).count == films.count, "two films share a file")
         for f in films {
+            // Procedural looks are generated in code: no file, but the id must be registered.
+            if let look = f.proceduralID {
+                #expect(ProceduralLooks.isRegistered(look), "\(f.id): unregistered procedural look \(look)")
+                continue
+            }
+            #expect(f.file == "Packed/\(f.id).mlut", "\(f.id): unexpected file \(f.file)")
             #expect(FileManager.default.fileExists(atPath: Self.dir.appendingPathComponent(f.file).path), "\(f.id): missing \(f.file)")
         }
+    }
+
+    @Test func bundledFilmsFolderHasNoPNGs() throws {
+        let en = try #require(FileManager.default.enumerator(atPath: Self.dir.path))
+        let all = en.compactMap { $0 as? String }
+        #expect(!all.isEmpty)
+        #expect(!all.contains { $0.lowercased().hasSuffix(".png") }, "PNGs would be bundled into the app")
+        let packed = all.filter { $0.hasSuffix(".mlut") }
+        #expect(Set(packed) == Set(try Self.library().films.filter { $0.proceduralID == nil }.map(\.file)),
+                "Packed/ must hold exactly one .mlut per non-procedural film")
     }
 
     @Test func parentsAndVariantLabels() throws {
@@ -35,7 +51,7 @@ import Testing
     }
 
     @Test func everyFilmHasMatchingAttributionRow() throws {
-        let films = try Self.library().films
+        let films = try Self.library().films.filter { $0.proceduralID == nil }
         let text = try String(contentsOf: Self.dir.appendingPathComponent("ATTRIBUTION.md"), encoding: .utf8)
         var rows: [String: String] = [:]
         for line in text.split(separator: "\n") where line.hasPrefix("| ") {
@@ -52,29 +68,67 @@ import Testing
         #expect(rows.count == films.count, "attribution has rows for films that don't exist")
     }
 
-    @Test func everyHaldFileIsReferencedOnceAndValid() throws {
-        let films = try Self.library().films
-        let hald = Self.dir.appendingPathComponent("HaldCLUT", isDirectory: true)
+    static let sources = Self.dir.deletingLastPathComponent().appendingPathComponent("FilmSources", isDirectory: true)
+
+    @Test func everySourcePNGIsReferencedOnceAndValid() throws {
+        let films = try Self.library().films.filter { $0.proceduralID == nil }
+        let hald = Self.sources.appendingPathComponent("HaldCLUT", isDirectory: true)
         let onDisk = try FileManager.default.contentsOfDirectory(atPath: hald.path).filter { !$0.hasPrefix(".") }
-        let referenced = films.map { ($0.file as NSString).lastPathComponent }
+        let referenced = try films.map { try #require($0.png) }.map { ($0 as NSString).lastPathComponent }
         #expect(Set(referenced).count == referenced.count)
         #expect(Set(onDisk) == Set(referenced), "unreferenced or missing files: \(Set(onDisk).symmetricDifference(referenced).sorted())")
+        #expect(films.allSatisfy { $0.png == "HaldCLUT/\($0.id).png" })
 
         // Header check for every file (cheap): square, side a perfect cube (Hald level L, side L^3).
         for f in films {
-            let url = Self.dir.appendingPathComponent(f.file)
+            let url = Self.sources.appendingPathComponent(try #require(f.png))
             let props = CGImageSourceCreateWithURL(url as CFURL, nil)
                 .flatMap { CGImageSourceCopyPropertiesAtIndex($0, 0, nil) as? [CFString: Any] }
             let w = props?[kCGImagePropertyPixelWidth] as? Int ?? 0
             let h = props?[kCGImagePropertyPixelHeight] as? Int ?? 0
             #expect(w == h && (2...32).contains { $0 * $0 * $0 == w }, "\(f.id): \(w)x\(h) is not a Hald CLUT")
         }
-        // Full decode of a sample (every 25th film): the cube has 4 Float32 channels per texel.
-        for f in films.enumerated().filter({ $0.offset % 25 == 0 }).map(\.element) {
-            let lut = try LUT.loadHald(url: Self.dir.appendingPathComponent(f.file))
-            #expect(lut.dimension >= 2 && lut.dimension <= LUT.maxHaldDimension, "\(f.id): dimension \(lut.dimension)")
-            #expect(lut.data.count == lut.dimension * lut.dimension * lut.dimension * 16)
+    }
+
+    @Test func proceduralEntriesNeedNoFiles() {
+        let procedural = Film(id: "p", displayName: "P", brand: "T", family: .slide, iso: 100, description: "",
+                              file: "procedural:vision3-500t")
+        #expect(procedural.proceduralID == "vision3-500t")
+        #expect(procedural.png == nil)
+    }
+
+    /// Every packed cube is 48^3 or 56^3 and, on the `PackProbe` colours (pixels of `Fixtures/sample.jpg` and
+    /// `Fixtures/raw/iphone-xs.dng` plus a neutral ramp and an HSV sweep), within max 4/255 and 99.9th percentile
+    /// 1.5/255 of its 64^3 original, or is the 64^3 cube itself, equal to what `LUT.loadHald` reads from the PNG
+    /// (exactly, up to 16-bit rounding for the few Hald images larger than 64^3, which `loadHald` resamples in Float).
+    /// `mira-sheet --pack-films` picks the smallest dimension that passes.
+    @Test func packedCubesMeetTheErrorLimitsOrAreExact() throws {
+        let films = try Self.library().films.filter { $0.proceduralID == nil }
+        let fixtures = Self.dir.deletingLastPathComponent().appendingPathComponent("Fixtures", isDirectory: true)
+        let probe = PackProbe.colors(fixturesDirectory: fixtures)
+        #expect(probe.count / 3 > 50_000, "probe fixtures missing")
+        var counts: [Int: Int] = [:]
+        for f in films {
+            let data = try Data(contentsOf: Self.dir.appendingPathComponent(f.file))
+            let packed = try PackedLUT.unpack(data)
+            #expect(PackedLUT.candidateDimensions.contains(packed.dimension), "\(f.id): dimension \(packed.dimension)")
+            counts[packed.dimension, default: 0] += 1
+            let (n, rgb) = try LUT.haldSamples(url: Self.sources.appendingPathComponent(try #require(f.png)))
+            let orig = PackedLUT.original(rgb, dimension: n)
+            #expect(orig.dimension == 64)
+            if packed.dimension == 64 {
+                let a = orig.data.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
+                let b = packed.data.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
+                // Exact for 64^3 sources; at most half a 16-bit step for larger ones.
+                let tolerance: Float = n == 64 ? 0 : 0.5 / 65535 + 1e-7
+                #expect(zip(a, b).allSatisfy { abs($0 - $1) <= tolerance }, "\(f.id): 64^3 cube differs from its PNG")
+            } else {
+                let fid = PackedLUT.probeError(reference: PackedLUT.evaluate(orig, colors: probe), candidate: packed, colors: probe)
+                #expect(fid.within(maxError: PackedLUT.acceptedMaxError, p999Error: PackedLUT.acceptedP999Error),
+                        "\(f.id): \(packed.dimension)^3 max \(fid.max * 255)/255 p99.9 \(fid.p999 * 255)/255")
+            }
         }
+        print("packed dimensions: \(counts.sorted { $0.key < $1.key })")
     }
 
     // MARK: stock / variant grouping

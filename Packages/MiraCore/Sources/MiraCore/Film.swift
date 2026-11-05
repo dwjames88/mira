@@ -42,8 +42,13 @@ public struct Film: Codable, Identifiable, Hashable, Sendable {
     public var family: FilmFamily
     public var iso: Int
     public var description: String
-    /// Path relative to the films directory, e.g. `HaldCLUT/kodak-portra-400.png`.
+    /// Path relative to the films directory, e.g. `Packed/kodak-portra-400.mlut` (a `PackedLUT`; `.png` Hald and
+    /// `.cube` files also load, for user or test libraries).
     public var file: String
+    /// The Hald PNG this film was packed from, relative to the `FilmSources` folder of the source repository
+    /// (e.g. `HaldCLUT/kodak-portra-400.png`). Not bundled; used by `mira-sheet --pack-films`.
+    public var png: String?
+    /// Path of the original file inside the RawTherapee archive (see `Films/ATTRIBUTION.md`).
     public var source: String?
     /// The id of the stock this entry is a variant of (a push/pull or alternate rendering of the same
     /// film); nil for a stock. Variants are not shown as cards of their own; the FILMS panel offers them.
@@ -54,8 +59,20 @@ public struct Film: Codable, Identifiable, Hashable, Sendable {
     public var monochrome: Bool?
     /// Per-film overrides of the character derived from family and ISO (see `FilmCharacter.defaults`).
     public var character: FilmCharacter.Override?
+    /// Datasheet reciprocity data (long and short exposure failure); nil falls back to the family default
+    /// (`Reciprocity.familyDefault`). `FilmLibrary` fills a variant's from its parent.
+    public var reciprocity: ReciprocityData?
 
     /// True for black-and-white emulsions: monochrome grain, untinted halation.
+    /// Prefix of `file` for looks Mira generates in code instead of loading a LUT file, e.g.
+    /// `procedural:vision3-500t` (see `ProceduralLooks`). Such films have no file on disk.
+    public static let proceduralPrefix = "procedural:"
+
+    /// The procedural look id when this film is generated in code, else nil.
+    public var proceduralID: String? {
+        file.hasPrefix(Self.proceduralPrefix) ? String(file.dropFirst(Self.proceduralPrefix.count)) : nil
+    }
+
     public var isMonochrome: Bool { monochrome ?? (family == .blackAndWhite) }
 
     /// True when this entry is a variant of another stock.
@@ -70,7 +87,7 @@ public struct Film: Codable, Identifiable, Hashable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, displayName, brand, family, iso, description, file, source, parent, variant, monochrome, character
+        case id, displayName, brand, family, iso, description, file, png, source, parent, variant, monochrome, character, reciprocity
     }
 
     /// `iso` may be a number or a numeric string in `films.json`.
@@ -89,18 +106,20 @@ public struct Film: Codable, Identifiable, Hashable, Sendable {
         }
         description = try c.decodeIfPresent(String.self, forKey: .description) ?? ""
         file = try c.decode(String.self, forKey: .file)
+        png = try c.decodeIfPresent(String.self, forKey: .png)
         source = try c.decodeIfPresent(String.self, forKey: .source)
         parent = try c.decodeIfPresent(String.self, forKey: .parent)
         variant = try c.decodeIfPresent(String.self, forKey: .variant)
         monochrome = try c.decodeIfPresent(Bool.self, forKey: .monochrome)
         character = try c.decodeIfPresent(FilmCharacter.Override.self, forKey: .character)
+        reciprocity = try c.decodeIfPresent(ReciprocityData.self, forKey: .reciprocity)
     }
 
     public init(
         id: String, displayName: String, brand: String, family: FilmFamily,
-        iso: Int, description: String, file: String, source: String? = nil,
+        iso: Int, description: String, file: String, png: String? = nil, source: String? = nil,
         parent: String? = nil, variant: String? = nil, monochrome: Bool? = nil,
-        character: FilmCharacter.Override? = nil
+        character: FilmCharacter.Override? = nil, reciprocity: ReciprocityData? = nil
     ) {
         self.id = id
         self.displayName = displayName
@@ -109,10 +128,12 @@ public struct Film: Codable, Identifiable, Hashable, Sendable {
         self.iso = iso
         self.description = description
         self.file = file
+        self.png = png
         self.source = source
         self.parent = parent
         self.variant = variant
         self.monochrome = monochrome
         self.character = character
+        self.reciprocity = reciprocity
     }
 }

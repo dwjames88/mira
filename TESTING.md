@@ -47,7 +47,7 @@ The first launch of the app asks for access to your Photos library (`NSPhotoLibr
 scripts/run.sh
 ```
 
-Check: the app opens; Open (or drag a photo onto the window) loads it; the film strip shows thumbnails and the family picker filters them; selecting a film updates the preview; holding C or the HOLD TO COMPARE button shows the original; the Films window (Shift-Command-L) lists all 260 looks (82 stocks) and the credit; File ▸ Export… (⌘E) offers JPEG, HEIC and TIFF, and the written files open correctly with orientation and colour intact.
+Check: the app opens; Open (or drag a photo onto the window) loads it; the film strip shows thumbnails and the family picker filters them; selecting a film updates the preview; holding C or the HOLD TO COMPARE button shows the original; the Films window (Shift-Command-L) lists all 264 looks (86 stocks) and the credit; File ▸ Export… (⌘E) offers JPEG, HEIC and TIFF, and the written files open correctly with orientation and colour intact.
 
 ### Library browser
 
@@ -197,6 +197,7 @@ MiraCore has 36 tests:
 - Renderer (6): neutral recipe returns the input unchanged; rendering is deterministic; extents are preserved except with a border; warmth and tint move in the right direction; grain is resolution independent; export keeps orientation and size.
 - Recipe (4): JSON round trip; empty object gives defaults; unknown keys are ignored; adjustment format identifiers.
 - Film (2): a synthesised film round-trips through the library and Strength blends correctly; every bundled film renders plausibly.
+- PackedLUT (6): every transform and codec round-trips; deterministic and exact Float scale; corrupt files rejected; library loads `.mlut` without the disk cache; real library keeps at most 64 cubes in memory; single-cube decode is fast. Catalog: `Films/` bundles no PNG and one `.mlut` per non-procedural film; every packed cube is within max 4/255 and p99.9 1.5/255 of its PNG in `FilmSources/` on the `PackProbe` colours or is the exact 64³ cube.
 - LUT (7): identity `.cube` parses; `.cube` domain is normalised; bad `.cube` input is rejected; identity HaldCLUT; bad Hald size rejected; resampled identity stays identity; large Hald is capped at 64.
 - Adjustment, sidecar, source and cache (14): adjustment encode/decode round trip; foreign identifier and version rejected; legacy `com.dwjames.emulsion` still decodes and new saves write `com.fieldframes.mira`; legacy `.emulsion.json` sidecar is read, migrated on save and removed on revert; `PHAdjustmentData` round trip; sidecar URL keeps the extension; save, load and remove; fallback when the folder is read-only; foreign sidecar format rejected; RAW detection; explicit orientation swaps dimensions; LUT cache hit matches and a corrupt cache file is tolerated; prewarm loads every film.
 - Photo library logic (3): RAW identifiers; dirty check; sidecar status lines.
@@ -249,7 +250,7 @@ Writes `build/contact-sheet.png` (every film) and `build/contact-sheet-effects.p
 - Live Photos and video are unsupported (the extension declares Image only).
 - Bundled films only; there is no custom LUT import.
 - The LUTs from the 2015 collection are sRGB 8-bit.
-- The built app is about 80 MB because the Films folder is duplicated in the app and the extension.
+- The built app is about 284 MB because the Films folder (126 MB of packed cubes) is duplicated in the app and the extension.
 - Free-team signing lasts 7 days; re-run `scripts/install.sh` when the extension or app stops launching.
 
 ## Verification log (2026-10-20)
@@ -301,15 +302,19 @@ Not verified live: Space-drag pan, mixer eyedropper, SAVE through the new sub-to
 
 ## Film science and RAW development
 
-No RAW or DNG fixture ships with the repository, so the RAW checks need a RAW/DNG file of your own.
+One real RAW fixture is committed (`Fixtures/raw/iphone-xs.dng`, CC0) and drives `RawIntegrationTests`; the Sony ARW and iPhone 12 Pro DNG listed in `Fixtures/raw/README.md` are optional downloads (those tests skip a missing file). For the checks below, open any RAW/DNG file in the app.
 
-1. Variant picker: choose a stock with variants (Portra 400); the FILMS panel's Variant picker lists them (−1, +1, NC, VC…), and picking one changes the preview without adding a card to the strip, which shows stocks only (82).
+1. Variant picker: choose a stock with variants (Portra 400); the FILMS panel's Variant picker lists them (−1, +1, NC, VC…), and picking one changes the preview without adding a card to the strip, which shows stocks only (86).
 2. Push/Pull: drag from −2 to +2 stops in thirds; the image gets brighter, harder and grainier with push, softer with pull; reset returns to 0.
 3. Scan: Neutral, Frontier-like and Noritsu-like each shift colour and contrast slightly; Neutral is the unchanged film.
 4. Toning: on a black and white stock the Toning control is present and tints the image; on a colour stock it is absent.
-5. Rem-jet: the toggle appears only on motion-picture stocks. None ship yet, so it never shows; confirm it is absent everywhere.
+5. Rem-jet: the toggle appears only on motion-picture stocks (500T Tungsten and 250D Daylight, the Motion Picture tab); confirm it is absent on every other family.
 6. Latitude readout: under the histogram and in FILMS; it changes with the film and with push/pull.
 7. Grain and Halation at 50% read as the film's own amount; the preview and a full-size export have the same grain character.
 8. Legacy: open a photo edited in an earlier build; it renders as before until you choose a film.
 9. RAW group: open a RAW/DNG file; DEVELOP shows the RAW group (white balance, boost, highlight recovery, tone map, noise reduction, sharpness, lens correction); changes re-develop after a short pause; a JPEG shows no RAW group; export is sharper than the draft preview.
 10. ALL / RAW toggle: beside Filter in the Mac library; RAW limits the grid to RAW files, ALL restores it.
+11. Paper: on a colour stock the Paper chips (None, Cinema Print, Color Paper) are present; choosing one sets Scan to Neutral and choosing a Scan other than Neutral clears the paper; they are absent on the Cinema Print and Color Paper cards and on every monochrome film (where Toning shows instead).
+12. Exposure time and Reciprocity (colour or B&W stock): the slider starts at the photo's EXIF time, double-clicking its label returns to it; at 1/125 s nothing changes; at 30 s Compensated keeps brightness and shows the cast, contrast and grain, Uncompensated also darkens, Off ignores the time; the readout names the loss and says "beyond datasheet" past the last published time; monochrome films show no colour cast.
+13. Mira originals: 500T Tungsten reads cool under daylight (correct with Temperature); 250D Daylight is neutral; Cinema Print is contrasty; Color Paper is clean and bright.
+14. Film strip: scrolling to the far end fills thumbnails as cards appear; a second launch shows them at once from the disk cache.

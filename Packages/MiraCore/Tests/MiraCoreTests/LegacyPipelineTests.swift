@@ -39,6 +39,7 @@ import Testing
              recipe: Recipe(filmID: "kodak-portra-400", exposure: 0.3, contrast: 0.2, warmth: 0.3, grainAmount: 0.5,
                             halationAmount: 0.5, halationRadius: 0.7, pipeline: L),
              stats: [0.6757183598537008, 0.6238438026577436, 0.5607067033356649, 0.2978134832883525],
+             // kodak-portra-400 ships as an exact 64^3 cube, so this is the original hash.
              hash: 12106836713621142157),
     ]
 

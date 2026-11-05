@@ -78,7 +78,7 @@ struct StripGroup<Content: View>: View {
             .padding(.leading, 4)
             .frame(height: T.rows(1.5), alignment: .leading)
             FFHairline()
-            HStack(alignment: .top, spacing: T.cells(1)) { content }
+            LazyHStack(alignment: .top, spacing: T.cells(1)) { content }
                 .padding(.top, T.rows(1) / 2)
         }
         .accessibilityElement(children: .contain)

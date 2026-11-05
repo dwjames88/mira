@@ -6,7 +6,8 @@
     "family": "colorNegative",
     "iso": "100",
     "description": "Rich, saturated hues with bold, warm reds.",
-    "file": "HaldCLUT/agfa-ultra-color-100.png",
+    "file": "Packed/agfa-ultra-color-100.mlut",
+    "png": "HaldCLUT/agfa-ultra-color-100.png",
     "source": "HaldCLUT/Color/Agfa/Agfa Ultra Color 100.png"
   },
   {
@@ -16,7 +17,8 @@
     "family": "colorNegative",
     "iso": "200",
     "description": "Warm reds and golden light with a nostalgic feel.",
-    "file": "HaldCLUT/agfa-vista-200.png",
+    "file": "Packed/agfa-vista-200.mlut",
+    "png": "HaldCLUT/agfa-vista-200.png",
     "source": "HaldCLUT/Color/Agfa/Agfa Vista 200.png"
   },
   {
@@ -26,8 +28,10 @@
     "family": "colorNegative",
     "iso": 160,
     "description": "Soft, natural pastels with gentle contrast and delicate skin.",
-    "file": "HaldCLUT/fuji-pro-160c.png",
-    "source": "HaldCLUT/Color/Fuji/Fuji 160C 2.png"
+    "file": "Packed/fuji-pro-160c.mlut",
+    "png": "HaldCLUT/fuji-pro-160c.png",
+    "source": "HaldCLUT/Color/Fuji/Fuji 160C 2.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 2, "rows": [[4, 0.3333, null], [32, 1.0, null]], "source": "https://juneleung.github.io/filmdoc/fuji/pro_160c_datasheet.pdf"}
   },
   {
     "id": "fuji-pro-160c-minus-1",
@@ -36,7 +40,8 @@
     "family": "colorNegative",
     "iso": 160,
     "description": "Pro 160C rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/fuji-pro-160c-minus-1.png",
+    "file": "Packed/fuji-pro-160c-minus-1.mlut",
+    "png": "HaldCLUT/fuji-pro-160c-minus-1.png",
     "source": "HaldCLUT/Color/Fuji/Fuji 160C 1 -.png",
     "parent": "fuji-pro-160c",
     "variant": "−1"
@@ -48,7 +53,8 @@
     "family": "colorNegative",
     "iso": 160,
     "description": "Pro 160C rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/fuji-pro-160c-plus-1.png",
+    "file": "Packed/fuji-pro-160c-plus-1.mlut",
+    "png": "HaldCLUT/fuji-pro-160c-plus-1.png",
     "source": "HaldCLUT/Color/Fuji/Fuji 160C 3 +.png",
     "parent": "fuji-pro-160c",
     "variant": "+1"
@@ -60,7 +66,8 @@
     "family": "colorNegative",
     "iso": 160,
     "description": "Pro 160C rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/fuji-pro-160c-plus-2.png",
+    "file": "Packed/fuji-pro-160c-plus-2.mlut",
+    "png": "HaldCLUT/fuji-pro-160c-plus-2.png",
     "source": "HaldCLUT/Color/Fuji/Fuji 160C 4 ++.png",
     "parent": "fuji-pro-160c",
     "variant": "+2"
@@ -72,8 +79,10 @@
     "family": "colorNegative",
     "iso": "400",
     "description": "Cool, airy greens and delicate, luminous skin.",
-    "file": "HaldCLUT/fuji-pro-400h.png",
-    "source": "HaldCLUT/Color/Fuji/Fuji 400H 2.png"
+    "file": "Packed/fuji-pro-400h.mlut",
+    "png": "HaldCLUT/fuji-pro-400h.png",
+    "source": "HaldCLUT/Color/Fuji/Fuji 400H 2.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 1, "rows": [[4, 0.5, null], [16, 1.0, null], [32, null, null]], "source": "https://www.macodirect.de/media/pdf/4f/c9/b3/FH4011_Datenblatt_e.pdf"}
   },
   {
     "id": "fuji-pro-400h-minus-1",
@@ -82,7 +91,8 @@
     "family": "colorNegative",
     "iso": 400,
     "description": "Pro 400H rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/fuji-pro-400h-minus-1.png",
+    "file": "Packed/fuji-pro-400h-minus-1.mlut",
+    "png": "HaldCLUT/fuji-pro-400h-minus-1.png",
     "source": "HaldCLUT/Color/Fuji/Fuji 400H 1 -.png",
     "parent": "fuji-pro-400h",
     "variant": "−1"
@@ -94,7 +104,8 @@
     "family": "colorNegative",
     "iso": 400,
     "description": "Pro 400H rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/fuji-pro-400h-plus-1.png",
+    "file": "Packed/fuji-pro-400h-plus-1.mlut",
+    "png": "HaldCLUT/fuji-pro-400h-plus-1.png",
     "source": "HaldCLUT/Color/Fuji/Fuji 400H 3 +.png",
     "parent": "fuji-pro-400h",
     "variant": "+1"
@@ -106,7 +117,8 @@
     "family": "colorNegative",
     "iso": 400,
     "description": "Pro 400H rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/fuji-pro-400h-plus-2.png",
+    "file": "Packed/fuji-pro-400h-plus-2.mlut",
+    "png": "HaldCLUT/fuji-pro-400h-plus-2.png",
     "source": "HaldCLUT/Color/Fuji/Fuji 400H 4 ++.png",
     "parent": "fuji-pro-400h",
     "variant": "+2"
@@ -118,7 +130,8 @@
     "family": "colorNegative",
     "iso": 800,
     "description": "Smooth low-light color with gentle contrast and subtle grain.",
-    "file": "HaldCLUT/fuji-pro-800z.png",
+    "file": "Packed/fuji-pro-800z.mlut",
+    "png": "HaldCLUT/fuji-pro-800z.png",
     "source": "HaldCLUT/Color/Fuji/Fuji 800Z 2.png"
   },
   {
@@ -128,7 +141,8 @@
     "family": "colorNegative",
     "iso": 800,
     "description": "Pro 800Z rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/fuji-pro-800z-minus-1.png",
+    "file": "Packed/fuji-pro-800z-minus-1.mlut",
+    "png": "HaldCLUT/fuji-pro-800z-minus-1.png",
     "source": "HaldCLUT/Color/Fuji/Fuji 800Z 1 -.png",
     "parent": "fuji-pro-800z",
     "variant": "−1"
@@ -140,7 +154,8 @@
     "family": "colorNegative",
     "iso": 800,
     "description": "Pro 800Z rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/fuji-pro-800z-plus-1.png",
+    "file": "Packed/fuji-pro-800z-plus-1.mlut",
+    "png": "HaldCLUT/fuji-pro-800z-plus-1.png",
     "source": "HaldCLUT/Color/Fuji/Fuji 800Z 3 +.png",
     "parent": "fuji-pro-800z",
     "variant": "+1"
@@ -152,7 +167,8 @@
     "family": "colorNegative",
     "iso": 800,
     "description": "Pro 800Z rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/fuji-pro-800z-plus-2.png",
+    "file": "Packed/fuji-pro-800z-plus-2.mlut",
+    "png": "HaldCLUT/fuji-pro-800z-plus-2.png",
     "source": "HaldCLUT/Color/Fuji/Fuji 800Z 4 ++.png",
     "parent": "fuji-pro-800z",
     "variant": "+2"
@@ -164,7 +180,8 @@
     "family": "colorNegative",
     "iso": 100,
     "description": "Bright, fine-grained color with a slight green bias.",
-    "file": "HaldCLUT/fuji-superia-100.png",
+    "file": "Packed/fuji-superia-100.mlut",
+    "png": "HaldCLUT/fuji-superia-100.png",
     "source": "HaldCLUT/Color/Fuji/Fuji Superia 100 2.png"
   },
   {
@@ -174,7 +191,8 @@
     "family": "colorNegative",
     "iso": 100,
     "description": "Superia 100 rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/fuji-superia-100-minus-1.png",
+    "file": "Packed/fuji-superia-100-minus-1.mlut",
+    "png": "HaldCLUT/fuji-superia-100-minus-1.png",
     "source": "HaldCLUT/Color/Fuji/Fuji Superia 100 1 -.png",
     "parent": "fuji-superia-100",
     "variant": "−1"
@@ -186,7 +204,8 @@
     "family": "colorNegative",
     "iso": 100,
     "description": "Superia 100 rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/fuji-superia-100-plus-1.png",
+    "file": "Packed/fuji-superia-100-plus-1.mlut",
+    "png": "HaldCLUT/fuji-superia-100-plus-1.png",
     "source": "HaldCLUT/Color/Fuji/Fuji Superia 100 3 +.png",
     "parent": "fuji-superia-100",
     "variant": "+1"
@@ -198,7 +217,8 @@
     "family": "colorNegative",
     "iso": 100,
     "description": "Superia 100 rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/fuji-superia-100-plus-2.png",
+    "file": "Packed/fuji-superia-100-plus-2.mlut",
+    "png": "HaldCLUT/fuji-superia-100-plus-2.png",
     "source": "HaldCLUT/Color/Fuji/Fuji Superia 100 4 ++.png",
     "parent": "fuji-superia-100",
     "variant": "+2"
@@ -210,7 +230,8 @@
     "family": "colorNegative",
     "iso": 1600,
     "description": "High-speed snapshot color with cool shadows and visible grain.",
-    "file": "HaldCLUT/fuji-superia-1600.png",
+    "file": "Packed/fuji-superia-1600.mlut",
+    "png": "HaldCLUT/fuji-superia-1600.png",
     "source": "HaldCLUT/Color/Fuji/Fuji Superia 1600 2.png"
   },
   {
@@ -220,7 +241,8 @@
     "family": "colorNegative",
     "iso": 1600,
     "description": "Superia 1600 rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/fuji-superia-1600-minus-1.png",
+    "file": "Packed/fuji-superia-1600-minus-1.mlut",
+    "png": "HaldCLUT/fuji-superia-1600-minus-1.png",
     "source": "HaldCLUT/Color/Fuji/Fuji Superia 1600 1 -.png",
     "parent": "fuji-superia-1600",
     "variant": "−1"
@@ -232,7 +254,8 @@
     "family": "colorNegative",
     "iso": 1600,
     "description": "Superia 1600 rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/fuji-superia-1600-plus-1.png",
+    "file": "Packed/fuji-superia-1600-plus-1.mlut",
+    "png": "HaldCLUT/fuji-superia-1600-plus-1.png",
     "source": "HaldCLUT/Color/Fuji/Fuji Superia 1600 3 +.png",
     "parent": "fuji-superia-1600",
     "variant": "+1"
@@ -244,7 +267,8 @@
     "family": "colorNegative",
     "iso": 1600,
     "description": "Superia 1600 rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/fuji-superia-1600-plus-2.png",
+    "file": "Packed/fuji-superia-1600-plus-2.mlut",
+    "png": "HaldCLUT/fuji-superia-1600-plus-2.png",
     "source": "HaldCLUT/Color/Fuji/Fuji Superia 1600 4 ++.png",
     "parent": "fuji-superia-1600",
     "variant": "+2"
@@ -256,7 +280,8 @@
     "family": "colorNegative",
     "iso": "200",
     "description": "Everyday snapshot color with lively greens and blues.",
-    "file": "HaldCLUT/fuji-superia-200.png",
+    "file": "Packed/fuji-superia-200.mlut",
+    "png": "HaldCLUT/fuji-superia-200.png",
     "source": "HaldCLUT/Color/Fuji/Fuji Superia 200.png"
   },
   {
@@ -266,8 +291,10 @@
     "family": "colorNegative",
     "iso": "400",
     "description": "Punchy consumer-film color with a cool green cast.",
-    "file": "HaldCLUT/fuji-superia-400.png",
-    "source": "HaldCLUT/Color/Fuji/Fuji Superia 400 2.png"
+    "file": "Packed/fuji-superia-400.mlut",
+    "png": "HaldCLUT/fuji-superia-400.png",
+    "source": "HaldCLUT/Color/Fuji/Fuji Superia 400 2.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 2, "rows": [[4, 0.3333, null], [16, 0.6667, null], [64, 1.0, null]], "source": "https://archive.org/download/manualsonline-id-53ae5aa5-2c2a-af64-4959-c7d919fe73bf/53ae5aa5-2c2a-af64-4959-c7d919fe73bf.pdf"}
   },
   {
     "id": "fuji-superia-400-minus-1",
@@ -276,7 +303,8 @@
     "family": "colorNegative",
     "iso": 400,
     "description": "Superia 400 rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/fuji-superia-400-minus-1.png",
+    "file": "Packed/fuji-superia-400-minus-1.mlut",
+    "png": "HaldCLUT/fuji-superia-400-minus-1.png",
     "source": "HaldCLUT/Color/Fuji/Fuji Superia 400 1 -.png",
     "parent": "fuji-superia-400",
     "variant": "−1"
@@ -288,7 +316,8 @@
     "family": "colorNegative",
     "iso": 400,
     "description": "Superia 400 rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/fuji-superia-400-plus-1.png",
+    "file": "Packed/fuji-superia-400-plus-1.mlut",
+    "png": "HaldCLUT/fuji-superia-400-plus-1.png",
     "source": "HaldCLUT/Color/Fuji/Fuji Superia 400 3 +.png",
     "parent": "fuji-superia-400",
     "variant": "+1"
@@ -300,7 +329,8 @@
     "family": "colorNegative",
     "iso": 400,
     "description": "Superia 400 rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/fuji-superia-400-plus-2.png",
+    "file": "Packed/fuji-superia-400-plus-2.mlut",
+    "png": "HaldCLUT/fuji-superia-400-plus-2.png",
     "source": "HaldCLUT/Color/Fuji/Fuji Superia 400 4 ++.png",
     "parent": "fuji-superia-400",
     "variant": "+2"
@@ -312,7 +342,8 @@
     "family": "colorNegative",
     "iso": 800,
     "description": "Saturated everyday color with a cool, green-leaning cast.",
-    "file": "HaldCLUT/fuji-superia-800.png",
+    "file": "Packed/fuji-superia-800.mlut",
+    "png": "HaldCLUT/fuji-superia-800.png",
     "source": "HaldCLUT/Color/Fuji/Fuji Superia 800 2.png"
   },
   {
@@ -322,7 +353,8 @@
     "family": "colorNegative",
     "iso": 800,
     "description": "Superia 800 rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/fuji-superia-800-minus-1.png",
+    "file": "Packed/fuji-superia-800-minus-1.mlut",
+    "png": "HaldCLUT/fuji-superia-800-minus-1.png",
     "source": "HaldCLUT/Color/Fuji/Fuji Superia 800 1 -.png",
     "parent": "fuji-superia-800",
     "variant": "−1"
@@ -334,7 +366,8 @@
     "family": "colorNegative",
     "iso": 800,
     "description": "Superia 800 rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/fuji-superia-800-plus-1.png",
+    "file": "Packed/fuji-superia-800-plus-1.mlut",
+    "png": "HaldCLUT/fuji-superia-800-plus-1.png",
     "source": "HaldCLUT/Color/Fuji/Fuji Superia 800 3 +.png",
     "parent": "fuji-superia-800",
     "variant": "+1"
@@ -346,7 +379,8 @@
     "family": "colorNegative",
     "iso": 800,
     "description": "Superia 800 rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/fuji-superia-800-plus-2.png",
+    "file": "Packed/fuji-superia-800-plus-2.mlut",
+    "png": "HaldCLUT/fuji-superia-800-plus-2.png",
     "source": "HaldCLUT/Color/Fuji/Fuji Superia 800 4 ++.png",
     "parent": "fuji-superia-800",
     "variant": "+2"
@@ -358,7 +392,8 @@
     "family": "colorNegative",
     "iso": 1600,
     "description": "Fast, vivid color with cool shadows and bold greens.",
-    "file": "HaldCLUT/fuji-superia-hg-1600.png",
+    "file": "Packed/fuji-superia-hg-1600.mlut",
+    "png": "HaldCLUT/fuji-superia-hg-1600.png",
     "source": "HaldCLUT/Color/Fuji/Fuji Superia HG 1600.png"
   },
   {
@@ -368,7 +403,8 @@
     "family": "colorNegative",
     "iso": "100",
     "description": "Clean, accurate color with neutral, true-to-life tones.",
-    "file": "HaldCLUT/fuji-superia-reala-100.png",
+    "file": "Packed/fuji-superia-reala-100.mlut",
+    "png": "HaldCLUT/fuji-superia-reala-100.png",
     "source": "HaldCLUT/Color/Fuji/Fuji Superia Reala 100.png"
   },
   {
@@ -378,7 +414,8 @@
     "family": "colorNegative",
     "iso": 800,
     "description": "Vivid, punchy color with strong greens and bold contrast.",
-    "file": "HaldCLUT/fuji-superia-x-tra-800.png",
+    "file": "Packed/fuji-superia-x-tra-800.mlut",
+    "png": "HaldCLUT/fuji-superia-x-tra-800.png",
     "source": "HaldCLUT/Color/Fuji/Fuji Superia X-Tra 800.png"
   },
   {
@@ -388,11 +425,13 @@
     "family": "colorNegative",
     "iso": "100",
     "description": "Vivid, saturated color with crisp contrast.",
-    "file": "HaldCLUT/kodak-ektar-100.png",
+    "file": "Packed/kodak-ektar-100.mlut",
+    "png": "HaldCLUT/kodak-ektar-100.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Ektar 100.png",
     "character": {
       "grainStrength": 0.35
-    }
+    },
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 1, "rows": [], "source": "https://www.kodakprofessional.com/sites/default/files/2025-07/e4046.pdf"}
   },
   {
     "id": "kodak-elite-100-xpro",
@@ -401,7 +440,8 @@
     "family": "colorNegative",
     "iso": 100,
     "description": "Cross-processed slide with cyan-green shadows and punchy contrast.",
-    "file": "HaldCLUT/kodak-elite-100-xpro.png",
+    "file": "Packed/kodak-elite-100-xpro.mlut",
+    "png": "HaldCLUT/kodak-elite-100-xpro.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Elite 100 XPRO.png"
   },
   {
@@ -411,8 +451,10 @@
     "family": "colorNegative",
     "iso": "160",
     "description": "Fine, gentle pastels with natural, muted skin tones.",
-    "file": "HaldCLUT/kodak-portra-160.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Portra 160 2.png"
+    "file": "Packed/kodak-portra-160.mlut",
+    "png": "HaldCLUT/kodak-portra-160.png",
+    "source": "HaldCLUT/Color/Kodak/Kodak Portra 160 2.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 10, "rows": [[100, null, null]], "source": "https://cyberphoto.se/storage/C0254BB2DFD47BB7DDA9286256ACEF3E997E98C198A401C96283EB306112A972/b21c65bff8d846ad9d061cd1bcbf6adb/pdf/media/c160c5da59fe4ecea361a56f50c24052/Kodak_Reciprocity.pdf"}
   },
   {
     "id": "kodak-portra-160-minus-1",
@@ -421,7 +463,8 @@
     "family": "colorNegative",
     "iso": 160,
     "description": "Portra 160 rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/kodak-portra-160-minus-1.png",
+    "file": "Packed/kodak-portra-160-minus-1.mlut",
+    "png": "HaldCLUT/kodak-portra-160-minus-1.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Portra 160 1 -.png",
     "parent": "kodak-portra-160",
     "variant": "−1"
@@ -433,7 +476,8 @@
     "family": "colorNegative",
     "iso": 160,
     "description": "Portra 160 rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/kodak-portra-160-plus-1.png",
+    "file": "Packed/kodak-portra-160-plus-1.mlut",
+    "png": "HaldCLUT/kodak-portra-160-plus-1.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Portra 160 3 +.png",
     "parent": "kodak-portra-160",
     "variant": "+1"
@@ -445,7 +489,8 @@
     "family": "colorNegative",
     "iso": 160,
     "description": "Portra 160 rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/kodak-portra-160-plus-2.png",
+    "file": "Packed/kodak-portra-160-plus-2.mlut",
+    "png": "HaldCLUT/kodak-portra-160-plus-2.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Portra 160 4 ++.png",
     "parent": "kodak-portra-160",
     "variant": "+2"
@@ -457,8 +502,10 @@
     "family": "colorNegative",
     "iso": 160,
     "description": "Neutral, low-saturation color with subdued, natural skin tones.",
-    "file": "HaldCLUT/kodak-portra-160-nc.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Portra 160 NC 2.png"
+    "file": "Packed/kodak-portra-160-nc.mlut",
+    "png": "HaldCLUT/kodak-portra-160-nc.png",
+    "source": "HaldCLUT/Color/Kodak/Kodak Portra 160 NC 2.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 10, "rows": [[100, null, null]], "source": "https://cyberphoto.se/storage/C0254BB2DFD47BB7DDA9286256ACEF3E997E98C198A401C96283EB306112A972/b21c65bff8d846ad9d061cd1bcbf6adb/pdf/media/c160c5da59fe4ecea361a56f50c24052/Kodak_Reciprocity.pdf"}
   },
   {
     "id": "kodak-portra-160-nc-minus-1",
@@ -467,7 +514,8 @@
     "family": "colorNegative",
     "iso": 160,
     "description": "Portra 160 NC rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/kodak-portra-160-nc-minus-1.png",
+    "file": "Packed/kodak-portra-160-nc-minus-1.mlut",
+    "png": "HaldCLUT/kodak-portra-160-nc-minus-1.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Portra 160 NC 1 -.png",
     "parent": "kodak-portra-160-nc",
     "variant": "−1"
@@ -479,7 +527,8 @@
     "family": "colorNegative",
     "iso": 160,
     "description": "Portra 160 NC rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/kodak-portra-160-nc-plus-1.png",
+    "file": "Packed/kodak-portra-160-nc-plus-1.mlut",
+    "png": "HaldCLUT/kodak-portra-160-nc-plus-1.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Portra 160 NC 3 +.png",
     "parent": "kodak-portra-160-nc",
     "variant": "+1"
@@ -491,7 +540,8 @@
     "family": "colorNegative",
     "iso": 160,
     "description": "Portra 160 NC rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/kodak-portra-160-nc-plus-2.png",
+    "file": "Packed/kodak-portra-160-nc-plus-2.mlut",
+    "png": "HaldCLUT/kodak-portra-160-nc-plus-2.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Portra 160 NC 4 ++.png",
     "parent": "kodak-portra-160-nc",
     "variant": "+2"
@@ -503,8 +553,10 @@
     "family": "colorNegative",
     "iso": 160,
     "description": "Vivid color with richer saturation and contrast than standard Portra.",
-    "file": "HaldCLUT/kodak-portra-160-vc.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Portra 160 VC 2.png"
+    "file": "Packed/kodak-portra-160-vc.mlut",
+    "png": "HaldCLUT/kodak-portra-160-vc.png",
+    "source": "HaldCLUT/Color/Kodak/Kodak Portra 160 VC 2.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 10, "rows": [[100, null, null]], "source": "https://cyberphoto.se/storage/C0254BB2DFD47BB7DDA9286256ACEF3E997E98C198A401C96283EB306112A972/b21c65bff8d846ad9d061cd1bcbf6adb/pdf/media/c160c5da59fe4ecea361a56f50c24052/Kodak_Reciprocity.pdf"}
   },
   {
     "id": "kodak-portra-160-vc-minus-1",
@@ -513,7 +565,8 @@
     "family": "colorNegative",
     "iso": 160,
     "description": "Portra 160 VC rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/kodak-portra-160-vc-minus-1.png",
+    "file": "Packed/kodak-portra-160-vc-minus-1.mlut",
+    "png": "HaldCLUT/kodak-portra-160-vc-minus-1.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Portra 160 VC 1 -.png",
     "parent": "kodak-portra-160-vc",
     "variant": "−1"
@@ -525,7 +578,8 @@
     "family": "colorNegative",
     "iso": 160,
     "description": "Portra 160 VC rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/kodak-portra-160-vc-plus-1.png",
+    "file": "Packed/kodak-portra-160-vc-plus-1.mlut",
+    "png": "HaldCLUT/kodak-portra-160-vc-plus-1.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Portra 160 VC 3 +.png",
     "parent": "kodak-portra-160-vc",
     "variant": "+1"
@@ -537,7 +591,8 @@
     "family": "colorNegative",
     "iso": 160,
     "description": "Portra 160 VC rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/kodak-portra-160-vc-plus-2.png",
+    "file": "Packed/kodak-portra-160-vc-plus-2.mlut",
+    "png": "HaldCLUT/kodak-portra-160-vc-plus-2.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Portra 160 VC 4 ++.png",
     "parent": "kodak-portra-160-vc",
     "variant": "+2"
@@ -549,8 +604,10 @@
     "family": "colorNegative",
     "iso": "400",
     "description": "Warm, forgiving skin tones with soft pastel highlights.",
-    "file": "HaldCLUT/kodak-portra-400.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Portra 400 2.png"
+    "file": "Packed/kodak-portra-400.mlut",
+    "png": "HaldCLUT/kodak-portra-400.png",
+    "source": "HaldCLUT/Color/Kodak/Kodak Portra 400 2.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 10, "rows": [[100, null, null]], "source": "https://cyberphoto.se/storage/C0254BB2DFD47BB7DDA9286256ACEF3E997E98C198A401C96283EB306112A972/b21c65bff8d846ad9d061cd1bcbf6adb/pdf/media/c160c5da59fe4ecea361a56f50c24052/Kodak_Reciprocity.pdf"}
   },
   {
     "id": "kodak-portra-400-minus-1",
@@ -559,7 +616,8 @@
     "family": "colorNegative",
     "iso": 400,
     "description": "Portra 400 rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/kodak-portra-400-minus-1.png",
+    "file": "Packed/kodak-portra-400-minus-1.mlut",
+    "png": "HaldCLUT/kodak-portra-400-minus-1.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Portra 400 1 -.png",
     "parent": "kodak-portra-400",
     "variant": "−1"
@@ -571,7 +629,8 @@
     "family": "colorNegative",
     "iso": 400,
     "description": "Portra 400 rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/kodak-portra-400-plus-1.png",
+    "file": "Packed/kodak-portra-400-plus-1.mlut",
+    "png": "HaldCLUT/kodak-portra-400-plus-1.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Portra 400 3 +.png",
     "parent": "kodak-portra-400",
     "variant": "+1"
@@ -583,7 +642,8 @@
     "family": "colorNegative",
     "iso": 400,
     "description": "Portra 400 rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/kodak-portra-400-plus-2.png",
+    "file": "Packed/kodak-portra-400-plus-2.mlut",
+    "png": "HaldCLUT/kodak-portra-400-plus-2.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Portra 400 4 ++.png",
     "parent": "kodak-portra-400",
     "variant": "+2"
@@ -595,8 +655,10 @@
     "family": "colorNegative",
     "iso": 400,
     "description": "Neutral, restrained color with soft, natural skin rendering.",
-    "file": "HaldCLUT/kodak-portra-400-nc.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Portra 400 NC 2.png"
+    "file": "Packed/kodak-portra-400-nc.mlut",
+    "png": "HaldCLUT/kodak-portra-400-nc.png",
+    "source": "HaldCLUT/Color/Kodak/Kodak Portra 400 NC 2.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 10, "rows": [[100, null, null]], "source": "https://cyberphoto.se/storage/C0254BB2DFD47BB7DDA9286256ACEF3E997E98C198A401C96283EB306112A972/b21c65bff8d846ad9d061cd1bcbf6adb/pdf/media/c160c5da59fe4ecea361a56f50c24052/Kodak_Reciprocity.pdf"}
   },
   {
     "id": "kodak-portra-400-nc-minus-1",
@@ -605,7 +667,8 @@
     "family": "colorNegative",
     "iso": 400,
     "description": "Portra 400 NC rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/kodak-portra-400-nc-minus-1.png",
+    "file": "Packed/kodak-portra-400-nc-minus-1.mlut",
+    "png": "HaldCLUT/kodak-portra-400-nc-minus-1.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Portra 400 NC 1 -.png",
     "parent": "kodak-portra-400-nc",
     "variant": "−1"
@@ -617,7 +680,8 @@
     "family": "colorNegative",
     "iso": 400,
     "description": "Portra 400 NC rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/kodak-portra-400-nc-plus-1.png",
+    "file": "Packed/kodak-portra-400-nc-plus-1.mlut",
+    "png": "HaldCLUT/kodak-portra-400-nc-plus-1.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Portra 400 NC 3 +.png",
     "parent": "kodak-portra-400-nc",
     "variant": "+1"
@@ -629,7 +693,8 @@
     "family": "colorNegative",
     "iso": 400,
     "description": "Portra 400 NC rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/kodak-portra-400-nc-plus-2.png",
+    "file": "Packed/kodak-portra-400-nc-plus-2.mlut",
+    "png": "HaldCLUT/kodak-portra-400-nc-plus-2.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Portra 400 NC 4 ++.png",
     "parent": "kodak-portra-400-nc",
     "variant": "+2"
@@ -641,8 +706,10 @@
     "family": "colorNegative",
     "iso": 400,
     "description": "Warm, punchy color with strong saturation and rich contrast.",
-    "file": "HaldCLUT/kodak-portra-400-uc.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Portra 400 UC 2.png"
+    "file": "Packed/kodak-portra-400-uc.mlut",
+    "png": "HaldCLUT/kodak-portra-400-uc.png",
+    "source": "HaldCLUT/Color/Kodak/Kodak Portra 400 UC 2.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 10, "rows": [[100, null, null]], "source": "https://cyberphoto.se/storage/C0254BB2DFD47BB7DDA9286256ACEF3E997E98C198A401C96283EB306112A972/b21c65bff8d846ad9d061cd1bcbf6adb/pdf/media/c160c5da59fe4ecea361a56f50c24052/Kodak_Reciprocity.pdf"}
   },
   {
     "id": "kodak-portra-400-uc-minus-1",
@@ -651,7 +718,8 @@
     "family": "colorNegative",
     "iso": 400,
     "description": "Portra 400 UC rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/kodak-portra-400-uc-minus-1.png",
+    "file": "Packed/kodak-portra-400-uc-minus-1.mlut",
+    "png": "HaldCLUT/kodak-portra-400-uc-minus-1.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Portra 400 UC 1 -.png",
     "parent": "kodak-portra-400-uc",
     "variant": "−1"
@@ -663,7 +731,8 @@
     "family": "colorNegative",
     "iso": 400,
     "description": "Portra 400 UC rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/kodak-portra-400-uc-plus-1.png",
+    "file": "Packed/kodak-portra-400-uc-plus-1.mlut",
+    "png": "HaldCLUT/kodak-portra-400-uc-plus-1.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Portra 400 UC 3 +.png",
     "parent": "kodak-portra-400-uc",
     "variant": "+1"
@@ -675,7 +744,8 @@
     "family": "colorNegative",
     "iso": 400,
     "description": "Portra 400 UC rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/kodak-portra-400-uc-plus-2.png",
+    "file": "Packed/kodak-portra-400-uc-plus-2.mlut",
+    "png": "HaldCLUT/kodak-portra-400-uc-plus-2.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Portra 400 UC 4 ++.png",
     "parent": "kodak-portra-400-uc",
     "variant": "+2"
@@ -687,8 +757,10 @@
     "family": "colorNegative",
     "iso": 400,
     "description": "Vibrant, contrasty color with saturated reds and deep shadows.",
-    "file": "HaldCLUT/kodak-portra-400-vc.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Portra 400 VC 2.png"
+    "file": "Packed/kodak-portra-400-vc.mlut",
+    "png": "HaldCLUT/kodak-portra-400-vc.png",
+    "source": "HaldCLUT/Color/Kodak/Kodak Portra 400 VC 2.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 10, "rows": [[100, null, null]], "source": "https://cyberphoto.se/storage/C0254BB2DFD47BB7DDA9286256ACEF3E997E98C198A401C96283EB306112A972/b21c65bff8d846ad9d061cd1bcbf6adb/pdf/media/c160c5da59fe4ecea361a56f50c24052/Kodak_Reciprocity.pdf"}
   },
   {
     "id": "kodak-portra-400-vc-minus-1",
@@ -697,7 +769,8 @@
     "family": "colorNegative",
     "iso": 400,
     "description": "Portra 400 VC rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/kodak-portra-400-vc-minus-1.png",
+    "file": "Packed/kodak-portra-400-vc-minus-1.mlut",
+    "png": "HaldCLUT/kodak-portra-400-vc-minus-1.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Portra 400 VC 1 -.png",
     "parent": "kodak-portra-400-vc",
     "variant": "−1"
@@ -709,7 +782,8 @@
     "family": "colorNegative",
     "iso": 400,
     "description": "Portra 400 VC rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/kodak-portra-400-vc-plus-1.png",
+    "file": "Packed/kodak-portra-400-vc-plus-1.mlut",
+    "png": "HaldCLUT/kodak-portra-400-vc-plus-1.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Portra 400 VC 3 +.png",
     "parent": "kodak-portra-400-vc",
     "variant": "+1"
@@ -721,7 +795,8 @@
     "family": "colorNegative",
     "iso": 400,
     "description": "Portra 400 VC rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/kodak-portra-400-vc-plus-2.png",
+    "file": "Packed/kodak-portra-400-vc-plus-2.mlut",
+    "png": "HaldCLUT/kodak-portra-400-vc-plus-2.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Portra 400 VC 4 ++.png",
     "parent": "kodak-portra-400-vc",
     "variant": "+2"
@@ -733,8 +808,10 @@
     "family": "colorNegative",
     "iso": "800",
     "description": "Low-light warmth with a touch more grain-era punch.",
-    "file": "HaldCLUT/kodak-portra-800.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Portra 800 2.png"
+    "file": "Packed/kodak-portra-800.mlut",
+    "png": "HaldCLUT/kodak-portra-800.png",
+    "source": "HaldCLUT/Color/Kodak/Kodak Portra 800 2.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 1, "rows": [[10, null, null]], "source": "https://cyberphoto.se/storage/C0254BB2DFD47BB7DDA9286256ACEF3E997E98C198A401C96283EB306112A972/b21c65bff8d846ad9d061cd1bcbf6adb/pdf/media/c160c5da59fe4ecea361a56f50c24052/Kodak_Reciprocity.pdf"}
   },
   {
     "id": "kodak-portra-800-minus-1",
@@ -743,7 +820,8 @@
     "family": "colorNegative",
     "iso": 800,
     "description": "Portra 800 rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/kodak-portra-800-minus-1.png",
+    "file": "Packed/kodak-portra-800-minus-1.mlut",
+    "png": "HaldCLUT/kodak-portra-800-minus-1.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Portra 800 1 -.png",
     "parent": "kodak-portra-800",
     "variant": "−1"
@@ -755,7 +833,8 @@
     "family": "colorNegative",
     "iso": 800,
     "description": "Portra 800 rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/kodak-portra-800-plus-1.png",
+    "file": "Packed/kodak-portra-800-plus-1.mlut",
+    "png": "HaldCLUT/kodak-portra-800-plus-1.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Portra 800 3 +.png",
     "parent": "kodak-portra-800",
     "variant": "+1"
@@ -767,7 +846,8 @@
     "family": "colorNegative",
     "iso": 800,
     "description": "Portra 800 rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/kodak-portra-800-plus-2.png",
+    "file": "Packed/kodak-portra-800-plus-2.mlut",
+    "png": "HaldCLUT/kodak-portra-800-plus-2.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Portra 800 4 ++.png",
     "parent": "kodak-portra-800",
     "variant": "+2"
@@ -779,7 +859,8 @@
     "family": "colorNegative",
     "iso": 800,
     "description": "Portra 800 with harder contrast and deeper blacks.",
-    "file": "HaldCLUT/kodak-portra-800-high-contrast.png",
+    "file": "Packed/kodak-portra-800-high-contrast.mlut",
+    "png": "HaldCLUT/kodak-portra-800-high-contrast.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Portra 800 HC.png",
     "parent": "kodak-portra-800",
     "variant": "High contrast"
@@ -791,7 +872,8 @@
     "family": "colorNegative",
     "iso": 100,
     "description": "Reversed-film look with a deep red-orange wash and golden highlights.",
-    "file": "HaldCLUT/lomography-redscale-100.png",
+    "file": "Packed/lomography-redscale-100.mlut",
+    "png": "HaldCLUT/lomography-redscale-100.png",
     "source": "HaldCLUT/Color/Lomography/Lomography Redscale 100.png"
   },
   {
@@ -801,7 +883,8 @@
     "family": "colorNegative",
     "iso": 200,
     "description": "Saturated consumer color with a clean, slightly cool palette.",
-    "file": "HaldCLUT/kodak-elite-color-200.png",
+    "file": "Packed/kodak-elite-color-200.mlut",
+    "png": "HaldCLUT/kodak-elite-color-200.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Elite Color 200.png"
   },
   {
@@ -811,7 +894,8 @@
     "family": "colorNegative",
     "iso": 400,
     "description": "Faster consumer color with warm saturation and a little grain.",
-    "file": "HaldCLUT/kodak-elite-color-400.png",
+    "file": "Packed/kodak-elite-color-400.mlut",
+    "png": "HaldCLUT/kodak-elite-color-400.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Elite Color 400.png"
   },
   {
@@ -821,7 +905,8 @@
     "family": "slide",
     "iso": "100",
     "description": "Neutral, balanced slide color with gentle contrast.",
-    "file": "HaldCLUT/agfa-precisa-100.png",
+    "file": "Packed/agfa-precisa-100.mlut",
+    "png": "HaldCLUT/agfa-precisa-100.png",
     "source": "HaldCLUT/Color/Agfa/Agfa Precisa 100.png"
   },
   {
@@ -831,7 +916,8 @@
     "family": "slide",
     "iso": "100",
     "description": "Soft contrast and smooth, natural skin rendering.",
-    "file": "HaldCLUT/fuji-astia-100f.png",
+    "file": "Packed/fuji-astia-100f.mlut",
+    "png": "HaldCLUT/fuji-astia-100f.png",
     "source": "HaldCLUT/Color/Fuji/Fuji Astia 100F.png"
   },
   {
@@ -841,7 +927,8 @@
     "family": "slide",
     "iso": 100,
     "description": "A neutral, generic rendering of Astia 100F.",
-    "file": "HaldCLUT/fuji-astia-100f-generic.png",
+    "file": "Packed/fuji-astia-100f-generic.mlut",
+    "png": "HaldCLUT/fuji-astia-100f-generic.png",
     "source": "HaldCLUT/Color/Fuji/Fuji Astia 100 Generic.png",
     "parent": "fuji-astia-100f",
     "variant": "Generic"
@@ -853,8 +940,10 @@
     "family": "slide",
     "iso": "100",
     "description": "Neutral, clean slide color with fine tonal detail.",
-    "file": "HaldCLUT/fuji-provia-100f.png",
-    "source": "HaldCLUT/Color/Fuji/Fuji Provia 100F.png"
+    "file": "Packed/fuji-provia-100f.mlut",
+    "png": "HaldCLUT/fuji-provia-100f.png",
+    "source": "HaldCLUT/Color/Fuji/Fuji Provia 100F.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 128, "rows": [[240, 0.3333, {"r": 0.083, "g": 0.0, "b": 0.083}], [480, null, null]], "source": "https://www.digitaltruth.com/products/fuji_tech/Provia100f.pdf"}
   },
   {
     "id": "fuji-provia-100f-generic",
@@ -863,7 +952,8 @@
     "family": "slide",
     "iso": 100,
     "description": "A neutral, generic rendering of Provia 100F.",
-    "file": "HaldCLUT/fuji-provia-100f-generic.png",
+    "file": "Packed/fuji-provia-100f-generic.mlut",
+    "png": "HaldCLUT/fuji-provia-100f-generic.png",
     "source": "HaldCLUT/Color/Fuji/Fuji Provia 100 Generic.png",
     "parent": "fuji-provia-100f",
     "variant": "Generic"
@@ -875,8 +965,10 @@
     "family": "slide",
     "iso": 400,
     "description": "Clean, neutral slide color with fine grain for its speed.",
-    "file": "HaldCLUT/fuji-provia-400f.png",
-    "source": "HaldCLUT/Color/Fuji/Fuji Provia 400F.png"
+    "file": "Packed/fuji-provia-400f.mlut",
+    "png": "HaldCLUT/fuji-provia-400f.png",
+    "source": "HaldCLUT/Color/Fuji/Fuji Provia 400F.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 32, "rows": [[60, 0.6667, {"r": 0.166, "g": 0.0, "b": 0.166}], [120, 1.0, {"r": 0.249, "g": 0.0, "b": 0.249}], [240, 1.0, {"r": 0.249, "g": 0.0, "b": 0.249}], [480, null, null]], "source": "https://juneleung.github.io/filmdoc/fuji/PROVIA400FAF3-066E_1.pdf"}
   },
   {
     "id": "fuji-provia-400x",
@@ -885,8 +977,10 @@
     "family": "slide",
     "iso": 400,
     "description": "Saturated, fine-grained slide color with a crisp, contrasty finish.",
-    "file": "HaldCLUT/fuji-provia-400x.png",
-    "source": "HaldCLUT/Color/Fuji/Fuji Provia 400X.png"
+    "file": "Packed/fuji-provia-400x.mlut",
+    "png": "HaldCLUT/fuji-provia-400x.png",
+    "source": "HaldCLUT/Color/Fuji/Fuji Provia 400X.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 60, "rows": [[120, 0.5, {"r": 0.0, "g": 0.083, "b": 0.083}], [240, 1.0, {"r": 0.0, "g": 0.166, "b": 0.166}], [480, 1.0, {"r": 0.0, "g": 0.166, "b": 0.166}]], "source": "https://www.chrysis.net/wp-content/uploads/2020/08/Fujichrome_Provia_400X_datasheet.pdf"}
   },
   {
     "id": "fuji-sensia-100",
@@ -895,7 +989,8 @@
     "family": "slide",
     "iso": 100,
     "description": "Natural, slightly warm slide color with moderate saturation.",
-    "file": "HaldCLUT/fuji-sensia-100.png",
+    "file": "Packed/fuji-sensia-100.mlut",
+    "png": "HaldCLUT/fuji-sensia-100.png",
     "source": "HaldCLUT/Color/Fuji/Fuji Sensia 100.png"
   },
   {
@@ -905,7 +1000,8 @@
     "family": "slide",
     "iso": 200,
     "description": "Cross-processed negative with green-yellow shadows and heavy contrast.",
-    "file": "HaldCLUT/fuji-superia-200-xpro.png",
+    "file": "Packed/fuji-superia-200-xpro.mlut",
+    "png": "HaldCLUT/fuji-superia-200-xpro.png",
     "source": "HaldCLUT/Color/Fuji/Fuji Superia 200 XPRO.png"
   },
   {
@@ -915,8 +1011,10 @@
     "family": "slide",
     "iso": 100,
     "description": "Rich, saturated slide color with deep contrast and vivid greens.",
-    "file": "HaldCLUT/fuji-velvia-100.png",
-    "source": "HaldCLUT/Color/Fuji/Fuji Velvia 100 Generic.png"
+    "file": "Packed/fuji-velvia-100.mlut",
+    "png": "HaldCLUT/fuji-velvia-100.png",
+    "source": "HaldCLUT/Color/Fuji/Fuji Velvia 100 Generic.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 60, "rows": [[120, 0.3333, {"r": 0.0, "g": 0.083, "b": 0.0}], [240, 0.5, {"r": 0.0, "g": 0.083, "b": 0.0}], [480, 0.6667, {"r": 0.0, "g": 0.083, "b": 0.0}]], "source": "https://archive.org/download/manualsonline-id-8a2be063-a576-9414-fd21-a085127eed70/8a2be063-a576-9414-fd21-a085127eed70.pdf"}
   },
   {
     "id": "fuji-velvia-50",
@@ -925,8 +1023,10 @@
     "family": "slide",
     "iso": "50",
     "description": "Deeply saturated landscape color with strong contrast.",
-    "file": "HaldCLUT/fuji-velvia-50.png",
-    "source": "HaldCLUT/Color/Fuji/Fuji Velvia 50.png"
+    "file": "Packed/fuji-velvia-50.mlut",
+    "png": "HaldCLUT/fuji-velvia-50.png",
+    "source": "HaldCLUT/Color/Fuji/Fuji Velvia 50.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 1, "rows": [[4, 0.3333, {"r": 0.0, "g": 0.166, "b": 0.0}], [8, 0.5, {"r": 0.0, "g": 0.249, "b": 0.0}], [16, 0.6667, {"r": 0.0, "g": 0.332, "b": 0.0}], [32, 1.0, {"r": 0.0, "g": 0.415, "b": 0.0}], [64, null, null]], "source": "https://www.macodirect.de/media/pdf/25/a7/d2/FV504P_Datenblatt_e.pdf"}
   },
   {
     "id": "kodak-e100gx",
@@ -935,7 +1035,8 @@
     "family": "slide",
     "iso": 100,
     "description": "Warm, clean slide color with fine grain and a golden bias.",
-    "file": "HaldCLUT/kodak-e100gx.png",
+    "file": "Packed/kodak-e100gx.mlut",
+    "png": "HaldCLUT/kodak-e100gx.png",
     "source": "HaldCLUT/Color/Kodak/Kodak E-100 GX Ektachrome 100.png"
   },
   {
@@ -945,8 +1046,10 @@
     "family": "slide",
     "iso": "100",
     "description": "Vibrant, cool-leaning slide color with a bright snap.",
-    "file": "HaldCLUT/kodak-ektachrome-100-vs.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Ektachrome 100 VS.png"
+    "file": "Packed/kodak-ektachrome-100-vs.mlut",
+    "png": "HaldCLUT/kodak-ektachrome-100-vs.png",
+    "source": "HaldCLUT/Color/Kodak/Kodak Ektachrome 100 VS.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 10, "rows": [[100, null, null]], "source": "https://cyberphoto.se/storage/C0254BB2DFD47BB7DDA9286256ACEF3E997E98C198A401C96283EB306112A972/b21c65bff8d846ad9d061cd1bcbf6adb/pdf/media/c160c5da59fe4ecea361a56f50c24052/Kodak_Reciprocity.pdf"}
   },
   {
     "id": "kodak-ektachrome-100-vs-generic",
@@ -955,7 +1058,8 @@
     "family": "slide",
     "iso": 100,
     "description": "A neutral, generic rendering of Ektachrome 100 VS.",
-    "file": "HaldCLUT/kodak-ektachrome-100-vs-generic.png",
+    "file": "Packed/kodak-ektachrome-100-vs-generic.mlut",
+    "png": "HaldCLUT/kodak-ektachrome-100-vs-generic.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Ektachrome 100 VS Generic.png",
     "parent": "kodak-ektachrome-100-vs",
     "variant": "Generic"
@@ -967,8 +1071,10 @@
     "family": "slide",
     "iso": 200,
     "description": "Natural slide color with moderate saturation and gentle contrast.",
-    "file": "HaldCLUT/kodak-elite-chrome-200.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Elite Chrome 200.png"
+    "file": "Packed/kodak-elite-chrome-200.mlut",
+    "png": "HaldCLUT/kodak-elite-chrome-200.png",
+    "source": "HaldCLUT/Color/Kodak/Kodak Elite Chrome 200.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 10, "rows": [[100, null, null]], "source": "https://cyberphoto.se/storage/C0254BB2DFD47BB7DDA9286256ACEF3E997E98C198A401C96283EB306112A972/b21c65bff8d846ad9d061cd1bcbf6adb/pdf/media/c160c5da59fe4ecea361a56f50c24052/Kodak_Reciprocity.pdf"}
   },
   {
     "id": "kodak-elite-chrome-400",
@@ -977,8 +1083,10 @@
     "family": "slide",
     "iso": 400,
     "description": "Fast slide with natural color and moderately visible grain.",
-    "file": "HaldCLUT/kodak-elite-chrome-400.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Elite Chrome 400.png"
+    "file": "Packed/kodak-elite-chrome-400.mlut",
+    "png": "HaldCLUT/kodak-elite-chrome-400.png",
+    "source": "HaldCLUT/Color/Kodak/Kodak Elite Chrome 400.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 0.1, "rows": [[1, 0.4, {"r": 0.0, "g": 0.166, "b": 0.166}], [10, 0.5, {"r": 0.0, "g": 0.332, "b": 0.332}], [100, null, null]], "source": "https://cyberphoto.se/storage/C0254BB2DFD47BB7DDA9286256ACEF3E997E98C198A401C96283EB306112A972/b21c65bff8d846ad9d061cd1bcbf6adb/pdf/media/c160c5da59fe4ecea361a56f50c24052/Kodak_Reciprocity.pdf"}
   },
   {
     "id": "kodak-elite-extracolor-100",
@@ -987,8 +1095,10 @@
     "family": "slide",
     "iso": 100,
     "description": "Highly saturated, punchy slide color with vivid reds and blues.",
-    "file": "HaldCLUT/kodak-elite-extracolor-100.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Elite ExtraColor 100.png"
+    "file": "Packed/kodak-elite-extracolor-100.mlut",
+    "png": "HaldCLUT/kodak-elite-extracolor-100.png",
+    "source": "HaldCLUT/Color/Kodak/Kodak Elite ExtraColor 100.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 10, "rows": [[100, null, null]], "source": "https://cyberphoto.se/storage/C0254BB2DFD47BB7DDA9286256ACEF3E997E98C198A401C96283EB306112A972/b21c65bff8d846ad9d061cd1bcbf6adb/pdf/media/c160c5da59fe4ecea361a56f50c24052/Kodak_Reciprocity.pdf"}
   },
   {
     "id": "kodak-kodachrome-200",
@@ -997,8 +1107,10 @@
     "family": "kodachrome",
     "iso": 200,
     "description": "Punchy, warm slide with bold reds and visible grain.",
-    "file": "HaldCLUT/kodak-kodachrome-200.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Kodachrome 200.png"
+    "file": "Packed/kodak-kodachrome-200.mlut",
+    "png": "HaldCLUT/kodak-kodachrome-200.png",
+    "source": "HaldCLUT/Color/Kodak/Kodak Kodachrome 200.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 0.1, "rows": [[1, 0.5, {"r": 0.0, "g": 0.0, "b": 0.332}], [10, null, null]], "source": "https://cyberphoto.se/storage/C0254BB2DFD47BB7DDA9286256ACEF3E997E98C198A401C96283EB306112A972/b21c65bff8d846ad9d061cd1bcbf6adb/pdf/media/c160c5da59fe4ecea361a56f50c24052/Kodak_Reciprocity.pdf"}
   },
   {
     "id": "kodak-kodachrome-25",
@@ -1007,7 +1119,8 @@
     "family": "kodachrome",
     "iso": 25,
     "description": "Ultra-fine slide with dense, warm color and rich reds.",
-    "file": "HaldCLUT/kodak-kodachrome-25.png",
+    "file": "Packed/kodak-kodachrome-25.mlut",
+    "png": "HaldCLUT/kodak-kodachrome-25.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Kodachrome 25.png"
   },
   {
@@ -1017,8 +1130,10 @@
     "family": "kodachrome",
     "iso": "64",
     "description": "Classic rich reds and warm, dense midtones.",
-    "file": "HaldCLUT/kodak-kodachrome-64.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Kodachrome 64.png"
+    "file": "Packed/kodak-kodachrome-64.mlut",
+    "png": "HaldCLUT/kodak-kodachrome-64.png",
+    "source": "HaldCLUT/Color/Kodak/Kodak Kodachrome 64.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 0.01, "rows": [[0.1, 0.3333, {"r": 0.0, "g": 0.166, "b": 0.166}], [1, null, null]], "source": "https://cyberphoto.se/storage/C0254BB2DFD47BB7DDA9286256ACEF3E997E98C198A401C96283EB306112A972/b21c65bff8d846ad9d061cd1bcbf6adb/pdf/media/c160c5da59fe4ecea361a56f50c24052/Kodak_Reciprocity.pdf"}
   },
   {
     "id": "kodak-kodachrome-64-generic",
@@ -1027,7 +1142,8 @@
     "family": "kodachrome",
     "iso": 64,
     "description": "A neutral, generic rendering of Kodachrome 64.",
-    "file": "HaldCLUT/kodak-kodachrome-64-generic.png",
+    "file": "Packed/kodak-kodachrome-64-generic.mlut",
+    "png": "HaldCLUT/kodak-kodachrome-64-generic.png",
     "source": "HaldCLUT/Color/Kodak/Kodak Kodachrome 64 Generic.png",
     "parent": "kodak-kodachrome-64",
     "variant": "Generic"
@@ -1039,7 +1155,8 @@
     "family": "slide",
     "iso": "200",
     "description": "Cross-processed slide with shifted color and high contrast.",
-    "file": "HaldCLUT/lomography-x-pro-slide-200.png",
+    "file": "Packed/lomography-x-pro-slide-200.mlut",
+    "png": "HaldCLUT/lomography-x-pro-slide-200.png",
     "source": "HaldCLUT/Color/Lomography/Lomography X-Pro Slide 200.png"
   },
   {
@@ -1049,8 +1166,10 @@
     "family": "blackAndWhite",
     "iso": 100,
     "description": "Classic fine-grained monochrome with moderate contrast.",
-    "file": "HaldCLUT/agfa-apx-100.png",
-    "source": "HaldCLUT/Black-and-White/Agfa/Agfa APX 100.png"
+    "file": "Packed/agfa-apx-100.mlut",
+    "png": "HaldCLUT/agfa-apx-100.png",
+    "source": "HaldCLUT/Black-and-White/Agfa/Agfa APX 100.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 0.5, "rows": [[1, 1.0, null], [10, 2.0, null], [100, 3.0, null]], "contrastPerStop": 0.11, "source": "https://125px.com/docs/film/agfa/apx100.pdf"}
   },
   {
     "id": "agfa-apx-25",
@@ -1059,8 +1178,10 @@
     "family": "blackAndWhite",
     "iso": 25,
     "description": "Ultra-fine grain with crisp detail and delicate tones.",
-    "file": "HaldCLUT/agfa-apx-25.png",
-    "source": "HaldCLUT/Black-and-White/Agfa/Agfa APX 25.png"
+    "file": "Packed/agfa-apx-25.mlut",
+    "png": "HaldCLUT/agfa-apx-25.png",
+    "source": "HaldCLUT/Black-and-White/Agfa/Agfa APX 25.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 0.5, "rows": [[1, 1.0, null], [10, 1.5, null], [100, 2.0, null]], "contrastPerStop": 0.0, "source": "https://www.chrysis.net/wp-content/uploads/2020/08/agfapanapx25-datasheet.pdf"}
   },
   {
     "id": "fuji-neopan-1600",
@@ -1069,7 +1190,8 @@
     "family": "blackAndWhite",
     "iso": 1600,
     "description": "High-speed monochrome with coarse grain and punchy contrast.",
-    "file": "HaldCLUT/fuji-neopan-1600.png",
+    "file": "Packed/fuji-neopan-1600.mlut",
+    "png": "HaldCLUT/fuji-neopan-1600.png",
     "source": "HaldCLUT/Black-and-White/Fuji/Fuji Neopan 1600 2.png"
   },
   {
@@ -1079,7 +1201,8 @@
     "family": "blackAndWhite",
     "iso": 1600,
     "description": "Neopan 1600 rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/fuji-neopan-1600-minus-1.png",
+    "file": "Packed/fuji-neopan-1600-minus-1.mlut",
+    "png": "HaldCLUT/fuji-neopan-1600-minus-1.png",
     "source": "HaldCLUT/Black-and-White/Fuji/Fuji Neopan 1600 1 -.png",
     "parent": "fuji-neopan-1600",
     "variant": "−1"
@@ -1091,7 +1214,8 @@
     "family": "blackAndWhite",
     "iso": 1600,
     "description": "Neopan 1600 rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/fuji-neopan-1600-plus-1.png",
+    "file": "Packed/fuji-neopan-1600-plus-1.mlut",
+    "png": "HaldCLUT/fuji-neopan-1600-plus-1.png",
     "source": "HaldCLUT/Black-and-White/Fuji/Fuji Neopan 1600 3 +.png",
     "parent": "fuji-neopan-1600",
     "variant": "+1"
@@ -1103,7 +1227,8 @@
     "family": "blackAndWhite",
     "iso": 1600,
     "description": "Neopan 1600 rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/fuji-neopan-1600-plus-2.png",
+    "file": "Packed/fuji-neopan-1600-plus-2.mlut",
+    "png": "HaldCLUT/fuji-neopan-1600-plus-2.png",
     "source": "HaldCLUT/Black-and-White/Fuji/Fuji Neopan 1600 4 ++.png",
     "parent": "fuji-neopan-1600",
     "variant": "+2"
@@ -1115,11 +1240,13 @@
     "family": "blackAndWhite",
     "iso": "100",
     "description": "Smooth, deep blacks with extremely fine tonal detail.",
-    "file": "HaldCLUT/fuji-neopan-acros-100.png",
+    "file": "Packed/fuji-neopan-acros-100.mlut",
+    "png": "HaldCLUT/fuji-neopan-acros-100.png",
     "source": "HaldCLUT/Black-and-White/Fuji/Fuji Neopan Acros 100.png",
     "character": {
       "grainStrength": 0.4
-    }
+    },
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 120, "rows": [[120, 0.5, null], [1000, 0.5, null]], "contrastPerStop": 0.0, "source": "https://juneleung.github.io/filmdoc/fuji/Acros-120_AF3-083E.pdf"}
   },
   {
     "id": "ilford-delta-100",
@@ -1128,11 +1255,13 @@
     "family": "blackAndWhite",
     "iso": "100",
     "description": "Smooth, fine monochrome with delicate gradation.",
-    "file": "HaldCLUT/ilford-delta-100.png",
+    "file": "Packed/ilford-delta-100.mlut",
+    "png": "HaldCLUT/ilford-delta-100.png",
     "source": "HaldCLUT/Black-and-White/Ilford/Ilford Delta 100.png",
     "character": {
       "grainStrength": 0.4
-    }
+    },
+    "reciprocity": {"type": "schwarzschild", "p": 1.26, "threshold": 1.0, "contrastPerStop": 0.025, "source": "https://www.ilfordphoto.com/wp/wp-content/uploads/2024/05/Reciprocity-Failure-Compensation-v2.pdf"}
   },
   {
     "id": "ilford-delta-3200",
@@ -1141,8 +1270,10 @@
     "family": "blackAndWhite",
     "iso": 3200,
     "description": "Very fast, gritty monochrome with moody, contrasty shadows.",
-    "file": "HaldCLUT/ilford-delta-3200.png",
-    "source": "HaldCLUT/Black-and-White/Ilford/Ilford Delta 3200 2.png"
+    "file": "Packed/ilford-delta-3200.mlut",
+    "png": "HaldCLUT/ilford-delta-3200.png",
+    "source": "HaldCLUT/Black-and-White/Ilford/Ilford Delta 3200 2.png",
+    "reciprocity": {"type": "schwarzschild", "p": 1.33, "threshold": 1.0, "contrastPerStop": 0.025, "source": "https://www.ilfordphoto.com/wp/wp-content/uploads/2024/05/Reciprocity-Failure-Compensation-v2.pdf"}
   },
   {
     "id": "ilford-delta-3200-minus-1",
@@ -1151,7 +1282,8 @@
     "family": "blackAndWhite",
     "iso": 3200,
     "description": "Delta 3200 rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/ilford-delta-3200-minus-1.png",
+    "file": "Packed/ilford-delta-3200-minus-1.mlut",
+    "png": "HaldCLUT/ilford-delta-3200-minus-1.png",
     "source": "HaldCLUT/Black-and-White/Ilford/Ilford Delta 3200 1 -.png",
     "parent": "ilford-delta-3200",
     "variant": "−1"
@@ -1163,7 +1295,8 @@
     "family": "blackAndWhite",
     "iso": 3200,
     "description": "Delta 3200 rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/ilford-delta-3200-plus-1.png",
+    "file": "Packed/ilford-delta-3200-plus-1.mlut",
+    "png": "HaldCLUT/ilford-delta-3200-plus-1.png",
     "source": "HaldCLUT/Black-and-White/Ilford/Ilford Delta 3200 3 +.png",
     "parent": "ilford-delta-3200",
     "variant": "+1"
@@ -1175,7 +1308,8 @@
     "family": "blackAndWhite",
     "iso": 3200,
     "description": "Delta 3200 rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/ilford-delta-3200-plus-2.png",
+    "file": "Packed/ilford-delta-3200-plus-2.mlut",
+    "png": "HaldCLUT/ilford-delta-3200-plus-2.png",
     "source": "HaldCLUT/Black-and-White/Ilford/Ilford Delta 3200 4 ++.png",
     "parent": "ilford-delta-3200",
     "variant": "+2"
@@ -1187,8 +1321,10 @@
     "family": "blackAndWhite",
     "iso": 400,
     "description": "Fine-grained modern monochrome with clean, even tonality.",
-    "file": "HaldCLUT/ilford-delta-400.png",
-    "source": "HaldCLUT/Black-and-White/Ilford/Ilford Delta 400.png"
+    "file": "Packed/ilford-delta-400.mlut",
+    "png": "HaldCLUT/ilford-delta-400.png",
+    "source": "HaldCLUT/Black-and-White/Ilford/Ilford Delta 400.png",
+    "reciprocity": {"type": "schwarzschild", "p": 1.41, "threshold": 1.0, "contrastPerStop": 0.025, "source": "https://www.ilfordphoto.com/wp/wp-content/uploads/2024/05/Reciprocity-Failure-Compensation-v2.pdf"}
   },
   {
     "id": "ilford-fp4-plus-125",
@@ -1197,8 +1333,10 @@
     "family": "blackAndWhite",
     "iso": "125",
     "description": "Classic soft-toned monochrome with gentle contrast.",
-    "file": "HaldCLUT/ilford-fp4-plus-125.png",
-    "source": "HaldCLUT/Black-and-White/Ilford/Ilford FP4 Plus 125.png"
+    "file": "Packed/ilford-fp4-plus-125.mlut",
+    "png": "HaldCLUT/ilford-fp4-plus-125.png",
+    "source": "HaldCLUT/Black-and-White/Ilford/Ilford FP4 Plus 125.png",
+    "reciprocity": {"type": "schwarzschild", "p": 1.26, "threshold": 1.0, "contrastPerStop": 0.025, "source": "https://www.ilfordphoto.com/wp/wp-content/uploads/2024/05/Reciprocity-Failure-Compensation-v2.pdf"}
   },
   {
     "id": "ilford-hp5-plus-400",
@@ -1207,11 +1345,13 @@
     "family": "blackAndWhite",
     "iso": "400",
     "description": "Versatile black and white with wide, forgiving tonality.",
-    "file": "HaldCLUT/ilford-hp5-plus-400.png",
+    "file": "Packed/ilford-hp5-plus-400.mlut",
+    "png": "HaldCLUT/ilford-hp5-plus-400.png",
     "source": "HaldCLUT/Black-and-White/Ilford/Ilford HP5 2.png",
     "character": {
       "grainStrength": 1.35
-    }
+    },
+    "reciprocity": {"type": "schwarzschild", "p": 1.31, "threshold": 1.0, "contrastPerStop": 0.025, "source": "https://www.ilfordphoto.com/wp/wp-content/uploads/2024/05/Reciprocity-Failure-Compensation-v2.pdf"}
   },
   {
     "id": "ilford-hp5-plus-400-minus-1",
@@ -1220,7 +1360,8 @@
     "family": "blackAndWhite",
     "iso": 400,
     "description": "HP5 Plus 400 rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/ilford-hp5-plus-400-minus-1.png",
+    "file": "Packed/ilford-hp5-plus-400-minus-1.mlut",
+    "png": "HaldCLUT/ilford-hp5-plus-400-minus-1.png",
     "source": "HaldCLUT/Black-and-White/Ilford/Ilford HP5 1 -.png",
     "parent": "ilford-hp5-plus-400",
     "variant": "−1",
@@ -1235,7 +1376,8 @@
     "family": "blackAndWhite",
     "iso": 400,
     "description": "HP5 Plus 400 rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/ilford-hp5-plus-400-plus-1.png",
+    "file": "Packed/ilford-hp5-plus-400-plus-1.mlut",
+    "png": "HaldCLUT/ilford-hp5-plus-400-plus-1.png",
     "source": "HaldCLUT/Black-and-White/Ilford/Ilford HP5 3 +.png",
     "parent": "ilford-hp5-plus-400",
     "variant": "+1",
@@ -1250,7 +1392,8 @@
     "family": "blackAndWhite",
     "iso": 400,
     "description": "HP5 Plus 400 rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/ilford-hp5-plus-400-plus-2.png",
+    "file": "Packed/ilford-hp5-plus-400-plus-2.mlut",
+    "png": "HaldCLUT/ilford-hp5-plus-400-plus-2.png",
     "source": "HaldCLUT/Black-and-White/Ilford/Ilford HP5 4 ++.png",
     "parent": "ilford-hp5-plus-400",
     "variant": "+2",
@@ -1265,7 +1408,8 @@
     "family": "blackAndWhite",
     "iso": 400,
     "description": "An alternate rendering of HP5 Plus 400 with a different tonal balance.",
-    "file": "HaldCLUT/ilford-hp5-plus-400-alt.png",
+    "file": "Packed/ilford-hp5-plus-400-alt.mlut",
+    "png": "HaldCLUT/ilford-hp5-plus-400-alt.png",
     "source": "HaldCLUT/Black-and-White/Ilford/Ilford HP5 Plus 400.png",
     "parent": "ilford-hp5-plus-400",
     "variant": "Alt",
@@ -1280,7 +1424,8 @@
     "family": "blackAndWhite",
     "iso": 800,
     "description": "Fast, grainy monochrome with soft, extended highlights.",
-    "file": "HaldCLUT/ilford-hps-800.png",
+    "file": "Packed/ilford-hps-800.mlut",
+    "png": "HaldCLUT/ilford-hps-800.png",
     "source": "HaldCLUT/Black-and-White/Ilford/Ilford HPS 800.png"
   },
   {
@@ -1290,8 +1435,10 @@
     "family": "blackAndWhite",
     "iso": "50",
     "description": "Ultra-fine, high-detail monochrome with crisp whites.",
-    "file": "HaldCLUT/ilford-pan-f-plus-50.png",
-    "source": "HaldCLUT/Black-and-White/Ilford/Ilford Pan F Plus 50.png"
+    "file": "Packed/ilford-pan-f-plus-50.mlut",
+    "png": "HaldCLUT/ilford-pan-f-plus-50.png",
+    "source": "HaldCLUT/Black-and-White/Ilford/Ilford Pan F Plus 50.png",
+    "reciprocity": {"type": "schwarzschild", "p": 1.33, "threshold": 1.0, "contrastPerStop": 0.025, "source": "https://www.ilfordphoto.com/wp/wp-content/uploads/2024/05/Reciprocity-Failure-Compensation-v2.pdf"}
   },
   {
     "id": "ilford-xp2-400",
@@ -1300,8 +1447,10 @@
     "family": "blackAndWhite",
     "iso": 400,
     "description": "Smooth chromogenic monochrome with soft contrast and little grain.",
-    "file": "HaldCLUT/ilford-xp2-400.png",
-    "source": "HaldCLUT/Black-and-White/Ilford/Ilford XP2.png"
+    "file": "Packed/ilford-xp2-400.mlut",
+    "png": "HaldCLUT/ilford-xp2-400.png",
+    "source": "HaldCLUT/Black-and-White/Ilford/Ilford XP2.png",
+    "reciprocity": {"type": "schwarzschild", "p": 1.31, "threshold": 1.0, "contrastPerStop": 0.025, "source": "https://www.ilfordphoto.com/wp/wp-content/uploads/2024/05/Reciprocity-Failure-Compensation-v2.pdf"}
   },
   {
     "id": "kodak-bw-400-cn",
@@ -1310,8 +1459,10 @@
     "family": "blackAndWhite",
     "iso": 400,
     "description": "Smooth chromogenic black and white with soft, wide tonality.",
-    "file": "HaldCLUT/kodak-bw-400-cn.png",
-    "source": "HaldCLUT/Black-and-White/Kodak/Kodak BW 400 CN.png"
+    "file": "Packed/kodak-bw-400-cn.mlut",
+    "png": "HaldCLUT/kodak-bw-400-cn.png",
+    "source": "HaldCLUT/Black-and-White/Kodak/Kodak BW 400 CN.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 120, "rows": [], "contrastPerStop": 0.0, "source": "https://cyberphoto.se/storage/C0254BB2DFD47BB7DDA9286256ACEF3E997E98C198A401C96283EB306112A972/b21c65bff8d846ad9d061cd1bcbf6adb/pdf/media/c160c5da59fe4ecea361a56f50c24052/Kodak_Reciprocity.pdf"}
   },
   {
     "id": "kodak-hie",
@@ -1320,7 +1471,8 @@
     "family": "blackAndWhite",
     "iso": 400,
     "description": "Infrared monochrome with pale foliage and dark, dramatic skies.",
-    "file": "HaldCLUT/kodak-hie.png",
+    "file": "Packed/kodak-hie.mlut",
+    "png": "HaldCLUT/kodak-hie.png",
     "source": "HaldCLUT/Black-and-White/Kodak/Kodak HIE (HS Infra).png"
   },
   {
@@ -1330,11 +1482,13 @@
     "family": "blackAndWhite",
     "iso": "100",
     "description": "Fine-grained, crisp black and white with smooth tones.",
-    "file": "HaldCLUT/kodak-t-max-100.png",
+    "file": "Packed/kodak-t-max-100.mlut",
+    "png": "HaldCLUT/kodak-t-max-100.png",
     "source": "HaldCLUT/Black-and-White/Kodak/Kodak T-Max 100.png",
     "character": {
       "grainStrength": 0.4
-    }
+    },
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 0.1, "rows": [[1, 0.3333, null], [10, 0.5, null], [100, 1, null]], "highIntensity": [[0.0001, 0.3333], [0.001, 0]], "contrastPerStop": 0.0, "source": "https://www.macodirect.de/media/pdf/56/88/e2/KTM104_Datenblatt_e.pdf"}
   },
   {
     "id": "kodak-t-max-3200",
@@ -1343,8 +1497,10 @@
     "family": "blackAndWhite",
     "iso": 3200,
     "description": "Fast, grainy monochrome with contrasty shadows and bold texture.",
-    "file": "HaldCLUT/kodak-t-max-3200.png",
-    "source": "HaldCLUT/Black-and-White/Kodak/Kodak TMAX 3200 2.png"
+    "file": "Packed/kodak-t-max-3200.mlut",
+    "png": "HaldCLUT/kodak-t-max-3200.png",
+    "source": "HaldCLUT/Black-and-White/Kodak/Kodak TMAX 3200 2.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 0.1, "rows": [[1, 0.3333, null], [10, 0.6667, null], [100, 2, null]], "contrastPerStop": 0.0, "source": "https://www.macodirect.de/media/pdf/56/88/e2/KTM104_Datenblatt_e.pdf"}
   },
   {
     "id": "kodak-t-max-3200-minus-1",
@@ -1353,7 +1509,8 @@
     "family": "blackAndWhite",
     "iso": 3200,
     "description": "T-Max 3200 rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/kodak-t-max-3200-minus-1.png",
+    "file": "Packed/kodak-t-max-3200-minus-1.mlut",
+    "png": "HaldCLUT/kodak-t-max-3200-minus-1.png",
     "source": "HaldCLUT/Black-and-White/Kodak/Kodak TMAX 3200 1 -.png",
     "parent": "kodak-t-max-3200",
     "variant": "−1"
@@ -1365,7 +1522,8 @@
     "family": "blackAndWhite",
     "iso": 3200,
     "description": "T-Max 3200 rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/kodak-t-max-3200-plus-1.png",
+    "file": "Packed/kodak-t-max-3200-plus-1.mlut",
+    "png": "HaldCLUT/kodak-t-max-3200-plus-1.png",
     "source": "HaldCLUT/Black-and-White/Kodak/Kodak TMAX 3200 4 +.png",
     "parent": "kodak-t-max-3200",
     "variant": "+1"
@@ -1377,7 +1535,8 @@
     "family": "blackAndWhite",
     "iso": 3200,
     "description": "T-Max 3200 rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/kodak-t-max-3200-plus-2.png",
+    "file": "Packed/kodak-t-max-3200-plus-2.mlut",
+    "png": "HaldCLUT/kodak-t-max-3200-plus-2.png",
     "source": "HaldCLUT/Black-and-White/Kodak/Kodak TMAX 3200 5 ++.png",
     "parent": "kodak-t-max-3200",
     "variant": "+2"
@@ -1389,7 +1548,8 @@
     "family": "blackAndWhite",
     "iso": 3200,
     "description": "An alternate rendering of T-Max 3200 with a different tonal balance.",
-    "file": "HaldCLUT/kodak-t-max-3200-alt.png",
+    "file": "Packed/kodak-t-max-3200-alt.mlut",
+    "png": "HaldCLUT/kodak-t-max-3200-alt.png",
     "source": "HaldCLUT/Black-and-White/Kodak/Kodak TMAX 3200 3 Alt.png",
     "parent": "kodak-t-max-3200",
     "variant": "Alt"
@@ -1401,8 +1561,10 @@
     "family": "blackAndWhite",
     "iso": "400",
     "description": "Clean, sharp monochrome with a modern tonal curve.",
-    "file": "HaldCLUT/kodak-t-max-400.png",
-    "source": "HaldCLUT/Black-and-White/Kodak/Kodak T-Max 400.png"
+    "file": "Packed/kodak-t-max-400.mlut",
+    "png": "HaldCLUT/kodak-t-max-400.png",
+    "source": "HaldCLUT/Black-and-White/Kodak/Kodak T-Max 400.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 0.1, "rows": [[10, 0.3333, null], [100, 1.5, null]], "contrastPerStop": 0.0, "source": "https://www.freestylephoto.com/pdf/product_pdfs/kodak/Kodak_Tmax400.pdf"}
   },
   {
     "id": "kodak-tri-x-400",
@@ -1411,11 +1573,13 @@
     "family": "blackAndWhite",
     "iso": "400",
     "description": "Gritty classic reportage black and white, rich contrast.",
-    "file": "HaldCLUT/kodak-tri-x-400.png",
+    "file": "Packed/kodak-tri-x-400.mlut",
+    "png": "HaldCLUT/kodak-tri-x-400.png",
     "source": "HaldCLUT/Black-and-White/Kodak/Kodak TRI-X 400 2.png",
     "character": {
       "grainStrength": 1.45
-    }
+    },
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 0.1, "rows": [[1, 1.0, null], [10, 2.0, null], [100, 3.0, null]], "highIntensity": [[1e-05, 1.0], [0.0001, 0.5], [0.001, 0]], "contrastPerStop": 0.1, "source": "https://cdn.shopify.com/s/files/1/0339/5113/files/f4017_trix_320400.pdf"}
   },
   {
     "id": "kodak-tri-x-400-minus-1",
@@ -1424,7 +1588,8 @@
     "family": "blackAndWhite",
     "iso": 400,
     "description": "Tri-X 400 rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/kodak-tri-x-400-minus-1.png",
+    "file": "Packed/kodak-tri-x-400-minus-1.mlut",
+    "png": "HaldCLUT/kodak-tri-x-400-minus-1.png",
     "source": "HaldCLUT/Black-and-White/Kodak/Kodak TRI-X 400 1 -.png",
     "parent": "kodak-tri-x-400",
     "variant": "−1",
@@ -1439,7 +1604,8 @@
     "family": "blackAndWhite",
     "iso": 400,
     "description": "Tri-X 400 rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/kodak-tri-x-400-plus-1.png",
+    "file": "Packed/kodak-tri-x-400-plus-1.mlut",
+    "png": "HaldCLUT/kodak-tri-x-400-plus-1.png",
     "source": "HaldCLUT/Black-and-White/Kodak/Kodak TRI-X 400 4 +.png",
     "parent": "kodak-tri-x-400",
     "variant": "+1",
@@ -1454,7 +1620,8 @@
     "family": "blackAndWhite",
     "iso": 400,
     "description": "Tri-X 400 rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/kodak-tri-x-400-plus-2.png",
+    "file": "Packed/kodak-tri-x-400-plus-2.mlut",
+    "png": "HaldCLUT/kodak-tri-x-400-plus-2.png",
     "source": "HaldCLUT/Black-and-White/Kodak/Kodak TRI-X 400 5 ++.png",
     "parent": "kodak-tri-x-400",
     "variant": "+2",
@@ -1469,7 +1636,8 @@
     "family": "blackAndWhite",
     "iso": 400,
     "description": "An alternate rendering of Tri-X 400 with a different tonal balance.",
-    "file": "HaldCLUT/kodak-tri-x-400-alt.png",
+    "file": "Packed/kodak-tri-x-400-alt.mlut",
+    "png": "HaldCLUT/kodak-tri-x-400-alt.png",
     "source": "HaldCLUT/Black-and-White/Kodak/Kodak TRI-X 400 3 Alt.png",
     "parent": "kodak-tri-x-400",
     "variant": "Alt",
@@ -1484,7 +1652,8 @@
     "family": "blackAndWhite",
     "iso": 400,
     "description": "Infrared-sensitive monochrome with bright foliage and deep skies.",
-    "file": "HaldCLUT/rollei-ir-400.png",
+    "file": "Packed/rollei-ir-400.mlut",
+    "png": "HaldCLUT/rollei-ir-400.png",
     "source": "HaldCLUT/Black-and-White/Rollei/Rollei IR 400.png"
   },
   {
@@ -1494,7 +1663,8 @@
     "family": "blackAndWhite",
     "iso": 25,
     "description": "Orthochromatic monochrome with dark reds and bright blues.",
-    "file": "HaldCLUT/rollei-ortho-25.png",
+    "file": "Packed/rollei-ortho-25.mlut",
+    "png": "HaldCLUT/rollei-ortho-25.png",
     "source": "HaldCLUT/Black-and-White/Rollei/Rollei Ortho 25.png"
   },
   {
@@ -1504,7 +1674,8 @@
     "family": "blackAndWhite",
     "iso": 100,
     "description": "Fine-grained monochrome with a wide, smooth tonal range.",
-    "file": "HaldCLUT/rollei-retro-100-tonal.png",
+    "file": "Packed/rollei-retro-100-tonal.mlut",
+    "png": "HaldCLUT/rollei-retro-100-tonal.png",
     "source": "HaldCLUT/Black-and-White/Rollei/Rollei Retro 100 Tonal.png"
   },
   {
@@ -1514,7 +1685,8 @@
     "family": "blackAndWhite",
     "iso": 80,
     "description": "Crisp, high-contrast black and white with extended red sensitivity.",
-    "file": "HaldCLUT/rollei-retro-80s.png",
+    "file": "Packed/rollei-retro-80s.mlut",
+    "png": "HaldCLUT/rollei-retro-80s.png",
     "source": "HaldCLUT/Black-and-White/Rollei/Rollei Retro 80s.png"
   },
   {
@@ -1524,7 +1696,8 @@
     "family": "instant",
     "iso": "100",
     "description": "Peel-apart instant look with soft, natural color.",
-    "file": "HaldCLUT/fuji-fp-100c.png",
+    "file": "Packed/fuji-fp-100c.mlut",
+    "png": "HaldCLUT/fuji-fp-100c.png",
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c 3.png"
   },
   {
@@ -1534,7 +1707,8 @@
     "family": "instant",
     "iso": 100,
     "description": "FP-100C rendered two stops darker, with dense shadows.",
-    "file": "HaldCLUT/fuji-fp-100c-minus-2.png",
+    "file": "Packed/fuji-fp-100c-minus-2.mlut",
+    "png": "HaldCLUT/fuji-fp-100c-minus-2.png",
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c 1 --.png",
     "parent": "fuji-fp-100c",
     "variant": "−2"
@@ -1546,7 +1720,8 @@
     "family": "instant",
     "iso": 100,
     "description": "FP-100C rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/fuji-fp-100c-minus-1.png",
+    "file": "Packed/fuji-fp-100c-minus-1.mlut",
+    "png": "HaldCLUT/fuji-fp-100c-minus-1.png",
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c 2 -.png",
     "parent": "fuji-fp-100c",
     "variant": "−1"
@@ -1558,7 +1733,8 @@
     "family": "instant",
     "iso": 100,
     "description": "FP-100C rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/fuji-fp-100c-plus-1.png",
+    "file": "Packed/fuji-fp-100c-plus-1.mlut",
+    "png": "HaldCLUT/fuji-fp-100c-plus-1.png",
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c 5 +.png",
     "parent": "fuji-fp-100c",
     "variant": "+1"
@@ -1570,7 +1746,8 @@
     "family": "instant",
     "iso": 100,
     "description": "FP-100C rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/fuji-fp-100c-plus-2.png",
+    "file": "Packed/fuji-fp-100c-plus-2.mlut",
+    "png": "HaldCLUT/fuji-fp-100c-plus-2.png",
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c 6 ++.png",
     "parent": "fuji-fp-100c",
     "variant": "+2"
@@ -1582,7 +1759,8 @@
     "family": "instant",
     "iso": 100,
     "description": "FP-100C rendered three stops brighter, with washed, glowing highlights.",
-    "file": "HaldCLUT/fuji-fp-100c-plus-3.png",
+    "file": "Packed/fuji-fp-100c-plus-3.mlut",
+    "png": "HaldCLUT/fuji-fp-100c-plus-3.png",
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c 8 +++.png",
     "parent": "fuji-fp-100c",
     "variant": "+3"
@@ -1594,7 +1772,8 @@
     "family": "instant",
     "iso": 100,
     "description": "An alternate rendering of FP-100C with a different tonal balance.",
-    "file": "HaldCLUT/fuji-fp-100c-alt.png",
+    "file": "Packed/fuji-fp-100c-alt.mlut",
+    "png": "HaldCLUT/fuji-fp-100c-alt.png",
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c 4 Alt.png",
     "parent": "fuji-fp-100c",
     "variant": "Alt"
@@ -1606,7 +1785,8 @@
     "family": "instant",
     "iso": 100,
     "description": "An alternate rendering of FP-100C two stops brighter, with different contrast.",
-    "file": "HaldCLUT/fuji-fp-100c-plus-2-alt.png",
+    "file": "Packed/fuji-fp-100c-plus-2-alt.mlut",
+    "png": "HaldCLUT/fuji-fp-100c-plus-2-alt.png",
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c 7 ++ Alt.png",
     "parent": "fuji-fp-100c",
     "variant": "+2 Alt"
@@ -1618,7 +1798,8 @@
     "family": "instant",
     "iso": 100,
     "description": "The cool-toned FP-100C rendered two stops darker, with dense shadows.",
-    "file": "HaldCLUT/fuji-fp-100c-cool-minus-2.png",
+    "file": "Packed/fuji-fp-100c-cool-minus-2.mlut",
+    "png": "HaldCLUT/fuji-fp-100c-cool-minus-2.png",
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c Cool 1 --.png",
     "parent": "fuji-fp-100c",
     "variant": "Cool −2"
@@ -1630,7 +1811,8 @@
     "family": "instant",
     "iso": 100,
     "description": "The cool-toned FP-100C rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/fuji-fp-100c-cool-minus-1.png",
+    "file": "Packed/fuji-fp-100c-cool-minus-1.mlut",
+    "png": "HaldCLUT/fuji-fp-100c-cool-minus-1.png",
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c Cool 2 -.png",
     "parent": "fuji-fp-100c",
     "variant": "Cool −1"
@@ -1642,7 +1824,8 @@
     "family": "instant",
     "iso": 100,
     "description": "The cool-toned version of FP-100C, with bluer whites.",
-    "file": "HaldCLUT/fuji-fp-100c-cool.png",
+    "file": "Packed/fuji-fp-100c-cool.mlut",
+    "png": "HaldCLUT/fuji-fp-100c-cool.png",
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c Cool 3.png",
     "parent": "fuji-fp-100c",
     "variant": "Cool"
@@ -1654,7 +1837,8 @@
     "family": "instant",
     "iso": 100,
     "description": "The cool-toned FP-100C rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/fuji-fp-100c-cool-plus-1.png",
+    "file": "Packed/fuji-fp-100c-cool-plus-1.mlut",
+    "png": "HaldCLUT/fuji-fp-100c-cool-plus-1.png",
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c Cool 4 +.png",
     "parent": "fuji-fp-100c",
     "variant": "Cool +1"
@@ -1666,7 +1850,8 @@
     "family": "instant",
     "iso": 100,
     "description": "The cool-toned FP-100C rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/fuji-fp-100c-cool-plus-2.png",
+    "file": "Packed/fuji-fp-100c-cool-plus-2.mlut",
+    "png": "HaldCLUT/fuji-fp-100c-cool-plus-2.png",
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c Cool 5 ++.png",
     "parent": "fuji-fp-100c",
     "variant": "Cool +2"
@@ -1678,7 +1863,8 @@
     "family": "instant",
     "iso": 100,
     "description": "Peel-apart negative with a faded, muted palette and soft contrast.",
-    "file": "HaldCLUT/fuji-fp-100c-negative.png",
+    "file": "Packed/fuji-fp-100c-negative.mlut",
+    "png": "HaldCLUT/fuji-fp-100c-negative.png",
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c Negative 3.png"
   },
   {
@@ -1688,7 +1874,8 @@
     "family": "instant",
     "iso": 100,
     "description": "FP-100C Negative rendered two stops darker, with dense shadows.",
-    "file": "HaldCLUT/fuji-fp-100c-negative-minus-2.png",
+    "file": "Packed/fuji-fp-100c-negative-minus-2.mlut",
+    "png": "HaldCLUT/fuji-fp-100c-negative-minus-2.png",
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c Negative 1 --.png",
     "parent": "fuji-fp-100c-negative",
     "variant": "−2"
@@ -1700,7 +1887,8 @@
     "family": "instant",
     "iso": 100,
     "description": "FP-100C Negative rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/fuji-fp-100c-negative-minus-1.png",
+    "file": "Packed/fuji-fp-100c-negative-minus-1.mlut",
+    "png": "HaldCLUT/fuji-fp-100c-negative-minus-1.png",
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c Negative 2 -.png",
     "parent": "fuji-fp-100c-negative",
     "variant": "−1"
@@ -1712,7 +1900,8 @@
     "family": "instant",
     "iso": 100,
     "description": "FP-100C Negative rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/fuji-fp-100c-negative-plus-1.png",
+    "file": "Packed/fuji-fp-100c-negative-plus-1.mlut",
+    "png": "HaldCLUT/fuji-fp-100c-negative-plus-1.png",
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c Negative 4 +.png",
     "parent": "fuji-fp-100c-negative",
     "variant": "+1"
@@ -1724,7 +1913,8 @@
     "family": "instant",
     "iso": 100,
     "description": "FP-100C Negative rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/fuji-fp-100c-negative-plus-2.png",
+    "file": "Packed/fuji-fp-100c-negative-plus-2.mlut",
+    "png": "HaldCLUT/fuji-fp-100c-negative-plus-2.png",
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c Negative 5 ++.png",
     "parent": "fuji-fp-100c-negative",
     "variant": "+2"
@@ -1736,7 +1926,8 @@
     "family": "instant",
     "iso": 100,
     "description": "FP-100C Negative rendered three stops brighter, with washed, glowing highlights.",
-    "file": "HaldCLUT/fuji-fp-100c-negative-plus-3.png",
+    "file": "Packed/fuji-fp-100c-negative-plus-3.mlut",
+    "png": "HaldCLUT/fuji-fp-100c-negative-plus-3.png",
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c Negative 7 +++.png",
     "parent": "fuji-fp-100c-negative",
     "variant": "+3"
@@ -1748,7 +1939,8 @@
     "family": "instant",
     "iso": 100,
     "description": "An alternate rendering of FP-100C Negative two stops brighter, with different contrast.",
-    "file": "HaldCLUT/fuji-fp-100c-negative-plus-2-alt.png",
+    "file": "Packed/fuji-fp-100c-negative-plus-2-alt.mlut",
+    "png": "HaldCLUT/fuji-fp-100c-negative-plus-2-alt.png",
     "source": "HaldCLUT/Color/Fuji/Fuji FP-100c Negative 6 ++ Alt.png",
     "parent": "fuji-fp-100c-negative",
     "variant": "+2 Alt"
@@ -1760,7 +1952,8 @@
     "family": "instant",
     "iso": 3000,
     "description": "High-speed peel-apart black and white with gritty, contrasty tones.",
-    "file": "HaldCLUT/fuji-fp-3000b.png",
+    "file": "Packed/fuji-fp-3000b.mlut",
+    "png": "HaldCLUT/fuji-fp-3000b.png",
     "source": "HaldCLUT/Black-and-White/Fuji/Fuji FP-3000b 3.png",
     "monochrome": true
   },
@@ -1771,7 +1964,8 @@
     "family": "instant",
     "iso": 3000,
     "description": "FP-3000B rendered two stops darker, with dense shadows.",
-    "file": "HaldCLUT/fuji-fp-3000b-minus-2.png",
+    "file": "Packed/fuji-fp-3000b-minus-2.mlut",
+    "png": "HaldCLUT/fuji-fp-3000b-minus-2.png",
     "source": "HaldCLUT/Black-and-White/Fuji/Fuji FP-3000b 1 --.png",
     "parent": "fuji-fp-3000b",
     "variant": "−2",
@@ -1784,7 +1978,8 @@
     "family": "instant",
     "iso": 3000,
     "description": "FP-3000B rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/fuji-fp-3000b-minus-1.png",
+    "file": "Packed/fuji-fp-3000b-minus-1.mlut",
+    "png": "HaldCLUT/fuji-fp-3000b-minus-1.png",
     "source": "HaldCLUT/Black-and-White/Fuji/Fuji FP-3000b 2 -.png",
     "parent": "fuji-fp-3000b",
     "variant": "−1",
@@ -1797,7 +1992,8 @@
     "family": "instant",
     "iso": 3000,
     "description": "FP-3000B rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/fuji-fp-3000b-plus-1.png",
+    "file": "Packed/fuji-fp-3000b-plus-1.mlut",
+    "png": "HaldCLUT/fuji-fp-3000b-plus-1.png",
     "source": "HaldCLUT/Black-and-White/Fuji/Fuji FP-3000b 4 +.png",
     "parent": "fuji-fp-3000b",
     "variant": "+1",
@@ -1810,7 +2006,8 @@
     "family": "instant",
     "iso": 3000,
     "description": "FP-3000B rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/fuji-fp-3000b-plus-2.png",
+    "file": "Packed/fuji-fp-3000b-plus-2.mlut",
+    "png": "HaldCLUT/fuji-fp-3000b-plus-2.png",
     "source": "HaldCLUT/Black-and-White/Fuji/Fuji FP-3000b 5 ++.png",
     "parent": "fuji-fp-3000b",
     "variant": "+2",
@@ -1823,7 +2020,8 @@
     "family": "instant",
     "iso": 3000,
     "description": "FP-3000B rendered three stops brighter, with washed, glowing highlights.",
-    "file": "HaldCLUT/fuji-fp-3000b-plus-3.png",
+    "file": "Packed/fuji-fp-3000b-plus-3.mlut",
+    "png": "HaldCLUT/fuji-fp-3000b-plus-3.png",
     "source": "HaldCLUT/Black-and-White/Fuji/Fuji FP-3000b 6 +++.png",
     "parent": "fuji-fp-3000b",
     "variant": "+3",
@@ -1836,7 +2034,8 @@
     "family": "instant",
     "iso": 3000,
     "description": "FP-3000B with harder contrast and deeper blacks.",
-    "file": "HaldCLUT/fuji-fp-3000b-high-contrast.png",
+    "file": "Packed/fuji-fp-3000b-high-contrast.mlut",
+    "png": "HaldCLUT/fuji-fp-3000b-high-contrast.png",
     "source": "HaldCLUT/Black-and-White/Fuji/Fuji FP-3000b HC.png",
     "parent": "fuji-fp-3000b",
     "variant": "High contrast",
@@ -1849,7 +2048,8 @@
     "family": "instant",
     "iso": 3000,
     "description": "Peel-apart negative in black and white, with soft, hazy grays.",
-    "file": "HaldCLUT/fuji-fp-3000b-negative.png",
+    "file": "Packed/fuji-fp-3000b-negative.mlut",
+    "png": "HaldCLUT/fuji-fp-3000b-negative.png",
     "source": "HaldCLUT/Black-and-White/Fuji/Fuji FP-3000b Negative 3.png",
     "monochrome": true
   },
@@ -1860,7 +2060,8 @@
     "family": "instant",
     "iso": 3000,
     "description": "FP-3000B Negative rendered two stops darker, with dense shadows.",
-    "file": "HaldCLUT/fuji-fp-3000b-negative-minus-2.png",
+    "file": "Packed/fuji-fp-3000b-negative-minus-2.mlut",
+    "png": "HaldCLUT/fuji-fp-3000b-negative-minus-2.png",
     "source": "HaldCLUT/Black-and-White/Fuji/Fuji FP-3000b Negative 1 --.png",
     "parent": "fuji-fp-3000b-negative",
     "variant": "−2",
@@ -1873,7 +2074,8 @@
     "family": "instant",
     "iso": 3000,
     "description": "FP-3000B Negative rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/fuji-fp-3000b-negative-minus-1.png",
+    "file": "Packed/fuji-fp-3000b-negative-minus-1.mlut",
+    "png": "HaldCLUT/fuji-fp-3000b-negative-minus-1.png",
     "source": "HaldCLUT/Black-and-White/Fuji/Fuji FP-3000b Negative 2 -.png",
     "parent": "fuji-fp-3000b-negative",
     "variant": "−1",
@@ -1886,7 +2088,8 @@
     "family": "instant",
     "iso": 3000,
     "description": "FP-3000B Negative rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/fuji-fp-3000b-negative-plus-1.png",
+    "file": "Packed/fuji-fp-3000b-negative-plus-1.mlut",
+    "png": "HaldCLUT/fuji-fp-3000b-negative-plus-1.png",
     "source": "HaldCLUT/Black-and-White/Fuji/Fuji FP-3000b Negative 4 +.png",
     "parent": "fuji-fp-3000b-negative",
     "variant": "+1",
@@ -1899,7 +2102,8 @@
     "family": "instant",
     "iso": 3000,
     "description": "FP-3000B Negative rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/fuji-fp-3000b-negative-plus-2.png",
+    "file": "Packed/fuji-fp-3000b-negative-plus-2.mlut",
+    "png": "HaldCLUT/fuji-fp-3000b-negative-plus-2.png",
     "source": "HaldCLUT/Black-and-White/Fuji/Fuji FP-3000b Negative 5 ++.png",
     "parent": "fuji-fp-3000b-negative",
     "variant": "+2",
@@ -1912,7 +2116,8 @@
     "family": "instant",
     "iso": 3000,
     "description": "FP-3000B Negative rendered three stops brighter, with washed, glowing highlights.",
-    "file": "HaldCLUT/fuji-fp-3000b-negative-plus-3.png",
+    "file": "Packed/fuji-fp-3000b-negative-plus-3.mlut",
+    "png": "HaldCLUT/fuji-fp-3000b-negative-plus-3.png",
     "source": "HaldCLUT/Black-and-White/Fuji/Fuji FP-3000b Negative 6 +++.png",
     "parent": "fuji-fp-3000b-negative",
     "variant": "+3",
@@ -1925,7 +2130,8 @@
     "family": "instant",
     "iso": 3000,
     "description": "An earlier-era look for FP-3000B Negative, with softer tonality.",
-    "file": "HaldCLUT/fuji-fp-3000b-negative-early.png",
+    "file": "Packed/fuji-fp-3000b-negative-early.mlut",
+    "png": "HaldCLUT/fuji-fp-3000b-negative-early.png",
     "source": "HaldCLUT/Black-and-White/Fuji/Fuji FP-3000b Negative Early.png",
     "parent": "fuji-fp-3000b-negative",
     "variant": "Early",
@@ -1938,7 +2144,8 @@
     "family": "instant",
     "iso": 100,
     "description": "Classic black-and-white instant with soft, slightly warm grays.",
-    "file": "HaldCLUT/polaroid-664.png",
+    "file": "Packed/polaroid-664.mlut",
+    "png": "HaldCLUT/polaroid-664.png",
     "source": "HaldCLUT/Black-and-White/Polaroid/Polaroid 664.png",
     "monochrome": true
   },
@@ -1949,7 +2156,8 @@
     "family": "instant",
     "iso": 80,
     "description": "Black-and-white instant print with fine, rich tones.",
-    "file": "HaldCLUT/polaroid-665.png",
+    "file": "Packed/polaroid-665.mlut",
+    "png": "HaldCLUT/polaroid-665.png",
     "source": "HaldCLUT/Black-and-White/Polaroid/Polaroid 665 3.png",
     "monochrome": true
   },
@@ -1960,7 +2168,8 @@
     "family": "instant",
     "iso": 80,
     "description": "665 rendered two stops darker, with dense shadows.",
-    "file": "HaldCLUT/polaroid-665-minus-2.png",
+    "file": "Packed/polaroid-665-minus-2.mlut",
+    "png": "HaldCLUT/polaroid-665-minus-2.png",
     "source": "HaldCLUT/Black-and-White/Polaroid/Polaroid 665 1 --.png",
     "parent": "polaroid-665",
     "variant": "−2",
@@ -1973,7 +2182,8 @@
     "family": "instant",
     "iso": 80,
     "description": "665 rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/polaroid-665-minus-1.png",
+    "file": "Packed/polaroid-665-minus-1.mlut",
+    "png": "HaldCLUT/polaroid-665-minus-1.png",
     "source": "HaldCLUT/Black-and-White/Polaroid/Polaroid 665 2 -.png",
     "parent": "polaroid-665",
     "variant": "−1",
@@ -1986,7 +2196,8 @@
     "family": "instant",
     "iso": 80,
     "description": "665 rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/polaroid-665-plus-1.png",
+    "file": "Packed/polaroid-665-plus-1.mlut",
+    "png": "HaldCLUT/polaroid-665-plus-1.png",
     "source": "HaldCLUT/Black-and-White/Polaroid/Polaroid 665 4 +.png",
     "parent": "polaroid-665",
     "variant": "+1",
@@ -1999,7 +2210,8 @@
     "family": "instant",
     "iso": 80,
     "description": "665 rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/polaroid-665-plus-2.png",
+    "file": "Packed/polaroid-665-plus-2.mlut",
+    "png": "HaldCLUT/polaroid-665-plus-2.png",
     "source": "HaldCLUT/Black-and-White/Polaroid/Polaroid 665 5 ++.png",
     "parent": "polaroid-665",
     "variant": "+2",
@@ -2012,7 +2224,8 @@
     "family": "instant",
     "iso": 80,
     "description": "Peel-apart negative in black and white, with deep shadows and a long tonal scale.",
-    "file": "HaldCLUT/polaroid-665-negative.png",
+    "file": "Packed/polaroid-665-negative.mlut",
+    "png": "HaldCLUT/polaroid-665-negative.png",
     "source": "HaldCLUT/Black-and-White/Polaroid/Polaroid 665 Negative 2.png",
     "monochrome": true
   },
@@ -2023,7 +2236,8 @@
     "family": "instant",
     "iso": 80,
     "description": "665 Negative rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/polaroid-665-negative-minus-1.png",
+    "file": "Packed/polaroid-665-negative-minus-1.mlut",
+    "png": "HaldCLUT/polaroid-665-negative-minus-1.png",
     "source": "HaldCLUT/Black-and-White/Polaroid/Polaroid 665 Negative 1 -.png",
     "parent": "polaroid-665-negative",
     "variant": "−1",
@@ -2036,7 +2250,8 @@
     "family": "instant",
     "iso": 80,
     "description": "665 Negative rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/polaroid-665-negative-plus-1.png",
+    "file": "Packed/polaroid-665-negative-plus-1.mlut",
+    "png": "HaldCLUT/polaroid-665-negative-plus-1.png",
     "source": "HaldCLUT/Black-and-White/Polaroid/Polaroid 665 Negative 3 +.png",
     "parent": "polaroid-665-negative",
     "variant": "+1",
@@ -2049,7 +2264,8 @@
     "family": "instant",
     "iso": 80,
     "description": "665 Negative with harder contrast and deeper blacks.",
-    "file": "HaldCLUT/polaroid-665-negative-high-contrast.png",
+    "file": "Packed/polaroid-665-negative-high-contrast.mlut",
+    "png": "HaldCLUT/polaroid-665-negative-high-contrast.png",
     "source": "HaldCLUT/Black-and-White/Polaroid/Polaroid 665 Negative HC.png",
     "parent": "polaroid-665-negative",
     "variant": "High contrast",
@@ -2062,9 +2278,11 @@
     "family": "instant",
     "iso": 3000,
     "description": "High-speed black-and-white instant with strong contrast.",
-    "file": "HaldCLUT/polaroid-667.png",
+    "file": "Packed/polaroid-667.mlut",
+    "png": "HaldCLUT/polaroid-667.png",
     "source": "HaldCLUT/Black-and-White/Polaroid/Polaroid 667.png",
-    "monochrome": true
+    "monochrome": true,
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 0.1, "rows": [[1, 0.5, null], [10, 1.3, null], [100, 2.4, null]], "source": "https://juneleung.github.io/filmdoc/polaroid/667fds.pdf"}
   },
   {
     "id": "polaroid-669",
@@ -2073,8 +2291,10 @@
     "family": "instant",
     "iso": "80",
     "description": "Classic peel-apart instant with a gentle cool tint.",
-    "file": "HaldCLUT/polaroid-669.png",
-    "source": "HaldCLUT/Color/Polaroid/Polaroid 669 3.png"
+    "file": "Packed/polaroid-669.mlut",
+    "png": "HaldCLUT/polaroid-669.png",
+    "source": "HaldCLUT/Color/Polaroid/Polaroid 669 3.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 0.0083, "rows": [[0.125, 0.68, {"r": 0.0, "g": 0.997, "b": 0.997}], [0.25, 1.0, {"r": 0.0, "g": 0.997, "b": 1.329}], [1, 1.68, {"r": 0.0, "g": 1.329, "b": 1.661}], [10, 3.0, {"r": 0.0, "g": 1.993, "b": 2.325}]], "highIntensity": [[0.000333, 0.32], [0.001, 0]], "source": "https://juneleung.github.io/filmdoc/polaroid/88fds.pdf"}
   },
   {
     "id": "polaroid-669-minus-2",
@@ -2083,7 +2303,8 @@
     "family": "instant",
     "iso": 80,
     "description": "669 rendered two stops darker, with dense shadows.",
-    "file": "HaldCLUT/polaroid-669-minus-2.png",
+    "file": "Packed/polaroid-669-minus-2.mlut",
+    "png": "HaldCLUT/polaroid-669-minus-2.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid 669 1 --.png",
     "parent": "polaroid-669",
     "variant": "−2"
@@ -2095,7 +2316,8 @@
     "family": "instant",
     "iso": 80,
     "description": "669 rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/polaroid-669-minus-1.png",
+    "file": "Packed/polaroid-669-minus-1.mlut",
+    "png": "HaldCLUT/polaroid-669-minus-1.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid 669 2 -.png",
     "parent": "polaroid-669",
     "variant": "−1"
@@ -2107,7 +2329,8 @@
     "family": "instant",
     "iso": 80,
     "description": "669 rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/polaroid-669-plus-1.png",
+    "file": "Packed/polaroid-669-plus-1.mlut",
+    "png": "HaldCLUT/polaroid-669-plus-1.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid 669 4 +.png",
     "parent": "polaroid-669",
     "variant": "+1"
@@ -2119,7 +2342,8 @@
     "family": "instant",
     "iso": 80,
     "description": "669 rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/polaroid-669-plus-2.png",
+    "file": "Packed/polaroid-669-plus-2.mlut",
+    "png": "HaldCLUT/polaroid-669-plus-2.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid 669 5 ++.png",
     "parent": "polaroid-669",
     "variant": "+2"
@@ -2131,7 +2355,8 @@
     "family": "instant",
     "iso": 80,
     "description": "669 rendered three stops brighter, with washed, glowing highlights.",
-    "file": "HaldCLUT/polaroid-669-plus-3.png",
+    "file": "Packed/polaroid-669-plus-3.mlut",
+    "png": "HaldCLUT/polaroid-669-plus-3.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid 669 6 +++.png",
     "parent": "polaroid-669",
     "variant": "+3"
@@ -2143,7 +2368,8 @@
     "family": "instant",
     "iso": 80,
     "description": "The cold-toned 669 rendered two stops darker, with dense shadows.",
-    "file": "HaldCLUT/polaroid-669-cold-minus-2.png",
+    "file": "Packed/polaroid-669-cold-minus-2.mlut",
+    "png": "HaldCLUT/polaroid-669-cold-minus-2.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid 669 Cold 1 --.png",
     "parent": "polaroid-669",
     "variant": "Cold −2"
@@ -2155,7 +2381,8 @@
     "family": "instant",
     "iso": 80,
     "description": "The cold-toned 669 rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/polaroid-669-cold-minus-1.png",
+    "file": "Packed/polaroid-669-cold-minus-1.mlut",
+    "png": "HaldCLUT/polaroid-669-cold-minus-1.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid 669 Cold 2 -.png",
     "parent": "polaroid-669",
     "variant": "Cold −1"
@@ -2167,7 +2394,8 @@
     "family": "instant",
     "iso": 80,
     "description": "The cold-toned version of 669, with bluer whites.",
-    "file": "HaldCLUT/polaroid-669-cold.png",
+    "file": "Packed/polaroid-669-cold.mlut",
+    "png": "HaldCLUT/polaroid-669-cold.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid 669 Cold 3.png",
     "parent": "polaroid-669",
     "variant": "Cold"
@@ -2179,7 +2407,8 @@
     "family": "instant",
     "iso": 80,
     "description": "The cold-toned 669 rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/polaroid-669-cold-plus-1.png",
+    "file": "Packed/polaroid-669-cold-plus-1.mlut",
+    "png": "HaldCLUT/polaroid-669-cold-plus-1.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid 669 Cold 4 +.png",
     "parent": "polaroid-669",
     "variant": "Cold +1"
@@ -2191,7 +2420,8 @@
     "family": "instant",
     "iso": 3000,
     "description": "Fast, contrasty black-and-white instant with deep blacks.",
-    "file": "HaldCLUT/polaroid-672.png",
+    "file": "Packed/polaroid-672.mlut",
+    "png": "HaldCLUT/polaroid-672.png",
     "source": "HaldCLUT/Black-and-White/Polaroid/Polaroid 672.png",
     "monochrome": true
   },
@@ -2202,7 +2432,8 @@
     "family": "instant",
     "iso": "80",
     "description": "Faded, slightly warm instant print with lifted blacks.",
-    "file": "HaldCLUT/polaroid-690.png",
+    "file": "Packed/polaroid-690.mlut",
+    "png": "HaldCLUT/polaroid-690.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid 690 3.png"
   },
   {
@@ -2212,7 +2443,8 @@
     "family": "instant",
     "iso": 80,
     "description": "690 rendered two stops darker, with dense shadows.",
-    "file": "HaldCLUT/polaroid-690-minus-2.png",
+    "file": "Packed/polaroid-690-minus-2.mlut",
+    "png": "HaldCLUT/polaroid-690-minus-2.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid 690 1 --.png",
     "parent": "polaroid-690",
     "variant": "−2"
@@ -2224,7 +2456,8 @@
     "family": "instant",
     "iso": 80,
     "description": "690 rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/polaroid-690-minus-1.png",
+    "file": "Packed/polaroid-690-minus-1.mlut",
+    "png": "HaldCLUT/polaroid-690-minus-1.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid 690 2 -.png",
     "parent": "polaroid-690",
     "variant": "−1"
@@ -2236,7 +2469,8 @@
     "family": "instant",
     "iso": 80,
     "description": "690 rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/polaroid-690-plus-1.png",
+    "file": "Packed/polaroid-690-plus-1.mlut",
+    "png": "HaldCLUT/polaroid-690-plus-1.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid 690 4 +.png",
     "parent": "polaroid-690",
     "variant": "+1"
@@ -2248,7 +2482,8 @@
     "family": "instant",
     "iso": 80,
     "description": "690 rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/polaroid-690-plus-2.png",
+    "file": "Packed/polaroid-690-plus-2.mlut",
+    "png": "HaldCLUT/polaroid-690-plus-2.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid 690 5 ++.png",
     "parent": "polaroid-690",
     "variant": "+2"
@@ -2260,7 +2495,8 @@
     "family": "instant",
     "iso": 80,
     "description": "The cold-toned 690 rendered two stops darker, with dense shadows.",
-    "file": "HaldCLUT/polaroid-690-cold-minus-2.png",
+    "file": "Packed/polaroid-690-cold-minus-2.mlut",
+    "png": "HaldCLUT/polaroid-690-cold-minus-2.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid 690 Cold 1 --.png",
     "parent": "polaroid-690",
     "variant": "Cold −2"
@@ -2272,7 +2508,8 @@
     "family": "instant",
     "iso": 80,
     "description": "The cold-toned 690 rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/polaroid-690-cold-minus-1.png",
+    "file": "Packed/polaroid-690-cold-minus-1.mlut",
+    "png": "HaldCLUT/polaroid-690-cold-minus-1.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid 690 Cold 2 -.png",
     "parent": "polaroid-690",
     "variant": "Cold −1"
@@ -2284,7 +2521,8 @@
     "family": "instant",
     "iso": 80,
     "description": "The cold-toned version of 690, with bluer whites.",
-    "file": "HaldCLUT/polaroid-690-cold.png",
+    "file": "Packed/polaroid-690-cold.mlut",
+    "png": "HaldCLUT/polaroid-690-cold.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid 690 Cold 3.png",
     "parent": "polaroid-690",
     "variant": "Cold"
@@ -2296,7 +2534,8 @@
     "family": "instant",
     "iso": 80,
     "description": "The cold-toned 690 rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/polaroid-690-cold-plus-1.png",
+    "file": "Packed/polaroid-690-cold-plus-1.mlut",
+    "png": "HaldCLUT/polaroid-690-cold-plus-1.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid 690 Cold 4 +.png",
     "parent": "polaroid-690",
     "variant": "Cold +1"
@@ -2308,7 +2547,8 @@
     "family": "instant",
     "iso": 80,
     "description": "The cold-toned 690 rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/polaroid-690-cold-plus-2.png",
+    "file": "Packed/polaroid-690-cold-plus-2.mlut",
+    "png": "HaldCLUT/polaroid-690-cold-plus-2.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid 690 Cold 5 ++.png",
     "parent": "polaroid-690",
     "variant": "Cold +2"
@@ -2320,7 +2560,8 @@
     "family": "instant",
     "iso": 80,
     "description": "The warm-toned 690 rendered two stops darker, with dense shadows.",
-    "file": "HaldCLUT/polaroid-690-warm-minus-2.png",
+    "file": "Packed/polaroid-690-warm-minus-2.mlut",
+    "png": "HaldCLUT/polaroid-690-warm-minus-2.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid 690 Warm 1 --.png",
     "parent": "polaroid-690",
     "variant": "Warm −2"
@@ -2332,7 +2573,8 @@
     "family": "instant",
     "iso": 80,
     "description": "The warm-toned 690 rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/polaroid-690-warm-minus-1.png",
+    "file": "Packed/polaroid-690-warm-minus-1.mlut",
+    "png": "HaldCLUT/polaroid-690-warm-minus-1.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid 690 Warm 2 -.png",
     "parent": "polaroid-690",
     "variant": "Warm −1"
@@ -2344,7 +2586,8 @@
     "family": "instant",
     "iso": 80,
     "description": "The warm-toned version of 690, with golden whites.",
-    "file": "HaldCLUT/polaroid-690-warm.png",
+    "file": "Packed/polaroid-690-warm.mlut",
+    "png": "HaldCLUT/polaroid-690-warm.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid 690 Warm 3.png",
     "parent": "polaroid-690",
     "variant": "Warm"
@@ -2356,7 +2599,8 @@
     "family": "instant",
     "iso": 80,
     "description": "The warm-toned 690 rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/polaroid-690-warm-plus-1.png",
+    "file": "Packed/polaroid-690-warm-plus-1.mlut",
+    "png": "HaldCLUT/polaroid-690-warm-plus-1.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid 690 Warm 4 +.png",
     "parent": "polaroid-690",
     "variant": "Warm +1"
@@ -2368,7 +2612,8 @@
     "family": "instant",
     "iso": 80,
     "description": "The warm-toned 690 rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/polaroid-690-warm-plus-2.png",
+    "file": "Packed/polaroid-690-warm-plus-2.mlut",
+    "png": "HaldCLUT/polaroid-690-warm-plus-2.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid 690 Warm 5 ++.png",
     "parent": "polaroid-690",
     "variant": "Warm +2"
@@ -2380,7 +2625,8 @@
     "family": "instant",
     "iso": 40,
     "description": "Instant slide with a soft, pastel palette and muted contrast.",
-    "file": "HaldCLUT/polaroid-polachrome.png",
+    "file": "Packed/polaroid-polachrome.mlut",
+    "png": "HaldCLUT/polaroid-polachrome.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid Polachrome.png"
   },
   {
@@ -2390,7 +2636,8 @@
     "family": "instant",
     "iso": 100,
     "description": "Warm instant color with soft contrast and a gentle golden cast.",
-    "file": "HaldCLUT/polaroid-px-100uv-plus.png",
+    "file": "Packed/polaroid-px-100uv-plus.mlut",
+    "png": "HaldCLUT/polaroid-px-100uv-plus.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-100UV+ Warm 3.png"
   },
   {
@@ -2400,7 +2647,8 @@
     "family": "instant",
     "iso": 100,
     "description": "PX-100UV+ rendered two stops darker, with dense shadows.",
-    "file": "HaldCLUT/polaroid-px-100uv-plus-minus-2.png",
+    "file": "Packed/polaroid-px-100uv-plus-minus-2.mlut",
+    "png": "HaldCLUT/polaroid-px-100uv-plus-minus-2.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-100UV+ Warm 1 --.png",
     "parent": "polaroid-px-100uv-plus",
     "variant": "−2"
@@ -2412,7 +2660,8 @@
     "family": "instant",
     "iso": 100,
     "description": "PX-100UV+ rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/polaroid-px-100uv-plus-minus-1.png",
+    "file": "Packed/polaroid-px-100uv-plus-minus-1.mlut",
+    "png": "HaldCLUT/polaroid-px-100uv-plus-minus-1.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-100UV+ Warm 2 -.png",
     "parent": "polaroid-px-100uv-plus",
     "variant": "−1"
@@ -2424,7 +2673,8 @@
     "family": "instant",
     "iso": 100,
     "description": "PX-100UV+ rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/polaroid-px-100uv-plus-plus-1.png",
+    "file": "Packed/polaroid-px-100uv-plus-plus-1.mlut",
+    "png": "HaldCLUT/polaroid-px-100uv-plus-plus-1.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-100UV+ Warm 4 +.png",
     "parent": "polaroid-px-100uv-plus",
     "variant": "+1"
@@ -2436,7 +2686,8 @@
     "family": "instant",
     "iso": 100,
     "description": "PX-100UV+ rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/polaroid-px-100uv-plus-plus-2.png",
+    "file": "Packed/polaroid-px-100uv-plus-plus-2.mlut",
+    "png": "HaldCLUT/polaroid-px-100uv-plus-plus-2.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-100UV+ Warm 5 ++.png",
     "parent": "polaroid-px-100uv-plus",
     "variant": "+2"
@@ -2448,7 +2699,8 @@
     "family": "instant",
     "iso": 100,
     "description": "PX-100UV+ rendered three stops brighter, with washed, glowing highlights.",
-    "file": "HaldCLUT/polaroid-px-100uv-plus-plus-3.png",
+    "file": "Packed/polaroid-px-100uv-plus-plus-3.mlut",
+    "png": "HaldCLUT/polaroid-px-100uv-plus-plus-3.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-100UV+ Warm 6 +++.png",
     "parent": "polaroid-px-100uv-plus",
     "variant": "+3"
@@ -2460,7 +2712,8 @@
     "family": "instant",
     "iso": 100,
     "description": "The cold-toned PX-100UV+ rendered two stops darker, with dense shadows.",
-    "file": "HaldCLUT/polaroid-px-100uv-plus-cold-minus-2.png",
+    "file": "Packed/polaroid-px-100uv-plus-cold-minus-2.mlut",
+    "png": "HaldCLUT/polaroid-px-100uv-plus-cold-minus-2.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-100UV+ Cold 1 --.png",
     "parent": "polaroid-px-100uv-plus",
     "variant": "Cold −2"
@@ -2472,7 +2725,8 @@
     "family": "instant",
     "iso": 100,
     "description": "The cold-toned PX-100UV+ rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/polaroid-px-100uv-plus-cold-minus-1.png",
+    "file": "Packed/polaroid-px-100uv-plus-cold-minus-1.mlut",
+    "png": "HaldCLUT/polaroid-px-100uv-plus-cold-minus-1.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-100UV+ Cold 2 -.png",
     "parent": "polaroid-px-100uv-plus",
     "variant": "Cold −1"
@@ -2484,7 +2738,8 @@
     "family": "instant",
     "iso": 100,
     "description": "The cold-toned version of PX-100UV+, with bluer whites.",
-    "file": "HaldCLUT/polaroid-px-100uv-plus-cold.png",
+    "file": "Packed/polaroid-px-100uv-plus-cold.mlut",
+    "png": "HaldCLUT/polaroid-px-100uv-plus-cold.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-100UV+ Cold 3.png",
     "parent": "polaroid-px-100uv-plus",
     "variant": "Cold"
@@ -2496,7 +2751,8 @@
     "family": "instant",
     "iso": 100,
     "description": "The cold-toned PX-100UV+ rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/polaroid-px-100uv-plus-cold-plus-1.png",
+    "file": "Packed/polaroid-px-100uv-plus-cold-plus-1.mlut",
+    "png": "HaldCLUT/polaroid-px-100uv-plus-cold-plus-1.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-100UV+ Cold 4 +.png",
     "parent": "polaroid-px-100uv-plus",
     "variant": "Cold +1"
@@ -2508,7 +2764,8 @@
     "family": "instant",
     "iso": 100,
     "description": "The cold-toned PX-100UV+ rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/polaroid-px-100uv-plus-cold-plus-2.png",
+    "file": "Packed/polaroid-px-100uv-plus-cold-plus-2.mlut",
+    "png": "HaldCLUT/polaroid-px-100uv-plus-cold-plus-2.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-100UV+ Cold 5 ++.png",
     "parent": "polaroid-px-100uv-plus",
     "variant": "Cold +2"
@@ -2520,7 +2777,8 @@
     "family": "instant",
     "iso": 100,
     "description": "The cold-toned PX-100UV+ rendered three stops brighter, with washed, glowing highlights.",
-    "file": "HaldCLUT/polaroid-px-100uv-plus-cold-plus-3.png",
+    "file": "Packed/polaroid-px-100uv-plus-cold-plus-3.mlut",
+    "png": "HaldCLUT/polaroid-px-100uv-plus-cold-plus-3.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-100UV+ Cold 6 +++.png",
     "parent": "polaroid-px-100uv-plus",
     "variant": "Cold +3"
@@ -2532,7 +2790,8 @@
     "family": "instant",
     "iso": "600",
     "description": "Bold instant color with warm, contrasty shadows.",
-    "file": "HaldCLUT/polaroid-px-680.png",
+    "file": "Packed/polaroid-px-680.mlut",
+    "png": "HaldCLUT/polaroid-px-680.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 3.png"
   },
   {
@@ -2542,7 +2801,8 @@
     "family": "instant",
     "iso": 600,
     "description": "PX-680 rendered two stops darker, with dense shadows.",
-    "file": "HaldCLUT/polaroid-px-680-minus-2.png",
+    "file": "Packed/polaroid-px-680-minus-2.mlut",
+    "png": "HaldCLUT/polaroid-px-680-minus-2.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 1 --.png",
     "parent": "polaroid-px-680",
     "variant": "−2"
@@ -2554,7 +2814,8 @@
     "family": "instant",
     "iso": 600,
     "description": "PX-680 rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/polaroid-px-680-minus-1.png",
+    "file": "Packed/polaroid-px-680-minus-1.mlut",
+    "png": "HaldCLUT/polaroid-px-680-minus-1.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 2 -.png",
     "parent": "polaroid-px-680",
     "variant": "−1"
@@ -2566,7 +2827,8 @@
     "family": "instant",
     "iso": 600,
     "description": "PX-680 rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/polaroid-px-680-plus-1.png",
+    "file": "Packed/polaroid-px-680-plus-1.mlut",
+    "png": "HaldCLUT/polaroid-px-680-plus-1.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 4 +.png",
     "parent": "polaroid-px-680",
     "variant": "+1"
@@ -2578,7 +2840,8 @@
     "family": "instant",
     "iso": 600,
     "description": "PX-680 rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/polaroid-px-680-plus-2.png",
+    "file": "Packed/polaroid-px-680-plus-2.mlut",
+    "png": "HaldCLUT/polaroid-px-680-plus-2.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 5 ++.png",
     "parent": "polaroid-px-680",
     "variant": "+2"
@@ -2590,7 +2853,8 @@
     "family": "instant",
     "iso": 600,
     "description": "The cold-toned PX-680 rendered two stops darker, with dense shadows.",
-    "file": "HaldCLUT/polaroid-px-680-cold-minus-2.png",
+    "file": "Packed/polaroid-px-680-cold-minus-2.mlut",
+    "png": "HaldCLUT/polaroid-px-680-cold-minus-2.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 Cold 1 --.png",
     "parent": "polaroid-px-680",
     "variant": "Cold −2"
@@ -2602,7 +2866,8 @@
     "family": "instant",
     "iso": 600,
     "description": "The cold-toned PX-680 rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/polaroid-px-680-cold-minus-1.png",
+    "file": "Packed/polaroid-px-680-cold-minus-1.mlut",
+    "png": "HaldCLUT/polaroid-px-680-cold-minus-1.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 Cold 2 -.png",
     "parent": "polaroid-px-680",
     "variant": "Cold −1"
@@ -2614,7 +2879,8 @@
     "family": "instant",
     "iso": 600,
     "description": "The cold-toned version of PX-680, with bluer whites.",
-    "file": "HaldCLUT/polaroid-px-680-cold.png",
+    "file": "Packed/polaroid-px-680-cold.mlut",
+    "png": "HaldCLUT/polaroid-px-680-cold.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 Cold 3.png",
     "parent": "polaroid-px-680",
     "variant": "Cold"
@@ -2626,7 +2892,8 @@
     "family": "instant",
     "iso": 600,
     "description": "The cold-toned PX-680 rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/polaroid-px-680-cold-plus-1.png",
+    "file": "Packed/polaroid-px-680-cold-plus-1.mlut",
+    "png": "HaldCLUT/polaroid-px-680-cold-plus-1.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 Cold 4 +.png",
     "parent": "polaroid-px-680",
     "variant": "Cold +1"
@@ -2638,7 +2905,8 @@
     "family": "instant",
     "iso": 600,
     "description": "The cold-toned PX-680 rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/polaroid-px-680-cold-plus-2.png",
+    "file": "Packed/polaroid-px-680-cold-plus-2.mlut",
+    "png": "HaldCLUT/polaroid-px-680-cold-plus-2.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 Cold 5 ++.png",
     "parent": "polaroid-px-680",
     "variant": "Cold +2"
@@ -2650,7 +2918,8 @@
     "family": "instant",
     "iso": 600,
     "description": "An alternate, cold-toned rendering of PX-680 with extra brightness.",
-    "file": "HaldCLUT/polaroid-px-680-cold-plus-2-alt.png",
+    "file": "Packed/polaroid-px-680-cold-plus-2-alt.mlut",
+    "png": "HaldCLUT/polaroid-px-680-cold-plus-2-alt.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 Cold 6 ++ Alt.png",
     "parent": "polaroid-px-680",
     "variant": "Cold +2 Alt"
@@ -2662,7 +2931,8 @@
     "family": "instant",
     "iso": 600,
     "description": "The warm-toned PX-680 rendered two stops darker, with dense shadows.",
-    "file": "HaldCLUT/polaroid-px-680-warm-minus-2.png",
+    "file": "Packed/polaroid-px-680-warm-minus-2.mlut",
+    "png": "HaldCLUT/polaroid-px-680-warm-minus-2.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 Warm 1 --.png",
     "parent": "polaroid-px-680",
     "variant": "Warm −2"
@@ -2674,7 +2944,8 @@
     "family": "instant",
     "iso": 600,
     "description": "The warm-toned PX-680 rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/polaroid-px-680-warm-minus-1.png",
+    "file": "Packed/polaroid-px-680-warm-minus-1.mlut",
+    "png": "HaldCLUT/polaroid-px-680-warm-minus-1.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 Warm 2 -.png",
     "parent": "polaroid-px-680",
     "variant": "Warm −1"
@@ -2686,7 +2957,8 @@
     "family": "instant",
     "iso": 600,
     "description": "The warm-toned version of PX-680, with golden whites.",
-    "file": "HaldCLUT/polaroid-px-680-warm.png",
+    "file": "Packed/polaroid-px-680-warm.mlut",
+    "png": "HaldCLUT/polaroid-px-680-warm.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 Warm 3.png",
     "parent": "polaroid-px-680",
     "variant": "Warm"
@@ -2698,7 +2970,8 @@
     "family": "instant",
     "iso": 600,
     "description": "The warm-toned PX-680 rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/polaroid-px-680-warm-plus-1.png",
+    "file": "Packed/polaroid-px-680-warm-plus-1.mlut",
+    "png": "HaldCLUT/polaroid-px-680-warm-plus-1.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 Warm 4 +.png",
     "parent": "polaroid-px-680",
     "variant": "Warm +1"
@@ -2710,7 +2983,8 @@
     "family": "instant",
     "iso": 600,
     "description": "The warm-toned PX-680 rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/polaroid-px-680-warm-plus-2.png",
+    "file": "Packed/polaroid-px-680-warm-plus-2.mlut",
+    "png": "HaldCLUT/polaroid-px-680-warm-plus-2.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-680 Warm 5 ++.png",
     "parent": "polaroid-px-680",
     "variant": "Warm +2"
@@ -2722,7 +2996,8 @@
     "family": "instant",
     "iso": "80",
     "description": "Dreamy, pastel instant color with a hazy glow.",
-    "file": "HaldCLUT/polaroid-px-70.png",
+    "file": "Packed/polaroid-px-70.mlut",
+    "png": "HaldCLUT/polaroid-px-70.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 3.png"
   },
   {
@@ -2732,7 +3007,8 @@
     "family": "instant",
     "iso": 80,
     "description": "PX-70 rendered two stops darker, with dense shadows.",
-    "file": "HaldCLUT/polaroid-px-70-minus-2.png",
+    "file": "Packed/polaroid-px-70-minus-2.mlut",
+    "png": "HaldCLUT/polaroid-px-70-minus-2.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 1 --.png",
     "parent": "polaroid-px-70",
     "variant": "−2"
@@ -2744,7 +3020,8 @@
     "family": "instant",
     "iso": 80,
     "description": "PX-70 rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/polaroid-px-70-minus-1.png",
+    "file": "Packed/polaroid-px-70-minus-1.mlut",
+    "png": "HaldCLUT/polaroid-px-70-minus-1.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 2 -.png",
     "parent": "polaroid-px-70",
     "variant": "−1"
@@ -2756,7 +3033,8 @@
     "family": "instant",
     "iso": 80,
     "description": "PX-70 rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/polaroid-px-70-plus-1.png",
+    "file": "Packed/polaroid-px-70-plus-1.mlut",
+    "png": "HaldCLUT/polaroid-px-70-plus-1.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 4 +.png",
     "parent": "polaroid-px-70",
     "variant": "+1"
@@ -2768,7 +3046,8 @@
     "family": "instant",
     "iso": 80,
     "description": "PX-70 rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/polaroid-px-70-plus-2.png",
+    "file": "Packed/polaroid-px-70-plus-2.mlut",
+    "png": "HaldCLUT/polaroid-px-70-plus-2.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 5 ++.png",
     "parent": "polaroid-px-70",
     "variant": "+2"
@@ -2780,7 +3059,8 @@
     "family": "instant",
     "iso": 80,
     "description": "PX-70 rendered three stops brighter, with washed, glowing highlights.",
-    "file": "HaldCLUT/polaroid-px-70-plus-3.png",
+    "file": "Packed/polaroid-px-70-plus-3.mlut",
+    "png": "HaldCLUT/polaroid-px-70-plus-3.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 6 +++.png",
     "parent": "polaroid-px-70",
     "variant": "+3"
@@ -2792,7 +3072,8 @@
     "family": "instant",
     "iso": 80,
     "description": "The cold-toned PX-70 rendered two stops darker, with dense shadows.",
-    "file": "HaldCLUT/polaroid-px-70-cold-minus-2.png",
+    "file": "Packed/polaroid-px-70-cold-minus-2.mlut",
+    "png": "HaldCLUT/polaroid-px-70-cold-minus-2.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 Cold 1 --.png",
     "parent": "polaroid-px-70",
     "variant": "Cold −2"
@@ -2804,7 +3085,8 @@
     "family": "instant",
     "iso": 80,
     "description": "The cold-toned PX-70 rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/polaroid-px-70-cold-minus-1.png",
+    "file": "Packed/polaroid-px-70-cold-minus-1.mlut",
+    "png": "HaldCLUT/polaroid-px-70-cold-minus-1.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 Cold 2 -.png",
     "parent": "polaroid-px-70",
     "variant": "Cold −1"
@@ -2816,7 +3098,8 @@
     "family": "instant",
     "iso": 80,
     "description": "The cold-toned version of PX-70, with bluer whites.",
-    "file": "HaldCLUT/polaroid-px-70-cold.png",
+    "file": "Packed/polaroid-px-70-cold.mlut",
+    "png": "HaldCLUT/polaroid-px-70-cold.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 Cold 3.png",
     "parent": "polaroid-px-70",
     "variant": "Cold"
@@ -2828,7 +3111,8 @@
     "family": "instant",
     "iso": 80,
     "description": "The cold-toned PX-70 rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/polaroid-px-70-cold-plus-1.png",
+    "file": "Packed/polaroid-px-70-cold-plus-1.mlut",
+    "png": "HaldCLUT/polaroid-px-70-cold-plus-1.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 Cold 4 +.png",
     "parent": "polaroid-px-70",
     "variant": "Cold +1"
@@ -2840,7 +3124,8 @@
     "family": "instant",
     "iso": 80,
     "description": "The cold-toned PX-70 rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/polaroid-px-70-cold-plus-2.png",
+    "file": "Packed/polaroid-px-70-cold-plus-2.mlut",
+    "png": "HaldCLUT/polaroid-px-70-cold-plus-2.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 Cold 5 ++.png",
     "parent": "polaroid-px-70",
     "variant": "Cold +2"
@@ -2852,7 +3137,8 @@
     "family": "instant",
     "iso": 80,
     "description": "The warm-toned PX-70 rendered two stops darker, with dense shadows.",
-    "file": "HaldCLUT/polaroid-px-70-warm-minus-2.png",
+    "file": "Packed/polaroid-px-70-warm-minus-2.mlut",
+    "png": "HaldCLUT/polaroid-px-70-warm-minus-2.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 Warm 1 --.png",
     "parent": "polaroid-px-70",
     "variant": "Warm −2"
@@ -2864,7 +3150,8 @@
     "family": "instant",
     "iso": 80,
     "description": "The warm-toned PX-70 rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/polaroid-px-70-warm-minus-1.png",
+    "file": "Packed/polaroid-px-70-warm-minus-1.mlut",
+    "png": "HaldCLUT/polaroid-px-70-warm-minus-1.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 Warm 2 -.png",
     "parent": "polaroid-px-70",
     "variant": "Warm −1"
@@ -2876,7 +3163,8 @@
     "family": "instant",
     "iso": 80,
     "description": "The warm-toned version of PX-70, with golden whites.",
-    "file": "HaldCLUT/polaroid-px-70-warm.png",
+    "file": "Packed/polaroid-px-70-warm.mlut",
+    "png": "HaldCLUT/polaroid-px-70-warm.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 Warm 3.png",
     "parent": "polaroid-px-70",
     "variant": "Warm"
@@ -2888,7 +3176,8 @@
     "family": "instant",
     "iso": 80,
     "description": "The warm-toned PX-70 rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/polaroid-px-70-warm-plus-1.png",
+    "file": "Packed/polaroid-px-70-warm-plus-1.mlut",
+    "png": "HaldCLUT/polaroid-px-70-warm-plus-1.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 Warm 4 +.png",
     "parent": "polaroid-px-70",
     "variant": "Warm +1"
@@ -2900,7 +3189,8 @@
     "family": "instant",
     "iso": 80,
     "description": "The warm-toned PX-70 rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/polaroid-px-70-warm-plus-2.png",
+    "file": "Packed/polaroid-px-70-warm-plus-2.mlut",
+    "png": "HaldCLUT/polaroid-px-70-warm-plus-2.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid PX-70 Warm 5 ++.png",
     "parent": "polaroid-px-70",
     "variant": "Warm +2"
@@ -2912,7 +3202,8 @@
     "family": "instant",
     "iso": "80",
     "description": "Expired-film drift with muddy tones and color shifts.",
-    "file": "HaldCLUT/polaroid-time-zero-expired.png",
+    "file": "Packed/polaroid-time-zero-expired.mlut",
+    "png": "HaldCLUT/polaroid-time-zero-expired.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid Time Zero (Expired) 4.png"
   },
   {
@@ -2922,7 +3213,8 @@
     "family": "instant",
     "iso": 80,
     "description": "Time Zero Expired rendered three stops darker, with heavy shadows.",
-    "file": "HaldCLUT/polaroid-time-zero-expired-minus-3.png",
+    "file": "Packed/polaroid-time-zero-expired-minus-3.mlut",
+    "png": "HaldCLUT/polaroid-time-zero-expired-minus-3.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid Time Zero (Expired) 1 ---.png",
     "parent": "polaroid-time-zero-expired",
     "variant": "−3"
@@ -2934,7 +3226,8 @@
     "family": "instant",
     "iso": 80,
     "description": "Time Zero Expired rendered two stops darker, with dense shadows.",
-    "file": "HaldCLUT/polaroid-time-zero-expired-minus-2.png",
+    "file": "Packed/polaroid-time-zero-expired-minus-2.mlut",
+    "png": "HaldCLUT/polaroid-time-zero-expired-minus-2.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid Time Zero (Expired) 2 --.png",
     "parent": "polaroid-time-zero-expired",
     "variant": "−2"
@@ -2946,7 +3239,8 @@
     "family": "instant",
     "iso": 80,
     "description": "Time Zero Expired rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/polaroid-time-zero-expired-minus-1.png",
+    "file": "Packed/polaroid-time-zero-expired-minus-1.mlut",
+    "png": "HaldCLUT/polaroid-time-zero-expired-minus-1.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid Time Zero (Expired) 3 -.png",
     "parent": "polaroid-time-zero-expired",
     "variant": "−1"
@@ -2958,7 +3252,8 @@
     "family": "instant",
     "iso": 80,
     "description": "Time Zero Expired rendered a stop brighter, with airier highlights.",
-    "file": "HaldCLUT/polaroid-time-zero-expired-plus-1.png",
+    "file": "Packed/polaroid-time-zero-expired-plus-1.mlut",
+    "png": "HaldCLUT/polaroid-time-zero-expired-plus-1.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid Time Zero (Expired) 5 +.png",
     "parent": "polaroid-time-zero-expired",
     "variant": "+1"
@@ -2970,7 +3265,8 @@
     "family": "instant",
     "iso": 80,
     "description": "Time Zero Expired rendered two stops brighter, with bleached highlights.",
-    "file": "HaldCLUT/polaroid-time-zero-expired-plus-2.png",
+    "file": "Packed/polaroid-time-zero-expired-plus-2.mlut",
+    "png": "HaldCLUT/polaroid-time-zero-expired-plus-2.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid Time Zero (Expired) 6 ++.png",
     "parent": "polaroid-time-zero-expired",
     "variant": "+2"
@@ -2982,7 +3278,8 @@
     "family": "instant",
     "iso": 80,
     "description": "The cold-toned Time Zero Expired rendered three stops darker, with heavy shadows.",
-    "file": "HaldCLUT/polaroid-time-zero-expired-cold-minus-3.png",
+    "file": "Packed/polaroid-time-zero-expired-cold-minus-3.mlut",
+    "png": "HaldCLUT/polaroid-time-zero-expired-cold-minus-3.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid Time Zero (Expired) Cold 1 ---.png",
     "parent": "polaroid-time-zero-expired",
     "variant": "Cold −3"
@@ -2994,7 +3291,8 @@
     "family": "instant",
     "iso": 80,
     "description": "The cold-toned Time Zero Expired rendered two stops darker, with dense shadows.",
-    "file": "HaldCLUT/polaroid-time-zero-expired-cold-minus-2.png",
+    "file": "Packed/polaroid-time-zero-expired-cold-minus-2.mlut",
+    "png": "HaldCLUT/polaroid-time-zero-expired-cold-minus-2.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid Time Zero (Expired) Cold 2 --.png",
     "parent": "polaroid-time-zero-expired",
     "variant": "Cold −2"
@@ -3006,7 +3304,8 @@
     "family": "instant",
     "iso": 80,
     "description": "The cold-toned Time Zero Expired rendered a stop darker, with deeper shadows.",
-    "file": "HaldCLUT/polaroid-time-zero-expired-cold-minus-1.png",
+    "file": "Packed/polaroid-time-zero-expired-cold-minus-1.mlut",
+    "png": "HaldCLUT/polaroid-time-zero-expired-cold-minus-1.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid Time Zero (Expired) Cold 3 -.png",
     "parent": "polaroid-time-zero-expired",
     "variant": "Cold −1"
@@ -3018,9 +3317,59 @@
     "family": "instant",
     "iso": 80,
     "description": "The cold-toned version of Time Zero Expired, with bluer whites.",
-    "file": "HaldCLUT/polaroid-time-zero-expired-cold.png",
+    "file": "Packed/polaroid-time-zero-expired-cold.mlut",
+    "png": "HaldCLUT/polaroid-time-zero-expired-cold.png",
     "source": "HaldCLUT/Color/Polaroid/Polaroid Time Zero (Expired) Cold 4.png",
     "parent": "polaroid-time-zero-expired",
     "variant": "Cold"
+  },
+  {
+    "id": "vision3-500t",
+    "displayName": "500T Tungsten",
+    "brand": "Mira",
+    "family": "motionPicture",
+    "iso": 500,
+    "description": "Mira original inspired by tungsten cinema negative: soft contrast, teal shadows, warm highlights. Balanced for tungsten, so daylight runs cool until you warm it.",
+    "file": "procedural:vision3-500t",
+    "source": null,
+    "character": {
+      "grainStrength": 1.0,
+      "grainSize": 0.0005
+    },
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 1, "rows": [[10, 1.0, {"r": 0.0, "g": 0.332, "b": 0.332}]], "source": "https://www.kodak.com/content/products-brochures/motion-picture/KODAK-VISION3-500T-5219-7219-brochure.pdf"}
+  },
+  {
+    "id": "vision3-250d",
+    "displayName": "250D Daylight",
+    "brand": "Mira",
+    "family": "motionPicture",
+    "iso": 250,
+    "description": "Mira original inspired by daylight cinema negative: neutral balance, a touch more contrast, fine grain.",
+    "file": "procedural:vision3-250d",
+    "source": null,
+    "character": {
+      "grainStrength": 0.62,
+      "grainSize": 0.00038
+    }
+  },
+  {
+    "id": "cinema-print",
+    "displayName": "Cinema Print",
+    "brand": "Mira",
+    "family": "print",
+    "iso": 0,
+    "description": "Mira original inspired by cinema print film: deep contrast, dense cool blacks, rich hue-stable color.",
+    "file": "procedural:cinema-print",
+    "source": null
+  },
+  {
+    "id": "color-paper",
+    "displayName": "Color Paper",
+    "brand": "Mira",
+    "family": "print",
+    "iso": 0,
+    "description": "Mira original inspired by color photographic paper: clean whites, moderate contrast, gentle warmth.",
+    "file": "procedural:color-paper",
+    "source": null
   }
 ]
