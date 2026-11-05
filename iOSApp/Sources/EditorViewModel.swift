@@ -29,6 +29,9 @@ final class EditorViewModel {
     var panelHidden: [EditorTab: Bool] = [:]
     /// FILMS step: true while the applied stock's full options panel replaces the card strip.
     var filmsDetail = false
+    /// A library asset another screen (the camera's last-frame thumbnail) wants opened. The gallery picks it up and opens
+    /// it through its own path, so the open gets the same OPENING state, Photos backstop and failure card.
+    var pendingLibraryOpen: PHAsset?
 
     /// Single source of truth for every edit.
     var recipe: Recipe {

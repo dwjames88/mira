@@ -56,8 +56,7 @@ final class CameraSaveRoundTripTests: XCTestCase {
         XCTAssertEqual(loaded.recipe.grainAmount, recipe.grainAmount, accuracy: 1e-9)
         XCTAssertTrue(loaded.isRaw, "the frame reopens on its RAW")
 
-        let inputBox = await EditKit.requestEditingInput(asset: Unchecked(value: asset))
-        let input = try XCTUnwrap(inputBox?.value)
+        let input = try await EditingInputFetch.fetch(PhotoKitEditingInputRequester(asset: asset))
         let data = try XCTUnwrap(input.adjustmentData)
         XCTAssertEqual(data.formatIdentifier, MiraAdjustment.formatIdentifier)
         XCTAssertEqual(data.formatVersion, "4", "pipeline 2 recipes write format 4")

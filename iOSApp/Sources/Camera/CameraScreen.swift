@@ -57,7 +57,9 @@ struct CameraScreen: View {
             onOpenFrame: { [editor, onClose] id in
                 guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil).firstObject else { return }
                 onClose()
-                Task { await editor.openAsset(asset) }
+                // Through the gallery's open path (OPENING state, Photos backstop, failure card): a just-captured
+                // asset is exactly the case the backstop covers.
+                editor.pendingLibraryOpen = asset
             })
     }
 }

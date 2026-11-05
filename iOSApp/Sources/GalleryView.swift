@@ -50,6 +50,11 @@ struct GalleryView: View {
             }
         }
         .task { await gallery.start() }
+        .onChange(of: editor.pendingLibraryOpen) { _, asset in
+            guard let asset else { return }
+            editor.pendingLibraryOpen = nil
+            Task { await gallery.open(asset, in: editor) }
+        }
         .onChange(of: pickerItem) { _, item in
             guard let item else { return }
             Task { await editor.pick(item); pickerItem = nil }
