@@ -8,11 +8,18 @@ import UIKit
 public struct FinderView: UIViewRepresentable {
     public let renderer: FinderRenderer
 
-    public init(renderer: FinderRenderer) { self.renderer = renderer }
+    /// Called on the main actor with the finder's layer when the view is in a window, nil when it leaves one.
+    public var onPreviewLayer: (@MainActor (PreviewLayerBox?) -> Void)?
+
+    public init(renderer: FinderRenderer, onPreviewLayer: (@MainActor (PreviewLayerBox?) -> Void)? = nil) {
+        self.renderer = renderer
+        self.onPreviewLayer = onPreviewLayer
+    }
 
     public func makeUIView(context: Context) -> MetalLayerView {
         let view = MetalLayerView()
         view.renderer = renderer
+        view.onPreviewLayer = onPreviewLayer
         renderer.attach(to: view.metalLayer)
         view.isAccessibilityElement = true
         view.accessibilityTraits = .image
@@ -22,6 +29,7 @@ public struct FinderView: UIViewRepresentable {
     }
 
     public func updateUIView(_ view: MetalLayerView, context: Context) {
+        view.onPreviewLayer = onPreviewLayer
         if view.renderer !== renderer {
             view.renderer = renderer
             renderer.attach(to: view.metalLayer)
@@ -31,6 +39,7 @@ public struct FinderView: UIViewRepresentable {
 
     public final class MetalLayerView: UIView {
         var renderer: FinderRenderer?
+        var onPreviewLayer: (@MainActor (PreviewLayerBox?) -> Void)?
 
         override public class var layerClass: AnyClass { CAMetalLayer.self }
         var metalLayer: CAMetalLayer { layer as! CAMetalLayer }
@@ -56,6 +65,7 @@ public struct FinderView: UIViewRepresentable {
         override public func didMoveToWindow() {
             super.didMoveToWindow()
             setNeedsLayout()
+            onPreviewLayer?(window == nil ? nil : PreviewLayerBox(metalLayer))
         }
     }
 }

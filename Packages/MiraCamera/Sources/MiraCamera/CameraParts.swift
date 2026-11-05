@@ -67,15 +67,13 @@ struct MeterView: View {
     let needle: Double
     let readout: String
     let latitude: LatitudeReadout
-    /// Degrees to turn the readout row (device turned while the interface stays portrait).
-    var readoutRotation: Double = 0
     /// Two rows (exposure, then latitude) for a narrow column.
     var stacked = false
 
     var body: some View {
         VStack(spacing: 4) {
             scale.frame(height: 26)
-            readoutRow.rotationEffect(.degrees(readoutRotation))
+            readoutRow
         }
         .padding(.horizontal, T.cells(2))
         .padding(.vertical, 6)

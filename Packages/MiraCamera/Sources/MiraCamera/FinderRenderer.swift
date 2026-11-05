@@ -349,7 +349,7 @@ public final class FinderRenderer: @unchecked Sendable {
     }
 
     /// The frame rotated upright (a multiple of 90 degrees by orientation, else a rotation) and cropped, origin at zero.
-    static func upright(_ frame: FinderFrame, crop: CGRect?) -> CIImage {
+    public static func upright(_ frame: FinderFrame, crop: CGRect?) -> CIImage {
         var angle = frame.rotationAngle.truncatingRemainder(dividingBy: 360)
         if angle < 0 { angle += 360 }
         var image = frame.image

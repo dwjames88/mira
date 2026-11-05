@@ -2,6 +2,14 @@
 import CoreLocation
 import Foundation
 import MiraCameraKit
+import QuartzCore
+
+/// A layer handed across actors without retaining it. Only the main actor creates it; the session queue only passes
+/// it to `AVCaptureDevice.RotationCoordinator`.
+public struct PreviewLayerBox: @unchecked Sendable {
+    public weak var layer: CALayer?
+    public init(_ layer: CALayer?) { self.layer = layer }
+}
 
 /// The camera as the model drives it: `CaptureDeviceControlling` plus lifecycle, capture and the event streams.
 /// `CaptureController` is the real one, `FakeCaptureDevice` the simulator and snapshot stand-in.
@@ -12,6 +20,9 @@ public protocol CameraDevice: CaptureDeviceControlling {
     /// Applies the settings to the outputs and returns the capture format they resolve to.
     func configure(settings: CameraSettings) async -> CaptureFormat
     func capture(format: CaptureFormat, location: CLLocation?) async throws -> CapturedFrame
+    /// The layer that displays the finder, once it is in a window (nil when it leaves). The rotation coordinator
+    /// reports 0 degrees without a layer in a view hierarchy, so the preview angle needs it.
+    func setPreviewLayer(_ box: PreviewLayerBox?) async
     /// iOS 26+: call after the first finder frame is on screen.
     func runDeferredStartWhenNeeded() async
 

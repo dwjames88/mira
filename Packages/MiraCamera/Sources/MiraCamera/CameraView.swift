@@ -196,8 +196,7 @@ public struct CameraView<FilmDoor: View, WBDoor: View>: View {
             CameraHeader(filmName: filmName, developing: model.developingCount, onBack: onClose) { settingsShown = true }
                 .reportFrame("header")
             FFHairline()
-            MeterView(needle: model.needle, readout: model.readoutText, latitude: model.latitude,
-                      readoutRotation: model.readoutRotation)
+            MeterView(needle: model.needle, readout: model.readoutText, latitude: model.latitude)
                 .reportFrame("meter")
             finder.reportFrame("finder")
             LensChips(lenses: model.lenses, selected: model.selectedLens) { model.selectLens($0) }
@@ -284,7 +283,7 @@ public struct CameraView<FilmDoor: View, WBDoor: View>: View {
             let size = geo.size
             ZStack {
                 T.inkAlways
-                if let renderer = model.finder { FinderView(renderer: renderer) }
+                if let renderer = model.finder { FinderView(renderer: renderer) { model.previewLayerChanged($0) } }
                 if let p = model.focusPoint { FocusMark(point: p, locked: model.aeAfLocked, bounds: size) }
                 overlays(size: size)
                 T.inkAlways.opacity(model.blink ? 1 : 0).allowsHitTesting(false)

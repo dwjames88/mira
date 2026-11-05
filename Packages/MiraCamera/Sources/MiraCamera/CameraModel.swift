@@ -27,6 +27,7 @@ enum DeviceCommand: Sendable {
     case focus(CGPoint, lock: Bool)
     case unlockFocus
     case whiteBalance(WhiteBalanceState)
+    case previewLayer(PreviewLayerBox?)
 }
 
 /// All the camera screen's state. Main actor; every device, Photos, Metal and CoreLocation callback hops here
@@ -64,7 +65,7 @@ public final class CameraModel {
     public var silentShutterSupported = false
     /// Upright width / height of the frames on screen (what the finder aspect-fits).
     public var frameAspect: Double = 3.0 / 4.0
-    /// Degrees the sensor image is rotated to be upright (90 = portrait phone). Drives the readouts' rotation.
+    /// Degrees the sensor image is rotated to be upright (90 = portrait phone). Maps touches back to the device.
     public var rotationAngle: Double = 90
     public var cardThumbnails: [String: CGImage] = [:]
     public var wb = WhiteBalanceState() {
@@ -85,10 +86,6 @@ public final class CameraModel {
 
     public let statsEnabled = ProcessInfo.processInfo.environment["MIRA_CAMERA_STATS"] == "1"
     public var statusText: String? { state.statusText }
-    /// Degrees to turn the readouts so they stay upright in the world when the interface stays portrait
-    /// (orientation lock) and the phone is turned: the frame angle's difference from portrait (90).
-    /// The fake source reports 0 as "upright", so it never rotates. [VERIFY on device: sign.]
-    public var readoutRotation: Double { CameraBackend.usesFakes ? 0 : rotationAngle - 90 }
     public var lowestZoom: Double { lenses.first?.zoomFactor ?? 1 }
     public var highestZoom: Double { (lenses.last?.zoomFactor ?? 1) * 2 }
 
@@ -534,6 +531,11 @@ public final class CameraModel {
         }
     }
 
+    // MARK: Finder layer
+
+    /// The finder's layer is in a window (or left it): the rotation coordinator needs it for the preview angle.
+    public func previewLayerChanged(_ box: PreviewLayerBox?) { send(.previewLayer(box)) }
+
     // MARK: Film door support
 
     /// Film IDs the door wants thumbnails of (the finder renders them from the live frame, each published as it is done, refreshed at about 2 Hz); empty when closed.
@@ -572,6 +574,7 @@ public final class CameraModel {
         case .focus(let p, let lock): await device.focusAndMeter(at: p, lock: lock)
         case .unlockFocus: await device.unlockFocusAndExposure()
         case .whiteBalance(let s): await device.setWhiteBalance(s)
+        case .previewLayer(let box): await device.setPreviewLayer(box)
         }
     }
 }

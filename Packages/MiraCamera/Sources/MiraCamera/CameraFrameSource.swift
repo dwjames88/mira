@@ -197,6 +197,7 @@ public actor FakeCaptureDevice: CameraDevice {
 
     public func stop() async { readinessOut.yield(.sessionNotRunning) }
     public func runDeferredStartWhenNeeded() async {}
+    public func setPreviewLayer(_ box: PreviewLayerBox?) async {}
 
     public func configure(settings: CameraSettings) async -> CaptureFormat {
         CaptureFormatPolicy.format(for: await capabilities(), settings: settings)
