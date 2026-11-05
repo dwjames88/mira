@@ -13,7 +13,7 @@ Licence: Creative Commons Attribution-ShareAlike 4.0 International
 https://creativecommons.org/licenses/by-sa/4.0/
 Earlier version, sometimes cited for this collection: CC BY-SA 3.0 https://creativecommons.org/licenses/by-sa/3.0/
 
-The PNG files (FilmSources/HaldCLUT/ in the source repository) are kept unmodified; the app ships their samples losslessly repacked as Packed/*.mlut under the same licence.
+The PNG files (FilmSources/HaldCLUT/ in the source repository) are kept unmodified; the app ships each look resampled from 64^3 to 48^3 (an adaptation) as Packed/*.mlut under the same CC BY-SA 4.0 licence.
 
 ======================================================================
 Legal code, CC BY-SA 4.0 (from https://creativecommons.org/licenses/by-sa/4.0/legalcode.txt)

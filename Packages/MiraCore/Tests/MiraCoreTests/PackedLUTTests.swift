@@ -97,4 +97,19 @@ import Testing
         // Release builds measure ~10-20 ms; debug test builds are several times slower, so this only catches blow-ups.
         #expect(ms < 400, "decode took \(ms) ms")
     }
+
+    /// A bundled 48^3 film renders through the current (atlas) pipeline and changes the picture.
+    @Test func bundled48CubeRendersThroughThePipeline() throws {
+        let lib = try FilmLibrary(directory: FilmTests.filmsDirectory())
+        let film = try #require(lib.film(id: "kodak-portra-400"))
+        #expect(try lib.lut(for: film).dimension == PackedLUT.shippedDimension)
+        let r = Renderer(library: lib)
+        let ctx = Renderer.makeContext()
+        let input = Fixture.gradientAndPatches(size: 128)
+        let plain = Pixels(r.apply(Recipe(), to: input), context: ctx)
+        let graded = Pixels(r.apply(Recipe(filmID: film.id), to: input), context: ctx)
+        let diff = zip(plain.rgba, graded.rgba).reduce(0) { $0 + abs(Int($1.0) - Int($1.1)) }
+        #expect(diff > plain.rgba.count)   // clearly different from the ungraded image
+        #expect((0..<3).allSatisfy { mean(graded.channel($0)) > 0.05 && mean(graded.channel($0)) < 0.95 })
+    }
 }

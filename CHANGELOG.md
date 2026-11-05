@@ -4,6 +4,9 @@ All notable changes to Mira. Format follows [Keep a Changelog](https://keepachan
 
 ## [Unreleased]
 
+### Changed
+- Film payload: the Hald PNGs moved to `FilmSources/HaldCLUT/` (kept for provenance, not bundled); the app and the Photos extension now bundle `Films/Packed/<id>.mlut`, each look resampled from 64³ to 48³ (16-bit) and LZMA-compressed, about 75 MB instead of 361 MB per copy. Worst-case error against the 64³ original is 32/255 at a single point (worst mean 0.4/255). `mira-sheet --pack-films FilmSources Films` regenerates them. Packed films skip the LUT disk cache.
+
 ### Added
 - 260 film looks (from 31): the full RawTherapee Film Simulation Collection (Pat David et al., CC BY-SA 4.0), shown as 82 stock cards (Color Negative 26, Slide 15, Kodachrome 3, Black & White 22, Instant 16). The 178 push/pull, tone and alternate variants are chosen with a Variant picker in the FILMS panel. Motion Picture (ECN-2) and Print families exist but have no stocks (no freely licensed data), so their tabs are hidden.
 - Film science (pipeline 2): exposure with film latitude, white balance before the film, energy-conserving halation in the exposure (rem-jet for motion-picture stocks), per-film grain (density dependent, chroma for colour films, frame-relative and band-limited so previews match exports), per-film character from family and ISO. Grain and Halation sliders read 50% as the film's own amount.
@@ -17,7 +20,7 @@ All notable changes to Mira. Format follows [Keep a Changelog](https://keepachan
 - The in-memory LUT cache is an LRU of 64 cubes; the launch prewarm loads stock cards only.
 
 ### Notes
-- Known issue: `Films/HaldCLUT` grew from 38 MB to about 361 MB and is copied into both the app and the Photos extension, so the app is much larger.
+- Known issue (fixed in Unreleased): `Films/HaldCLUT` grew from 38 MB to about 361 MB and was copied into both the app and the Photos extension.
 
 ## [0.4.0] - 2026-10-23
 
