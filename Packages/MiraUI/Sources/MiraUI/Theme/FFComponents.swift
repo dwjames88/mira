@@ -383,21 +383,24 @@ public struct FilmCard: View {
     private let captionTint: Color?
     private let image: PlatformImage?
     private let isSelected: Bool
+    private let showsThumbnail: Bool
     private let action: () -> Void
     private let onHoverChange: ((Bool) -> Void)?
     @State private var hovering = false
 
-    public init(title: String, caption: String, image: PlatformImage?, isSelected: Bool,
+    public init(title: String, caption: String, image: PlatformImage?, isSelected: Bool, showsThumbnail: Bool = true,
                 onHoverChange: ((Bool) -> Void)? = nil, action: @escaping () -> Void) {
         self.init(title: Text(title), secondLine: nil, accessibilityTitle: title, caption: caption,
-                  captionTint: nil, image: image, isSelected: isSelected, onHoverChange: onHoverChange, action: action)
+                  captionTint: nil, image: image, isSelected: isSelected, showsThumbnail: showsThumbnail,
+                  onHoverChange: onHoverChange, action: action)
     }
 
     /// A card with a second title line (a preset's "- nickname") under the film-name line, each on one
     /// line and tail-truncated, with an optional caption colour (a warning mark). Everything else is the film card.
     public init(title: Text, secondLine: Text?, accessibilityTitle: String, caption: String,
-                captionTint: Color?, image: PlatformImage?, isSelected: Bool,
+                captionTint: Color?, image: PlatformImage?, isSelected: Bool, showsThumbnail: Bool = true,
                 onHoverChange: ((Bool) -> Void)? = nil, action: @escaping () -> Void) {
+        self.showsThumbnail = showsThumbnail
         self.onHoverChange = onHoverChange
         self.title = title
         self.secondLine = secondLine
@@ -409,32 +412,56 @@ public struct FilmCard: View {
         self.action = action
     }
 
+    @ViewBuilder private var titleLines: some View {
+        title
+            .font(T.display(16, weight: .medium))
+            .foregroundStyle(isSelected ? T.paper : T.paperSoft)
+            .lineLimit(1)
+            .padding(.top, 6)
+            .frame(width: Self.width, alignment: .leading)
+        if let secondLine {
+            secondLine
+                .font(T.display(16, weight: .medium))
+                .foregroundStyle(isSelected ? T.paper : T.paperSoft)
+                .lineLimit(1)
+                .frame(width: Self.width, alignment: .leading)
+        }
+    }
+
     public var body: some View {
         let _ = PerfCounters.filmCard += 1
         Button(action: action) {
             VStack(alignment: .leading, spacing: 0) {
-                ZStack {
-                    Rectangle().fill(T.hair)
-                    if let image {
-                        platformImageView(image)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
+                if showsThumbnail {
+                    ZStack {
+                        Rectangle().fill(T.hair)
+                        if let image {
+                            platformImageView(image)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        }
                     }
-                }
-                .frame(width: Self.width, height: Self.thumbnailHeight)
-                .clipped()
-                title
-                    .font(T.display(16, weight: .medium))
-                    .foregroundStyle(isSelected ? T.paper : T.paperSoft)
-                    .lineLimit(1)
-                    .padding(.top, 6)
-                    .frame(width: Self.width, alignment: .leading)
-                if let secondLine {
-                    secondLine
-                        .font(T.display(16, weight: .medium))
-                        .foregroundStyle(isSelected ? T.paper : T.paperSoft)
-                        .lineLimit(1)
-                        .frame(width: Self.width, alignment: .leading)
+                    .frame(width: Self.width, height: Self.thumbnailHeight)
+                    .clipped()
+                    titleLines
+                } else {
+                    // Static tile: the name in the display font on ink, no picture.
+                    VStack(alignment: .leading, spacing: 0) {
+                        title
+                            .font(T.display(18, weight: .medium))
+                            .foregroundStyle(isSelected ? T.paper : T.paperSoft)
+                            .lineLimit(3)
+                            .multilineTextAlignment(.leading)
+                        if let secondLine {
+                            secondLine
+                                .font(T.display(16, weight: .medium))
+                                .foregroundStyle(isSelected ? T.paper : T.paperSoft)
+                                .lineLimit(1)
+                        }
+                    }
+                    .padding(8)
+                    .frame(width: Self.width, height: Self.thumbnailHeight + 28, alignment: .topLeading)
+                    .background(T.ink)
                 }
                 Text(caption)
                     .ffLabel(size: 9, color: captionTint ?? (isSelected ? T.lichen : T.paperDim))

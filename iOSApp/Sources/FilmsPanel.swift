@@ -59,12 +59,13 @@ private struct FilmStrip<M: FilmPanelModel>: View {
                         PresetGroup(model: model, hub: hub)
                         StripGroup(title: "FILMS", count: model.visibleStocks.count + 1) {
                             FilmCard(title: "Original", caption: "NO LOOK", image: model.thumbnails["__original"],
-                                     isSelected: model.filmID == nil) { model.select(nil) }
+                                     isSelected: model.filmID == nil, showsThumbnail: model.showsThumbnails) { model.select(nil) }
                                 .task(id: model.thumbEpoch) { await model.requestThumbnail(nil) }
                                 .id("__original")
                             ForEach(model.visibleStocks) { film in
                                 FilmCard(title: film.stockName ?? film.displayName, caption: film.brand.uppercased(),
-                                         image: model.thumbnails[film.id], isSelected: model.selectedStockID == film.stockID) {
+                                         image: model.thumbnails[film.id], isSelected: model.selectedStockID == film.stockID,
+                                         showsThumbnail: model.showsThumbnails) {
                                     // The applied stock keeps its ISO and variation; any other starts at its base film.
                                     if model.selectedStockID != film.stockID { model.select(film.id) }
                                     withAnimation(.snappy(duration: 0.2)) { model.filmsDetail = true }

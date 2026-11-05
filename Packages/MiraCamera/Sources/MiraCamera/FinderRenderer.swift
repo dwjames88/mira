@@ -25,8 +25,6 @@ public struct FinderState: Sendable {
     /// The aspect crop (settings). The rect depends on the upright frame's orientation, so it is derived per frame.
     public var aspect: CaptureAspect = .fourThree
     public var thermal: FinderThermalLevel = .nominal
-    /// Film IDs the film door wants thumbnails of. Empty = the door is closed and no thumbnails are made.
-    public var cardFilmIDs: [String] = []
 
     public init() {}
 }
@@ -72,19 +70,10 @@ public final class FinderRenderer: @unchecked Sendable {
         var windowStart: Double?
         var lastImage: CIImage?
         var meterBusy = false
-        var cardsBusy = false
-        var lastCardTime = -Double.infinity
         var lastMeterTime = -Double.infinity
-        /// The latest upright frame (cards start from it the moment the door opens, without waiting for a frame).
-        var lastUpright: CIImage?
-        /// Rendered cards for the scene whose coarse signature is `cardSignature`; `cardPublished` are the ids the UI has.
-        var cardCache: [String: CGImage] = [:]
-        var cardSignature: [UInt8]?
-        var cardPublished: Set<String> = []
         var latitudeMS: Double?
         var onStats: (@Sendable (FinderStats) -> Void)?
         var onLatitude: (@Sendable (LatitudeReading?) -> Void)?
-        var onCards: (@Sendable ([String: CGImage]) -> Void)?
     }
 
     private let core = Mutex(Core())
@@ -99,14 +88,6 @@ public final class FinderRenderer: @unchecked Sendable {
     /// The latitude meter reads the frame at most this often (seconds): 4 Hz, from a copy of at most `meterLongSide` pixels.
     static let meterInterval = 0.25
     static let meterLongSide: CGFloat = 256
-    /// Film door cards are refreshed at most this often (seconds), from one copy of the frame at this long side (pixels).
-    static let cardInterval = 0.5
-    static let cardLongSide: CGFloat = 240
-    /// A scene counts as changed when a cell of its 8x8 average moves by more than this (of 255).
-    static let cardSceneTolerance = 10
-    static let cardWorkers = 3
-    static let cardCacheLimit = 80
-
     /// nil without a Metal device. `renderer` is injectable for tests; by default the app bundle's films
     /// (without them the finder shows the bare scene).
     public init?(renderer: Renderer? = nil) {
@@ -175,19 +156,12 @@ public final class FinderRenderer: @unchecked Sendable {
 
     /// Mutates the finder state under the lock. Safe from any thread; the body must be quick.
     public func update(_ body: (inout FinderState) -> Void) {
-        let cardsChanged: Bool = core.withLock { c in
-            let oldCards = c.state.cardFilmIDs
+        core.withLock { c in
             body(&c.state)
             c.ladder.mode = c.state.mode
             c.ladder.grainLiveSetting = c.state.grainLive
             c.ladder.thermal = c.state.thermal
-            // A closed door has nothing on screen: the next opening gets every card again (from the cache when the scene is the same).
-            if c.state.cardFilmIDs.isEmpty { c.cardPublished = [] }
-            else if oldCards.isEmpty { c.cardPublished = [] }
-            return c.state.cardFilmIDs != oldCards && !c.state.cardFilmIDs.isEmpty
         }
-        // The door asked for cards: start now from the latest frame, no waiting for the next frame or the 2 Hz gate.
-        if cardsChanged { startCards() }
     }
 
     public func setThermal(_ level: FinderThermalLevel) { update { $0.thermal = level } }
@@ -207,7 +181,6 @@ public final class FinderRenderer: @unchecked Sendable {
 
     public func setStatsHandler(_ handler: (@Sendable (FinderStats) -> Void)?) { core.withLock { $0.onStats = handler } }
     public func setLatitudeHandler(_ handler: (@Sendable (LatitudeReading?) -> Void)?) { core.withLock { $0.onLatitude = handler } }
-    public func setCardsHandler(_ handler: (@Sendable ([String: CGImage]) -> Void)?) { core.withLock { $0.onCards = handler } }
 
     /// The last presented frame (film applied, over ink) as an 8-bit sRGB image, nil before the first frame.
     /// Renders on the calling thread; call from a background task. Holds the last frame's pixel buffer until the
@@ -218,7 +191,7 @@ public final class FinderRenderer: @unchecked Sendable {
                                        colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
     }
 
-    public func releaseSnapshotSource() { core.withLock { $0.lastImage = nil; $0.lastUpright = nil } }
+    public func releaseSnapshotSource() { core.withLock { $0.lastImage = nil } }
 
     // MARK: Frames
 
@@ -240,7 +213,6 @@ public final class FinderRenderer: @unchecked Sendable {
             var offscreen: TextureBox?
             var size: CGSize
             var meter: Bool
-            var cards: Bool
         }
         let plan: Plan? = core.withLock { c in
             let q = c.ladder.quality
@@ -250,18 +222,13 @@ public final class FinderRenderer: @unchecked Sendable {
             c.inflight = true
             c.nextDue = c.nextDue + period < frame.timestamp - period ? frame.timestamp + period : c.nextDue + period
             c.accepted += 1
-            var cards = false
-            if !c.state.cardFilmIDs.isEmpty, !c.cardsBusy, frame.timestamp - c.lastCardTime >= Self.cardInterval {
-                c.lastCardTime = frame.timestamp
-                cards = true
-            }
             var meter = false
             if !c.meterBusy, frame.timestamp - c.lastMeterTime >= Self.meterInterval {
                 c.lastMeterTime = frame.timestamp
                 meter = true
             }
             return Plan(state: c.state, quality: q, layer: c.layer, offscreen: c.offscreen, size: c.drawableSize,
-                        meter: meter, cards: cards)
+                        meter: meter)
         }
         guard let plan else { return false }
         func release() { core.withLock { $0.inflight = false } }
@@ -345,11 +312,10 @@ public final class FinderRenderer: @unchecked Sendable {
             return false
         }
         if let drawable { cb.present(drawable) }
-        core.withLock { $0.lastImage = canvas; $0.lastUpright = upright }
+        core.withLock { $0.lastImage = canvas }
         cb.commit()
 
         if plan.meter, let renderer { startMeter(renderer, recipe: plan.state.recipe, image: upright) }
-        if plan.cards { startCards() }
         return true
     }
 
@@ -454,104 +420,6 @@ public final class FinderRenderer: @unchecked Sendable {
             }
             handler?(reading)
         }
-    }
-
-    /// Starts a card batch from the latest upright frame unless one is already running (a running batch re-reads the
-    /// wanted ids when it finishes a pass, so ids that arrive meanwhile are picked up).
-    func startCards() {
-        guard let renderer else { return }
-        let image: CIImage? = core.withLock { c in
-            guard !c.cardsBusy, !c.state.cardFilmIDs.isEmpty, let image = c.lastUpright else { return nil }
-            c.cardsBusy = true
-            return image
-        }
-        guard let image else { return }
-        DispatchQueue.global(qos: .userInitiated).async { [self] in
-            runCards(renderer, image: image)
-            core.withLock { $0.cardsBusy = false }
-        }
-    }
-
-    /// One 240 px copy of the frame, materialized once; the cards render from it through the film LUT stage only
-    /// (no grain, halation or bloom), up to `cardWorkers` at a time, and each is published as soon as it is done.
-    private func runCards(_ renderer: Renderer, image: CIImage) {
-        let sRGB = CGColorSpace(name: CGColorSpace.sRGB)!
-        let shrunk = Self.shrunk(image, longSide: Self.cardLongSide)
-        let rect = shrunk.extent
-        guard rect.width >= 1, rect.height >= 1,
-              let copy = ciContext.createCGImage(shrunk, from: rect, format: .RGBA8, colorSpace: sRGB) else { return }
-        let small = CIImage(cgImage: copy).withMiraHeadroom(1)
-        let signature = Self.signature(of: copy)
-        let scale = min(1, max(rect.width, rect.height) / max(image.extent.width, image.extent.height))
-        let r = renderer.withPreviewScale(scale)
-
-        // A new scene drops the cached cards; a still scene keeps them (small drift is measured against the scene
-        // the cards were made from, so it adds up to a change eventually).
-        core.withLock { c in
-            if let old = c.cardSignature, zip(old, signature).allSatisfy({ abs(Int($0) - Int($1)) <= Self.cardSceneTolerance }) { return }
-            c.cardCache = [:]
-            c.cardPublished = []
-            c.cardSignature = signature
-        }
-
-        while true {
-            let step: (ready: [String: CGImage], todo: [String], handler: (@Sendable ([String: CGImage]) -> Void)?) = core.withLock { c in
-                var ready: [String: CGImage] = [:]
-                var todo: [String] = []
-                for id in c.state.cardFilmIDs where !c.cardPublished.contains(id) {
-                    if let hit = c.cardCache[id] { ready[id] = hit; c.cardPublished.insert(id) } else { todo.append(id) }
-                }
-                return (ready, todo, c.onCards)
-            }
-            if !step.ready.isEmpty { step.handler?(step.ready) }
-            if step.todo.isEmpty { if step.ready.isEmpty { return } else { continue } }
-
-            let next = NSLock()
-            nonisolated(unsafe) var cursor = 0
-            // A few at a time, so cards that were requested (or moved up) meanwhile are not stuck behind a long pass.
-            let todo = Array(step.todo.prefix(Self.cardWorkers * 2))
-            DispatchQueue.concurrentPerform(iterations: min(Self.cardWorkers, todo.count)) { _ in
-                while true {
-                    next.lock()
-                    let i = cursor; cursor += 1
-                    next.unlock()
-                    if i >= todo.count { return }
-                    let id = todo[i]
-                    // "__original" is the door's key for the no-look card.
-                    let filmID: String? = id == "__original" ? nil : id
-                    var recipe = Recipe(filmID: filmID, reciprocity: .off).applyingNativeTexture(filmID: filmID)
-                    recipe.grainAmount = 0
-                    recipe.halationAmount = 0
-                    recipe.bloomAmount = 0
-                    // The LUT for this card loads here, on demand (nothing waits for the other films).
-                    let graded = r.thumbnail(recipe, input: small)
-                    guard let cg = ciContext.createCGImage(graded, from: graded.extent, format: .RGBA8, colorSpace: sRGB) else { continue }
-                    let handler: (@Sendable ([String: CGImage]) -> Void)? = core.withLock { c in
-                        // Dropped if the scene moved on meanwhile or the door no longer wants it.
-                        guard c.cardSignature == signature, c.state.cardFilmIDs.contains(id) else { return nil }
-                        if c.cardCache.count >= Self.cardCacheLimit { c.cardCache = c.cardCache.filter { c.state.cardFilmIDs.contains($0.key) } }
-                        c.cardCache[id] = cg
-                        c.cardPublished.insert(id)
-                        return c.onCards
-                    }
-                    handler?([id: cg])
-                }
-            }
-            // Loop: ids requested while this pass ran are rendered next, in the same batch.
-        }
-    }
-
-    /// 8x8 average of the copy, RGB (192 bytes): a cheap stand-in for a frame hash.
-    static func signature(of image: CGImage) -> [UInt8] {
-        var bytes = [UInt8](repeating: 0, count: 8 * 8 * 4)
-        bytes.withUnsafeMutableBytes { raw in
-            guard let ctx = CGContext(data: raw.baseAddress, width: 8, height: 8, bitsPerComponent: 8, bytesPerRow: 32,
-                                      space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return }
-            ctx.interpolationQuality = .high
-            ctx.draw(image, in: CGRect(x: 0, y: 0, width: 8, height: 8))
-        }
-        return bytes
     }
 }
 #endif

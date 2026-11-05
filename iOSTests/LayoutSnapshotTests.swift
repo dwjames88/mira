@@ -207,10 +207,6 @@ final class LayoutSnapshotTests: XCTestCase {
             m.select(film.id)
             if !m.isoChoices.isEmpty && !m.variationChoices.isEmpty { break }
         }
-        let cg = Self.sample.cgImage!
-        var thumbs: [String: CGImage] = ["__original": cg]
-        for film in m.visibleStocks.prefix(8) { thumbs[film.id] = cg }
-        m.setThumbnails(thumbs)
         return m
     }
 
@@ -264,17 +260,6 @@ final class LayoutSnapshotTests: XCTestCase {
         }
     }
 
-    func testCameraWBDoor() async {
-        for d in TestDevice.all {
-            var state = WhiteBalanceState()
-            let binding = Binding(get: { state }, set: { state = $0 })
-            let f = await renderDoor(device: d, name: "camera-wb-door") { CameraWBDoor(state: binding) }
-            assertDoor(f, device: d)
-            XCTAssertNotNil(f["label.WB"])
-            XCTAssertLessThan(f["panel"]!.height, 100, "one row plus handle")
-        }
-    }
-
     func testEditorFilmsPanelIsUnchangedByTheRefactor() async {
         let m = await makeModel()
         m.filmsDetail = true
@@ -304,18 +289,15 @@ final class LayoutSnapshotTests: XCTestCase {
         XCTAssertTrue(m.hasPhoto)
     }
 
-    func testCameraThumbnailsWantedDoNotBumpEpoch() async {
+    func testCameraFilmListIsStatic() async {
         let m = CameraFilmDoorModel()
         let epoch = m.thumbEpoch
         await m.requestThumbnail(nil)
         await m.requestThumbnail("x")
-        XCTAssertEqual(m.wantedThumbnailIDs, ["__original", "x"])
-        m.setThumbnails(["x": Self.sample.cgImage!])
-        XCTAssertNotNil(m.thumbnails["x"])
+        XCTAssertFalse(m.showsThumbnails)
+        XCTAssertTrue(m.thumbnails.isEmpty, "requesting a thumbnail does nothing in the camera")
         XCTAssertEqual(m.thumbEpoch, epoch)
-    }
-
-    func testWBDoorChipsMatchSpec() {
-        XCTAssertEqual(WhiteBalancePreset.allCases.map { $0.kelvin.map(String.init) ?? "AUTO" }, ["AUTO", "5500", "6500", "3200", "4000"])
+        let editor = EditorViewModel()
+        XCTAssertTrue(editor.showsThumbnails, "the editor keeps its real thumbnails")
     }
 }

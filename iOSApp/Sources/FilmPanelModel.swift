@@ -27,6 +27,8 @@ protocol FilmPanelModel: AnyObject, Observable {
     /// Changes whenever the thumbnails are discarded, so visible cards ask again.
     var thumbEpoch: Int { get }
     func requestThumbnail(_ id: String?) async
+    /// False draws the cards as plain name tiles with no picture (the camera's static film list).
+    var showsThumbnails: Bool { get }
 
     // Options panel
     var selectedFilm: Film? { get }
@@ -52,6 +54,8 @@ protocol FilmPanelModel: AnyObject, Observable {
 }
 
 extension FilmPanelModel {
+    var showsThumbnails: Bool { true }
+
     var showsExposureTimeControls: Bool { true }
 
     func bind<V>(_ keyPath: WritableKeyPath<Recipe, V>) -> Binding<V> {

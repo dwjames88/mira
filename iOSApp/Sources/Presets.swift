@@ -221,7 +221,8 @@ struct PresetCardView<M: FilmPanelModel>: View {
             caption: missing ? "Film missing" : (film.map { $0.iso > 0 ? "\($0.brand) \u{00B7} \($0.iso)" : $0.brand } ?? "No film"),
             captionTint: missing ? T.paper : nil,
             image: model.thumbnails[preset.filmID ?? "__original"],
-            isSelected: model.isApplied(preset)
+            isSelected: model.isApplied(preset),
+            showsThumbnail: model.showsThumbnails
         ) { model.apply(preset) }
         .task(id: model.thumbEpoch) { await model.requestThumbnail(preset.filmID) }
         .contextMenu {

@@ -71,9 +71,12 @@ public final class CameraModel {
     public var frameCrop = CGRect(x: 0, y: 0, width: 1, height: 1)
     /// Degrees the sensor image is rotated to be upright (90 = portrait phone). Maps touches back to the device.
     public var rotationAngle: Double = 90
-    public var cardThumbnails: [String: CGImage] = [:]
     public var wb = WhiteBalanceState() {
-        didSet { if wb != oldValue { send(.whiteBalance(wb)) } }
+        didSet {
+            guard wb != oldValue else { return }
+            settings.whiteBalanceKelvin = wb.kelvin
+            send(.whiteBalance(wb))
+        }
     }
     /// The user's recipe. Pushes to the finder and is what a capture saves (no finder-only fields).
     public var recipe: Recipe {
@@ -84,6 +87,7 @@ public final class CameraModel {
             settings.lastFilmID = recipe.filmID
         }
     }
+    private var lastManualKelvin: Int?
     public var settings: CameraSettings {
         didSet { settingsChanged(from: oldValue) }
     }
@@ -174,8 +178,9 @@ public final class CameraModel {
             state.grainLive = loaded.finderGrainLive
             state.aspect = loaded.aspect
         }
+        wb = WhiteBalanceState(kelvin: loaded.whiteBalanceKelvin)   // restored without a command: start() sends it
+        lastManualKelvin = wb.kelvin
         finder?.setLatitudeHandler(Self.makeLatitudeHandler(self))
-        finder?.setCardsHandler(Self.makeCardsHandler(self))
         if statsEnabled { finder?.setStatsHandler(Self.makeStatsHandler(self)) }
         startConsumers(commands: commands)
     }
@@ -224,10 +229,6 @@ public final class CameraModel {
 
     private nonisolated static func makeLatitudeHandler(_ model: CameraModel) -> @Sendable (LatitudeReading?) -> Void {
         { [weak model] reading in Task { @MainActor in model?.latitude = LatitudeReadout(reading: reading) } }
-    }
-
-    private nonisolated static func makeCardsHandler(_ model: CameraModel) -> @Sendable ([String: CGImage]) -> Void {
-        { [weak model] cards in Task { @MainActor in model?.cardThumbnails.merge(cards) { _, new in new } } }
     }
 
     private nonisolated static func makeStatsHandler(_ model: CameraModel) -> @Sendable (FinderStats) -> Void {
@@ -304,6 +305,7 @@ public final class CameraModel {
             zoom = main?.zoomFactor ?? 1
             if let main { send(.zoom(main.zoomFactor, ramp: false)) }
         }
+        if let kelvin = wb.kelvin { send(.whiteBalance(WhiteBalanceState(kelvin: kelvin))) }   // the stored value reaches the device
         location.setEnabled(settings.addLocation)
         frames.start()
         await device.start()
@@ -474,6 +476,29 @@ public final class CameraModel {
         send(.exposure(target))
     }
 
+    /// Sets the white balance (nil is AUTO), one selection haptic per 100 K step.
+    public func setWB(_ kelvin: Int?) {
+        let target = WhiteBalanceState(kelvin: kelvin)
+        guard target != wb else { return }
+        if target.kelvin != nil, wb.kelvin != nil { selection.selectionChanged() }
+        wb = target
+        if let k = target.kelvin { lastManualKelvin = k }
+    }
+
+    /// A drag ended: snap to a preset within 150 K.
+    public func commitWB() {
+        guard let k = wb.kelvin else { return }
+        let snapped = WhiteBalanceModel.snapped(k)
+        if snapped != k { impact.impactOccurred() }
+        setWB(snapped)
+    }
+
+    /// AUTO to the last manual value (5500 K the first time), or back to AUTO.
+    public func toggleAutoWB() {
+        selection.selectionChanged()
+        setWB(wb.kelvin == nil ? (lastManualKelvin ?? WhiteBalanceModel.startKelvin) : nil)
+    }
+
     public func selectLens(_ lens: Lens) {
         selection.selectionChanged()
         selectedLens = lens
@@ -551,14 +576,6 @@ public final class CameraModel {
 
     /// The finder's layer is in a window (or left it): the rotation coordinator needs it for the preview angle.
     public func previewLayerChanged(_ box: PreviewLayerBox?) { send(.previewLayer(box)) }
-
-    // MARK: Film door support
-
-    /// Film IDs the door wants thumbnails of (the finder renders them from the live frame, each published as it is done, refreshed at about 2 Hz); empty when closed.
-    public func setWantedCardIDs(_ ids: [String]) {
-        finder?.update { $0.cardFilmIDs = ids }
-        if ids.isEmpty { cardThumbnails = [:] }
-    }
 
     // MARK: Settings
 

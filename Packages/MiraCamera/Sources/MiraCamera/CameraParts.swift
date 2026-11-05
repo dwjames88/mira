@@ -228,6 +228,101 @@ struct EVDial: View {
     }
 }
 
+// MARK: White balance dial
+
+/// The white balance row, beside the EV dial's visual language: a hairline-boxed centre readout with a lichen
+/// tick, a Kelvin ruler dragged horizontally (100 K per `pointsPerStep`, a tick every 100 K, a label every
+/// 500 K), AUTO on the left (lichen when auto; tap toggles) and the unit on the right.
+struct WBDial: View {
+    /// nil is AUTO.
+    let kelvin: Int?
+    /// A live value while dragging (nil is AUTO).
+    let onChange: (Int?) -> Void
+    /// The drag ended: snap to a nearby preset.
+    let onCommit: () -> Void
+    let onToggleAuto: () -> Void
+    @State private var dragBase: Int?
+
+    private let pointsPerStep: CGFloat = 8
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Button(action: onToggleAuto) {
+                Text("AUTO").ffLabel(size: 9, color: kelvin == nil ? T.lichen : T.paperDim)
+                    .frame(width: 52, height: 40)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Auto white balance")
+            .accessibilityValue(kelvin == nil ? "On" : "Off")
+            ruler
+            Text("K").ffLabel(size: 9, color: T.paperDim).frame(width: 36)
+        }
+        .frame(height: 40)
+    }
+
+    private var ruler: some View {
+        GeometryReader { geo in
+            let center = Double(kelvin ?? WhiteBalanceModel.startKelvin)
+            let perK = Double(pointsPerStep) / Double(WhiteBalanceModel.step)
+            let halfSpan = Int(geo.size.width / 2 / pointsPerStep) + 1
+            ZStack {
+                // Ticks every 100 K; labels every 500 K, hidden under the readout.
+                ForEach(-halfSpan...halfSpan, id: \.self) { i in
+                    let k = (Int(center) / WhiteBalanceModel.step + i) * WhiteBalanceModel.step
+                    if WhiteBalanceModel.range.contains(k) {
+                        let x = (Double(k) - center) * perK
+                        let major = k % 500 == 0
+                        Rectangle().fill(major ? T.paperDim : T.hair)
+                            .frame(width: 1, height: major ? 8 : 4)
+                            .offset(x: x, y: 14)
+                        if major, abs(x) > 34 {
+                            Text("\(k)").ffLabel(size: 9, color: T.paperDim).fixedSize()
+                                .offset(x: x, y: -9)
+                        }
+                    }
+                }
+                .opacity(kelvin == nil ? 0.4 : 1)
+                Rectangle().stroke(T.hair, lineWidth: 1).frame(width: 118, height: 22).offset(y: -9)
+                Text(readout).ffLabel(size: 11, color: kelvin == nil ? T.paperDim : T.paper, weight: .medium)
+                    .fixedSize().offset(y: -9)
+                Rectangle().fill(T.lichen).frame(width: 16, height: 2).offset(y: 17)
+            }
+            .frame(width: geo.size.width, height: 40)
+            .clipped()
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 6)
+                    .onChanged { drag in
+                        let base = dragBase ?? (kelvin ?? WhiteBalanceModel.startKelvin)
+                        dragBase = base
+                        let steps = Int((-drag.translation.width / pointsPerStep).rounded())
+                        onChange(WhiteBalanceModel.clamp(base + steps * WhiteBalanceModel.step))
+                    }
+                    .onEnded { _ in
+                        dragBase = nil
+                        onCommit()
+                    })
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("White balance")
+        .accessibilityValue(kelvin.map { "\($0) Kelvin" } ?? "Auto")
+        .accessibilityAdjustableAction { direction in
+            let current = kelvin ?? WhiteBalanceModel.startKelvin
+            switch direction {
+            case .increment: onChange(WhiteBalanceModel.clamp(current + WhiteBalanceModel.step))
+            case .decrement: onChange(WhiteBalanceModel.clamp(current - WhiteBalanceModel.step))
+            @unknown default: break
+            }
+        }
+    }
+
+    private var readout: String {
+        guard let kelvin else { return "\u{2014}" }
+        return WhiteBalanceModel.preset(at: kelvin).map { "\(kelvin) \u{00B7} \($0.name)" } ?? "\(kelvin)"
+    }
+}
+
 // MARK: Shutter
 
 /// 72 pt ring, 1.5 pt paper hairline, ink fill; lichen for 120 ms on press; paperDim when it cannot take a press.
