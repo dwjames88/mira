@@ -15,6 +15,8 @@ struct TestDevice: Sendable {
                                         topInset: 62, bottomInset: 34)
     static let iPhoneSE = TestDevice(name: "iPhoneSE", size: CGSize(width: 375, height: 667), scale: 2,
                                      topInset: 20, bottomInset: 0)
+    static let iPhone16ProLandscape = TestDevice(name: "iPhone16ProLandscape", size: CGSize(width: 874, height: 402), scale: 3,
+                                                 topInset: 0, bottomInset: 21)
     static let all = [iPhone16Pro, iPhoneSE]
 }
 

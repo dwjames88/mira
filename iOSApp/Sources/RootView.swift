@@ -9,6 +9,8 @@ struct RootView: View {
     @State private var model = EditorViewModel()
     @State private var tab: EditorTab = .films
     @State private var pickerItem: PhotosPickerItem?
+    @State private var showCamera = false
+    private let launch = CameraLaunch.shared
     private let snapshotMode = ProcessInfo.processInfo.environment["MIRA_SNAPSHOT"] == "1"
 
     private let hub = PresetHub.shared
@@ -22,22 +24,46 @@ struct RootView: View {
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { _ = hub.store.reloadIfChanged(); hub.refresh() }
             }
+            .onChange(of: launch.cameraRequested) { _, requested in
+                if requested { openRequestedCamera() }
+            }
+            .onAppear { if launch.cameraRequested { openRequestedCamera() } }
     }
 
     @Environment(\.scenePhase) private var scenePhase
 
+    /// The Home Screen quick action: show the camera over whatever is open (the editor closes first).
+    private func openRequestedCamera() {
+        launch.cameraRequested = false
+        if model.hasPhoto { close() }
+        showCamera = true
+    }
+
     @ViewBuilder private var content: some View {
         if snapshotMode {
-            editor
+            if ProcessInfo.processInfo.environment["MIRA_SNAPSHOT_TAB"] == "camera" {
+                CameraScreen(editor: model, onClose: {})
+                    .foregroundStyle(FieldFramesTheme.paper)
+                    .tint(FieldFramesTheme.lichen)
+            } else {
+                editor
+            }
         } else {
             // The gallery stays alive under the editor so the NavigationStack path (the user's place
             // in the album list) survives opening and closing a photo.
             ZStack {
-                GalleryView(editor: model)
+                GalleryView(editor: model, onCamera: { showCamera = true })
                     .foregroundStyle(FieldFramesTheme.paper)
                     .tint(FieldFramesTheme.lichen)
-                    .allowsHitTesting(!model.hasPhoto)
-                    .accessibilityHidden(model.hasPhoto)
+                    .allowsHitTesting(!model.hasPhoto && !showCamera)
+                    .accessibilityHidden(model.hasPhoto || showCamera)
+                // Layered like the editor, so the gallery (and its album path) stays alive underneath.
+                if showCamera, !model.hasPhoto {
+                    CameraScreen(editor: model, onClose: { showCamera = false })
+                        .foregroundStyle(FieldFramesTheme.paper)
+                        .tint(FieldFramesTheme.lichen)
+                        .transition(.identity)
+                }
                 if model.hasPhoto { editor.transition(.identity) }
             }
         }
