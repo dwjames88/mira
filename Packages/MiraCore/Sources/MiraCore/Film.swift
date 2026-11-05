@@ -42,8 +42,13 @@ public struct Film: Codable, Identifiable, Hashable, Sendable {
     public var family: FilmFamily
     public var iso: Int
     public var description: String
-    /// Path relative to the films directory, e.g. `HaldCLUT/kodak-portra-400.png`.
+    /// Path relative to the films directory, e.g. `Packed/kodak-portra-400.mlut` (a `PackedLUT`; `.png` Hald and
+    /// `.cube` files also load, for user or test libraries).
     public var file: String
+    /// The Hald PNG this film was packed from, relative to the `FilmSources` folder of the source repository
+    /// (e.g. `HaldCLUT/kodak-portra-400.png`). Not bundled; used by `mira-sheet --pack-films`.
+    public var png: String?
+    /// Path of the original file inside the RawTherapee archive (see `Films/ATTRIBUTION.md`).
     public var source: String?
     /// The id of the stock this entry is a variant of (a push/pull or alternate rendering of the same
     /// film); nil for a stock. Variants are not shown as cards of their own; the FILMS panel offers them.
@@ -79,7 +84,7 @@ public struct Film: Codable, Identifiable, Hashable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, displayName, brand, family, iso, description, file, source, parent, variant, monochrome, character
+        case id, displayName, brand, family, iso, description, file, png, source, parent, variant, monochrome, character
     }
 
     /// `iso` may be a number or a numeric string in `films.json`.
@@ -98,6 +103,7 @@ public struct Film: Codable, Identifiable, Hashable, Sendable {
         }
         description = try c.decodeIfPresent(String.self, forKey: .description) ?? ""
         file = try c.decode(String.self, forKey: .file)
+        png = try c.decodeIfPresent(String.self, forKey: .png)
         source = try c.decodeIfPresent(String.self, forKey: .source)
         parent = try c.decodeIfPresent(String.self, forKey: .parent)
         variant = try c.decodeIfPresent(String.self, forKey: .variant)
@@ -107,7 +113,7 @@ public struct Film: Codable, Identifiable, Hashable, Sendable {
 
     public init(
         id: String, displayName: String, brand: String, family: FilmFamily,
-        iso: Int, description: String, file: String, source: String? = nil,
+        iso: Int, description: String, file: String, png: String? = nil, source: String? = nil,
         parent: String? = nil, variant: String? = nil, monochrome: Bool? = nil,
         character: FilmCharacter.Override? = nil
     ) {
@@ -118,6 +124,7 @@ public struct Film: Codable, Identifiable, Hashable, Sendable {
         self.iso = iso
         self.description = description
         self.file = file
+        self.png = png
         self.source = source
         self.parent = parent
         self.variant = variant

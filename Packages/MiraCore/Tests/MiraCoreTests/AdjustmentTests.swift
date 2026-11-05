@@ -174,7 +174,15 @@ import Testing
     @Test func cacheHitMatchesAndCorruptFileIsTolerated() throws {
         let cache = FileManager.default.temporaryDirectory.appendingPathComponent("mira-luts-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: cache) }
-        let dir = FilmTests.filmsDirectory()
+        // The disk cache serves Hald PNG libraries (packed films are never cached): copy one PNG into a temp library.
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("mira-pnglib-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let real = try #require(try FilmLibrary(directory: FilmTests.filmsDirectory()).films.first)
+        try FileManager.default.copyItem(
+            at: FilmCatalogTests.sources.appendingPathComponent(try #require(real.png)), to: dir.appendingPathComponent("a.png"))
+        try #"[{"id":"a","displayName":"A","brand":"T","family":"slide","iso":100,"file":"a.png"}]"#
+            .write(to: dir.appendingPathComponent("films.json"), atomically: true, encoding: .utf8)
         let first = try FilmLibrary(directory: dir, cacheDirectory: cache)
         let film = try #require(first.films.first)
         let a = try first.lut(for: film)
@@ -205,7 +213,8 @@ import Testing
         defer { try? FileManager.default.removeItem(at: cache) }
         let lib = try FilmLibrary(directory: FilmTests.filmsDirectory(), cacheDirectory: cache)
         lib.prewarmSync(concurrency: 4)
-        let files = try FileManager.default.contentsOfDirectory(atPath: cache.path).filter { $0.hasSuffix(".lut") }
-        #expect(files.count == lib.stocks.filter { $0.proceduralID == nil }.count)  // procedural looks have no cache file
+        #expect(lib.memoryCacheCount == min(lib.stocks.filter { $0.proceduralID == nil }.count, FilmLibrary.memoryCacheLimit))
+        // Packed films never write the disk cache.
+        #expect(!FileManager.default.fileExists(atPath: cache.path))
     }
 }
