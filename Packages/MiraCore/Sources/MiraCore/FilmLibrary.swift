@@ -28,7 +28,12 @@ public final class FilmLibrary: @unchecked Sendable {
         self.directory = directory
         self.cacheDirectory = cacheDirectory
         let data = try Data(contentsOf: directory.appendingPathComponent("films.json"))
-        let films = try JSONDecoder().decode([Film].self, from: data)
+        var films = try JSONDecoder().decode([Film].self, from: data)
+        // A variant (push / pull, alternate rendering) has its stock's reciprocity data.
+        let byID = Dictionary(films.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        for i in films.indices where films[i].reciprocity == nil {
+            if let parent = films[i].parent, let data = byID[parent]?.reciprocity { films[i].reciprocity = data }
+        }
         self.films = films
         self.index = Dictionary(films.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     }

@@ -29,7 +29,22 @@ extension CIImage {
     /// A copy tagged with `headroom` (an untagged copy for headroom <= 1).
     func withMiraHeadroom(_ headroom: CGFloat) -> CIImage {
         guard headroom > 1 || miraHeadroom > 1 else { return self }
-        return settingProperties([Self.miraHeadroomKey: Double(max(1, headroom))])
+        return settingProperties(properties.merging([Self.miraHeadroomKey: Double(max(1, headroom))]) { $1 })
+    }
+
+    static let miraExposureTimeKey = "MiraSourceExposureTime"
+
+    /// The photo's EXIF exposure time in seconds, as tagged by `ImageSource` when it loaded the file; nil when
+    /// the file has none. Like the headroom tag it survives transforms and crops.
+    public var miraExposureTime: Double? {
+        guard let v = properties[Self.miraExposureTimeKey] as? Double, v.isFinite, v > 0 else { return nil }
+        return v
+    }
+
+    /// A copy tagged with `seconds` (unchanged for nil or a non-positive value).
+    public func withMiraExposureTime(_ seconds: Double?) -> CIImage {
+        guard let seconds, seconds.isFinite, seconds > 0 else { return self }
+        return settingProperties(properties.merging([Self.miraExposureTimeKey: seconds]) { $1 })
     }
 }
 
@@ -53,7 +68,10 @@ extension ImageSource {
             return load(url: url, orientation: orientation).map { DevelopedSource(image: $0) }
         }
         let scale = draft ? develop.previewScale() : 1
-        return develop.develop(recipe.raw, filmApplied: recipe.filmID != nil, draft: draft, scale: scale)
+        let result = develop.develop(recipe.raw, filmApplied: recipe.filmID != nil, draft: draft, scale: scale)
             ?? load(url: url, orientation: orientation).map { DevelopedSource(image: $0) }
+        guard var developed = result else { return nil }
+        developed.image = developed.image.withMiraExposureTime(exposureTime(url: url))
+        return developed
     }
 }

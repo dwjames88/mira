@@ -30,7 +30,8 @@
     "description": "Soft, natural pastels with gentle contrast and delicate skin.",
     "file": "Packed/fuji-pro-160c.mlut",
     "png": "HaldCLUT/fuji-pro-160c.png",
-    "source": "HaldCLUT/Color/Fuji/Fuji 160C 2.png"
+    "source": "HaldCLUT/Color/Fuji/Fuji 160C 2.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 2, "rows": [[4, 0.3333, null], [32, 1.0, null]], "source": "https://juneleung.github.io/filmdoc/fuji/pro_160c_datasheet.pdf"}
   },
   {
     "id": "fuji-pro-160c-minus-1",
@@ -80,7 +81,8 @@
     "description": "Cool, airy greens and delicate, luminous skin.",
     "file": "Packed/fuji-pro-400h.mlut",
     "png": "HaldCLUT/fuji-pro-400h.png",
-    "source": "HaldCLUT/Color/Fuji/Fuji 400H 2.png"
+    "source": "HaldCLUT/Color/Fuji/Fuji 400H 2.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 1, "rows": [[4, 0.5, null], [16, 1.0, null], [32, null, null]], "source": "https://www.macodirect.de/media/pdf/4f/c9/b3/FH4011_Datenblatt_e.pdf"}
   },
   {
     "id": "fuji-pro-400h-minus-1",
@@ -291,7 +293,8 @@
     "description": "Punchy consumer-film color with a cool green cast.",
     "file": "Packed/fuji-superia-400.mlut",
     "png": "HaldCLUT/fuji-superia-400.png",
-    "source": "HaldCLUT/Color/Fuji/Fuji Superia 400 2.png"
+    "source": "HaldCLUT/Color/Fuji/Fuji Superia 400 2.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 2, "rows": [[4, 0.3333, null], [16, 0.6667, null], [64, 1.0, null]], "source": "https://archive.org/download/manualsonline-id-53ae5aa5-2c2a-af64-4959-c7d919fe73bf/53ae5aa5-2c2a-af64-4959-c7d919fe73bf.pdf"}
   },
   {
     "id": "fuji-superia-400-minus-1",
@@ -427,7 +430,8 @@
     "source": "HaldCLUT/Color/Kodak/Kodak Ektar 100.png",
     "character": {
       "grainStrength": 0.35
-    }
+    },
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 1, "rows": [], "source": "https://www.kodakprofessional.com/sites/default/files/2025-07/e4046.pdf"}
   },
   {
     "id": "kodak-elite-100-xpro",
@@ -449,7 +453,8 @@
     "description": "Fine, gentle pastels with natural, muted skin tones.",
     "file": "Packed/kodak-portra-160.mlut",
     "png": "HaldCLUT/kodak-portra-160.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Portra 160 2.png"
+    "source": "HaldCLUT/Color/Kodak/Kodak Portra 160 2.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 10, "rows": [[100, null, null]], "source": "https://cyberphoto.se/storage/C0254BB2DFD47BB7DDA9286256ACEF3E997E98C198A401C96283EB306112A972/b21c65bff8d846ad9d061cd1bcbf6adb/pdf/media/c160c5da59fe4ecea361a56f50c24052/Kodak_Reciprocity.pdf"}
   },
   {
     "id": "kodak-portra-160-minus-1",
@@ -499,7 +504,8 @@
     "description": "Neutral, low-saturation color with subdued, natural skin tones.",
     "file": "Packed/kodak-portra-160-nc.mlut",
     "png": "HaldCLUT/kodak-portra-160-nc.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Portra 160 NC 2.png"
+    "source": "HaldCLUT/Color/Kodak/Kodak Portra 160 NC 2.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 10, "rows": [[100, null, null]], "source": "https://cyberphoto.se/storage/C0254BB2DFD47BB7DDA9286256ACEF3E997E98C198A401C96283EB306112A972/b21c65bff8d846ad9d061cd1bcbf6adb/pdf/media/c160c5da59fe4ecea361a56f50c24052/Kodak_Reciprocity.pdf"}
   },
   {
     "id": "kodak-portra-160-nc-minus-1",
@@ -549,7 +555,8 @@
     "description": "Vivid color with richer saturation and contrast than standard Portra.",
     "file": "Packed/kodak-portra-160-vc.mlut",
     "png": "HaldCLUT/kodak-portra-160-vc.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Portra 160 VC 2.png"
+    "source": "HaldCLUT/Color/Kodak/Kodak Portra 160 VC 2.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 10, "rows": [[100, null, null]], "source": "https://cyberphoto.se/storage/C0254BB2DFD47BB7DDA9286256ACEF3E997E98C198A401C96283EB306112A972/b21c65bff8d846ad9d061cd1bcbf6adb/pdf/media/c160c5da59fe4ecea361a56f50c24052/Kodak_Reciprocity.pdf"}
   },
   {
     "id": "kodak-portra-160-vc-minus-1",
@@ -599,7 +606,8 @@
     "description": "Warm, forgiving skin tones with soft pastel highlights.",
     "file": "Packed/kodak-portra-400.mlut",
     "png": "HaldCLUT/kodak-portra-400.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Portra 400 2.png"
+    "source": "HaldCLUT/Color/Kodak/Kodak Portra 400 2.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 10, "rows": [[100, null, null]], "source": "https://cyberphoto.se/storage/C0254BB2DFD47BB7DDA9286256ACEF3E997E98C198A401C96283EB306112A972/b21c65bff8d846ad9d061cd1bcbf6adb/pdf/media/c160c5da59fe4ecea361a56f50c24052/Kodak_Reciprocity.pdf"}
   },
   {
     "id": "kodak-portra-400-minus-1",
@@ -649,7 +657,8 @@
     "description": "Neutral, restrained color with soft, natural skin rendering.",
     "file": "Packed/kodak-portra-400-nc.mlut",
     "png": "HaldCLUT/kodak-portra-400-nc.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Portra 400 NC 2.png"
+    "source": "HaldCLUT/Color/Kodak/Kodak Portra 400 NC 2.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 10, "rows": [[100, null, null]], "source": "https://cyberphoto.se/storage/C0254BB2DFD47BB7DDA9286256ACEF3E997E98C198A401C96283EB306112A972/b21c65bff8d846ad9d061cd1bcbf6adb/pdf/media/c160c5da59fe4ecea361a56f50c24052/Kodak_Reciprocity.pdf"}
   },
   {
     "id": "kodak-portra-400-nc-minus-1",
@@ -699,7 +708,8 @@
     "description": "Warm, punchy color with strong saturation and rich contrast.",
     "file": "Packed/kodak-portra-400-uc.mlut",
     "png": "HaldCLUT/kodak-portra-400-uc.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Portra 400 UC 2.png"
+    "source": "HaldCLUT/Color/Kodak/Kodak Portra 400 UC 2.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 10, "rows": [[100, null, null]], "source": "https://cyberphoto.se/storage/C0254BB2DFD47BB7DDA9286256ACEF3E997E98C198A401C96283EB306112A972/b21c65bff8d846ad9d061cd1bcbf6adb/pdf/media/c160c5da59fe4ecea361a56f50c24052/Kodak_Reciprocity.pdf"}
   },
   {
     "id": "kodak-portra-400-uc-minus-1",
@@ -749,7 +759,8 @@
     "description": "Vibrant, contrasty color with saturated reds and deep shadows.",
     "file": "Packed/kodak-portra-400-vc.mlut",
     "png": "HaldCLUT/kodak-portra-400-vc.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Portra 400 VC 2.png"
+    "source": "HaldCLUT/Color/Kodak/Kodak Portra 400 VC 2.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 10, "rows": [[100, null, null]], "source": "https://cyberphoto.se/storage/C0254BB2DFD47BB7DDA9286256ACEF3E997E98C198A401C96283EB306112A972/b21c65bff8d846ad9d061cd1bcbf6adb/pdf/media/c160c5da59fe4ecea361a56f50c24052/Kodak_Reciprocity.pdf"}
   },
   {
     "id": "kodak-portra-400-vc-minus-1",
@@ -799,7 +810,8 @@
     "description": "Low-light warmth with a touch more grain-era punch.",
     "file": "Packed/kodak-portra-800.mlut",
     "png": "HaldCLUT/kodak-portra-800.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Portra 800 2.png"
+    "source": "HaldCLUT/Color/Kodak/Kodak Portra 800 2.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 1, "rows": [[10, null, null]], "source": "https://cyberphoto.se/storage/C0254BB2DFD47BB7DDA9286256ACEF3E997E98C198A401C96283EB306112A972/b21c65bff8d846ad9d061cd1bcbf6adb/pdf/media/c160c5da59fe4ecea361a56f50c24052/Kodak_Reciprocity.pdf"}
   },
   {
     "id": "kodak-portra-800-minus-1",
@@ -930,7 +942,8 @@
     "description": "Neutral, clean slide color with fine tonal detail.",
     "file": "Packed/fuji-provia-100f.mlut",
     "png": "HaldCLUT/fuji-provia-100f.png",
-    "source": "HaldCLUT/Color/Fuji/Fuji Provia 100F.png"
+    "source": "HaldCLUT/Color/Fuji/Fuji Provia 100F.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 128, "rows": [[240, 0.3333, {"r": 0.083, "g": 0.0, "b": 0.083}], [480, null, null]], "source": "https://www.digitaltruth.com/products/fuji_tech/Provia100f.pdf"}
   },
   {
     "id": "fuji-provia-100f-generic",
@@ -954,7 +967,8 @@
     "description": "Clean, neutral slide color with fine grain for its speed.",
     "file": "Packed/fuji-provia-400f.mlut",
     "png": "HaldCLUT/fuji-provia-400f.png",
-    "source": "HaldCLUT/Color/Fuji/Fuji Provia 400F.png"
+    "source": "HaldCLUT/Color/Fuji/Fuji Provia 400F.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 32, "rows": [[60, 0.6667, {"r": 0.166, "g": 0.0, "b": 0.166}], [120, 1.0, {"r": 0.249, "g": 0.0, "b": 0.249}], [240, 1.0, {"r": 0.249, "g": 0.0, "b": 0.249}], [480, null, null]], "source": "https://juneleung.github.io/filmdoc/fuji/PROVIA400FAF3-066E_1.pdf"}
   },
   {
     "id": "fuji-provia-400x",
@@ -965,7 +979,8 @@
     "description": "Saturated, fine-grained slide color with a crisp, contrasty finish.",
     "file": "Packed/fuji-provia-400x.mlut",
     "png": "HaldCLUT/fuji-provia-400x.png",
-    "source": "HaldCLUT/Color/Fuji/Fuji Provia 400X.png"
+    "source": "HaldCLUT/Color/Fuji/Fuji Provia 400X.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 60, "rows": [[120, 0.5, {"r": 0.0, "g": 0.083, "b": 0.083}], [240, 1.0, {"r": 0.0, "g": 0.166, "b": 0.166}], [480, 1.0, {"r": 0.0, "g": 0.166, "b": 0.166}]], "source": "https://www.chrysis.net/wp-content/uploads/2020/08/Fujichrome_Provia_400X_datasheet.pdf"}
   },
   {
     "id": "fuji-sensia-100",
@@ -998,7 +1013,8 @@
     "description": "Rich, saturated slide color with deep contrast and vivid greens.",
     "file": "Packed/fuji-velvia-100.mlut",
     "png": "HaldCLUT/fuji-velvia-100.png",
-    "source": "HaldCLUT/Color/Fuji/Fuji Velvia 100 Generic.png"
+    "source": "HaldCLUT/Color/Fuji/Fuji Velvia 100 Generic.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 60, "rows": [[120, 0.3333, {"r": 0.0, "g": 0.083, "b": 0.0}], [240, 0.5, {"r": 0.0, "g": 0.083, "b": 0.0}], [480, 0.6667, {"r": 0.0, "g": 0.083, "b": 0.0}]], "source": "https://archive.org/download/manualsonline-id-8a2be063-a576-9414-fd21-a085127eed70/8a2be063-a576-9414-fd21-a085127eed70.pdf"}
   },
   {
     "id": "fuji-velvia-50",
@@ -1009,7 +1025,8 @@
     "description": "Deeply saturated landscape color with strong contrast.",
     "file": "Packed/fuji-velvia-50.mlut",
     "png": "HaldCLUT/fuji-velvia-50.png",
-    "source": "HaldCLUT/Color/Fuji/Fuji Velvia 50.png"
+    "source": "HaldCLUT/Color/Fuji/Fuji Velvia 50.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 1, "rows": [[4, 0.3333, {"r": 0.0, "g": 0.166, "b": 0.0}], [8, 0.5, {"r": 0.0, "g": 0.249, "b": 0.0}], [16, 0.6667, {"r": 0.0, "g": 0.332, "b": 0.0}], [32, 1.0, {"r": 0.0, "g": 0.415, "b": 0.0}], [64, null, null]], "source": "https://www.macodirect.de/media/pdf/25/a7/d2/FV504P_Datenblatt_e.pdf"}
   },
   {
     "id": "kodak-e100gx",
@@ -1031,7 +1048,8 @@
     "description": "Vibrant, cool-leaning slide color with a bright snap.",
     "file": "Packed/kodak-ektachrome-100-vs.mlut",
     "png": "HaldCLUT/kodak-ektachrome-100-vs.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Ektachrome 100 VS.png"
+    "source": "HaldCLUT/Color/Kodak/Kodak Ektachrome 100 VS.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 10, "rows": [[100, null, null]], "source": "https://cyberphoto.se/storage/C0254BB2DFD47BB7DDA9286256ACEF3E997E98C198A401C96283EB306112A972/b21c65bff8d846ad9d061cd1bcbf6adb/pdf/media/c160c5da59fe4ecea361a56f50c24052/Kodak_Reciprocity.pdf"}
   },
   {
     "id": "kodak-ektachrome-100-vs-generic",
@@ -1055,7 +1073,8 @@
     "description": "Natural slide color with moderate saturation and gentle contrast.",
     "file": "Packed/kodak-elite-chrome-200.mlut",
     "png": "HaldCLUT/kodak-elite-chrome-200.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Elite Chrome 200.png"
+    "source": "HaldCLUT/Color/Kodak/Kodak Elite Chrome 200.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 10, "rows": [[100, null, null]], "source": "https://cyberphoto.se/storage/C0254BB2DFD47BB7DDA9286256ACEF3E997E98C198A401C96283EB306112A972/b21c65bff8d846ad9d061cd1bcbf6adb/pdf/media/c160c5da59fe4ecea361a56f50c24052/Kodak_Reciprocity.pdf"}
   },
   {
     "id": "kodak-elite-chrome-400",
@@ -1066,7 +1085,8 @@
     "description": "Fast slide with natural color and moderately visible grain.",
     "file": "Packed/kodak-elite-chrome-400.mlut",
     "png": "HaldCLUT/kodak-elite-chrome-400.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Elite Chrome 400.png"
+    "source": "HaldCLUT/Color/Kodak/Kodak Elite Chrome 400.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 0.1, "rows": [[1, 0.4, {"r": 0.0, "g": 0.166, "b": 0.166}], [10, 0.5, {"r": 0.0, "g": 0.332, "b": 0.332}], [100, null, null]], "source": "https://cyberphoto.se/storage/C0254BB2DFD47BB7DDA9286256ACEF3E997E98C198A401C96283EB306112A972/b21c65bff8d846ad9d061cd1bcbf6adb/pdf/media/c160c5da59fe4ecea361a56f50c24052/Kodak_Reciprocity.pdf"}
   },
   {
     "id": "kodak-elite-extracolor-100",
@@ -1077,7 +1097,8 @@
     "description": "Highly saturated, punchy slide color with vivid reds and blues.",
     "file": "Packed/kodak-elite-extracolor-100.mlut",
     "png": "HaldCLUT/kodak-elite-extracolor-100.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Elite ExtraColor 100.png"
+    "source": "HaldCLUT/Color/Kodak/Kodak Elite ExtraColor 100.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 10, "rows": [[100, null, null]], "source": "https://cyberphoto.se/storage/C0254BB2DFD47BB7DDA9286256ACEF3E997E98C198A401C96283EB306112A972/b21c65bff8d846ad9d061cd1bcbf6adb/pdf/media/c160c5da59fe4ecea361a56f50c24052/Kodak_Reciprocity.pdf"}
   },
   {
     "id": "kodak-kodachrome-200",
@@ -1088,7 +1109,8 @@
     "description": "Punchy, warm slide with bold reds and visible grain.",
     "file": "Packed/kodak-kodachrome-200.mlut",
     "png": "HaldCLUT/kodak-kodachrome-200.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Kodachrome 200.png"
+    "source": "HaldCLUT/Color/Kodak/Kodak Kodachrome 200.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 0.1, "rows": [[1, 0.5, {"r": 0.0, "g": 0.0, "b": 0.332}], [10, null, null]], "source": "https://cyberphoto.se/storage/C0254BB2DFD47BB7DDA9286256ACEF3E997E98C198A401C96283EB306112A972/b21c65bff8d846ad9d061cd1bcbf6adb/pdf/media/c160c5da59fe4ecea361a56f50c24052/Kodak_Reciprocity.pdf"}
   },
   {
     "id": "kodak-kodachrome-25",
@@ -1110,7 +1132,8 @@
     "description": "Classic rich reds and warm, dense midtones.",
     "file": "Packed/kodak-kodachrome-64.mlut",
     "png": "HaldCLUT/kodak-kodachrome-64.png",
-    "source": "HaldCLUT/Color/Kodak/Kodak Kodachrome 64.png"
+    "source": "HaldCLUT/Color/Kodak/Kodak Kodachrome 64.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 0.01, "rows": [[0.1, 0.3333, {"r": 0.0, "g": 0.166, "b": 0.166}], [1, null, null]], "source": "https://cyberphoto.se/storage/C0254BB2DFD47BB7DDA9286256ACEF3E997E98C198A401C96283EB306112A972/b21c65bff8d846ad9d061cd1bcbf6adb/pdf/media/c160c5da59fe4ecea361a56f50c24052/Kodak_Reciprocity.pdf"}
   },
   {
     "id": "kodak-kodachrome-64-generic",
@@ -1145,7 +1168,8 @@
     "description": "Classic fine-grained monochrome with moderate contrast.",
     "file": "Packed/agfa-apx-100.mlut",
     "png": "HaldCLUT/agfa-apx-100.png",
-    "source": "HaldCLUT/Black-and-White/Agfa/Agfa APX 100.png"
+    "source": "HaldCLUT/Black-and-White/Agfa/Agfa APX 100.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 0.5, "rows": [[1, 1.0, null], [10, 2.0, null], [100, 3.0, null]], "contrastPerStop": 0.11, "source": "https://125px.com/docs/film/agfa/apx100.pdf"}
   },
   {
     "id": "agfa-apx-25",
@@ -1156,7 +1180,8 @@
     "description": "Ultra-fine grain with crisp detail and delicate tones.",
     "file": "Packed/agfa-apx-25.mlut",
     "png": "HaldCLUT/agfa-apx-25.png",
-    "source": "HaldCLUT/Black-and-White/Agfa/Agfa APX 25.png"
+    "source": "HaldCLUT/Black-and-White/Agfa/Agfa APX 25.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 0.5, "rows": [[1, 1.0, null], [10, 1.5, null], [100, 2.0, null]], "contrastPerStop": 0.0, "source": "https://www.chrysis.net/wp-content/uploads/2020/08/agfapanapx25-datasheet.pdf"}
   },
   {
     "id": "fuji-neopan-1600",
@@ -1220,7 +1245,8 @@
     "source": "HaldCLUT/Black-and-White/Fuji/Fuji Neopan Acros 100.png",
     "character": {
       "grainStrength": 0.4
-    }
+    },
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 120, "rows": [[120, 0.5, null], [1000, 0.5, null]], "contrastPerStop": 0.0, "source": "https://juneleung.github.io/filmdoc/fuji/Acros-120_AF3-083E.pdf"}
   },
   {
     "id": "ilford-delta-100",
@@ -1234,7 +1260,8 @@
     "source": "HaldCLUT/Black-and-White/Ilford/Ilford Delta 100.png",
     "character": {
       "grainStrength": 0.4
-    }
+    },
+    "reciprocity": {"type": "schwarzschild", "p": 1.26, "threshold": 1.0, "contrastPerStop": 0.025, "source": "https://www.ilfordphoto.com/wp/wp-content/uploads/2024/05/Reciprocity-Failure-Compensation-v2.pdf"}
   },
   {
     "id": "ilford-delta-3200",
@@ -1245,7 +1272,8 @@
     "description": "Very fast, gritty monochrome with moody, contrasty shadows.",
     "file": "Packed/ilford-delta-3200.mlut",
     "png": "HaldCLUT/ilford-delta-3200.png",
-    "source": "HaldCLUT/Black-and-White/Ilford/Ilford Delta 3200 2.png"
+    "source": "HaldCLUT/Black-and-White/Ilford/Ilford Delta 3200 2.png",
+    "reciprocity": {"type": "schwarzschild", "p": 1.33, "threshold": 1.0, "contrastPerStop": 0.025, "source": "https://www.ilfordphoto.com/wp/wp-content/uploads/2024/05/Reciprocity-Failure-Compensation-v2.pdf"}
   },
   {
     "id": "ilford-delta-3200-minus-1",
@@ -1295,7 +1323,8 @@
     "description": "Fine-grained modern monochrome with clean, even tonality.",
     "file": "Packed/ilford-delta-400.mlut",
     "png": "HaldCLUT/ilford-delta-400.png",
-    "source": "HaldCLUT/Black-and-White/Ilford/Ilford Delta 400.png"
+    "source": "HaldCLUT/Black-and-White/Ilford/Ilford Delta 400.png",
+    "reciprocity": {"type": "schwarzschild", "p": 1.41, "threshold": 1.0, "contrastPerStop": 0.025, "source": "https://www.ilfordphoto.com/wp/wp-content/uploads/2024/05/Reciprocity-Failure-Compensation-v2.pdf"}
   },
   {
     "id": "ilford-fp4-plus-125",
@@ -1306,7 +1335,8 @@
     "description": "Classic soft-toned monochrome with gentle contrast.",
     "file": "Packed/ilford-fp4-plus-125.mlut",
     "png": "HaldCLUT/ilford-fp4-plus-125.png",
-    "source": "HaldCLUT/Black-and-White/Ilford/Ilford FP4 Plus 125.png"
+    "source": "HaldCLUT/Black-and-White/Ilford/Ilford FP4 Plus 125.png",
+    "reciprocity": {"type": "schwarzschild", "p": 1.26, "threshold": 1.0, "contrastPerStop": 0.025, "source": "https://www.ilfordphoto.com/wp/wp-content/uploads/2024/05/Reciprocity-Failure-Compensation-v2.pdf"}
   },
   {
     "id": "ilford-hp5-plus-400",
@@ -1320,7 +1350,8 @@
     "source": "HaldCLUT/Black-and-White/Ilford/Ilford HP5 2.png",
     "character": {
       "grainStrength": 1.35
-    }
+    },
+    "reciprocity": {"type": "schwarzschild", "p": 1.31, "threshold": 1.0, "contrastPerStop": 0.025, "source": "https://www.ilfordphoto.com/wp/wp-content/uploads/2024/05/Reciprocity-Failure-Compensation-v2.pdf"}
   },
   {
     "id": "ilford-hp5-plus-400-minus-1",
@@ -1406,7 +1437,8 @@
     "description": "Ultra-fine, high-detail monochrome with crisp whites.",
     "file": "Packed/ilford-pan-f-plus-50.mlut",
     "png": "HaldCLUT/ilford-pan-f-plus-50.png",
-    "source": "HaldCLUT/Black-and-White/Ilford/Ilford Pan F Plus 50.png"
+    "source": "HaldCLUT/Black-and-White/Ilford/Ilford Pan F Plus 50.png",
+    "reciprocity": {"type": "schwarzschild", "p": 1.33, "threshold": 1.0, "contrastPerStop": 0.025, "source": "https://www.ilfordphoto.com/wp/wp-content/uploads/2024/05/Reciprocity-Failure-Compensation-v2.pdf"}
   },
   {
     "id": "ilford-xp2-400",
@@ -1417,7 +1449,8 @@
     "description": "Smooth chromogenic monochrome with soft contrast and little grain.",
     "file": "Packed/ilford-xp2-400.mlut",
     "png": "HaldCLUT/ilford-xp2-400.png",
-    "source": "HaldCLUT/Black-and-White/Ilford/Ilford XP2.png"
+    "source": "HaldCLUT/Black-and-White/Ilford/Ilford XP2.png",
+    "reciprocity": {"type": "schwarzschild", "p": 1.31, "threshold": 1.0, "contrastPerStop": 0.025, "source": "https://www.ilfordphoto.com/wp/wp-content/uploads/2024/05/Reciprocity-Failure-Compensation-v2.pdf"}
   },
   {
     "id": "kodak-bw-400-cn",
@@ -1428,7 +1461,8 @@
     "description": "Smooth chromogenic black and white with soft, wide tonality.",
     "file": "Packed/kodak-bw-400-cn.mlut",
     "png": "HaldCLUT/kodak-bw-400-cn.png",
-    "source": "HaldCLUT/Black-and-White/Kodak/Kodak BW 400 CN.png"
+    "source": "HaldCLUT/Black-and-White/Kodak/Kodak BW 400 CN.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 120, "rows": [], "contrastPerStop": 0.0, "source": "https://cyberphoto.se/storage/C0254BB2DFD47BB7DDA9286256ACEF3E997E98C198A401C96283EB306112A972/b21c65bff8d846ad9d061cd1bcbf6adb/pdf/media/c160c5da59fe4ecea361a56f50c24052/Kodak_Reciprocity.pdf"}
   },
   {
     "id": "kodak-hie",
@@ -1453,7 +1487,8 @@
     "source": "HaldCLUT/Black-and-White/Kodak/Kodak T-Max 100.png",
     "character": {
       "grainStrength": 0.4
-    }
+    },
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 0.1, "rows": [[1, 0.3333, null], [10, 0.5, null], [100, 1, null]], "highIntensity": [[0.0001, 0.3333], [0.001, 0]], "contrastPerStop": 0.0, "source": "https://www.macodirect.de/media/pdf/56/88/e2/KTM104_Datenblatt_e.pdf"}
   },
   {
     "id": "kodak-t-max-3200",
@@ -1464,7 +1499,8 @@
     "description": "Fast, grainy monochrome with contrasty shadows and bold texture.",
     "file": "Packed/kodak-t-max-3200.mlut",
     "png": "HaldCLUT/kodak-t-max-3200.png",
-    "source": "HaldCLUT/Black-and-White/Kodak/Kodak TMAX 3200 2.png"
+    "source": "HaldCLUT/Black-and-White/Kodak/Kodak TMAX 3200 2.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 0.1, "rows": [[1, 0.3333, null], [10, 0.6667, null], [100, 2, null]], "contrastPerStop": 0.0, "source": "https://www.macodirect.de/media/pdf/56/88/e2/KTM104_Datenblatt_e.pdf"}
   },
   {
     "id": "kodak-t-max-3200-minus-1",
@@ -1527,7 +1563,8 @@
     "description": "Clean, sharp monochrome with a modern tonal curve.",
     "file": "Packed/kodak-t-max-400.mlut",
     "png": "HaldCLUT/kodak-t-max-400.png",
-    "source": "HaldCLUT/Black-and-White/Kodak/Kodak T-Max 400.png"
+    "source": "HaldCLUT/Black-and-White/Kodak/Kodak T-Max 400.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 0.1, "rows": [[10, 0.3333, null], [100, 1.5, null]], "contrastPerStop": 0.0, "source": "https://www.freestylephoto.com/pdf/product_pdfs/kodak/Kodak_Tmax400.pdf"}
   },
   {
     "id": "kodak-tri-x-400",
@@ -1541,7 +1578,8 @@
     "source": "HaldCLUT/Black-and-White/Kodak/Kodak TRI-X 400 2.png",
     "character": {
       "grainStrength": 1.45
-    }
+    },
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 0.1, "rows": [[1, 1.0, null], [10, 2.0, null], [100, 3.0, null]], "highIntensity": [[1e-05, 1.0], [0.0001, 0.5], [0.001, 0]], "contrastPerStop": 0.1, "source": "https://cdn.shopify.com/s/files/1/0339/5113/files/f4017_trix_320400.pdf"}
   },
   {
     "id": "kodak-tri-x-400-minus-1",
@@ -2243,7 +2281,8 @@
     "file": "Packed/polaroid-667.mlut",
     "png": "HaldCLUT/polaroid-667.png",
     "source": "HaldCLUT/Black-and-White/Polaroid/Polaroid 667.png",
-    "monochrome": true
+    "monochrome": true,
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 0.1, "rows": [[1, 0.5, null], [10, 1.3, null], [100, 2.4, null]], "source": "https://juneleung.github.io/filmdoc/polaroid/667fds.pdf"}
   },
   {
     "id": "polaroid-669",
@@ -2254,7 +2293,8 @@
     "description": "Classic peel-apart instant with a gentle cool tint.",
     "file": "Packed/polaroid-669.mlut",
     "png": "HaldCLUT/polaroid-669.png",
-    "source": "HaldCLUT/Color/Polaroid/Polaroid 669 3.png"
+    "source": "HaldCLUT/Color/Polaroid/Polaroid 669 3.png",
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 0.0083, "rows": [[0.125, 0.68, {"r": 0.0, "g": 0.997, "b": 0.997}], [0.25, 1.0, {"r": 0.0, "g": 0.997, "b": 1.329}], [1, 1.68, {"r": 0.0, "g": 1.329, "b": 1.661}], [10, 3.0, {"r": 0.0, "g": 1.993, "b": 2.325}]], "highIntensity": [[0.000333, 0.32], [0.001, 0]], "source": "https://juneleung.github.io/filmdoc/polaroid/88fds.pdf"}
   },
   {
     "id": "polaroid-669-minus-2",
@@ -3295,7 +3335,8 @@
     "character": {
       "grainStrength": 1.0,
       "grainSize": 0.0005
-    }
+    },
+    "reciprocity": {"type": "table", "noCorrectionUpTo": 1, "rows": [[10, 1.0, {"r": 0.0, "g": 0.332, "b": 0.332}]], "source": "https://www.kodak.com/content/products-brochures/motion-picture/KODAK-VISION3-500T-5219-7219-brochure.pdf"}
   },
   {
     "id": "vision3-250d",

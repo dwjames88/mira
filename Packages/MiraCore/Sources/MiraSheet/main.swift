@@ -34,6 +34,8 @@ struct Options {
     var filmsList: String?
     var states: String?
     var width = 900
+    var exposureTime: Double?
+    var reciprocity: ReciprocityMode?
 }
 
 func parseArguments() -> Options {
@@ -70,6 +72,12 @@ func parseArguments() -> Options {
         case "--films-list": o.filmsList = next(flag)
         case "--states": o.states = next(flag)
         case "--width": o.width = nextInt(flag)
+        case "--exposure-time":
+            guard let t = Double(next(flag)), t > 0 else { fail("--exposure-time needs seconds > 0") }
+            o.exposureTime = t
+        case "--reciprocity":
+            guard let m = ReciprocityMode(rawValue: next(flag)) else { fail("--reciprocity: off, compensated or uncompensated") }
+            o.reciprocity = m
         default: fail("unknown argument \(flag)")
         }
     }
@@ -121,7 +129,7 @@ if opts.bench {
 
 if opts.contactSheet {
     guard let p = opts.films, let input = opts.input, let out = opts.out else {
-        fail("usage: mira-sheet --contact-sheet --films <dir> --input <image|RAW> --out <dir> [--films-list id,id] [--states a,b] [--width 900] [--crop-only]")
+        fail("usage: mira-sheet --contact-sheet --films <dir> --input <image|RAW> --out <dir> [--films-list id,id] [--states a,b] [--width 900] [--crop-only] [--exposure-time <seconds>] [--reciprocity off|compensated|uncompensated]")
     }
     var states = ContactSheetState.defaults
     if let list = opts.states {
@@ -140,7 +148,8 @@ if opts.contactSheet {
         nonisolated(unsafe) var cache: [Bool: CIImage] = [:]
         let t0 = DispatchTime.now().uptimeNanoseconds
         let config = ContactSheet.Config(films: ids, states: states, tileWidth: opts.width, cropOnly: opts.cropOnly,
-                                         outDir: URL(fileURLWithPath: out, isDirectory: true))
+                                         outDir: URL(fileURLWithPath: out, isDirectory: true),
+                                         exposureTime: opts.exposureTime, reciprocity: opts.reciprocity)
         let result = try ContactSheet.run(config: config, library: lib, warn: { print("WARN \($0)") }) { recipe in
             let key = recipe.filmID != nil
             if let c = cache[key] { return c }
