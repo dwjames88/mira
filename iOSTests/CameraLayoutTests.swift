@@ -31,8 +31,6 @@ final class CameraLayoutTests: XCTestCase {
         let model = makeModel()
         let view = CameraView(model: model, filmName: "Kodak Portra 400", onClose: {}, onLayout: { box.frames = $0 }) { _ in
             Color.clear
-        } wbDoor: { _ in
-            Color.clear
         }
         await Snapshot.render(view, device: device, name: name, settle: .milliseconds(1500))
         await model.stop()
@@ -62,11 +60,12 @@ final class CameraLayoutTests: XCTestCase {
             let fit = FinderGeometry.fitRect(aspect: 3.0 / 4, in: finder.size)
             XCTAssertLessThanOrEqual(fit.width, finder.width + 0.5)
             XCTAssertLessThanOrEqual(fit.height, finder.height + 0.5)
-            assertNoOverlap(f, ["header", "meter", "finder", "lenses", "ev", "bottom"])
+            assertNoOverlap(f, ["header", "meter", "finder", "lenses", "ev", "wb", "bottom"])
+            XCTAssertEqual(f["wb"]!.height, f["ev"]!.height, accuracy: 0.5, "WB row as tall as the EV row on \(d.name)")
             XCTAssertLessThanOrEqual(f["bottom"]!.maxY, usable.height + 0.5, "bottom row stays on screen on \(d.name)")
             XCTAssertLessThanOrEqual(f["thumb"]!.maxX, f["shutter"]!.minX, "thumb left of the shutter")
             XCTAssertEqual(f["shutter"]!.midX, usable.width / 2, accuracy: 1, "shutter centered")
-            for id in ["header", "meter", "finder", "lenses", "ev", "bottom"] {
+            for id in ["header", "meter", "finder", "lenses", "ev", "wb", "bottom"] {
                 XCTAssertGreaterThanOrEqual(f[id]!.minX, -0.5)
                 XCTAssertLessThanOrEqual(f[id]!.maxX, usable.width + 0.5, "\(id) inside the width")
             }
@@ -82,8 +81,11 @@ final class CameraLayoutTests: XCTestCase {
         XCTAssertGreaterThan(finder.width, finder.height, "the finder takes the long side")
         XCTAssertLessThan(meter.maxX, finder.minX + 0.5, "meter on the left edge")
         XCTAssertGreaterThan(shutter.minX, finder.maxX - 0.5, "shutter column on the right")
-        assertNoOverlap(f, ["header", "meter", "lenses", "ev"])
-        XCTAssertLessThanOrEqual(f["ev"]!.maxY, usable.height + 0.5)
+        assertNoOverlap(f, ["header", "meter", "lenses", "ev", "wb"])
+        XCTAssertLessThanOrEqual(f["wb"]!.maxY, usable.height + 0.5)
+        XCTAssertEqual(f["wb"]!.height, f["ev"]!.height, accuracy: 0.5, "WB row as tall as the EV row")
+        XCTAssertGreaterThan(f["wb"]!.minY, f["ev"]!.minY, "WB under EV")
+        XCTAssertLessThanOrEqual(f["wb"]!.maxX, 210.5, "WB in the left column")
         XCTAssertLessThanOrEqual(shutter.maxY, usable.height + 0.5)
     }
 }

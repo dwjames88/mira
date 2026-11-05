@@ -292,18 +292,13 @@ public actor CaptureController: CameraDevice {
     public func setWhiteBalance(_ state: WhiteBalanceState) async {
         guard let device, (try? device.lockForConfiguration()) != nil else { return }
         defer { device.unlockForConfiguration() }
-        guard state.isFixed else {
+        guard let kelvin = state.kelvin else {
             if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) { device.whiteBalanceMode = .continuousAutoWhiteBalance }
             return
         }
         guard device.isLockingWhiteBalanceWithCustomDeviceGainsSupported else { return }
-        let gains: AVCaptureDevice.WhiteBalanceGains
-        if let kelvin = state.preset.kelvin {
-            let values = AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(temperature: Float(kelvin), tint: 0)
-            gains = device.deviceWhiteBalanceGains(for: values)
-        } else {
-            gains = device.deviceWhiteBalanceGains   // auto, locked: hold the current value
-        }
+        let values = AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(temperature: Float(kelvin), tint: 0)
+        let gains = device.deviceWhiteBalanceGains(for: values)
         let clamped = WhiteBalanceGains(red: Double(gains.redGain), green: Double(gains.greenGain), blue: Double(gains.blueGain))
             .clamped(maxGain: Double(device.maxWhiteBalanceGain))
         device.setWhiteBalanceModeLocked(

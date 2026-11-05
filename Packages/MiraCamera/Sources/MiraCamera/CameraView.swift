@@ -58,9 +58,9 @@ final class FinderTouchDriver {
     }
 }
 
-/// The two doors that slide up over the lower chrome (the settings stay a sheet).
+/// The door that slides up over the lower chrome (the settings stay a sheet).
 enum CameraDoor: String, Identifiable {
-    case film, wb
+    case film
     var id: String { rawValue }
 }
 
@@ -72,14 +72,13 @@ public struct CameraDoorContext {
 
 /// The camera screen: header, meter, finder, lens chips, EV dial, shutter row. Portrait stacks them; landscape
 /// gives the finder the long side with the meter, lens chips and EV dial on the left and the shutter column on the right.
-/// The film and white balance doors are supplied by the app (`filmDoor`, `wbDoor`) and slide up as a bottom panel
+/// The film door is supplied by the app (`filmDoor`) and slides up as a bottom panel
 /// over the lower chrome, the finder staying visible above.
-public struct CameraView<FilmDoor: View, WBDoor: View>: View {
+public struct CameraView<FilmDoor: View>: View {
     @Bindable var model: CameraModel
     let filmName: String?
     let onClose: () -> Void
     let filmDoor: (CameraDoorContext) -> FilmDoor
-    let wbDoor: (CameraDoorContext) -> WBDoor
     /// Layout tests report the finder's frame in the camera's coordinate space.
     var onLayout: (@MainActor @Sendable ([String: CGRect]) -> Void)?
 
@@ -90,22 +89,21 @@ public struct CameraView<FilmDoor: View, WBDoor: View>: View {
 
     public init(
         model: CameraModel, filmName: String?, onClose: @escaping () -> Void,
-        @ViewBuilder filmDoor: @escaping (CameraDoorContext) -> FilmDoor, @ViewBuilder wbDoor: @escaping (CameraDoorContext) -> WBDoor
+        @ViewBuilder filmDoor: @escaping (CameraDoorContext) -> FilmDoor
     ) {
         self.model = model
         self.filmName = filmName
         self.onClose = onClose
         self.filmDoor = filmDoor
-        self.wbDoor = wbDoor
     }
 
     /// `onLayout` receives the frames of the parts (header, meter, finder, lenses, ev, bottom, shutter, thumb) for layout tests.
     public init(
         model: CameraModel, filmName: String?, onClose: @escaping () -> Void,
         onLayout: (@MainActor @Sendable ([String: CGRect]) -> Void)?,
-        @ViewBuilder filmDoor: @escaping (CameraDoorContext) -> FilmDoor, @ViewBuilder wbDoor: @escaping (CameraDoorContext) -> WBDoor
+        @ViewBuilder filmDoor: @escaping (CameraDoorContext) -> FilmDoor
     ) {
-        self.init(model: model, filmName: filmName, onClose: onClose, filmDoor: filmDoor, wbDoor: wbDoor)
+        self.init(model: model, filmName: filmName, onClose: onClose, filmDoor: filmDoor)
         self.onLayout = onLayout
     }
 
@@ -131,12 +129,11 @@ public struct CameraView<FilmDoor: View, WBDoor: View>: View {
         .tint(T.lichen)
         .task { await model.start() }
         .onAppear {
-            // Headless snapshots: MIRA_SNAPSHOT_SHEET=filmdoor|wbdoor opens a door without a tap.
+            // Headless snapshots: MIRA_SNAPSHOT_SHEET=filmdoor opens the door without a tap.
             let env = ProcessInfo.processInfo.environment
             guard env["MIRA_SNAPSHOT"] == "1" else { return }
             switch env["MIRA_SNAPSHOT_SHEET"] {
             case "filmdoor": door = .film
-            case "wbdoor": door = .wb
             default: break
             }
         }
@@ -178,7 +175,6 @@ public struct CameraView<FilmDoor: View, WBDoor: View>: View {
                     Group {
                         switch door {
                         case .film: filmDoor(context)
-                        case .wb: wbDoor(context)
                         }
                     }
                     .frame(maxWidth: .infinity)
@@ -205,6 +201,9 @@ public struct CameraView<FilmDoor: View, WBDoor: View>: View {
                 .reportFrame("lenses")
             FFHairline()
             EVDial(value: model.evBias) { model.setEV($0) }.reportFrame("ev")
+            FFHairline()
+            WBDial(kelvin: model.wb.kelvin, onChange: { model.setWB($0) }, onCommit: { model.commitWB() }, onToggleAuto: { model.toggleAutoWB() })
+                .reportFrame("wb")
             FFHairline()
             ZStack {
                 HStack {
@@ -238,6 +237,9 @@ public struct CameraView<FilmDoor: View, WBDoor: View>: View {
                     .frame(height: 34).reportFrame("lenses")
                 FFHairline()
                 EVDial(value: model.evBias) { model.setEV($0) }.reportFrame("ev")
+                FFHairline()
+                WBDial(kelvin: model.wb.kelvin, onChange: { model.setWB($0) }, onCommit: { model.commitWB() }, onToggleAuto: { model.toggleAutoWB() })
+                    .reportFrame("wb")
             }
             .frame(width: 210)
             FFHairline(.vertical)
@@ -261,7 +263,6 @@ public struct CameraView<FilmDoor: View, WBDoor: View>: View {
     private var doors: some View {
         VStack(alignment: .trailing, spacing: 0) {
             DoorButton(title: "FILM", label: "Choose film") { openDoor(.film) }
-            DoorButton(title: "WB", label: "White balance") { openDoor(.wb) }
         }
     }
 

@@ -19,8 +19,6 @@ struct CameraScreen: View {
             if let model, let doors {
                 CameraView(model: model, filmName: filmName(model), onClose: onClose) { context in
                     FilmDoorHost(camera: model, doors: doors, context: context)
-                } wbDoor: { context in
-                    WBDoorHost(camera: model, context: context)
                 }
                 // IMPORT / SAVE PRESET from the door: the camera's presentations, bound to the door model
                 // (RootView turns the editor's off while the camera is open).
@@ -93,14 +91,5 @@ private struct FilmDoorHost: View {
             .onChange(of: camera.cardThumbnails.mapValues { ObjectIdentifier($0) }) {
                 doors.setThumbnails(camera.cardThumbnails)
             }
-    }
-}
-
-private struct WBDoorHost: View {
-    @Bindable var camera: CameraModel
-    let context: CameraDoorContext
-
-    var body: some View {
-        CameraWBDoor(state: $camera.wb, onClose: context.close)
     }
 }

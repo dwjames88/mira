@@ -13,6 +13,7 @@ import MiraCore
         let s = CameraSettings()
         #expect(!s.silentShutter && !s.addLocation && s.finderGrainLive)
         #expect(s.finderQuality == .auto && s.lastFilmID == nil && s.lastRecipe == nil)
+        #expect(s.whiteBalanceKelvin == nil)
     }
 
     @Test func roundTripThroughUserDefaults() {
@@ -22,7 +23,7 @@ import MiraCore
         #expect(store.load() == CameraSettings())
         let recipe = Recipe(filmID: "kodak-portra-400", exposure: 0.5)
         let s = CameraSettings(silentShutter: true, addLocation: true, finderGrainLive: false, finderQuality: .reduced,
-                               lastFilmID: "kodak-portra-400", lastRecipe: recipe)
+                               lastFilmID: "kodak-portra-400", lastRecipe: recipe, whiteBalanceKelvin: 4300)
         store.save(s)
         #expect(CameraSettingsStore(defaults: defaults).load() == s)
     }
@@ -30,6 +31,7 @@ import MiraCore
     @Test func missingKeysDecodeToDefaultsAndGarbageIsIgnored() throws {
         let partial = try JSONDecoder().decode(CameraSettings.self, from: Data(#"{"silentShutter":true}"#.utf8))
         #expect(partial.silentShutter && partial.finderGrainLive && partial.finderQuality == .auto)
+        #expect(partial.whiteBalanceKelvin == nil)
         let (defaults, name) = suite()
         defer { defaults.removePersistentDomain(forName: name) }
         defaults.set(Data("nope".utf8), forKey: CameraSettingsStore.defaultKey)

@@ -123,15 +123,31 @@ private struct LensFixture: Decodable {
 
 @Suite struct WhiteBalanceTests {
     @Test func presets() {
-        #expect(WhiteBalancePreset.allCases.map(\.kelvin) == [nil, 5500, 6500, 3200, 4000])
-        #expect(WhiteBalancePreset.allCases.map(\.label) == ["AUTO", "DAYLIGHT 5500", "CLOUDY 6500", "TUNGSTEN 3200", "FLUOR. 4000"])
-        #expect(WhiteBalancePreset.allCases.allSatisfy { !$0.accessibilityLabel.isEmpty })
+        #expect(WhiteBalancePreset.allCases.map(\.kelvin) == [3200, 4000, 5500, 6500])
+        #expect(WhiteBalanceModel.readout(5500) == "5500 K \u{00B7} DAYLIGHT")
+        #expect(WhiteBalanceModel.readout(5600) == "5600 K")
     }
 
     @Test func state() {
-        #expect(!WhiteBalanceState().isFixed)
-        #expect(WhiteBalanceState(preset: .auto, locked: true).isFixed)
-        #expect(WhiteBalanceState(preset: .tungsten).isFixed)
+        #expect(WhiteBalanceState().isAuto)
+        #expect(WhiteBalanceState(kelvin: 1000).kelvin == 2500)
+        #expect(WhiteBalanceState(kelvin: 12000).kelvin == 9000)
+        var s = WhiteBalanceState(kelvin: 5000)
+        s.kelvin = 20000
+        #expect(s.kelvin == 9000)
+    }
+
+    @Test func snapsToDetentsWithin150() {
+        #expect(WhiteBalanceModel.snapped(5400) == 5500)
+        #expect(WhiteBalanceModel.snapped(5650) == 5500)
+        #expect(WhiteBalanceModel.snapped(5651) == 5651)
+        #expect(WhiteBalanceModel.snapped(3050) == 3200)
+        #expect(WhiteBalanceModel.snapped(4150) == 4000)
+        #expect(WhiteBalanceModel.snapped(6400) == 6500)
+        #expect(WhiteBalanceModel.snapped(4700) == 4700)
+        #expect(WhiteBalanceModel.snapped(100) == 2500)
+        #expect(WhiteBalanceModel.snapped(99999) == 9000)
+        #expect(WhiteBalanceModel.quantised(5449) == 5400)
     }
 }
 

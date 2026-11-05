@@ -264,17 +264,6 @@ final class LayoutSnapshotTests: XCTestCase {
         }
     }
 
-    func testCameraWBDoor() async {
-        for d in TestDevice.all {
-            var state = WhiteBalanceState()
-            let binding = Binding(get: { state }, set: { state = $0 })
-            let f = await renderDoor(device: d, name: "camera-wb-door") { CameraWBDoor(state: binding) }
-            assertDoor(f, device: d)
-            XCTAssertNotNil(f["label.WB"])
-            XCTAssertLessThan(f["panel"]!.height, 100, "one row plus handle")
-        }
-    }
-
     func testEditorFilmsPanelIsUnchangedByTheRefactor() async {
         let m = await makeModel()
         m.filmsDetail = true
@@ -313,9 +302,5 @@ final class LayoutSnapshotTests: XCTestCase {
         m.setThumbnails(["x": Self.sample.cgImage!])
         XCTAssertNotNil(m.thumbnails["x"])
         XCTAssertEqual(m.thumbEpoch, epoch)
-    }
-
-    func testWBDoorChipsMatchSpec() {
-        XCTAssertEqual(WhiteBalancePreset.allCases.map { $0.kelvin.map(String.init) ?? "AUTO" }, ["AUTO", "5500", "6500", "3200", "4000"])
     }
 }

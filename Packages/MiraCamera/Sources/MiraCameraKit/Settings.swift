@@ -11,10 +11,13 @@ public struct CameraSettings: Sendable, Equatable, Codable {
     public var finderQuality: FinderQualityMode
     public var lastFilmID: String?
     public var lastRecipe: Recipe?
+    /// Last white balance in Kelvin; nil is AUTO.
+    public var whiteBalanceKelvin: Int?
 
     public init(
         silentShutter: Bool = false, addLocation: Bool = false, finderGrainLive: Bool = true,
-        finderQuality: FinderQualityMode = .auto, lastFilmID: String? = nil, lastRecipe: Recipe? = nil
+        finderQuality: FinderQualityMode = .auto, lastFilmID: String? = nil, lastRecipe: Recipe? = nil,
+        whiteBalanceKelvin: Int? = nil
     ) {
         self.silentShutter = silentShutter
         self.addLocation = addLocation
@@ -22,10 +25,11 @@ public struct CameraSettings: Sendable, Equatable, Codable {
         self.finderQuality = finderQuality
         self.lastFilmID = lastFilmID
         self.lastRecipe = lastRecipe
+        self.whiteBalanceKelvin = whiteBalanceKelvin
     }
 
     private enum CodingKeys: String, CodingKey {
-        case silentShutter, addLocation, finderGrainLive, finderQuality, lastFilmID, lastRecipe
+        case silentShutter, addLocation, finderGrainLive, finderQuality, lastFilmID, lastRecipe, whiteBalanceKelvin
     }
 
     public init(from decoder: Decoder) throws {
@@ -36,6 +40,7 @@ public struct CameraSettings: Sendable, Equatable, Codable {
         finderQuality = try c.decodeIfPresent(FinderQualityMode.self, forKey: .finderQuality) ?? .auto
         lastFilmID = try c.decodeIfPresent(String.self, forKey: .lastFilmID)
         lastRecipe = try c.decodeIfPresent(Recipe.self, forKey: .lastRecipe)
+        whiteBalanceKelvin = try c.decodeIfPresent(Int.self, forKey: .whiteBalanceKelvin).map(WhiteBalanceModel.clamp)
     }
 }
 

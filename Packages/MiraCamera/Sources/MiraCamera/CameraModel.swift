@@ -68,7 +68,11 @@ public final class CameraModel {
     public var rotationAngle: Double = 90
     public var cardThumbnails: [String: CGImage] = [:]
     public var wb = WhiteBalanceState() {
-        didSet { if wb != oldValue { send(.whiteBalance(wb)) } }
+        didSet {
+            guard wb != oldValue else { return }
+            settings.whiteBalanceKelvin = wb.kelvin
+            send(.whiteBalance(wb))
+        }
     }
     /// The user's recipe. Pushes to the finder and is what a capture saves (no finder-only fields).
     public var recipe: Recipe {
@@ -79,6 +83,7 @@ public final class CameraModel {
             settings.lastFilmID = recipe.filmID
         }
     }
+    private var lastManualKelvin: Int?
     public var settings: CameraSettings {
         didSet { settingsChanged(from: oldValue) }
     }
@@ -172,6 +177,8 @@ public final class CameraModel {
             state.mode = loaded.finderQuality
             state.grainLive = loaded.finderGrainLive
         }
+        wb = WhiteBalanceState(kelvin: loaded.whiteBalanceKelvin)   // restored without a command: start() sends it
+        lastManualKelvin = wb.kelvin
         finder?.setLatitudeHandler(Self.makeLatitudeHandler(self))
         finder?.setCardsHandler(Self.makeCardsHandler(self))
         if statsEnabled { finder?.setStatsHandler(Self.makeStatsHandler(self)) }
@@ -299,6 +306,7 @@ public final class CameraModel {
             zoom = main?.zoomFactor ?? 1
             if let main { send(.zoom(main.zoomFactor, ramp: false)) }
         }
+        if let kelvin = wb.kelvin { send(.whiteBalance(WhiteBalanceState(kelvin: kelvin))) }   // the stored value reaches the device
         location.setEnabled(settings.addLocation)
         frames.start()
         await device.start()
@@ -460,6 +468,29 @@ public final class CameraModel {
         evBias = target
         latestEV = target
         send(.exposure(target))
+    }
+
+    /// Sets the white balance (nil is AUTO), one selection haptic per 100 K step.
+    public func setWB(_ kelvin: Int?) {
+        let target = WhiteBalanceState(kelvin: kelvin)
+        guard target != wb else { return }
+        if target.kelvin != nil, wb.kelvin != nil { selection.selectionChanged() }
+        wb = target
+        if let k = target.kelvin { lastManualKelvin = k }
+    }
+
+    /// A drag ended: snap to a preset within 150 K.
+    public func commitWB() {
+        guard let k = wb.kelvin else { return }
+        let snapped = WhiteBalanceModel.snapped(k)
+        if snapped != k { impact.impactOccurred() }
+        setWB(snapped)
+    }
+
+    /// AUTO to the last manual value (5500 K the first time), or back to AUTO.
+    public func toggleAutoWB() {
+        selection.selectionChanged()
+        setWB(wb.kelvin == nil ? (lastManualKelvin ?? WhiteBalanceModel.startKelvin) : nil)
     }
 
     public func selectLens(_ lens: Lens) {
