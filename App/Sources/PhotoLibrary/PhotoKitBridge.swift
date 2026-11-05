@@ -91,6 +91,23 @@ enum PhotoKitBridge {
         }
     }
 
+    /// The grid's thumbnail request: like `requestImage` (timed as `grid thumbnail request`) but tells
+    /// `deliver` whether the image is the degraded first pass, so only the final one is cached.
+    nonisolated static func requestThumbnail(
+        manager: PHImageManager, asset: PHAsset, size: CGSize, options: PHImageRequestOptions,
+        deliver: @escaping @MainActor (NSImage?, Bool) -> Void
+    ) -> PHImageRequestID {
+        let interval = Perf.begin("grid thumbnail request")
+        return manager.requestImage(for: asset, targetSize: size, contentMode: .aspectFill, options: options) { @Sendable image, info in
+            let degraded = (info?[PHImageResultIsDegradedKey] as? Bool) ?? false
+            if !degraded || image == nil { Perf.end("grid thumbnail request", interval) }
+            let box = Unchecked(value: image)
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { deliver(box.value, degraded) }
+            }
+        }
+    }
+
     /// Detects a RAW resource off the main actor. Skips the lookup when `isCancelled` says the cell
     /// that asked for it has already scrolled away.
     nonisolated static func resourceTypeIdentifiers(of asset: Unchecked<PHAsset>) -> [String] {

@@ -237,7 +237,7 @@ private struct CoverImage: View {
                 }
             }
             .clipped()
-            .task(id: "\(nodeID ?? "-")|\(gallery.revision)|\(Int(size.width))") { await load() }
+            .task(id: "\(nodeID ?? "-")|\(gallery.coverToken(for: nodeID))|\(Int(size.width))") { await load() }
             .onDisappear {
                 if let id = requestID { gallery.covers.manager.cancelImageRequest(id) }
                 requestID = nil
@@ -252,13 +252,14 @@ private struct CoverImage: View {
         if let hit = store.image(for: key) { image = hit; return }
         let found = await Task.detached(priority: .userInitiated) { GalleryKit.coverAsset(nodeID: nodeID) }.value
         guard let found, !Task.isCancelled else { return }
+        ThumbnailMetrics.shared.recordRequest()
         requestID = GalleryKit.requestThumbnail(
             manager: store.manager, asset: found, size: pixels, options: Unchecked(value: store.options)
-        ) { box in
+        ) { box, _ in
             MainActor.assumeIsolated {
                 guard let img = box.value else { return }
                 image = img
-                store.store(img, for: key)
+                store.store(img, for: key, nodeID: nodeID)
             }
         }
     }
@@ -385,7 +386,8 @@ struct AlbumGridView: View {
             }
         }
         .ffNavigationTitle(title)
-        .task(id: gallery.revision) { await album.reload(rawOnly: rawOnly, gallery: gallery) }
+        // Loads once. Later library changes arrive through `album.apply`, not by refetching the album.
+        .task { if !album.loaded { await album.reload(rawOnly: rawOnly, gallery: gallery) } }
         .onChange(of: rawOnly) { _, on in album.setRawOnly(on) }
         .onDisappear { album.cancelWork(); album.stopCaching() }
     }
@@ -430,14 +432,15 @@ private struct GalleryCell: View {
     let album: AlbumModel
     let asset: PHAsset
     let index: Int
-    @State private var image: UIImage?
-    @State private var requestID: PHImageRequestID?
+    @State private var loader = ThumbnailCellLoader<UIImage, PHAsset>()
     @State private var badges: (raw: Bool, edited: Bool) = (false, false)
+    @State private var badgeKey: GridThumbnailKey?
 
     var body: some View {
+        let key = album.thumbnailKey(for: asset)
         Color(white: 0.1)
             .overlay {
-                if let image {
+                if let image = loader.image {
                     Image(uiImage: image).resizable().scaledToFill()
                 }
             }
@@ -452,18 +455,10 @@ private struct GalleryCell: View {
             .contentShape(Rectangle())
             .onAppear {
                 album.updateCaching(around: index)
-                guard image == nil else { return }
-                request()
-                let boxed = Unchecked(value: asset)
-                Task.detached(priority: .utility) {
-                    let found = GalleryKit.badges(of: boxed)
-                    await MainActor.run { badges = found }
-                }
+                refresh(key)
             }
-            .onDisappear {
-                if let id = requestID { album.caching.cancelImageRequest(id) }
-                requestID = nil
-            }
+            .onChange(of: key) { _, new in refresh(new) }
+            .onDisappear { loader.cancel() }
     }
 
     private func badge(_ text: String) -> some View {
@@ -472,13 +467,15 @@ private struct GalleryCell: View {
             .background(Color.black.opacity(0.6))
     }
 
-    private func request() {
-        let size = album.thumbSize == .zero ? CGSize(width: 300, height: 300) : album.thumbSize
-        requestID = GalleryKit.requestThumbnail(
-            manager: album.caching, asset: Unchecked(value: asset), size: size,
-            options: Unchecked(value: album.thumbOptions)
-        ) { box in
-            MainActor.assumeIsolated { if let img = box.value { image = img } }
+    /// Memory cache first; PhotoKit only when this asset's thumbnail at this size/version is not cached.
+    private func refresh(_ key: GridThumbnailKey) {
+        loader.update(key, asset: asset, pipeline: album.thumbnails)
+        guard badgeKey?.id != key.id || badgeKey?.version != key.version else { return }
+        badgeKey = key
+        let boxed = Unchecked(value: asset)
+        Task.detached(priority: .utility) {
+            let found = GalleryKit.badges(of: boxed)
+            await MainActor.run { badges = found }
         }
     }
 }

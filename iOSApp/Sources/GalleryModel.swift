@@ -13,12 +13,13 @@ struct Unchecked<Value>: @unchecked Sendable {
 enum GalleryKit {
     nonisolated static func requestThumbnail(
         manager: PHImageManager, asset: Unchecked<PHAsset>, size: CGSize, options: Unchecked<PHImageRequestOptions>,
-        deliver: @escaping @Sendable (Unchecked<UIImage?>) -> Void
+        deliver: @escaping @Sendable (Unchecked<UIImage?>, _ isDegraded: Bool) -> Void
     ) -> PHImageRequestID {
         manager.requestImage(for: asset.value, targetSize: size, contentMode: .aspectFill, options: options.value) {
-            @Sendable image, _ in
+            @Sendable image, info in
+            let degraded = (info?[PHImageResultIsDegradedKey] as? Bool) ?? false
             let box = Unchecked(value: image)
-            DispatchQueue.main.async { deliver(box) }
+            DispatchQueue.main.async { deliver(box, degraded) }
         }
     }
 
@@ -93,8 +94,11 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
     private(set) var status: PHAuthorizationStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
     private(set) var sections: [SidebarSection] = []
     private(set) var loadedSections = false
-    /// Bumps whenever the library changes; grids refetch on it.
+    /// Bumps when pictures were added, removed or reordered library-wide (covers are stale then).
+    /// Pure content edits do not bump it; they reach the open album as per-asset versions.
     private(set) var revision = 0
+    /// Per-album cover refreshes: an album whose membership changed gets a new cover.
+    private(set) var coverVersions: [String: Int] = [:]
     private(set) var isOpening = false
 
     @ObservationIgnored private var observing = false
@@ -104,6 +108,8 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
     @ObservationIgnored var rawClassification: RAWClassification?
     @ObservationIgnored var rawCandidates: Set<String>?
     @ObservationIgnored let rawChanges = RAWChangeTracker()
+    /// Open albums, told about each change so they can apply it in place.
+    @ObservationIgnored let openAlbums = NSHashTable<AlbumModel>.weakObjects()
 
     var hasAccess: Bool { status == .authorized || status == .limited }
 
@@ -131,7 +137,8 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
     }
 
     nonisolated func photoLibraryDidChange(_ changeInstance: PHChange) {
-        let dropped = rawChanges.invalidatedIDs(for: changeInstance)
+        let (dropped, membershipChanged) = rawChanges.inspect(changeInstance)
+        let boxed = Unchecked(value: changeInstance)
         Task.detached(priority: .utility) {
             if let dropped { await RAWScanStore.shared.invalidate(ids: dropped) } else { await RAWScanStore.shared.clearAll() }
         }
@@ -140,10 +147,13 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
                 guard let self else { return }
                 self.status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
                 if self.hasAccess {
-                    self.revision += 1
-                    self.covers.removeAll()
-                    self.rawClassification = nil
-                    self.rawCandidates = nil
+                    if membershipChanged {
+                        self.revision += 1
+                        self.covers.removeAll()
+                        self.rawClassification = nil
+                        self.rawCandidates = nil
+                    }
+                    for album in self.openAlbums.allObjects { album.apply(boxed.value, gallery: self) }
                     Task { await self.reloadSections() }
                 } else {
                     self.sections = []
@@ -159,6 +169,16 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
         isOpening = true
         defer { isOpening = false }
         await editor.openAsset(asset)
+    }
+
+    /// An album's membership changed: its cover is stale, other covers are not.
+    func invalidateCover(nodeID: String) {
+        covers.remove(nodeID: nodeID)
+        coverVersions[nodeID, default: 0] += 1
+    }
+
+    func coverToken(for nodeID: String?) -> String {
+        "\(revision).\(nodeID.flatMap { coverVersions[$0] } ?? 0)"
     }
 
     func presentLimitedPicker() {
@@ -210,6 +230,31 @@ final class AlbumModel {
     }()
     @ObservationIgnored private var cachedRange: Range<Int> = 0..<0
     @ObservationIgnored private(set) var thumbSize: CGSize = .zero
+    @ObservationIgnored let metrics = ThumbnailMetrics.shared
+    /// PhotoKit reported these assets changed (edit, revert, favorite): their cells fetch a new thumbnail.
+    private(set) var versions = AssetVersions()
+    /// Memory cache + the one request path for this album's grid thumbnails.
+    @ObservationIgnored private(set) lazy var thumbnails = ThumbnailPipeline<UIImage, PHAsset>(
+        metrics: metrics,
+        cost: { image in max(1, Int(image.size.width * image.size.height * image.scale * image.scale) * 4) },
+        fetch: { [unowned self] asset, key, deliver in
+            let side = CGFloat(key.pixels)
+            return Int(GalleryKit.requestThumbnail(
+                manager: self.caching, asset: Unchecked(value: asset), size: CGSize(width: side, height: side),
+                options: Unchecked(value: self.thumbOptions)
+            ) { box, degraded in
+                MainActor.assumeIsolated { deliver(box.value, degraded) }
+            })
+        },
+        cancel: { [unowned self] id in self.caching.cancelImageRequest(PHImageRequestID(id)) })
+
+    /// The grid cell's side in pixels (300 until the grid has measured itself).
+    var thumbPixels: Int { thumbSize == .zero ? 300 : Int(thumbSize.width) }
+
+    func thumbnailKey(for asset: PHAsset) -> GridThumbnailKey {
+        GridThumbnailKey(id: asset.localIdentifier, pixels: thumbPixels,
+                         modificationDate: asset.modificationDate, version: versions[asset.localIdentifier])
+    }
 
     init(nodeID: String) { self.nodeID = nodeID }
 
@@ -219,12 +264,12 @@ final class AlbumModel {
             Unchecked(value: SidebarLoader.fetchAssets(nodeID: id))
         }.value
         self.gallery = gallery
+        gallery.openAlbums.add(self)
         result = box.value
         displayIndices = nil
         count = box.value.count
         loaded = true
-        caching.stopCachingImagesForAllAssets()
-        cachedRange = 0..<0
+        stopCaching()
         startScan(gallery: gallery)
         setRawOnly(rawOnly)
     }
@@ -302,14 +347,45 @@ final class AlbumModel {
     }
 
     private func resetCaching() {
-        caching.stopCachingImagesForAllAssets()
+        stopCaching()
+    }
+
+    /// Applies a library change to this album in place. Edits only bump the changed assets' versions
+    /// (their cells refetch, nothing else does, and the RAW scan is not repeated). Added, removed or
+    /// reordered pictures update the fetch, the shown positions and the RAW scan.
+    func apply(_ change: PHChange, gallery: GalleryModel) {
+        guard let current = result, let details = change.changeDetails(for: current) else { return }
+        let removed = Array(details.removedIndexes ?? [])
+        let inserted = Array(details.insertedIndexes ?? [])
+        let summary = LibraryChangeSummary(
+            isIncremental: details.hasIncrementalChanges, removedCount: removed.count, insertedCount: inserted.count,
+            hasMoves: details.hasMoves, changedIDs: details.changedObjects.map(\.localIdentifier))
+        let after = details.fetchResultAfterChanges
+        result = after
+        versions.bump(summary.changedIDs)
+        guard summary.membershipChanged else { return }
+        gallery.invalidateCover(nodeID: nodeID)
+        if !removed.isEmpty {
+            caching.stopCachingImages(for: details.removedObjects, targetSize: thumbSize, contentMode: .aspectFill, options: thumbOptions)
+            metrics.recordStop()
+        }
         cachedRange = 0..<0
+        if let shown = displayIndices {
+            // RAW-only view: carry the positions across, the rescan below adds or removes the rest.
+            displayIndices = summary.isIncremental && !summary.hasMoves
+                ? IndexRemap.apply(shown, removed: removed, inserted: inserted) : []
+            count = displayIndices?.count ?? 0
+        } else {
+            count = after.count
+        }
+        startScan(gallery: gallery)
     }
 
     func cancelWork() { rawTask?.cancel() }
 
     func stopCaching() {
         caching.stopCachingImagesForAllAssets()
+        metrics.recordStopAll()
         cachedRange = 0..<0
     }
 
@@ -329,12 +405,14 @@ final class AlbumModel {
         let old = Set(cachedRange), new = Set(window)
         let add = new.subtracting(old).sorted(), drop = old.subtracting(new).sorted()
         if !add.isEmpty {
-            caching.startCachingImages(for: add.compactMap { asset(at: $0) }, targetSize: thumbSize,
-                                       contentMode: .aspectFill, options: thumbOptions)
+            let assets = add.compactMap { asset(at: $0) }
+            caching.startCachingImages(for: assets, targetSize: thumbSize, contentMode: .aspectFill, options: thumbOptions)
+            metrics.recordPreheat(assets: assets.count)
         }
         if !drop.isEmpty {
             caching.stopCachingImages(for: drop.compactMap { asset(at: $0) },
                                       targetSize: thumbSize, contentMode: .aspectFill, options: thumbOptions)
+            metrics.recordStop()
         }
         cachedRange = window
     }
@@ -360,6 +438,13 @@ final class CoverStore {
 
     func key(_ nodeID: String, _ size: CGSize) -> String { "\(nodeID)@\(Int(size.width))x\(Int(size.height))" }
     func image(for key: String) -> UIImage? { cache.object(forKey: key as NSString) }
-    func store(_ image: UIImage, for key: String) { cache.setObject(image, forKey: key as NSString) }
-    func removeAll() { cache.removeAllObjects() }
+    private var keysByNode: [String: Set<String>] = [:]
+    func store(_ image: UIImage, for key: String, nodeID: String) {
+        cache.setObject(image, forKey: key as NSString)
+        keysByNode[nodeID, default: []].insert(key)
+    }
+    func remove(nodeID: String) {
+        for key in keysByNode.removeValue(forKey: nodeID) ?? [] { cache.removeObject(forKey: key as NSString) }
+    }
+    func removeAll() { cache.removeAllObjects(); keysByNode = [:] }
 }

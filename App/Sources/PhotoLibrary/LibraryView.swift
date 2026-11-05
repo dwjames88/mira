@@ -9,6 +9,9 @@ private typealias T = FieldFramesTheme
 /// The Library mode: sidebar of sources plus a grid of the current one.
 struct LibraryView: View {
     let state: AppState
+    /// False while the editor covers the library. The view stays mounted (scroll position and cell
+    /// state survive), so this only decides whether the grid takes keyboard focus back.
+    var isActive = true
     var store: LibraryStore { state.store }
 
     var body: some View {
@@ -19,7 +22,7 @@ struct LibraryView: View {
                     LibrarySidebar(store: store)
                         .frame(width: T.cells(30))
                     FFHairline(.vertical)
-                    LibraryGridPane(state: state)
+                    LibraryGridPane(state: state, isActive: isActive)
                 }
             case .notDetermined:
                 VStack { Text("Waiting for Photos access").ffLabel(size: 11) }
@@ -198,6 +201,7 @@ private struct SidebarRow: View {
 
 private struct LibraryGridPane: View {
     let state: AppState
+    let isActive: Bool
     var store: LibraryStore { state.store }
     @FocusState private var focused: Bool
     @Environment(\.displayScale) private var displayScale
@@ -300,7 +304,8 @@ private struct LibraryGridPane: View {
             .onKeyPress(.rightArrow) { move(1, proxy) }
             .onKeyPress(.upArrow) { move(-columns, proxy) }
             .onKeyPress(.downArrow) { move(columns, proxy) }
-            .onAppear { focused = true }
+            .onAppear { focused = isActive }
+            .onChange(of: isActive) { _, active in focused = active }
         }
     }
 
@@ -318,13 +323,13 @@ private struct LibraryGridPane: View {
     }
 }
 
-/// A square thumbnail. Loads when it appears, cancels when it disappears.
+/// A square thumbnail. Reads the memory cache first and asks PhotoKit only on a miss; it refreshes
+/// when its asset changes or PhotoKit reports that asset edited, never because something else did.
 private struct AssetCell: View {
     let store: LibraryStore
     let index: Int
     let selected: Bool
-    @State private var image: NSImage?
-    @State private var requestID: PHImageRequestID?
+    @State private var loader = ThumbnailCellLoader<NSImage, PHAsset>()
     @State private var isRAW = false
 
     /// `Date.formatted` builds a formatter on every call; one shared formatter keeps cell bodies cheap.
@@ -336,15 +341,14 @@ private struct AssetCell: View {
     }()
 
     var body: some View {
-        // Reading the revision re-evaluates the cell after library changes.
-        let _ = store.revision
         let asset = store.asset(at: index)
+        let key = asset.map { store.thumbnailKey(for: $0) }
         Color.clear
             .aspectRatio(1, contentMode: .fit)
             .overlay {
                 ZStack {
                     T.inkSoft
-                    if let image {
+                    if let image = loader.image {
                         Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
                     }
                 }
@@ -366,11 +370,8 @@ private struct AssetCell: View {
                 store.prefetch(around: index)
                 load(asset)
             }
-            .onDisappear { cancel() }
-            .onChange(of: store.revision) { _, _ in
-                cancel()
-                load(store.asset(at: index))
-            }
+            .onDisappear { loader.cancel() }
+            .onChange(of: key) { _, _ in load(store.asset(at: index)) }
             .task(id: asset?.localIdentifier) {
                 guard let asset else { return }
                 if let cached = store.cachedRAW(asset) { isRAW = cached; return }
@@ -389,15 +390,6 @@ private struct AssetCell: View {
     }
 
     private func load(_ asset: PHAsset?) {
-        guard let asset else { return }
-        cancel()
-        requestID = store.requestThumbnail(for: asset) { img in
-            if let img { image = img }
-        }
-    }
-
-    private func cancel() {
-        if let requestID { store.cancelThumbnail(requestID) }
-        requestID = nil
+        loader.update(asset.map { store.thumbnailKey(for: $0) }, asset: asset, pipeline: store.thumbnails)
     }
 }
