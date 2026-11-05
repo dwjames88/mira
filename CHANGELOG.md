@@ -5,7 +5,7 @@ All notable changes to Mira. Format follows [Keep a Changelog](https://keepachan
 ## [Unreleased]
 
 ### Changed
-- Film payload: the Hald PNGs moved to `FilmSources/HaldCLUT/` (kept for provenance, not bundled); the app and the Photos extension now bundle `Films/Packed/<id>.mlut`, LZMA-compressed 16-bit cubes whose dimension is chosen per film by measured error: 48³ or 56³ when within 6/255 (max) and 2/255 (99.9th percentile) of the 64³ original, else the exact 64³ (65, 18 and 177 films). 157.5 MB per copy instead of 361 MB. `mira-sheet --pack-films FilmSources Films` regenerates them and prints a summary. Packed films skip the LUT disk cache.
+- Film payload: the Hald PNGs moved to `FilmSources/HaldCLUT/` (kept for provenance, not bundled); the app and the Photos extension now bundle `Films/Packed/<id>.mlut`, LZMA-compressed 16-bit cubes whose dimension is chosen per film by measured error on real image colours (pixels of the sample JPEG and the iPhone DNG fixture plus a neutral ramp and an HSV sweep): 48³ or 56³ when within 4/255 (max) and 1.5/255 (99.9th percentile) of the 64³ original, else the exact 64³ (124, 45 and 91 films). 125.6 MB per copy instead of 361 MB. `mira-sheet --pack-films FilmSources Films` regenerates them and prints a summary. Packed films skip the LUT disk cache.
 
 ### Added
 - 260 film looks (from 31): the full RawTherapee Film Simulation Collection (Pat David et al., CC BY-SA 4.0), shown as 82 stock cards (Color Negative 26, Slide 15, Kodachrome 3, Black & White 22, Instant 16). The 178 push/pull, tone and alternate variants are chosen with a Variant picker in the FILMS panel. Motion Picture (ECN-2) and Print families exist but have no stocks (no freely licensed data), so their tabs are hidden.
