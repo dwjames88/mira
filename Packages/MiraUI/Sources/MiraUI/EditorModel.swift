@@ -181,6 +181,19 @@ public final class EditorModel {
     @ObservationIgnored private var thumbnailCancel: CancelFlag?
     @ObservationIgnored var thumbnailCache: [CropSettings: [String: NSImage]] = [:]
     @ObservationIgnored var thumbnailCacheOrder: [CropSettings] = []
+    /// Rendered thumbnails kept between sessions (nil turns the disk cache off).
+    @ObservationIgnored public var thumbnailDiskCache: ThumbnailDiskCache? = ThumbnailDiskCache.standard()
+    /// The stock cards the strip has on screen (reported by the cards through `cardAppeared`).
+    @ObservationIgnored private(set) var visibleCardIDs: Set<String> = []
+    /// Tests and benchmarks: render every card, not just the ones on screen.
+    @ObservationIgnored var thumbnailDemandAll = false
+    @ObservationIgnored private var thumbnailDemandTask: Task<Void, Never>?
+    /// Film cards rendered on each side of the visible ones.
+    nonisolated static let thumbnailPrefetch = 6
+    /// Cards counted as visible when no card view has reported yet (the strip opens at its left edge).
+    nonisolated static let initialVisibleCards = 8
+    /// How long a change of the visible cards settles before the renders follow it.
+    nonisolated static let thumbnailDemandDelay: Duration = .milliseconds(40)
     @ObservationIgnored private var originalFrame: PreviewFrame?
     @ObservationIgnored private var originalKey: OriginalKey?
     @ObservationIgnored private var sourceGeneration = 0
@@ -853,17 +866,69 @@ public final class EditorModel {
     /// Results are cached per crop, so going back to a crop already seen is instant.
     nonisolated static let thumbnailFlushInterval: Duration = .milliseconds(60)
 
+    /// A stock card came on screen (or into the lazy stack's window).
+    func cardAppeared(_ id: String) {
+        guard visibleCardIDs.insert(id).inserted else { return }
+        scheduleThumbnailDemand()
+    }
+
+    /// A stock card left the screen.
+    func cardDisappeared(_ id: String) {
+        guard visibleCardIDs.remove(id) != nil else { return }
+        scheduleThumbnailDemand()
+    }
+
+    /// Tests and benchmarks: demand a thumbnail for every card, as if the whole strip were on screen.
+    func loadAllThumbnails() {
+        thumbnailDemandAll = true
+        startThumbnails(keepShown: true)
+    }
+
+    private func scheduleThumbnailDemand() {
+        thumbnailDemandTask?.cancel()
+        thumbnailDemandTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.thumbnailDemandDelay)
+            guard !Task.isCancelled, let self else { return }
+            self.startThumbnails(keepShown: true)
+        }
+    }
+
+    /// The tiles to have: Original, then the cards on screen and `thumbnailPrefetch` on each side, nearest
+    /// to the screen first, the applied card ahead of them. Before any card has reported (no strip
+    /// view yet, or another tab open) the first `initialVisibleCards` count as on screen.
+    func wantedThumbnailIDs() -> [String?] {
+        let cards = visibleFilms.map(\.id)
+        var order: [String] = []
+        if thumbnailDemandAll {
+            order = cards
+        } else if !cards.isEmpty {
+            var on = cards.indices.filter { visibleCardIDs.contains(cards[$0]) }
+            if on.isEmpty { on = Array(0..<min(Self.initialVisibleCards, cards.count)) }
+            let lo = on.min()!, hi = on.max()!
+            let from = max(0, lo - Self.thumbnailPrefetch), to = min(cards.count - 1, hi + Self.thumbnailPrefetch)
+            func distance(_ i: Int) -> Int { i < lo ? lo - i : (i > hi ? i - hi : 0) }
+            order = (from...to).sorted { (distance($0), $0) < (distance($1), $1) }.map { cards[$0] }
+            // The applied card leads, when it is in range.
+            if let stock = selectedStockID, let i = order.firstIndex(of: stock) { order.insert(order.remove(at: i), at: 0) }
+        }
+        if thumbnailDemandAll, let stock = selectedStockID, let i = order.firstIndex(of: stock) {
+            order.insert(order.remove(at: i), at: 0)
+        }
+        return [nil] + order.map { Optional($0) }
+    }
+
+    /// True when every wanted tile is on hand (tests wait on this instead of the whole library).
+    var thumbnailsSettled: Bool {
+        wantedThumbnailIDs().allSatisfy { thumbnails[$0 ?? Self.originalTileID] != nil }
+    }
+
     func startThumbnails(keepShown: Bool = false) {
         thumbnailTask?.cancel()
         thumbnailCancel?.cancel()
         guard engine.hasSource else { return }
         let crop = recipe.crop
         let generation = contentGeneration
-        // Original and the visible stock cards only; variants never get a thumbnail.
-        // The applied card first, then left to right (the strip opens at its left edge).
-        var cards = visibleFilms.map(\.id)
-        if let stock = selectedStockID, let i = cards.firstIndex(of: stock) { cards.insert(cards.remove(at: i), at: 0) }
-        let wanted: [String?] = [nil] + cards.map { Optional($0) }
+        let wanted = wantedThumbnailIDs()
         let cached = thumbnailCache[crop] ?? [:]
         let ids = wanted.filter { cached[$0 ?? Self.originalTileID] == nil }
         if !keepShown { thumbnails = cached }
@@ -871,11 +936,18 @@ public final class EditorModel {
         let cancel = CancelFlag()
         thumbnailCancel = cancel
         let engine = engine
+        let diskCache = thumbnailDiskCache
+        let directory = library.directory
+        let filmsByID = Dictionary(uniqueKeysWithValues: library.films.map { ($0.id, $0) })
         let (stream, continuation) = AsyncStream.makeStream(of: ThumbnailResult.self)
         thumbnailTask = Task { [weak self] in
             await withTaskCancellationHandler {
                 Task.detached(priority: .utility) {
                     engine.renderThumbnails(ids: ids, crop: crop, longSide: Self.thumbnailLongSide,
+                                            diskCache: diskCache,
+                                            filmSignature: { id in
+                                                filmsByID[id].map { ThumbnailHash.filmSignature($0, directory: directory) } ?? ""
+                                            },
                                             isCancelled: { cancel.isCancelled }) { id, cg in
                         continuation.yield(ThumbnailResult(id: id, image: cg))
                     }
@@ -977,6 +1049,7 @@ public final class EditorModel {
         previewTask?.cancel()
         thumbnailTask?.cancel()
         thumbnailCancel?.cancel()
+        thumbnailDemandTask?.cancel()
         hoverTask?.cancel()
         fullDecodeTask?.cancel()
         cancelRawWork()

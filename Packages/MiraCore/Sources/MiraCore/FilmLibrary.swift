@@ -2,8 +2,9 @@ import Foundation
 
 /// Reads `films.json` from a directory and lazily loads (and caches) each film's LUT.
 ///
-/// With a `cacheDirectory`, resampled cubes are also persisted as compact 16-bit files so the
-/// large Hald PNGs are decoded only once per install.
+/// Bundled films are `.mlut` files (`PackedLUT`), decoded in a few milliseconds and never disk-cached.
+/// With a `cacheDirectory`, cubes loaded from Hald PNGs (user or test libraries) are persisted as compact
+/// 16-bit files so a large PNG is decoded only once per install.
 public final class FilmLibrary: @unchecked Sendable {
     public let directory: URL
     public let films: [Film]
@@ -27,7 +28,12 @@ public final class FilmLibrary: @unchecked Sendable {
         self.directory = directory
         self.cacheDirectory = cacheDirectory
         let data = try Data(contentsOf: directory.appendingPathComponent("films.json"))
-        let films = try JSONDecoder().decode([Film].self, from: data)
+        var films = try JSONDecoder().decode([Film].self, from: data)
+        // A variant (push / pull, alternate rendering) has its stock's reciprocity data.
+        let byID = Dictionary(films.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        for i in films.indices where films[i].reciprocity == nil {
+            if let parent = films[i].parent, let data = byID[parent]?.reciprocity { films[i].reciprocity = data }
+        }
         self.films = films
         self.index = Dictionary(films.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     }
@@ -69,6 +75,7 @@ public final class FilmLibrary: @unchecked Sendable {
     }
 
     public func lut(for film: Film) throws -> LUT {
+        if let id = film.proceduralID { return try ProceduralLooks.lut(id) }
         lock.lock()
         if let hit = cached(film.id) { lock.unlock(); return hit }
         // One loader per film at a time, so concurrent callers don't decode the same PNG twice.
@@ -85,12 +92,16 @@ public final class FilmLibrary: @unchecked Sendable {
         lock.unlock()
 
         let url = directory.appendingPathComponent(film.file)
-        let cacheFile = cacheFileURL(for: film, source: url)
+        let ext = url.pathExtension.lowercased()
+        // Packed cubes decode faster than a cache file could be validated, so only PNG/cube loads use the disk cache.
+        let cacheFile = ext == PackedLUT.fileExtension ? nil : cacheFileURL(for: film, source: url)
         let lut: LUT
         if let cacheFile, let cached = Self.readCache(cacheFile) {
             lut = cached
         } else {
-            switch url.pathExtension.lowercased() {
+            switch ext {
+            case PackedLUT.fileExtension:
+                lut = try PackedLUT.unpack(Data(contentsOf: url, options: .mappedIfSafe))
             case "cube":
                 lut = try LUT.parseCube(String(contentsOf: url, encoding: .utf8))
             default:
@@ -112,7 +123,7 @@ public final class FilmLibrary: @unchecked Sendable {
         return lut
     }
 
-    /// Cold start decodes one Hald PNG per stock card (variants load on demand); more workers than 4 cut that by about 45 % on a 10-core Mac.
+    /// Cold start decodes one cube per stock card (variants load on demand); more workers than 4 cut that by about 45 % on a 10-core Mac.
     /// Utility priority keeps the UI responsive.
     public static var defaultPrewarmConcurrency: Int {
         min(8, max(4, ProcessInfo.processInfo.activeProcessorCount - 2))

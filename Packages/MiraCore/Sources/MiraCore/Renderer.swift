@@ -43,15 +43,19 @@ public enum RendererError: Error, CustomStringConvertible {
 /// Pipeline 2 (film science, see `FilmCharacter` for the physics): the order follows the light.
 ///  1. Exposure with latitude (`miraFilmExposure`): a gain in linear light whose highlights roll off
 ///     like a negative's shoulder, by the film's latitude, instead of clipping.
+///     A scene-referred source (RAW with extended range) carries a headroom H > 1: the white point
+///     gain x H then maps to 1 through a shoulder with a knee at 0.6, instead of clipping at the LUT.
 ///  2. White balance (warmth / tint): the light the film is exposed to, so before the film.
+///  2b. Reciprocity (`miraReciprocity`): the film's response to the exposure time (cast, contrast).
 ///  3. Dodge and burn, colour mixer, curves (unchanged).
 ///  4. Halation, in the exposure and in linear light: the highlights (`miraHighlights`) are blurred
 ///     by the film's radius and put back tinted (`miraHalationCombine`), so luminance is
 ///     redistributed, not added. The slider scales the film's own halation (0.5 is native).
 ///  5. Film LUT with strength blend (the Hald CLUTs are sRGB display referred).
 ///  6. Contrast, tone, texture, clarity, saturation, vibrance: printing and scanning, after the film.
-///     Between the LUT and contrast: scan profile and push / pull contrast and base fog
-///     (`miraScan`), then toning of monochrome films (`miraToning`). Push / pull also changes the
+///     Between the LUT and contrast: Paper (a print look cube, not for monochrome films) or the
+///     scan profile, with push / pull contrast and base fog (`miraScan`), then toning of
+///     monochrome films (`miraToning`). Push / pull also changes the
 ///     exposure gain (2^(0.33 N)), slide / Kodachrome latitude, and the grain strength.
 ///  7. Bloom.
 ///  8. Grain (`miraGrain`): band-limited smooth noise on the sRGB-encoded image, in frame-relative
@@ -90,10 +94,19 @@ public struct Renderer: Sendable {
 
     // MARK: Graph
 
-    public func apply(_ recipe: Recipe, to source: CIImage) -> CIImage {
+    /// `sourceHeadroom` is the largest linear value the source holds (1 for SDR; a RAW developed with
+    /// extended range reports its measured peak). nil reads the headroom a developed source carries
+    /// (`CIImage.miraHeadroom`, set by `ImageSource.developedSource`), else 1.
+    ///
+    /// `sourceExposureTime` is the photo's EXIF exposure time in seconds, for the reciprocity stage; nil reads the
+    /// tag a loaded source carries (`CIImage.miraExposureTime`). `recipe.exposureTime` overrides both.
+    public func apply(_ recipe: Recipe, to source: CIImage, sourceHeadroom: CGFloat? = nil,
+                      sourceExposureTime: Double? = nil) -> CIImage {
         // 0. Crop, rotation, flips and straighten first, so every stage below (and the
         // resolution-independent `scale`) sees the cropped output.
-        grade(recipe, cropped: CropGeometry.apply(recipe.crop, to: source), sourceSize: source.extent.size)
+        grade(recipe, cropped: CropGeometry.apply(recipe.crop, to: source), sourceSize: source.extent.size,
+              sourceHeadroom: sourceHeadroom ?? source.miraHeadroom,
+              sourceExposureTime: sourceExposureTime ?? source.miraExposureTime)
     }
 
     /// Everything after the crop: film, tone, colour, halation, bloom, grain, vignette and border.
@@ -107,8 +120,16 @@ public struct Renderer: Sendable {
     ///
     /// `maskOverlay` paints the dodge and burn masks as a translucent red wash over the result (the
     /// editor's mask view); it is never part of an export.
+    ///
+    /// `sourceHeadroom` (default 1, SDR) is the largest linear value `input` holds. Above 1 the
+    /// exposure stage maps the white point (gain x headroom) to 1 through the film's shoulder
+    /// instead of clipping at the LUT (pipeline 2 only; see `miraFilmExposure`).
+    ///
+    /// `sourceExposureTime` (seconds, nil = unknown) feeds the reciprocity stage (pipeline 2, with a film):
+    /// the effective time is `recipe.exposureTime ?? sourceExposureTime`; with none the stage is off.
     public func grade(_ recipe: Recipe, cropped input: CIImage, sourceSize: CGSize? = nil,
-                      maskRegion: CGRect? = nil, maskOverlay: Bool = false) -> CIImage {
+                      maskRegion: CGRect? = nil, maskOverlay: Bool = false,
+                      sourceHeadroom: CGFloat = 1, sourceExposureTime: Double? = nil) -> CIImage {
         let extent = input.extent
         guard !extent.isInfinite, !extent.isEmpty else { return input }
         let scale = min(extent.width, extent.height) / 1000
@@ -120,20 +141,39 @@ public struct Renderer: Sendable {
         // Push / pull (pipeline 2): stops of push development, -2 ... 2.
         let push = filmScience ? clamp(recipe.push, -2, 2) : 0
         let family = film?.family
+        // Reciprocity (pipeline 2, with a film): nil when off, no usable time, or no effect at that time.
+        let reciprocityEffect: ReciprocityEffect? = {
+            guard filmScience, recipe.reciprocity != .off, let film,
+                  let t = recipe.exposureTime ?? sourceExposureTime, t.isFinite, t > 0 else { return nil }
+            let e = Reciprocity.effect(film: film, exposureTime: t)
+            return e.isIdentity ? nil : e
+        }()
 
         // 1. Exposure. Pipeline 2: a gain in linear light with the film's highlight latitude, then
         // white balance (the light the film is exposed to).
         if filmScience {
-            if abs(recipe.exposure) > eps || abs(push) > eps {
+            let headroom = Double(min(max(sourceHeadroom, 1), 8))
+            if abs(recipe.exposure) > eps || abs(push) > eps || headroom > 1 {
                 // Pushing develops for more density (a gain of 2^(0.33 N) before the film); slide
                 // and Kodachrome lose latitude (clip harder) when pushed.
                 var latitude = character.latitude
                 if film == nil { latitude = 0 }
                 if push > 0, family == .slide || family == .kodachrome { latitude *= max(0, 1 - 0.3 * push) }
                 image = GradeKernels.applyFilmExposure(gain: exp2(clamp(recipe.exposure, -2, 2) + 0.33 * push),
-                                                       latitude: latitude, to: image)
+                                                       latitude: latitude, headroom: headroom, to: image)
             }
             image = whiteBalance(image, recipe)
+            // 1a'. Reciprocity failure of the exposure time, in the same scene-referred linear light.
+            if let reciprocityEffect {
+                let darkening = recipe.reciprocity == .uncompensated ? -reciprocityEffect.lossStops : 0
+                let gain = (r: exp2(darkening + reciprocityEffect.cast.r), g: exp2(darkening + reciprocityEffect.cast.g),
+                            b: exp2(darkening + reciprocityEffect.cast.b))
+                let contrast = reciprocityEffect.contrastGain
+                if abs(gain.r - 1) > 1e-5 || abs(gain.g - 1) > 1e-5 || abs(gain.b - 1) > 1e-5 || abs(contrast - 1) > 1e-5 {
+                    image = GradeKernels.applyReciprocity(gain: gain, contrast: abs(contrast - 1) > 1e-5 ? contrast : 1,
+                                                          to: image)
+                }
+            }
         } else if abs(recipe.exposure) > eps {
             let f = CIFilter.exposureAdjust()
             f.inputImage = image
@@ -160,7 +200,7 @@ public struct Renderer: Sendable {
 
         // 1c. Pipeline 2 halation: in the exposure, before the film, in linear light.
         if filmScience {
-            var amount = recipe.halationAmount * 2 * character.halationStrength * 0.35
+            var amount = recipe.halationAmount * 2 * character.halationStrength * 0.5
             var haloCharacter = character
             if character.remJet {
                 // Rem-jet backing absorbs most halation; with it removed the film bleeds red.
@@ -171,7 +211,7 @@ public struct Renderer: Sendable {
                     amount *= 0.15
                 }
             }
-            amount = clamp(amount, 0, 0.7)
+            amount = clamp(amount, 0, 0.9)
             if amount > 1e-4 {
                 image = filmHalation(image, extent: extent, amount: amount, character: haloCharacter,
                                      radiusSlider: clamp(recipe.halationRadius, 0, 1), diagonal: diagonal)
@@ -182,12 +222,10 @@ public struct Renderer: Sendable {
         if let film, let lut = try? library.lut(for: film) {
             let strength = clamp(recipe.strength, 0, 1)
             if strength > eps {
-                let f = CIFilter.colorCubeWithColorSpace()
-                f.inputImage = image
-                f.cubeDimension = Float(lut.dimension)
-                f.cubeData = lut.data
-                f.colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
-                if let graded = f.outputImage {
+                let graded = filmScience
+                    ? (GradeKernels.applyLUT3D(lut, cacheKey: "film:\(film.id)", to: image) ?? legacyCube(lut, image))
+                    : legacyCube(lut, image)
+                if let graded {
                     if strength < 1 - eps {
                         let mix = CIFilter.dissolveTransition()
                         mix.inputImage = image
@@ -201,9 +239,16 @@ public struct Renderer: Sendable {
             }
         }
 
-        // 2b. Pipeline 2: scan profile, push / pull contrast and base fog, then B&W toning.
+        // 2b. Pipeline 2: print stock (replaces the scan), push / pull contrast and base fog, then B&W toning.
         if filmScience {
-            var scan = ScanParameters.profile(recipe.scanProfile)
+            // A black-and-white negative is printed on black-and-white paper (Toning covers that): a
+            // colour print stock would tint it, so the paper is ignored for monochrome films.
+            let paper: PaperProfile = film?.isMonochrome == true ? .none : recipe.paper
+            if let paperID = ProceduralLooks.id(for: paper), let paperLUT = try? ProceduralLooks.lut(paperID) {
+                image = applyPaper(paperLUT, id: paperID, to: image, strength: clamp(recipe.strength, 0, 1), extent: extent)
+            }
+            // With a paper set the scan profile is ignored; push / pull contrast and base fog still apply.
+            var scan = ScanParameters.profile(paper == .none ? recipe.scanProfile : .neutral)
             scan.contrast += push * character.pushContrastPerStop
             if push > 0, let family, family == .colorNegative || family == .motionPicture || family == .blackAndWhite {
                 scan.blackLift += 0.012 * push
@@ -292,7 +337,7 @@ public struct Renderer: Sendable {
                 grainCharacter.grainStrength *= push > 0 ? 1 + character.pushGrainPerStop * push : 1 + 0.15 * push
                 image = filmGrain(image, extent: extent, character: grainCharacter,
                                   amount: clamp(recipe.grainAmount, 0, 1), sizeSlider: clamp(recipe.grainSize, 0, 1),
-                                  diagonal: diagonal)
+                                  diagonal: diagonal, shadowGain: reciprocityEffect?.shadowGrainGain ?? 1)
             }
         } else if recipe.grainAmount > eps {
             image = grain(image, extent: extent, amount: clamp(recipe.grainAmount, 0, 1),
@@ -347,18 +392,30 @@ public struct Renderer: Sendable {
     }
 
     /// Pipeline 2 halation: blur the highlights at the film's radius, take them out of the image and put
-    /// the same luminance back as a tinted glow (energy conserving).
+    /// a (nearly) equal luminance back as a tinted glow. The glow is two Gaussians, 0.65 at sigma and 0.35 at
+    /// sigma / 3: the tight one makes the fringe hug the edge of the light, the wide one is the soft tail.
+    /// The source loses only `halationCompensation` of the scattered light (see `miraHalationCombine`).
     private func filmHalation(_ image: CIImage, extent: CGRect, amount: Double, character: FilmCharacter,
                               radiusSlider: Double, diagonal: CGFloat) -> CIImage {
         let sigma = character.halationRadius * diagonal * exp2((radiusSlider - 0.5) * 2)
-        let blurred = Self.softBlur(GradeKernels.halationHighlights(of: image), extent: extent, sigma: sigma)
+        let h = GradeKernels.halationHighlights(of: image)
+        let wide = Self.softBlur(h, extent: extent, sigma: sigma)
+        let tight = Self.softBlur(h, extent: extent, sigma: sigma / 3)
+        let mix = CIFilter.additionCompositing()
+        mix.inputImage = tight.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": CIVector(x: 0.35, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: 0.35, z: 0, w: 0),
+            "inputBVector": CIVector(x: 0, y: 0, z: 0.35, w: 0), "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)])
+        mix.backgroundImage = wide.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": CIVector(x: 0.65, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: 0.65, z: 0, w: 0),
+            "inputBVector": CIVector(x: 0, y: 0, z: 0.65, w: 0), "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)])
+        let blurred = (mix.outputImage ?? wide).cropped(to: extent)
         return GradeKernels.applyHalation(amount: amount, tint: character.halationTint, to: image, blurred: blurred)
             .cropped(to: extent)
     }
 
     /// Pipeline 2 grain: smooth band-limited noise on the encoded image (see `miraGrain`).
     private func filmGrain(_ image: CIImage, extent: CGRect, character: FilmCharacter, amount: Double,
-                           sizeSlider: Double, diagonal: CGFloat) -> CIImage {
+                           sizeSlider: Double, diagonal: CGFloat, shadowGain: Double = 1) -> CIImage {
         let size = character.grainSize * exp2((sizeSlider - 0.5) * 2)
         // A pixel that averages f x f grains sees 1/f of the variation (f = grain cells per pixel).
         let cellsPerPixel = 1 / (size * diagonal)
@@ -366,7 +423,8 @@ public struct Renderer: Sendable {
         let std = amount * 2 * character.grainStrength * 0.025 * bandLimit
         let encoded = toGamma(image)
         let grained = GradeKernels.applyGrain(std: std, cell: size, chroma: character.grainChroma,
-                                              tonalCenter: character.grainTonalCenter, diagonal: diagonal, to: encoded)
+                                              tonalCenter: character.grainTonalCenter, diagonal: diagonal,
+                                              shadowGain: shadowGain, to: encoded)
         return fromGamma(grained).cropped(to: extent)
     }
 
@@ -472,6 +530,32 @@ public struct Renderer: Sendable {
     }
 
     // MARK: Helpers
+
+    /// Pipeline 1's lookup: `CIColorCubeWithColorSpace` in sRGB (output quantised to about 8 bits; kept so
+    /// saved legacy edits render exactly as before).
+    private func legacyCube(_ lut: LUT, _ image: CIImage) -> CIImage? {
+        let f = CIFilter.colorCubeWithColorSpace()
+        f.inputImage = image
+        f.cubeDimension = Float(lut.dimension)
+        f.cubeData = lut.data
+        f.colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
+        return f.outputImage
+    }
+
+    /// The Paper stage: the print look's cube (the same one the print cards use) applied in sRGB, blended
+    /// with the unprinted image by film strength.
+    private func applyPaper(_ lut: LUT, id: String, to image: CIImage, strength: Double, extent: CGRect) -> CIImage {
+        guard strength > 1e-4 else { return image }
+        // Pipeline 2 only: the float kernel (see `miraLUT3D`).
+        guard let printed = GradeKernels.applyLUT3D(lut, cacheKey: "paper:\(id)", to: image)
+                ?? legacyCube(lut, image) else { return image }
+        guard strength < 1 - 1e-4 else { return printed.cropped(to: extent) }
+        let mix = CIFilter.dissolveTransition()
+        mix.inputImage = image
+        mix.targetImage = printed
+        mix.time = Float(strength)
+        return (mix.outputImage ?? printed).cropped(to: extent)
+    }
 
     private func toGamma(_ image: CIImage) -> CIImage {
         let f = CIFilter.linearToSRGBToneCurve()

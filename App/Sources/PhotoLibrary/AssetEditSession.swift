@@ -97,7 +97,9 @@ final class AssetEditSession {
             }
         }
         if image == nil, let cg = input.displaySizeImage?.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+            // The stand-in carries no EXIF; the exposure time (reciprocity) comes from the original's file.
             image = CIImage(cgImage: cg)
+                .withMiraExposureTime(input.fullSizeImageURL.flatMap { ImageSource.exposureTime(url: $0) })
         }
         guard let image else { throw AssetEditError.inputUnavailable }
         isFullSize = full

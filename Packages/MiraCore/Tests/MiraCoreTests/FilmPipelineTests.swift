@@ -130,20 +130,33 @@ enum PipelineFixture {
 
     // MARK: Halation
 
-    @Test func halationConservesLuminanceAndTintsTheHalo() throws {
-        let r = Renderer(library: try Self.library())
+    @Test func halationRedistributesLuminanceAndTintsTheHalo() throws {
+        let lib = try Self.library()
+        let r = Renderer(library: lib)
         let n = 256
         let disc = PipelineFixture.linearImage(width: n, height: n) { x, y in
             let d = hypot(Double(x) - 127.5, Double(y) - 127.5)
             return d < 20 ? (2, 2, 2) : (0.02, 0.02, 0.02)
         }
+        var coreLuma = 0.0, discCount = 0.0
+        for y in 0..<n { for x in 0..<n where hypot(Double(x) - 127.5, Double(y) - 127.5) < 20 { discCount += 1 } }
+        coreLuma = 2   // the highlight part of a luma 2.0 pixel is itself (smoothstep is 1 above 1.0)
         for (film, tinted) in [("neg", true), ("bw", false)] {
+            let character = try #require(lib.film(id: film)?.resolvedCharacter)
+            let a = min(0.5 * 2 * character.halationStrength * 0.5, 0.9)
+            let c = Double(GradeKernels.halationCompensation)
             // Strength 0 skips the LUT (which would clip the 2.0 highlights), leaving only the halation.
             let before = LinearPixels(r.apply(Recipe(filmID: film, strength: 0, halationAmount: 0), to: disc))
             let after = LinearPixels(r.apply(Recipe(filmID: film, strength: 0, halationAmount: 0.5), to: disc))
             var mb = 0.0, ma = 0.0
             for y in 0..<n { for x in 0..<n { mb += before.luma(x, y); ma += after.luma(x, y) } }
-            #expect(abs(ma - mb) / mb < 0.01, "\(film): luminance \(mb) -> \(ma)")
+            // Only the share `c` of the scattered light is removed, all of it comes back: net gain a (1 - c) sum(h).
+            let bound = a * (1 - c) * coreLuma * discCount
+            #expect(ma - mb <= bound * 1.02, "\(film): luminance \(mb) -> \(ma), bound +\(bound)")
+            #expect(ma - mb >= -1e-3 * mb, "\(film): luminance \(mb) -> \(ma)")
+            // The core stays on the shoulder: it keeps at least 95% of its luminance.
+            #expect(after.luma(127, 127) >= 0.95 * before.luma(127, 127),
+                    "\(film): core \(before.luma(127, 127)) -> \(after.luma(127, 127))")
             var dr = 0.0, db = 0.0, count = 0.0
             for y in 0..<n { for x in 0..<n {
                 let d = hypot(Double(x) - 127.5, Double(y) - 127.5)

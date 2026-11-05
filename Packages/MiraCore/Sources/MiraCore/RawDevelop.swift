@@ -1,5 +1,6 @@
 import CoreGraphics
 import CoreImage
+import CoreImage.CIFilterBuiltins
 import Foundation
 import ImageIO
 
@@ -182,12 +183,15 @@ public final class RawDevelop: @unchecked Sendable {
     public let supported: RawSupportedControls
     /// Pixel size of the full decode (before orientation).
     public let nativeSize: CGSize
+    /// The file's EXIF exposure time in seconds; every developed image is tagged with it.
+    public let exposureTime: Double?
     /// Neutral temperature and tint the camera recorded, in kelvin and tint units.
     public var asShot: (temperature: Double, tint: Double) { (Double(initial.temperature), Double(initial.tint)) }
 
     /// `orientation` (Photos' `fullSizeImageOrientation`) overrides the file's own; nil keeps it.
     public init?(url: URL, orientation: CGImagePropertyOrientation? = nil) {
         guard let f = CIRAWFilter(imageURL: url) else { return nil }
+        exposureTime = ImageSource.exposureTime(url: url)
         filter = f
         if let orientation { f.orientation = orientation }
         initial = RawInitialValues(of: f)
@@ -198,6 +202,9 @@ public final class RawDevelop: @unchecked Sendable {
     /// For Photos editing input handed over as data; `typeHint` is a UTI such as "com.adobe.raw-image".
     public init?(data: Data, typeHint: String?, orientation: CGImagePropertyOrientation? = nil) {
         guard let f = CIRAWFilter(imageData: data, identifierHint: typeHint) else { return nil }
+        exposureTime = CGImageSourceCreateWithData(data as CFData, nil)
+            .flatMap { CGImageSourceCopyPropertiesAtIndex($0, 0, nil) as? [CFString: Any] }
+            .flatMap(ImageSource.exposureTime(properties:))
         filter = f
         if let orientation { f.orientation = orientation }
         initial = RawInitialValues(of: f)
@@ -213,14 +220,85 @@ public final class RawDevelop: @unchecked Sendable {
         return Float(PreviewSizing.maxSide / longSide)
     }
 
+    /// Longest side of the reduced decode used to measure headroom.
+    static let headroomProbeSide: CGFloat = 400
+    /// Factor on the measured peak.
+    static let headroomMargin: CGFloat = 1.1
+    /// Highest headroom reported.
+    public static let maxHeadroom: CGFloat = 8
+
+    private struct HeadroomKey: Hashable {
+        var settings: RawSettings
+        var filmApplied: Bool
+    }
+    private var headroomCache: [HeadroomKey: CGFloat] = [:]
+
     /// The upright image for `settings`. `draft` favours speed (previews); `scale` < 1 decodes smaller.
+    /// The image is tagged with its headroom (`CIImage.miraHeadroom`).
     public func apply(
         _ settings: RawSettings, filmApplied: Bool, draft: Bool, scale: Float = 1
     ) -> CIImage? {
+        develop(settings, filmApplied: filmApplied, draft: draft, scale: scale)?.image
+    }
+
+    /// Like `apply`, also reporting the headroom: the largest linear value the decode holds. It is
+    /// 1 unless a film is applied and extended dynamic range is on (explicitly or by the film
+    /// default); then it is measured, see `measureHeadroom`.
+    public func develop(
+        _ settings: RawSettings, filmApplied: Bool, draft: Bool, scale: Float = 1
+    ) -> DevelopedSource? {
         lock.lock(); defer { lock.unlock() }
+        var headroom: CGFloat = 1
+        let edr = RawSettingsMapper.resolvedExtendedDynamicRange(settings, filmApplied: filmApplied, initial: initial)
+        if filmApplied, edr > 0 {
+            let key = HeadroomKey(settings: settings, filmApplied: filmApplied)
+            if let hit = headroomCache[key] {
+                headroom = hit
+            } else {
+                headroom = measureHeadroom(settings, filmApplied: filmApplied)
+                headroomCache[key] = headroom
+            }
+        }
         RawSettingsMapper.apply(settings, filmApplied: filmApplied, draft: draft, scale: scale,
                                 initial: initial, to: filter)
-        return filter.outputImage
+        guard let image = filter.outputImage else { return nil }
+        return DevelopedSource(image: image.withMiraExposureTime(exposureTime), headroom: headroom)
+    }
+
+    /// Decodes a reduced draft (long side ~`headroomProbeSide`) with `settings` and returns its
+    /// peak linear value (max of R, G, B over the image) times `headroomMargin`, clamped to 1...8. CIRAWFilter's
+    /// `extendedDynamicRangeAmount` has no documented fixed relation to the peak (it varies with the
+    /// file, boost and white balance: see RawIntegrationTests), so it is measured. Caller holds the lock.
+    private func measureHeadroom(_ settings: RawSettings, filmApplied: Bool) -> CGFloat {
+        let longSide = max(nativeSize.width, nativeSize.height)
+        let scale = Float(min(1, Self.headroomProbeSide / max(longSide, 1)))
+        RawSettingsMapper.apply(settings, filmApplied: filmApplied, draft: true, scale: scale,
+                                initial: initial, to: filter)
+        guard let probe = filter.outputImage, !probe.extent.isEmpty, !probe.extent.isInfinite else { return 1 }
+        // The probe is a reduced decode, so its peak is a little below the full-size peak (a few percent on
+        // the sample files, 9% on one); `headroomMargin` covers that.
+        let peak = Self.peak(of: probe) * Self.headroomMargin
+        return min(max(peak, 1), Self.maxHeadroom)
+    }
+
+    private static let probeLock = NSLock()
+    private static let probeContext = Renderer.makeContext()
+
+    /// Maximum of R, G and B over `image`, in extended linear sRGB.
+    static func peak(of image: CIImage) -> CGFloat {
+        let f = CIFilter.areaMaximum()
+        f.inputImage = image
+        f.extent = image.extent
+        guard let out = f.outputImage else { return 1 }
+        var px = [Float](repeating: 0, count: 4)
+        let space = CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!
+        // A private context, one probe at a time: the probe never queues behind (or holds up) the
+        // shared context's preview renders while RawCamera decodes.
+        probeLock.lock(); defer { probeLock.unlock() }
+        probeContext.render(out, toBitmap: &px, rowBytes: 16,
+                                      bounds: CGRect(x: 0, y: 0, width: 1, height: 1), format: .RGBAf, colorSpace: space)
+        let m = max(px[0], px[1], px[2])
+        return m.isFinite ? CGFloat(m) : 1
     }
 }
 

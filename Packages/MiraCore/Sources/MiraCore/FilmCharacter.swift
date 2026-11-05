@@ -112,7 +112,7 @@ public struct FilmCharacter: Codable, Hashable, Sendable {
         size = min(max(size, 0.0002), 0.0012)
         return FilmCharacter(grainStrength: strength, grainSize: size, grainChroma: chroma,
                              grainTonalCenter: center, halationStrength: halation, halationTint: tint,
-                             halationRadius: 0.012, latitude: latitude, latitudeUnder: under,
+                             halationRadius: 0.006, latitude: latitude, latitudeUnder: under,
                              latitudeOver: over, remJet: remJet, pushContrastPerStop: pushContrast,
                              pushGrainPerStop: pushGrain)
     }

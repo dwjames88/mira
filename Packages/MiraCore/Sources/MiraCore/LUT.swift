@@ -112,6 +112,21 @@ public struct LUT: Sendable {
     /// the image's own colour space with no conversion, so the values stay sRGB-encoded.
     /// Cubes larger than 64 are trilinearly resampled down to 64.
     public static func loadHald(cgImage: CGImage) throws -> LUT {
+        let (n, rgb) = try haldSamples(cgImage: cgImage)
+        let lut = LUT(dimension: n, rgb16: rgb)
+        return n > maxHaldDimension ? lut.resampled(to: maxHaldDimension) : lut
+    }
+
+    /// The Hald image's 16-bit samples exactly as `loadHald` reads them: `dimension^3` texels of
+    /// interleaved R, G, B (red fastest, then green, then blue), no resampling. `PackedLUT` stores these.
+    public static func haldSamples(url: URL) throws -> (dimension: Int, rgb: [UInt16]) {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
+        else { throw LUTError.imageDecodeFailed(url.lastPathComponent) }
+        return try haldSamples(cgImage: image)
+    }
+
+    public static func haldSamples(cgImage: CGImage) throws -> (dimension: Int, rgb: [UInt16]) {
         let side = cgImage.width
         guard cgImage.height == side else { throw LUTError.invalidHald("image is not square") }
         var level = 0
@@ -136,16 +151,27 @@ public struct LUT: Sendable {
         }
         guard drawn else { throw LUTError.imageDecodeFailed("could not create bitmap context") }
 
-        var out = [Float](repeating: 1, count: n * n * n * 4)
-        let scale: Float = 1.0 / 65535.0
         // Texel i (r fastest, then g, then b) is pixel i in row-major order.
+        var rgb = [UInt16](repeating: 0, count: n * n * n * 3)
         for i in 0..<(n * n * n) {
-            out[i * 4 + 0] = Float(pixels[i * 4 + 0]) * scale
-            out[i * 4 + 1] = Float(pixels[i * 4 + 1]) * scale
-            out[i * 4 + 2] = Float(pixels[i * 4 + 2]) * scale
+            rgb[i * 3] = pixels[i * 4]
+            rgb[i * 3 + 1] = pixels[i * 4 + 1]
+            rgb[i * 3 + 2] = pixels[i * 4 + 2]
         }
-        let lut = LUT(dimension: n, data: out.withUnsafeBufferPointer { Data(buffer: $0) })
-        return n > maxHaldDimension ? lut.resampled(to: maxHaldDimension) : lut
+        return (n, rgb)
+    }
+
+    /// Builds a cube from interleaved 16-bit R, G, B samples (alpha 1), scaled by 1/65535.
+    public init(dimension: Int, rgb16: [UInt16]) {
+        let texels = dimension * dimension * dimension
+        var out = [Float](repeating: 1, count: texels * 4)
+        let scale: Float = 1.0 / 65535.0
+        for i in 0..<texels {
+            out[i * 4 + 0] = Float(rgb16[i * 3 + 0]) * scale
+            out[i * 4 + 1] = Float(rgb16[i * 3 + 1]) * scale
+            out[i * 4 + 2] = Float(rgb16[i * 3 + 2]) * scale
+        }
+        self.init(dimension: dimension, data: out.withUnsafeBufferPointer { Data(buffer: $0) })
     }
 
     // MARK: Resampling

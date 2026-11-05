@@ -98,7 +98,7 @@ struct FilmsPanel: View {
         }
     }
 
-    /// PUSH / PULL, SCAN and (monochrome films) TONING.
+    /// PUSH / PULL, SCAN, PAPER (not on print cards) and (monochrome films) TONING.
     @ViewBuilder private var filmControls: some View {
         if model.showsFilmControls {
             FFSlider("Push / Pull", value: Binding(get: { model.recipe.push },
@@ -107,8 +107,18 @@ struct FilmsPanel: View {
                 .padding(.top, T.rows(1))
                 .help("Shoot the film at a different speed and develop to compensate, in stops")
             LatitudeCompact(model: model)
+            if model.showsReciprocityControls { reciprocityControls }
             chipSection("Scan", ScanProfile.allCases.map { ($0.displayName, $0 == model.recipe.scanProfile, $0) }) {
-                model.recipe.scanProfile = $0
+                model.selectScan($0)
+            }
+            if model.showsPaperChips {
+                chipSection("Paper", PaperProfile.allCases.map { ($0.displayName, $0 == model.recipe.paper, $0) }) {
+                    model.selectPaper($0)
+                }
+                Text("Mira originals, inspired by published print behavior. Replaces Scan. No affiliation with Kodak or Fujifilm.")
+                    .ffLabel(color: T.paperDim)
+                    .lineLimit(3)
+                    .help("Cinema Print and Color Paper are Mira original looks; choosing one sets Scan to Neutral")
             }
             if model.showsToning {
                 chipSection("Toning", Toning.allCases.map { ($0.displayName, $0 == model.recipe.toning, $0) }) {
@@ -119,6 +129,31 @@ struct FilmsPanel: View {
                         .padding(.top, T.rows(0.5))
                 }
             }
+        }
+    }
+
+    /// EXPOSURE TIME: the EXIF time or the chosen one on a log slider (double-click the label for the EXIF time),
+    /// the reciprocity mode, and what the time does to this film.
+    @ViewBuilder private var reciprocityControls: some View {
+        FFSlider("Exposure time",
+                 value: Binding(get: { model.exposureTimeSliderValue },
+                                set: { model.setExposureTime(sliderValue: $0) }),
+                 in: ExposureTimeFormat.range, default: log2(model.sourceExposureTime.map { ExposureTimeFormat.standard(nearestTo: $0) } ?? ExposureTimeFormat.neutral),
+                 snap: ExposureTimeFormat.step,
+                 format: { _ in model.exposureTimeReadout })
+            .padding(.top, T.rows(1))
+            .help("Shutter speed the film is exposed for; long times make film lose speed (reciprocity failure). Double-click to use the photo's EXIF time")
+        chipSection("Reciprocity", ReciprocityMode.allCases.map { ($0.displayName, $0 == model.recipe.reciprocity, $0) }) {
+            model.recipe.reciprocity = $0
+        }
+        .help("Off ignores the exposure time. Compensated keeps the brightness and shows the colour cast, contrast and shadow grain. Uncompensated also darkens")
+        if let readout = model.reciprocityReadout {
+            (Text(readout).foregroundStyle(T.paperMid)
+                + Text(model.reciprocityExtrapolated ? " \u{00B7} beyond datasheet" : "").foregroundStyle(T.paperDim))
+                .ffLabel(color: T.paperMid)
+                .lineLimit(2)
+                .padding(.top, T.rows(0.5))
+                .accessibilityLabel(readout + (model.reciprocityExtrapolated ? ", beyond datasheet" : ""))
         }
     }
 

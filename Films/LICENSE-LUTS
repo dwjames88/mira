@@ -13,7 +13,7 @@ Licence: Creative Commons Attribution-ShareAlike 4.0 International
 https://creativecommons.org/licenses/by-sa/4.0/
 Earlier version, sometimes cited for this collection: CC BY-SA 3.0 https://creativecommons.org/licenses/by-sa/3.0/
 
-The files in HaldCLUT/ are redistributed unmodified.
+The PNG files (FilmSources/HaldCLUT/ in the source repository) are kept unmodified; the app ships each look resampled from 64^3 to 48^3 or 56^3 where the error stays small, else exact 64^3 (an adaptation when resampled) as Packed/*.mlut under the same CC BY-SA 4.0 licence.
 
 ======================================================================
 Legal code, CC BY-SA 4.0 (from https://creativecommons.org/licenses/by-sa/4.0/legalcode.txt)
