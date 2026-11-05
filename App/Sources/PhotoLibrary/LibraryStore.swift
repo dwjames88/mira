@@ -5,9 +5,9 @@ import Photos
 
 /// Bridges `PHPhotoLibraryChangeObserver` (arbitrary queue) to the main actor.
 private final class ChangeRelay: NSObject, PHPhotoLibraryChangeObserver, @unchecked Sendable {
-    let onChange: @Sendable () -> Void
-    nonisolated init(onChange: @escaping @Sendable () -> Void) { self.onChange = onChange }
-    nonisolated func photoLibraryDidChange(_ changeInstance: PHChange) { onChange() }
+    let onChange: @Sendable (Unchecked<PHChange>) -> Void
+    nonisolated init(onChange: @escaping @Sendable (Unchecked<PHChange>) -> Void) { self.onChange = onChange }
+    nonisolated func photoLibraryDidChange(_ changeInstance: PHChange) { onChange(Unchecked(value: changeInstance)) }
 }
 
 private final class LookupFlag: @unchecked Sendable {
@@ -52,12 +52,19 @@ final class LibraryStore {
         filterPanelOpen = open
         if open { schedulePass(delay: .milliseconds(50), replace: true) }
     }
-    /// Bumped whenever the library changes, so cells re-read their asset (edited badges, thumbnails).
+    /// Bumped when photos came, went or moved. Cells do not key on it (they key on the asset and its
+    /// version); it is for views that summarise the whole grid.
     private(set) var revision = 0
+    /// Per-asset change counters: PhotoKit reported the asset changed (edit, revert, favorite), so
+    /// only that cell fetches a new thumbnail.
+    private(set) var versions = AssetVersions()
     var selectedIndex: Int?
 
     @ObservationIgnored let imageManager = PHCachingImageManager()
     @ObservationIgnored private var relay: ChangeRelay?
+    @ObservationIgnored private var didStart = false
+    /// Counts thumbnail requests, memory-cache hits and caching-manager calls (read by tests, logged).
+    @ObservationIgnored let metrics = ThumbnailMetrics.shared
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
     @ObservationIgnored private var treeTask: Task<Void, Never>?
     @ObservationIgnored private var restoredExpansion = false
@@ -91,9 +98,18 @@ final class LibraryStore {
         options.isNetworkAccessAllowed = true
         return options
     }()
-    /// The last thumbnail each cell showed, so opening a photo can show it at once.
-    @ObservationIgnored private var shownThumbnails: [String: NSImage] = [:]
-    @ObservationIgnored private var shownOrder: [String] = []
+    /// Memory cache + the one request path for grid thumbnails (key: asset, pixel size, modification
+    /// date, per-asset version). Cells ask it; PhotoKit is only called on a miss.
+    @ObservationIgnored private(set) lazy var thumbnails = ThumbnailPipeline<NSImage, PHAsset>(
+        metrics: metrics,
+        cost: { image in max(1, Int(image.size.width * image.size.height) * 4) },
+        fetch: { [unowned self] asset, key, deliver in
+            let side = CGFloat(key.pixels)
+            return Int(PhotoKitBridge.requestThumbnail(
+                manager: self.imageManager, asset: asset, size: CGSize(width: side, height: side),
+                options: self.thumbnailOptions, deliver: deliver))
+        },
+        cancel: { [unowned self] id in self.imageManager.cancelImageRequest(PHImageRequestID(id)) })
     @ObservationIgnored private let rawQueue = DispatchQueue(label: "com.fieldframes.mira.raw-lookup", qos: .utility)
 
     private static let selectionKey = "mira.sidebar.selection"
@@ -151,12 +167,16 @@ final class LibraryStore {
 
     /// Asks for read/write access if not decided yet, then loads the library.
     func start() async {
+        // Once per authorization: a second call (the view being rebuilt) must not refetch the grid.
+        guard !didStart else { return }
         var status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
         if status == .notDetermined {
             status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
         }
         authorization = status
         if isAuthorized {
+            guard !didStart else { return }
+            didStart = true
             registerObserver()
             await loadMetadataStore()
             reload()
@@ -175,6 +195,8 @@ final class LibraryStore {
         guard status != authorization else { return }
         authorization = status
         if isAuthorized {
+            guard !didStart else { return }
+            didStart = true
             registerObserver()
             Task { [weak self] in
                 await self?.loadMetadataStore()
@@ -193,19 +215,68 @@ final class LibraryStore {
     /// Built in a `nonisolated` context so the `@Sendable` callback carries no main-actor isolation.
     private nonisolated static func makeRelay(_ store: LibraryStore) -> ChangeRelay {
         let weakStore = WeakStore(store)
-        return ChangeRelay { @Sendable in
+        return ChangeRelay { @Sendable change in
             DispatchQueue.main.async {
-                MainActor.assumeIsolated { weakStore.store?.scheduleRefresh() }
+                MainActor.assumeIsolated { weakStore.store?.libraryDidChange(change.value) }
             }
         }
     }
 
-    private func scheduleRefresh() {
+    /// Applies what PhotoKit says changed in the current grid, instead of refetching it: removals and
+    /// insertions shift positions (cells find their image in the memory cache), changed assets get a
+    /// new version so just their cells fetch again. The sidebar's counts refresh on a short delay.
+    private func libraryDidChange(_ change: PHChange) {
+        var membershipChanged = false
+        if let current = fetchResult, let details = change.changeDetails(for: current) {
+            membershipChanged = applyGridChange(details)
+        }
+        scheduleSidebarRefresh(reindex: membershipChanged)
+    }
+
+    /// Returns true when the set or order of photos changed.
+    private func applyGridChange(_ details: PHFetchResultChangeDetails<PHAsset>) -> Bool {
+        let summary = LibraryChangeSummary(
+            isIncremental: details.hasIncrementalChanges,
+            removedCount: details.removedIndexes?.count ?? 0,
+            insertedCount: details.insertedIndexes?.count ?? 0,
+            hasMoves: details.hasMoves,
+            changedIDs: details.changedObjects.map(\.localIdentifier))
+        let after = details.fetchResultAfterChanges
+        versions.bump(summary.changedIDs)
+        guard summary.membershipChanged else {
+            // Edits only: the same photos in the same places. Swap the fetch so cells read the fresh assets.
+            fetchResult = after
+            return false
+        }
+        scan = nil
+        if filter.needsAssetPass {
+            // Filtered positions refer to the old fetch: re-run the pass over the new one, grid stays up meanwhile.
+            runPass(newFetch: after)
+        } else {
+            fetchResult = after
+            displayIndices = nil
+            if let i = selectedIndex, i >= count { selectedIndex = nil }
+            if filterPanelOpen { runPass(newFetch: nil) }
+        }
+        let removed = details.removedObjects
+        if !removed.isEmpty, !cachedAssets.isEmpty {
+            imageManager.stopCachingImages(for: removed, targetSize: thumbnailSize, contentMode: .aspectFill, options: thumbnailOptions)
+            metrics.recordStop()
+            let gone = Set(removed.map(\.localIdentifier))
+            cachedAssets.removeAll { gone.contains($0.localIdentifier) }
+        }
+        // Positions moved: let the next cell that appears recompute the window (no stop-all).
+        cachedRange = 0..<0
+        revision += 1
+        return true
+    }
+
+    private func scheduleSidebarRefresh(reindex: Bool) {
         refreshTask?.cancel()
         refreshTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(250))
             guard !Task.isCancelled, let self else { return }
-            self.reload()
+            self.refreshSidebar(reindex: reindex)
         }
     }
 
@@ -215,7 +286,13 @@ final class LibraryStore {
     func reload() {
         guard isAuthorized else { return }
         refetchGrid(keepVisible: true)
-        restartIndexing(delay: .milliseconds(500))
+        refreshSidebar(reindex: true)
+    }
+
+    /// Rebuilds the sidebar tree off the main actor; optionally restarts the metadata index.
+    private func refreshSidebar(reindex: Bool) {
+        guard isAuthorized else { return }
+        if reindex { restartIndexing(delay: .milliseconds(500)) }
         treeTask?.cancel()
         treeTask = Task { [weak self] in
             let built = await Task.detached(priority: .userInitiated) { SidebarLoader.load() }.value
@@ -262,7 +339,8 @@ final class LibraryStore {
             displayIndices = nil
             filterPending = false
             if let i = selectedIndex, i >= count { selectedIndex = nil }
-            stopAllCaching()
+            // A different collection drops the preheat window; a refetch of the same one keeps it.
+            if keepVisible { cachedRange = 0..<0 } else { stopAllCaching() }
             revision += 1
             // Facets for the popover and the metadata criteria's bookkeeping.
             if filterPanelOpen { runPass(newFetch: nil) }
@@ -353,7 +431,7 @@ final class LibraryStore {
             self.filterPending = false
             if let newFetch {
                 self.fetchResult = newFetch
-                self.stopAllCaching()
+                self.cachedRange = 0..<0
             }
             if self.displayIndices != outcome.indices || newFetch != nil {
                 self.displayIndices = outcome.indices
@@ -429,15 +507,10 @@ final class LibraryStore {
         thumbnailPixels = pixels
     }
 
-    /// Requests a thumbnail; the handler may run twice (degraded, then final). Returns the request id.
-    func requestThumbnail(for asset: PHAsset, handler: @escaping @MainActor (NSImage?) -> Void) -> PHImageRequestID {
-        let id = asset.localIdentifier
-        return PhotoKitBridge.requestImage(
-            manager: imageManager, asset: asset, size: thumbnailSize, options: thumbnailOptions, signpost: true
-        ) { [weak self] image in
-            if let image { self?.remember(image, id: id) }
-            handler(image)
-        }
+    /// The memory-cache key of an asset's grid thumbnail at the current size.
+    func thumbnailKey(for asset: PHAsset) -> GridThumbnailKey {
+        GridThumbnailKey(id: asset.localIdentifier, pixels: Int(thumbnailPixels),
+                         modificationDate: asset.modificationDate, version: versions[asset.localIdentifier])
     }
 
     /// A larger image for the editor to show while the editing input loads.
@@ -455,14 +528,8 @@ final class LibraryStore {
         imageManager.cancelImageRequest(id)
     }
 
-    func cachedThumbnail(for asset: PHAsset) -> NSImage? { shownThumbnails[asset.localIdentifier] }
-
-    private func remember(_ image: NSImage, id: String) {
-        if shownThumbnails.updateValue(image, forKey: id) == nil {
-            shownOrder.append(id)
-            if shownOrder.count > 400 { shownThumbnails[shownOrder.removeFirst()] = nil }
-        }
-    }
+    /// The grid thumbnail already in memory, so opening a photo can show it at once.
+    func cachedThumbnail(for asset: PHAsset) -> NSImage? { thumbnails.cached(thumbnailKey(for: asset)) }
 
     /// Keeps a window of assets around `index` warm in the caching manager: the visible cells plus
     /// a little ahead and behind, nothing more.
@@ -474,20 +541,25 @@ final class LibraryStore {
         guard lower < upper else { return }
         let range = lower..<upper
         let assets = range.compactMap { asset(at: $0) }
-        if !cachedAssets.isEmpty {
-            let keep = Set(assets.map(\.localIdentifier))
-            let stale = cachedAssets.filter { !keep.contains($0.localIdentifier) }
-            if !stale.isEmpty {
-                imageManager.stopCachingImages(for: stale, targetSize: thumbnailSize, contentMode: .aspectFill, options: thumbnailOptions)
-            }
+        let keep = Set(assets.map(\.localIdentifier))
+        let had = Set(cachedAssets.map(\.localIdentifier))
+        let stale = cachedAssets.filter { !keep.contains($0.localIdentifier) }
+        if !stale.isEmpty {
+            imageManager.stopCachingImages(for: stale, targetSize: thumbnailSize, contentMode: .aspectFill, options: thumbnailOptions)
+            metrics.recordStop()
         }
-        imageManager.startCachingImages(for: assets, targetSize: thumbnailSize, contentMode: .aspectFill, options: thumbnailOptions)
+        let fresh = assets.filter { !had.contains($0.localIdentifier) }
+        if !fresh.isEmpty {
+            imageManager.startCachingImages(for: fresh, targetSize: thumbnailSize, contentMode: .aspectFill, options: thumbnailOptions)
+            metrics.recordPreheat(assets: fresh.count)
+        }
         cachedAssets = assets
         cachedRange = range
     }
 
     private func stopAllCaching() {
         imageManager.stopCachingImagesForAllAssets()
+        metrics.recordStopAll()
         cachedAssets = []
         cachedRange = 0..<0
     }

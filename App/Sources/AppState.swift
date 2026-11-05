@@ -364,14 +364,14 @@ final class AppState {
             if progress.showing {
                 model.recipe = loaded.recipe
                 model.replaceSource(loaded.source, isFull: true)
-                if let url = loaded.rawURL { model.attachRawSource(url: url, orientation: loaded.rawOrientation, developedFor: loaded.recipe) }
+                if let url = loaded.rawURL { model.attachRawSource(url: url, orientation: loaded.rawOrientation, developedFor: loaded.recipe, develop: loaded.rawDevelop) }
             } else {
                 flushSidecar()
                 scopedURL?.stopAccessingSecurityScopedResource()
                 scopedURL = nil
                 model.setSource(loaded.source)
                 model.recipe = loaded.recipe
-                if let url = loaded.rawURL { model.attachRawSource(url: url, orientation: loaded.rawOrientation, developedFor: loaded.recipe) }
+                if let url = loaded.rawURL { model.attachRawSource(url: url, orientation: loaded.rawOrientation, developedFor: loaded.recipe, develop: loaded.rawDevelop) }
             }
             editor = model
             target = .asset(session)
@@ -387,7 +387,7 @@ final class AppState {
             } else if !loaded.isFullSize {
                 editorNote = "Only a preview of this picture is available, so it cannot be saved."
             } else {
-                editorNote = nil
+                editorNote = loaded.rawNote
             }
             mode = .editor
             track()

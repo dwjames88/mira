@@ -8,12 +8,14 @@ enum AssetEditError: Error, LocalizedError {
     case inputUnavailable
     case noFullSizeImage
     case noRenderer
+    case rawOriginalMissing
 
     var errorDescription: String? {
         switch self {
         case .inputUnavailable: "Photos could not provide this picture for editing"
         case .noFullSizeImage: "The full-size picture is not available, so it cannot be saved"
         case .noRenderer: "Film library missing from the app bundle"
+        case .rawOriginalMissing: "This edit was made on the RAW original, which Photos could not provide. Check the connection to iCloud and try again"
         }
     }
 }
@@ -60,12 +62,21 @@ final class AssetEditSession {
         let colorSpace: CGColorSpace
         let size: CGSize
         let isFullSize: Bool
+        /// True when `source` is a draft develop of the RAW original (see `rawSource(for:full:)` for the full-quality one).
+        let isRaw: Bool
+        /// Why the rendered picture opened although the asset has a RAW, for the status line.
+        let rawNote: String?
     }
 
     private(set) var asset: PHAsset
     private var input: PHContentEditingInput?
     private var source: CIImage?
     private var isFullSize = false
+    /// The RAW being developed (the editing input's own file, or the asset's RAW resource).
+    private var rawDevelop: RawDevelop?
+    private var rawURL: URL?
+    /// True when the RAW is a separately fetched resource: saved edits are marked as RAW-based.
+    private var rawIsFetched = false
 
     init(asset: PHAsset) { self.asset = asset }
 
@@ -88,10 +99,57 @@ final class AssetEditSession {
         var image: CIImage?
         var space: CGColorSpace?
         var full = false
-        if let url = input.fullSizeImageURL {
-            let orientation = CGImagePropertyOrientation(rawValue: UInt32(input.fullSizeImageOrientation))
+        var rawNote: String?
+        rawDevelop = nil; rawURL = nil; rawIsFetched = false
+
+        let inputURL = input.fullSizeImageURL
+        let inputOrientation = CGImagePropertyOrientation(rawValue: UInt32(input.fullSizeImageOrientation))
+        let inputIsRAW = inputURL.map { ImageSource.isRAW(url: $0) } ?? false
+        let id = asset.localIdentifier
+        let hasRawResource = inputIsRAW ? true : await Task.detached(priority: .userInitiated) {
+            RawResourceStore.rawResource(forAsset: id) != nil
+        }.value
+        let adjustments = MiraAdjustment.state(of: input.adjustmentData)
+        let plan = RawOpenPolicy.plan(inputIsRAW: inputIsRAW, adjustments: adjustments, hasRawResource: hasRawResource)
+
+        var rawSource: (url: URL, orientation: CGImagePropertyOrientation?)?
+        switch plan {
+        case .useInput:
+            if let inputURL { rawSource = (inputURL, inputOrientation) }
+        case .fetchResource:
+            do {
+                // The RAW has its own orientation metadata; fullSizeImageOrientation describes the rendered file.
+                rawSource = (try await RawResourceStore.fetchRaw(forAsset: id), nil)
+                rawIsFetched = true
+            } catch {
+                if case .mira(rawBase: true) = adjustments { throw AssetEditError.rawOriginalMissing }
+                rawNote = "RAW NOT DOWNLOADED · OPENED THE RENDERED PICTURE"
+            }
+        case .rawBaseMissing:
+            throw AssetEditError.rawOriginalMissing
+        case .keepRendered(let reason):
+            if reason == .foreignAdjustments { rawNote = "EDITED IN ANOTHER APP · OPENED THE RENDERED PICTURE, NOT THE RAW" }
+            if reason == .earlierEditOnRenderedFile { rawNote = "EARLIER EDIT KEEPS ITS RENDERED BASE" }
+        }
+
+        if let raw = rawSource {
+            // Draft develop at preview size (cached per asset for the session) is the first editable frame; the
+            // view model swaps in the full-quality develop in the background.
+            let developRecipe = recipe
+            let frame = await Task.detached(priority: .userInitiated) {
+                RawOpener.openDraft(url: raw.url, orientation: raw.orientation, settings: developRecipe.raw,
+                                    filmApplied: developRecipe.filmID != nil, cacheKey: id)
+            }.value
+            if let frame {
+                image = frame.source.image
+                space = ImageSource.outputColorSpace(url: raw.url, image: frame.source.image)
+                full = true
+                rawDevelop = frame.develop
+                rawURL = raw.url
+            }
+        } else if let url = inputURL {
             let loaded = await Task.detached(priority: .userInitiated) { () -> (Unchecked<CIImage>, Unchecked<CGColorSpace>)? in
-                guard let image = ImageSource.load(url: url, orientation: orientation) else { return nil }
+                guard let image = ImageSource.load(url: url, orientation: inputOrientation) else { return nil }
                 return (Unchecked(value: image), Unchecked(value: ImageSource.outputColorSpace(url: url, image: image)))
             }.value
             if let loaded { image = loaded.0.value; space = loaded.1.value; full = true }
@@ -104,7 +162,23 @@ final class AssetEditSession {
         self.source = image
         isFullSize = full
         return Loaded(recipe: recipe, hadOurAdjustments: ours, foreignFormat: foreign, source: image,
-                      colorSpace: colorSpace, size: image.extent.size, isFullSize: full)
+                      colorSpace: colorSpace, size: image.extent.size, isFullSize: full,
+                      isRaw: rawDevelop != nil, rawNote: rawNote)
+    }
+
+    /// The RAW developed for `recipe`'s RAW settings: draft at preview size, or (`full`) the full-quality
+    /// full-size develop that zoom, histogram and Save use. nil for non-RAW assets. Runs off the main actor.
+    func rawSource(for recipe: Recipe, full: Bool) async -> LoadedSource? {
+        guard let develop = rawDevelop, let url = rawURL else { return nil }
+        let loaded = await Task.detached(priority: .userInitiated) { () -> LoadedSource? in
+            let developed = develop.develop(recipe.raw, filmApplied: recipe.filmID != nil, draft: !full,
+                                            scale: full ? 1 : develop.previewScale())
+            guard let image = developed?.image else { return nil }
+            return LoadedSource(image: image, colorSpace: ImageSource.outputColorSpace(url: url, image: image),
+                                size: image.extent.size)
+        }.value
+        if full, let loaded { source = loaded.image }
+        return loaded
     }
 
     private func requestInput() async throws -> PHContentEditingInput {
@@ -116,13 +190,20 @@ final class AssetEditSession {
 
     /// Renders `recipe` over the pristine original at full size and commits it as an edit of the asset.
     func save(recipe: Recipe, renderer: Renderer) async throws {
-        guard let input, let source else { throw AssetEditError.inputUnavailable }
+        guard let input, var source else { throw AssetEditError.inputUnavailable }
         guard isFullSize, let inputURL = input.fullSizeImageURL else { throw AssetEditError.noFullSizeImage }
 
+        // A RAW is developed again, full quality and full size, for the recipe being saved.
+        if rawDevelop != nil {
+            guard let full = await rawSource(for: recipe, full: true) else { throw AssetEditError.inputUnavailable }
+            source = full.image
+        }
         let output = PHContentEditingOutput(contentEditingInput: input)
-        output.adjustmentData = try MiraAdjustment.adjustmentData(for: recipe)
+        // An edit made on a separately fetched RAW says so, so it reopens on the RAW and the Photos extension
+        // (which only receives the rendered JPEG of a pair) leaves it alone.
+        output.adjustmentData = try MiraAdjustment.adjustmentData(for: recipe, rawBase: rawIsFetched)
         let outputURL = output.renderedContentURL
-        let colorSpace = ImageSource.outputColorSpace(url: inputURL, image: source)
+        let colorSpace = ImageSource.outputColorSpace(url: rawURL ?? inputURL, image: source)
 
         let sourceBox = Unchecked(value: source)
         try await Task.detached(priority: .userInitiated) {

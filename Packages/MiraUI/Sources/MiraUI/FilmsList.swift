@@ -14,16 +14,17 @@ public struct FilmsList: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("\(library.stocks.count) stocks \u{00B7} \(library.films.count) looks \u{00B7} \(familyCount) families")
+            Text("\(library.filmStocks.count) stocks \u{00B7} \(library.films.count) looks \u{00B7} \(familyCount) families")
                 .ffLabel(color: T.paperDim)
                 .frame(height: T.rows(1))
             ForEach(FilmFamily.displayOrder, id: \.self) { family in
-                let films = library.stocks.filter { $0.family == family }
-                if !films.isEmpty {
-                    FFSectionLabel(family.displayName, trailing: String(format: "%03d", films.count))
+                let stocks = library.filmStocks.filter { $0.family == family }
+                if !stocks.isEmpty {
+                    FFSectionLabel(family.displayName, trailing: String(format: "%03d", stocks.count))
                         .padding(.top, T.rows(2))
-                    ForEach(films) { film in
-                        FilmRow(film: film, variants: library.variants(of: film.id).dropFirst().compactMap(\.variant))
+                    ForEach(stocks) { stock in
+                        FilmRow(stock: stock, isos: library.isoChoices(stockID: stock.id).map(\.label),
+                                description: library.film(id: stock.baseFilmID)?.description ?? "")
                         FFHairline()
                     }
                 }
@@ -32,32 +33,40 @@ public struct FilmsList: View {
     }
 
     private var familyCount: Int {
-        FilmFamily.displayOrder.filter { family in library.stocks.contains { $0.family == family } }.count
+        FilmFamily.displayOrder.filter { family in library.filmStocks.contains { $0.family == family } }.count
     }
 }
 
 private struct FilmRow: View {
-    let film: Film
-    /// Labels of the stock's variants, in library order.
-    var variants: [String] = []
+    let stock: FilmStock
+    /// The stock's ISO chip labels, ascending.
+    var isos: [String] = []
+    var description = ""
+
+    /// Looks beyond one per ISO: push / pull steps, scans and the like.
+    private var variationCount: Int { stock.films.count - isos.count }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .firstTextBaseline) {
-                Text(film.displayName)
+                Text(stock.name)
                     .font(T.display(21, weight: .medium))
                     .foregroundStyle(T.paper)
                 Spacer(minLength: T.cells(2))
-                Text(film.iso > 0 ? "\(film.brand) \u{00B7} ISO \(film.iso)" : film.brand)
+                Text(stock.brand)
                     .ffLabel()
             }
-            if !variants.isEmpty {
-                Text("Variants \u{00B7} " + variants.joined(separator: " \u{00B7} "))
+            if isos.count > 1 || variationCount > 0 {
+                let iso = isos.count > 1 ? "ISO " + isos.joined(separator: " \u{00B7} ") : (isos.first.map { "ISO \($0)" } ?? "")
+                let variations = variationCount > 0 ? "\(variationCount) variation\(variationCount == 1 ? "" : "s")" : ""
+                Text([iso, variations].filter { !$0.isEmpty }.joined(separator: " \u{00B7} "))
                     .ffLabel(color: T.lichen)
                     .fixedSize(horizontal: false, vertical: true)
+            } else if let only = isos.first, only != "0" {
+                Text("ISO \(only)").ffLabel(color: T.lichen)
             }
-            if !film.description.isEmpty {
-                Text(film.description)
+            if !description.isEmpty {
+                Text(description)
                     .font(.system(size: 12))
                     .foregroundStyle(T.paperMid)
                     .fixedSize(horizontal: false, vertical: true)

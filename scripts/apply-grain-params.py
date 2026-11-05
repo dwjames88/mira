@@ -58,8 +58,14 @@ def main():
     by_id = {f["id"]: f for f in films}
 
     def stock_of(f):
-        while f.get("parent") in by_id:
-            f = by_id[f["parent"]]
+        # A variant inherits from its stock: follow `parent`, else the `stock` key (the stock's base film id).
+        seen = 0
+        while seen < 8:
+            nxt = f.get("parent") if f.get("parent") in by_id else (f.get("stock") if f.get("stock") in by_id and f.get("stock") != f["id"] else None)
+            if nxt is None:
+                break
+            f = by_id[nxt]
+            seen += 1
         return f
 
     wanted = {}

@@ -53,21 +53,15 @@ struct FilmVariantTests {
         #expect(model.selectedStockID == nil)
     }
 
-    @Test func variantChoicesListBaseThenVariants() throws {
-        let library = try Self.makeLibrary()
-        let fromBase = FilmVariantChoice.choices(for: "portra", in: library)
-        #expect(fromBase.map(\.label) == ["Base", "\u{2212}1", "+1", "+2"])
-        #expect(fromBase.map(\.id) == ["portra", "portra-m1", "portra-p1", "portra-p2"])
-        #expect(fromBase.map(\.isBase) == [true, false, false, false])
-        // Same list when a variant is the selected film.
-        #expect(FilmVariantChoice.choices(for: "portra-p2", in: library) == fromBase)
-        // No picker for a lone stock, Original or an unknown id.
-        #expect(FilmVariantChoice.choices(for: "trix", in: library).isEmpty)
-        #expect(FilmVariantChoice.choices(for: nil, in: library).isEmpty)
-        #expect(FilmVariantChoice.choices(for: "nope", in: library).isEmpty)
-        let model = EditorModel(library: library)
+    @Test func variationChoicesListStandardThenVariations() throws {
+        let model = EditorModel(library: try Self.makeLibrary())
+        #expect(model.variationChoices.isEmpty && model.isoChoices.isEmpty, "Original has no chips")
         model.selectFilm("portra-m1")
-        #expect(model.variantChoices == fromBase)
+        #expect(model.variationChoices.map(\.label) == ["Standard", "\u{2212}1", "+1", "+2"])
+        #expect(model.variationChoices.map(\.filmID) == ["portra", "portra-m1", "portra-p1", "portra-p2"])
+        #expect(model.isoChoices.isEmpty, "a single ISO hides the ISO row")
+        model.selectFilm("trix")
+        #expect(model.variationChoices.isEmpty && model.isoChoices.isEmpty)
     }
 
     @Test func selectFilmOptsIntoCurrentPipelineOnly() throws {
@@ -206,5 +200,76 @@ struct FilmControlTests {
         // Push, toning and scan do nothing on pipeline 1, so changing one moves the recipe up in the same edit.
         model.recipe.push = 1
         #expect(model.recipe.pipeline == Recipe.currentPipeline)
+    }
+}
+
+/// ISO and Variations chips against the bundled catalog.
+@MainActor
+@Suite("Stock ISO and variation chips", .serialized)
+struct StockChipTests {
+    static func makeModel(_ film: String?) throws -> EditorModel {
+        let library = try FilmLibrary(directory: SnapshotTests.root.appendingPathComponent("Films"))
+        return EditorModel(library: library, recipe: Recipe(filmID: film))
+    }
+
+    @Test func stripHasOneCardPerStockTitledByStockName() throws {
+        let model = try Self.makeModel(nil)
+        let cards = model.visibleFilms
+        #expect(cards.count == model.library.filmStocks.count)
+        #expect(cards.allSatisfy { $0.isStockBase && $0.stockName != nil })
+        #expect(cards.contains { $0.stockName == "Portra" && $0.id == "kodak-portra-400" })
+        model.familyFilter = .instant
+        #expect(model.visibleFilms.allSatisfy { $0.family == .instant } && !model.visibleFilms.isEmpty)
+    }
+
+    @Test func clickingACardAppliesTheBaseFilm() throws {
+        let model = try Self.makeModel("fuji-superia-100")
+        let portra = try #require(model.library.stock(id: "kodak-portra"))
+        model.selectStock(portra)
+        #expect(model.selectedFilmID == "kodak-portra-400" && model.recipe.filmID == "kodak-portra-400")
+        #expect(model.selectedStockID == "kodak-portra" && model.selectedCardID == "kodak-portra-400")
+    }
+
+    @Test func oldPresetFilmShowsStockIsoAndVariation() throws {
+        let model = try Self.makeModel("kodak-portra-400-plus-1")
+        #expect(model.selectedStockID == "kodak-portra")
+        #expect(model.selectedCardID == "kodak-portra-400")
+        #expect(model.selectedFilm?.iso == 400 && model.selectedFilm?.variationLabel == "+1")
+        #expect(model.isoChoices.map(\.label) == ["160", "400", "800"])
+        let selected = model.variationChoices.first { $0.filmID == model.selectedFilmID }
+        #expect(selected?.variation == "+1")
+        #expect(model.selectedFilm?.displayName == "Portra 400 +1")
+    }
+
+    @Test func isoThenVariationAppliesTheRightFilm() throws {
+        let model = try Self.makeModel("kodak-portra-400")
+        model.selectISO(800)
+        #expect(model.recipe.filmID == "kodak-portra-800")
+        let plusOne = try #require(model.variationChoices.first { $0.variation == "+1" })
+        model.selectFilm(plusOne.filmID)
+        #expect(model.recipe.filmID == "kodak-portra-800-plus-1")
+        model.selectISO(160)   // keeps +1
+        #expect(model.recipe.filmID == "kodak-portra-160-plus-1")
+        model.selectFilm("kodak-portra-400-nc")
+        model.selectISO(800)   // 800 has no NC: back to Standard
+        #expect(model.recipe.filmID == "kodak-portra-800")
+        #expect(model.selectedStockID == "kodak-portra")
+    }
+
+    @Test func proviaFourHundredHasNoStandardChip() throws {
+        let model = try Self.makeModel("fuji-provia-100f")
+        #expect(model.isoChoices.map(\.label) == ["100F", "400"])
+        #expect(model.variationChoices.map(\.label) == ["Standard", "Generic"])
+        model.selectISO(400)
+        #expect(model.recipe.filmID == "fuji-provia-400f")
+        #expect(model.variationChoices.map(\.label) == ["F", "X"])
+        model.selectFilm(model.variationChoices[1].filmID)
+        #expect(model.recipe.filmID == "fuji-provia-400x")
+    }
+
+    @Test func singletonStocksShowNoChipRows() throws {
+        let model = try Self.makeModel("kodak-ektar-100")
+        #expect(model.isoChoices.isEmpty && model.variationChoices.isEmpty)
+        #expect(model.selectedStockID == "kodak-ektar-100")
     }
 }

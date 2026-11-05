@@ -141,13 +141,22 @@ final class RAWChangeTracker: @unchecked Sendable {
 
     /// Identifiers of changed or removed images, or nil when the change cannot be itemised (clear everything).
     nonisolated func invalidatedIDs(for change: PHChange) -> [String]? {
+        inspect(change).invalidated
+    }
+
+    /// What a change did to the library's pictures: which ids to forget (nil: everything) and whether
+    /// pictures were added, removed or reordered (covers and RAW answers are only stale then; a pure
+    /// content edit leaves them valid).
+    nonisolated func inspect(_ change: PHChange) -> (invalidated: [String]?, membershipChanged: Bool) {
         lock.lock(); defer { lock.unlock() }
-        guard let current = result, let details = change.changeDetails(for: current) else { return [] }
+        guard let current = result else { return ([], true) }
+        guard let details = change.changeDetails(for: current) else { return ([], false) }
         result = details.fetchResultAfterChanges
-        guard details.hasIncrementalChanges else { return nil }
+        guard details.hasIncrementalChanges else { return (nil, true) }
         let before = details.fetchResultBeforeChanges
         var ids = details.changedObjects.map(\.localIdentifier)
         for i in details.removedIndexes ?? [] where i < before.count { ids.append(before.object(at: i).localIdentifier) }
-        return ids
+        let membership = !(details.removedIndexes?.isEmpty ?? true) || !(details.insertedIndexes?.isEmpty ?? true) || details.hasMoves
+        return (ids, membership)
     }
 }

@@ -1,0 +1,219 @@
+Building for debugging...
+[Using on-disk description]
+[4 / 6] MiraUITests-product
+Build complete! (0.38 sec)
+Test Suite 'All tests' started at 2026-11-04 20:13:28.059.
+Test Suite 'All tests' passed at 2026-11-04 20:13:28.061.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+􀟈  Test run started.
+􀄵  Testing Library Version: 2070
+􀄵  Target Platform: arm64e-apple-macos14.0
+􀙟  Suite "Frame canvas on screen" skipped.
+􀙟  Suite "UIPerf" skipped.
+􀟈  Suite "Hover preview" started.
+􀟈  Suite "Extension hosting" started.
+􀟈  Suite "Scroll pan" started.
+􀟈  Suite "Curve editing" started.
+􀟈  Suite "Film controls" started.
+􀟈  Suite "Appearance preference" started.
+􀟈  Suite "Presets" started.
+􀟈  Suite "Grade model" started.
+􀟈  Suite "User-facing copy" started.
+􀟈  Suite "RAW controls and latitude" started.
+􀟈  Suite "Field Frames theme" started.
+􀟈  Suite "Lazy film-strip thumbnails" started.
+􀟈  Suite "Preset import UI" started.
+􀟈  Suite "Preset snapshots" started.
+􀟈  Suite "Native texture on film selection" started.
+􀙟  Suite "Thumbnail timing" skipped.
+􀟈  Suite "Film stocks and variants" started.
+􀟈  Suite "Editor tabs" started.
+􀟈  Suite "Key map" started.
+􀟈  Suite "Film selection observation" started.
+􀟈  Suite "Preview pipeline" started.
+􀟈  Suite "Exposure time control" started.
+􀟈  Suite "Update notice snapshots" started.
+􀟈  Suite "Crop mode" started.
+􀙟  Suite "DodgeBurnPerf" skipped.
+􀟈  Suite "Paper and scan chips" started.
+􀟈  Suite "Snapshots" started.
+􀙟  Test layerMatchesCGImage() skipped.
+􀟈  Test hoverShowsPreviewAfterDebounceAndEndReturns() started.
+􀟈  Test interiorPointStaysBetweenNeighbours() started.
+􀟈  Suite "Viewing" started.
+􀟈  Suite "Grade snapshots" started.
+􀟈  Test endpointsCannotBeDeleted() started.
+􀙟  Test sliderAndFilmTiming() skipped.
+􀟈  Test scrollEventPansZoomedPicture() started.
+􀟈  Suite "Tone controls UI" started.
+􀟈  Test collapseStateRoundTrips() started.
+􀟈  Test editorFillsTheWindowAndFollowsResizes(size:) started.
+􀟈  Suite "Dodge and burn tool" started.
+􀟈  Test nudgeAndHit() started.
+􀟈  Test addPointLandsOnTheCurve() started.
+􀟈  Test clickMapsThroughAspectFit() started.
+􀟈  Test remJetToggleOnlyForRemJetFilms() started.
+􀟈  Test darkAquaDetection() started.
+􀟈  Test eyedropperSelectsNearestRangeAndTurnsOff() started.
+􀟈  Test endpointsMoveOnlyVertically() started.
+􀟈  Test keyAndRawValues() started.
+􀟈  Test nsAppearanceMapping() started.
+􀟈  Test storedReadsOnlyValidValues() started.
+􀟈  Test familyNamesAreUSEnglish() started.
+􀟈  Test unknownOrMissingIsSystem() started.
+􀟈  Test toggleFlipsEffectiveAppearance() started.
+􀟈  Test pointsKeepOrderWhenInserted() started.
+􀟈  Test saveThenApplyRestoresFilmAndDevelopValuesButNotCrop() started.
+􀟈  Test onlyVisibleAndPrefetchCardsRenderInitially() started.
+􀟈  Test latitudeFormatting() started.
+􀟈  Test importWithDuplicateAndMissingFilm() started.
+􀟈  Test stripShowsStocksOnlyAndRespectsFamilyFilter() started.
+􀟈  Test modifiersBelongToMenus() started.
+􀟈  Test filmCatalogUsesUSSpelling() started.
+􀟈  Test renderFilmsTabWithPresetsAndSheets() started.
+􀙟  Test firstEightAndAll() skipped.
+􀟈  Test versionLineHasShortVersionAndBuild() started.
+􀟈  Test textFieldsKeepTheirKeys() started.
+􀟈  Test selectedFilmIDFollowsRecipeButIgnoresSliders() started.
+􀟈  Test startsOnFilms() started.
+􀟈  Test otherKeysPassThrough() started.
+􀟈  Test compareIsPressAndHold() started.
+􀟈  Test zoomAndSpace() started.
+􀟈  Test framesFollowTheReportedCanvas() started.
+􀟈  Test tabsOnOneTwoThree() started.
+􀟈  Test nothingWithoutAPhoto() started.
+􀟈  Test cssNamesAreCustomProperties() started.
+􀟈  Test selectingFilmResetsTextureToNative() started.
+􀟈  Test fontsRegisterAndResolve() started.
+􀟈  Test grainTileIsGeneratedAndNotUniform() started.
+􀟈  Test cancelRestoresAndCommitWrites() started.
+􀟈  Test displayWeightAxisApplies() started.
+􀟈  Test everyTokenHasExactValuesInBothAppearances() started.
+􀟈  Test controlIsShownOnlyWithAFilm() started.
+􀟈  Test selectingPaperClearsScanAndViceVersa() started.
+􀟈  Test cellGrid() started.
+􀟈  Test renderUpdateNotice() started.
+􀙟  Test paintingDragTiming() skipped.
+􀟈  Test fullScreenToggleAndEscape() started.
+􀟈  Test case passing 1 argument size → (1400.0, 900.0) to editorFillsTheWindowAndFollowsResizes(size:) started.
+􀟈  Test renderEditorAndBrowser() started.
+􀟈  Test clickZoomsTo200AndBack() started.
+􀟈  Test curvesDark() started.
+􀟈  Test sectionsAndSlidersAreInOrder() started.
+􀟈  Test paintingAStrokeChangesThePreviewUnderIt() started.
+􁁛  Test endpointsCannotBeDeleted() passed after 0.001 seconds.
+􁁛  Test collapseStateRoundTrips() passed after 0.001 seconds.
+􁁛  Test addPointLandsOnTheCurve() passed after 0.001 seconds.
+􁁛  Test endpointsMoveOnlyVertically() passed after 0.001 seconds.
+􁁛  Test interiorPointStaysBetweenNeighbours() passed after 0.001 seconds.
+􁁛  Test unknownOrMissingIsSystem() passed after 0.001 seconds.
+􁁛  Test keyAndRawValues() passed after 0.001 seconds.
+􁁛  Test toggleFlipsEffectiveAppearance() passed after 0.001 seconds.
+􁁛  Test clickMapsThroughAspectFit() passed after 0.001 seconds.
+􁁛  Test otherKeysPassThrough() passed after 0.001 seconds.
+􁁛  Test compareIsPressAndHold() passed after 0.001 seconds.
+􁁛  Test nudgeAndHit() passed after 0.001 seconds.
+􁁛  Test zoomAndSpace() passed after 0.001 seconds.
+􁁛  Test pointsKeepOrderWhenInserted() passed after 0.001 seconds.
+􁁛  Test modifiersBelongToMenus() passed after 0.001 seconds.
+􁁛  Test nothingWithoutAPhoto() passed after 0.001 seconds.
+􁁛  Test tabsOnOneTwoThree() passed after 0.001 seconds.
+􁁛  Test textFieldsKeepTheirKeys() passed after 0.001 seconds.
+􁁛  Test cellGrid() passed after 0.001 seconds.
+􁁛  Test cssNamesAreCustomProperties() passed after 0.001 seconds.
+􁁛  Test fullScreenToggleAndEscape() passed after 0.001 seconds.
+􁁛  Suite "Curve editing" passed after 0.002 seconds.
+􁁛  Suite "Key map" passed after 0.002 seconds.
+􁁛  Test storedReadsOnlyValidValues() passed after 0.006 seconds.
+􁁛  Test darkAquaDetection() passed after 0.007 seconds.
+􁁛  Test nsAppearanceMapping() passed after 0.007 seconds.
+􁁛  Suite "Appearance preference" passed after 0.008 seconds.
+􁁛  Test displayWeightAxisApplies() passed after 0.016 seconds.
+􁁛  Test fontsRegisterAndResolve() passed after 0.017 seconds.
+􁁛  Test everyTokenHasExactValuesInBothAppearances() passed after 0.029 seconds.
+􁁛  Test grainTileIsGeneratedAndNotUniform() passed after 0.090 seconds.
+􁁛  Suite "Field Frames theme" passed after 0.091 seconds.
+􁁛  Test familyNamesAreUSEnglish() passed after 0.426 seconds.
+􁁛  Test selectedFilmIDFollowsRecipeButIgnoresSliders() passed after 0.426 seconds.
+􁁛  Test stripShowsStocksOnlyAndRespectsFamilyFilter() passed after 0.426 seconds.
+􁁛  Test latitudeFormatting() passed after 0.426 seconds.
+􁁛  Test versionLineHasShortVersionAndBuild() passed after 0.426 seconds.
+􁁛  Suite "Film selection observation" passed after 0.426 seconds.
+􁁛  Test filmCatalogUsesUSSpelling() passed after 0.426 seconds.
+􀟈  Test optionalBindingFallsBackAndClearsToNil() started.
+􀟈  Test selectingAVariantKeepsTheStockCardSelected() started.
+􁁛  Suite "User-facing copy" passed after 0.426 seconds.
+􁁛  Test selectingFilmResetsTextureToNative() passed after 0.431 seconds.
+􁁛  Test selectingPaperClearsScanAndViceVersa() passed after 0.430 seconds.
+􁁛  Test remJetToggleOnlyForRemJetFilms() passed after 0.431 seconds.
+􀟈  Test hoverRecipeMatchesSelection() started.
+􀟈  Test paperChipsAreHiddenOnPrintCards() started.
+􀟈  Test toningOnlyForMonochromeFilms() started.
+􁁛  Test controlIsShownOnlyWithAFilm() passed after 0.430 seconds.
+􀟈  Test timesAreFormatted() started.
+􁁛  Test renderUpdateNotice() passed after 0.441 seconds.
+􁁛  Test sectionsAndSlidersAreInOrder() passed after 0.441 seconds.
+􀟈  Test downloadProgressText() started.
+􀟈  Test everyNewSliderEditsAndResetsThroughTheModel() started.
+􁁛  Test importWithDuplicateAndMissingFilm() passed after 0.442 seconds.
+􀟈  Test skipReplaceAndApplyToAll() started.
+􁁛  Test optionalBindingFallsBackAndClearsToNil() passed after 0.026 seconds.
+􀟈  Test rawGroupOnlyForRawSourcesAndSupportedControls() started.
+􁁛  Test selectingAVariantKeepsTheStockCardSelected() passed after 0.035 seconds.
+􁁛  Test hoverRecipeMatchesSelection() passed after 0.030 seconds.
+􁁛  Test paperChipsAreHiddenOnPrintCards() passed after 0.030 seconds.
+􁁛  Test toningOnlyForMonochromeFilms() passed after 0.030 seconds.
+􁁛  Test timesAreFormatted() passed after 0.030 seconds.
+􀟈  Test variantChoicesListBaseThenVariants() started.
+􀟈  Test presetsKeepTheirOwnValues() started.
+􀟈  Test paperChipsAreHiddenOnMonochromeFilms() started.
+􀟈  Test pushSnapsToThirdsAndFormats() started.
+􀟈  Test sliderSnapsToStandardSpeeds() started.
+􁁛  Test cancelRestoresAndCommitWrites() passed after 0.477 seconds.
+􀟈  Test committingAnIdentityCropClearsIt() started.
+􁁛  Test eyedropperSelectsNearestRangeAndTurnsOff() passed after 0.506 seconds.
+􀟈  Test eyedropperIgnoresGreys() started.
+􁁛  Test saveThenApplyRestoresFilmAndDevelopValuesButNotCrop() passed after 0.513 seconds.
+􀟈  Test missingFilmAppliesDevelopSettingsAndSaysSo() started.
+􀟈  Test case passing 1 argument size → (1900.0, 1200.0) to editorFillsTheWindowAndFollowsResizes(size:) started.
+􁁛  Test downloadProgressText() passed after 0.217 seconds.
+􀟈  Test inlineMarkdownRendersAndFallsBack() started.
+􁁛  Test startsOnFilms() passed after 0.671 seconds.
+􀟈  Test enteringCropBeginsItAndLeavingCommits() started.
+􁁛  Test everyNewSliderEditsAndResetsThroughTheModel() passed after 0.351 seconds.
+􁁛  Test rawGroupOnlyForRawSourcesAndSupportedControls() passed after 0.340 seconds.
+􁁛  Test variantChoicesListBaseThenVariants() passed after 0.332 seconds.
+􁁛  Test presetsKeepTheirOwnValues() passed after 0.332 seconds.
+􁁛  Test paperChipsAreHiddenOnMonochromeFilms() passed after 0.332 seconds.
+􁁛  Test pushSnapsToThirdsAndFormats() passed after 0.332 seconds.
+􁁛  Test sliderSnapsToStandardSpeeds() passed after 0.332 seconds.
+􁁛  Suite "Native texture on film selection" passed after 0.794 seconds.
+􀟈  Test developPanelSnapshots() started.
+􀟈  Test latitudeReadingFollowsTheFilmAndClears() started.
+􀟈  Test selectFilmOptsIntoCurrentPipelineOnly() started.
+􀟈  Test familyTabsIncludeMotionPictureAndPrint() started.
+􀟈  Test resetClearsFilmSettingsButKeepsRawFilmAndPipeline() started.
+􀟈  Test readoutShowsExifOrNoExifOrTheChosenTime() started.
+􁁛  Test inlineMarkdownRendersAndFallsBack() passed after 0.136 seconds.
+􁁛  Suite "Update notice snapshots" passed after 0.797 seconds.
+􁁛  Test scrollEventPansZoomedPicture() passed after 0.864 seconds.
+􁁛  Suite "Scroll pan" passed after 0.864 seconds.
+􁁛  Test eyedropperIgnoresGreys() passed after 0.378 seconds.
+􀟈  Test histogramFollowsTheDisplayedFrame() started.
+􁁛  Test missingFilmAppliesDevelopSettingsAndSaysSo() passed after 0.381 seconds.
+􁁛  Test selectFilmOptsIntoCurrentPipelineOnly() passed after 0.100 seconds.
+􁁛  Test familyTabsIncludeMotionPictureAndPrint() passed after 0.100 seconds.
+􁁛  Test resetClearsFilmSettingsButKeepsRawFilmAndPipeline() passed after 0.100 seconds.
+􁁛  Test readoutShowsExifOrNoExifOrTheChosenTime() passed after 0.100 seconds.
+􁁛  Suite "Paper and scan chips" passed after 0.895 seconds.
+􀟈  Test noFilmPresetIsNamedOriginal() started.
+􀟈  Test legacyRecipeOpenedUnchangedHasNoEdits() started.
+􀟈  Test legacyControlsKeepThePipelineAndFilmScienceControlsUpgradeIt() started.
+􀟈  Test resetReturnsToExif() started.
+􀟈  Test case passing 1 argument size → (1000.0, 700.0) to editorFillsTheWindowAndFollowsResizes(size:) started.
+􁁛  Test skipReplaceAndApplyToAll() passed after 0.577 seconds.
+􀟈  Test badFilesAreListedByName() started.
+􁁛  Test enteringCropBeginsItAndLeavingCommits() passed after 0.370 seconds.
+􀟈  Test doneCommitsAndReturnsToThePreviousTab() started.
+􁁛  Test framesFollowTheReportedCanvas() passed after 1.042 seconds.
+􀟈  Test burs
