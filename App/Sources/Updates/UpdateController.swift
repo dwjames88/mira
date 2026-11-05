@@ -16,6 +16,9 @@ final class UpdateController {
     @ObservationIgnored private let preferences = UpdatePreferences()
     @ObservationIgnored private let checker = UpdateChecker(userAgent: UpdateController.userAgent)
     @ObservationIgnored private var task: Task<Void, Never>?
+    /// Identifies the current install attempt. A cancelled attempt unwinds a moment after Cancel; it must not
+    /// reset the phase, the task slot or the scratch folder of a newer attempt started in between.
+    @ObservationIgnored private var installToken = UUID()
     @ObservationIgnored private var release: Release?
     @ObservationIgnored private var savedFile: URL?
     @ObservationIgnored private var installedBundle: URL?
@@ -157,26 +160,31 @@ final class UpdateController {
     private func install() {
         guard let release, task == nil, let asset = release.installableAsset else { return }
         let info = info(for: release)
+        let token = UUID()
+        installToken = token
         task = Task { [weak self] in
             guard let self else { return }
             do {
-                try await self.runInstall(release: release, asset: asset, info: info)
+                try await self.runInstall(release: release, asset: asset, info: info, token: token)
             } catch let error as UpdateError where error == .cancelled {
-                self.phase = .available(info)
+                if self.installToken == token { self.phase = .available(info) }
             } catch {
                 let failure = error as? UpdateError ?? .installFailed(error.localizedDescription)
                 self.logger.error("Update failed: \(failure.description, privacy: .public)")
-                self.phase = .failed(failure.userMessage, info: info)
+                if self.installToken == token { self.phase = .failed(failure.userMessage, info: info) }
             }
-            self.task = nil
+            if self.installToken == token { self.task = nil }
         }
     }
 
-    private func runInstall(release: Release, asset: ReleaseAsset, info: UpdateNoticeInfo) async throws {
+    private func runInstall(release: Release, asset: ReleaseAsset, info: UpdateNoticeInfo, token: UUID) async throws {
         let fm = FileManager.default
-        let work = try fm.url(for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-            .appendingPathComponent("MiraUpdate", isDirectory: true)
-        try? fm.removeItem(at: work)
+        let caches = try fm.url(for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+        // Scratch folders of earlier attempts (a cancelled one, or one a crash left behind) go first.
+        for name in (try? fm.contentsOfDirectory(atPath: caches.path)) ?? [] where name.hasPrefix("MiraUpdate") {
+            try? fm.removeItem(at: caches.appendingPathComponent(name))
+        }
+        let work = caches.appendingPathComponent("MiraUpdate-\(token.uuidString)", isDirectory: true)
         try fm.createDirectory(at: work, withIntermediateDirectories: true)
         defer { try? fm.removeItem(at: work) }
 
