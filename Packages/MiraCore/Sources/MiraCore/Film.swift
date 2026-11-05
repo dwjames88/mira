@@ -71,6 +71,8 @@ public struct Film: Codable, Identifiable, Hashable, Sendable {
     public var monochrome: Bool?
     /// Per-film overrides of the character derived from family and ISO (see `FilmCharacter.defaults`).
     public var character: FilmCharacter.Override?
+    /// Per-stock grain parameters (`scripts/apply-grain-params.py`); variants carry their stock's.
+    public var grain: FilmCharacter.GrainOverride?
     /// Datasheet reciprocity data (long and short exposure failure); nil falls back to the family default
     /// (`Reciprocity.familyDefault`). `FilmLibrary` fills a variant's from its parent.
     public var reciprocity: ReciprocityData?
@@ -104,11 +106,13 @@ public struct Film: Codable, Identifiable, Hashable, Sendable {
 
     /// Grain, halation and latitude for this film: family and ISO defaults with the film's overrides.
     public var resolvedCharacter: FilmCharacter {
-        FilmCharacter.defaults(family: family, iso: iso, monochrome: isMonochrome).applying(character)
+        var c = FilmCharacter.defaults(family: family, iso: iso, monochrome: isMonochrome).applying(character).applying(grain)
+        if isMonochrome { c.grainLayerCorrelation = 1 }   // one layer, neutral grain
+        return c
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, displayName, brand, family, iso, description, file, png, source, parent, variant, stock, stockBase, stockName, isoLabel, variation, monochrome, character, reciprocity
+        case id, displayName, brand, family, iso, description, file, png, source, parent, variant, stock, stockBase, stockName, isoLabel, variation, monochrome, character, grain, reciprocity
     }
 
     /// `iso` may be a number or a numeric string in `films.json`.
@@ -138,6 +142,7 @@ public struct Film: Codable, Identifiable, Hashable, Sendable {
         variation = try c.decodeIfPresent(String.self, forKey: .variation)
         monochrome = try c.decodeIfPresent(Bool.self, forKey: .monochrome)
         character = try c.decodeIfPresent(FilmCharacter.Override.self, forKey: .character)
+        grain = try c.decodeIfPresent(FilmCharacter.GrainOverride.self, forKey: .grain)
         reciprocity = try c.decodeIfPresent(ReciprocityData.self, forKey: .reciprocity)
     }
 
@@ -147,7 +152,8 @@ public struct Film: Codable, Identifiable, Hashable, Sendable {
         parent: String? = nil, variant: String? = nil,
         stock: String? = nil, stockBase: Bool? = nil, stockName: String? = nil, isoLabel: String? = nil,
         variation: String? = nil, monochrome: Bool? = nil,
-        character: FilmCharacter.Override? = nil, reciprocity: ReciprocityData? = nil
+        character: FilmCharacter.Override? = nil, reciprocity: ReciprocityData? = nil,
+        grain: FilmCharacter.GrainOverride? = nil
     ) {
         self.id = id
         self.displayName = displayName
@@ -167,6 +173,7 @@ public struct Film: Codable, Identifiable, Hashable, Sendable {
         self.variation = variation
         self.monochrome = monochrome
         self.character = character
+        self.grain = grain
         self.reciprocity = reciprocity
     }
 }
