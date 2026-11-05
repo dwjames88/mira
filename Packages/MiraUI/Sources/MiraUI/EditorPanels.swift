@@ -49,7 +49,8 @@ private struct SpecSliders: View {
 
 // MARK: Films
 
-/// FILMS: the selected film's header (name, brand, ISO, family, description) and its STRENGTH.
+/// FILMS: the selected film's header (name, brand, ISO, family, description), the ISO and VARIATIONS chip rows of
+/// its stock, and its STRENGTH.
 struct FilmsPanel: View {
     @Bindable var model: EditorModel
 
@@ -62,10 +63,10 @@ struct FilmsPanel: View {
             FFHairline()
             FFScrollView {
                 VStack(alignment: .leading, spacing: 0) {
+                    stockChips
                     SpecSliders(model: model, specs: [SliderSpec("strength", "Strength", \.strength, 0...1, default: 1,
                                                                       help: "Choosing a film sets grain, halation and bloom to its own level")])
                         .padding(.top, T.rows(1))
-                    variantSection
                     filmControls
                     presetSection
                 }
@@ -77,26 +78,44 @@ struct FilmsPanel: View {
         .ffPanel()
     }
 
-    /// VARIANT: one chip per entry of the selected film's stock (Base, then each variant), wrapping onto
-    /// several lines; absent for a stock with no variants.
-    @ViewBuilder private var variantSection: some View {
-        let choices = model.variantChoices
-        if !choices.isEmpty {
+    /// ISO and VARIATIONS: chip rows for the selected film's stock, wrapping onto several lines. Each row is
+    /// absent when the stock offers only one choice there.
+    @ViewBuilder private var stockChips: some View {
+        let isos = model.isoChoices
+        if !isos.isEmpty {
+            let current = model.selectedFilm?.iso
             VStack(alignment: .leading, spacing: T.rows(0.5)) {
-                FFSectionLabel("Variant").padding(.top, T.rows(1))
+                FFSectionLabel("ISO").padding(.top, T.rows(1))
                 FFWrapLayout(spacing: T.cells(2), lineSpacing: 0) {
-                    ForEach(choices) { choice in
-                        VariantChip(title: choice.label, selected: choice.id == model.selectedFilmID,
-                                    onHover: { inside in
-                            if inside {
-                                model.hoverFilm(choice.id)
-                            } else if model.hoveredTarget == .film(choice.id) {
-                                model.endHover()
-                            }
-                        }) { model.selectFilm(choice.id) }
+                    ForEach(isos) { choice in
+                        let target = model.filmID(forISO: choice.iso)
+                        VariantChip(title: choice.label, selected: choice.iso == current, kind: "ISO",
+                                    onHover: { hoverChip($0, target) }) { model.selectISO(choice.iso) }
                     }
                 }
             }
+        }
+        let variations = model.variationChoices
+        if !variations.isEmpty {
+            VStack(alignment: .leading, spacing: T.rows(0.5)) {
+                FFSectionLabel("Variations").padding(.top, T.rows(1))
+                FFWrapLayout(spacing: T.cells(2), lineSpacing: 0) {
+                    ForEach(variations) { choice in
+                        VariantChip(title: choice.label, selected: choice.filmID == model.selectedFilmID, kind: "Variation",
+                                    onHover: { hoverChip($0, choice.filmID) }) { model.selectFilm(choice.filmID) }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Hovering a chip previews the film it would apply, like a strip card.
+    private func hoverChip(_ inside: Bool, _ id: String?) {
+        guard let id else { return }
+        if inside {
+            model.hoverFilm(id)
+        } else if model.hoveredTarget == .film(id) {
+            model.endHover()
         }
     }
 
@@ -278,6 +297,7 @@ struct FilmsPanel: View {
 private struct VariantChip: View {
     let title: String
     let selected: Bool
+    var kind = "Variant"
     let onHover: (Bool) -> Void
     let action: () -> Void
 
@@ -294,7 +314,7 @@ private struct VariantChip: View {
         }
         .buttonStyle(.plain)
         .onHover(perform: onHover)
-        .accessibilityLabel("Variant \(title)")
+        .accessibilityLabel("\(kind) \(title)")
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }

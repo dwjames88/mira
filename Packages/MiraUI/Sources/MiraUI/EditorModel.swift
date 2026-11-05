@@ -271,8 +271,8 @@ public final class EditorModel {
 
     public var films: [Film] { library.films }
 
-    /// The cards of the film strip: stocks only (variants live in the FILMS panel's picker), narrowed
-    /// by the family filter.
+    /// The cards of the film strip: one per stock, shown as its base film (the card id is that film's id, which
+    /// also keys its thumbnail), narrowed by the family filter.
     public var visibleFilms: [Film] {
         let stocks = library.stocks
         guard let familyFilter else { return stocks }
@@ -292,15 +292,44 @@ public final class EditorModel {
         return FilmFamily.displayOrder.filter { present.contains($0) }
     }
 
-    /// The stock the applied film belongs to (the film itself for a stock); nil for Original.
-    public var selectedStockID: String? {
-        selectedFilmID.map { library.film(id: $0)?.stockID ?? $0 }
+    /// The stock the applied film belongs to; nil for Original.
+    public var selectedStock: FilmStock? {
+        selectedFilmID.flatMap { library.stock(for: $0) }
     }
 
-    /// The Variant picker's choices for the applied film; empty when its stock has one entry.
-    public var variantChoices: [FilmVariantChoice] {
-        FilmVariantChoice.choices(for: selectedFilmID, in: library)
+    /// The id of the stock the applied film belongs to; nil for Original.
+    public var selectedStockID: String? { selectedStock?.id }
+
+    /// The id of the strip card of the applied film's stock (the stock's base film); nil for Original.
+    public var selectedCardID: String? { selectedStock?.baseFilmID }
+
+    /// The FILMS panel's ISO chips for the applied film's stock; empty when the stock has a single ISO.
+    public var isoChoices: [FilmISOChoice] {
+        guard let stock = selectedStock else { return [] }
+        let choices = library.isoChoices(stockID: stock.id)
+        return choices.count > 1 ? choices : []
     }
+
+    /// The FILMS panel's Variations chips at the applied film's ISO; empty when there is only one.
+    public var variationChoices: [FilmVariationChoice] {
+        guard let stock = selectedStock, let film = selectedFilm else { return [] }
+        let choices = library.variationChoices(stockID: stock.id, iso: film.iso)
+        return choices.count > 1 ? choices : []
+    }
+
+    /// The film an ISO chip applies: that ISO with the current variation where it exists, else Standard.
+    public func filmID(forISO iso: Int) -> String? {
+        guard let stock = selectedStock else { return nil }
+        return library.film(stockID: stock.id, iso: iso, variation: selectedFilm?.variationLabel)?.id
+    }
+
+    /// Applies the ISO chip `iso` of the applied film's stock.
+    public func selectISO(_ iso: Int) {
+        if let id = filmID(forISO: iso) { selectFilm(id) }
+    }
+
+    /// Applies a card: its stock's base film. The recipe stores that concrete film id.
+    public func selectStock(_ stock: FilmStock) { selectFilm(stock.baseFilmID) }
 
     public var selectedFilm: Film? {
         recipe.filmID.flatMap { library.film(id: $0) }
@@ -918,9 +947,9 @@ public final class EditorModel {
             func distance(_ i: Int) -> Int { i < lo ? lo - i : (i > hi ? i - hi : 0) }
             order = (from...to).sorted { (distance($0), $0) < (distance($1), $1) }.map { cards[$0] }
             // The applied card leads, when it is in range.
-            if let stock = selectedStockID, let i = order.firstIndex(of: stock) { order.insert(order.remove(at: i), at: 0) }
+            if let card = selectedCardID, let i = order.firstIndex(of: card) { order.insert(order.remove(at: i), at: 0) }
         }
-        if thumbnailDemandAll, let stock = selectedStockID, let i = order.firstIndex(of: stock) {
+        if thumbnailDemandAll, let card = selectedCardID, let i = order.firstIndex(of: card) {
             order.insert(order.remove(at: i), at: 0)
         }
         return [nil] + order.map { Optional($0) }
@@ -1069,25 +1098,6 @@ public final class EditorModel {
 #endif
 
 import MiraCore
-
-/// One entry of the FILMS panel's Variant picker: the stock itself ("Base") or one of its variants.
-public struct FilmVariantChoice: Identifiable, Hashable, Sendable {
-    public let id: String
-    public let label: String
-    public let isBase: Bool
-
-    /// The stock's entries for the film `filmID` (a stock or a variant), stock first. Empty when the
-    /// film is unknown or its stock has no variants, so the picker is hidden.
-    public static func choices(for filmID: String?, in library: FilmLibrary) -> [FilmVariantChoice] {
-        guard let filmID else { return [] }
-        let entries = library.variants(of: filmID)
-        guard entries.count > 1 else { return [] }
-        return entries.map { film in
-            FilmVariantChoice(id: film.id, label: film.isVariant ? (film.variant ?? film.displayName) : "Base",
-                              isBase: !film.isVariant)
-        }
-    }
-}
 
 /// Push / Pull stops: snapped to thirds, shown as "+1\u{2153}", "\u{2212}\u{2154}" or "0".
 public enum PushFormat {

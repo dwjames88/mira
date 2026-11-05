@@ -388,10 +388,10 @@ private struct FilmStrip: View {
 
             ForEach(model.visibleFilms) { film in
                 FilmCard(
-                    title: film.displayName,
-                    caption: caption(for: film),
+                    title: film.stockName ?? film.displayName,
+                    caption: film.brand,
                     image: model.thumbnails[film.id],
-                    isSelected: model.selectedStockID == film.id,
+                    isSelected: model.selectedStockID == film.stockID,
                     onHoverChange: { hover($0, film.id) }
                 ) { model.selectFilm(film.id) }
                 // The strip is lazy: a card's thumbnail is rendered while the card is on screen or near it.
@@ -410,10 +410,6 @@ private struct FilmStrip: View {
         } else if model.hoveredTarget == target {
             model.endHover()
         }
-    }
-
-    private func caption(for film: Film) -> String {
-        film.iso > 0 ? "\(film.brand) \u{00B7} \(film.iso)" : film.brand
     }
 }
 
