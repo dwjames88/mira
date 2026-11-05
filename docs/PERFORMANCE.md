@@ -87,6 +87,56 @@ cd Packages/MiraUI && MIRA_PERF=1 swift test -c release -Xswiftc -enable-testing
 
 (writes `build/perf-thumbnails.txt`).
 
+## Camera finder (Roll 1 proxy, Mac)
+
+**These are proxies. The Roll 1 go/no-go measurement (30 fps sustained on a real iPhone 16 Pro, see `Design/CAMERA.md` section 6) is still outstanding.** A Mac GPU is not an A18 Pro; use these only to compare the cases with each other and to size the plan, not as a pass or fail.
+
+What was added to `Renderer` for the live finder (capture and export always use the defaults, which render exactly as before):
+
+- `withGrainSeed(_:)` / `grainSeedOverride`: a per-frame grain seed (integer below 2^24) instead of the photo's own. Never part of `Recipe`.
+- `withTextureScale(_:)` / `textureScale` (0.25...1, default 1): halation (both pipelines), bloom and pipeline-2 grain do their work on a copy at that fraction of the resolution. Halation blurs the reduced highlights (sigma scales with the size) and enlarges the glow; bloom and grain run on the reduced copy and only what they added (result minus input) is enlarged and added at full size. The grain keeps its pitch in frame terms and takes its amplitude from the full-size pitch, so strength matches. Measured against textureScale 1 on a synthetic scene with strong halation, bloom and grain: mean colour within 0.1 %, halation energy within 1.5 %, grain RMS within 2 %.
+
+Measured with the opt-in `FinderBudgetBenchmark` (`MIRA_PERF=1`): Kodak Portra 400 at native grain, halation and bloom (50 %), `Fixtures/sample.jpg` cover-fitted into an IOSurface BGRA buffer, a Metal-queue `CIContext` with the shared working space (extended linear sRGB, RGBAh, `cacheIntermediates` off), `startTask(toRender:to: CIRenderDestination(mtlTexture:commandBuffer:))` into a bgra8 texture, waited on; a new `CIImage` and grain seed every frame, 90 frames after 20 warm-up; ms per frame, CPU start to GPU complete.
+
+Machine: Apple M1 Pro, macOS (Darwin 27.0.0), release build (`swift test -c release`). **The Mac was swamped by other builds: load average 470 at the first run and 340 at the second**, so the absolute numbers and especially the p95 are inflated and noisy. Two runs are shown; read the ratios between rows, not the milliseconds.
+
+Run 1 (ms, median / p95):
+
+| Case | 1920x1440 | 1206x1809 |
+|---|---|---|
+| full | 67.7 / 914.4 | 33.2 / 117.8 |
+| grain off | 28.4 / 201.8 | 22.7 / 91.9 |
+| textureScale 0.5 | 38.4 / 184.1 | 40.9 / 167.9 |
+| textureScale 0.5 + grain off | 12.7 / 115.5 | 17.3 / 84.4 |
+| renderScale 0.75 | 16.0 / 35.7 | 12.3 / 22.9 |
+
+Run 2 (ms, median / p95):
+
+| Case | 1920x1440 | 1206x1809 |
+|---|---|---|
+| full | 80.3 / 497.9 | 107.5 / 364.6 |
+| grain off | 50.5 / 215.4 | 13.2 / 46.9 |
+| textureScale 0.5 | 20.5 / 42.1 | 13.6 / 23.9 |
+| textureScale 0.5 + grain off | 10.4 / 17.3 | 8.8 / 19.3 |
+| renderScale 0.75 | 14.9 / 26.8 | 34.3 / 167.2 |
+
+Other costs on the same runs: `latitudeReading` on a 1920x1440 frame 16.6 ms (run 1) and 12.4 ms (run 2) median; 8 film-strip thumbnails at 220 px 59 ms (run 1) and 426 ms (run 2) median for the batch of 8.
+
+| Platform | Case | Median / p95 |
+|---|---|---|
+| iOS simulator | full / grain off / textureScale 0.5 / textureScale 0.5 + grain off / renderScale 0.75 | to be filled in |
+| iPhone 16 Pro (device) | the same cases | outstanding (the go/no-go) |
+
+Reading: grain is the biggest single stage, and texture scale 0.5 cuts the textured frame by roughly half or more in both runs; if the device cannot hold 30 fps, Roll 1 ships the finder with halation, bloom and grain at half resolution and the capture stays full quality.
+
+Reproduce:
+
+```
+MIRA_PERF=1 swift test -c release -Xswiftc -enable-testing --package-path Packages/MiraCore --filter FinderBudgetBenchmark
+```
+
+(prints the table to stdout; `-Xswiftc -enable-testing` is needed because the suite uses `@testable import`; record `sysctl -n machdep.cpu.brand_string` and `uptime` with the numbers.)
+
 ## What each change was
 
 1. **Narrower observation (`EditorModel.selectedFilmID`).** `FilmStrip.body` read `model.recipe.filmID`, and `recipe` is one observed property, so every slider tick re-evaluated the strip and its 32 cards. The model now keeps a stored `selectedFilmID` that changes only when the film does, and the strip reads that. Result: 0 strip evaluations per tick, SwiftUI cost per tick 4.0 to 2.3 ms.
