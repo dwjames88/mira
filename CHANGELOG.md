@@ -2,6 +2,35 @@
 
 All notable changes to Mira. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased 1.1.0]
+
+Roll 1: a camera for iPhone. Not yet verified on an iPhone (see Notes).
+
+### Added
+- **Camera (iOS).** A live finder rendered through MiraCore with the film you chose. Hold the finder to see the bare scene.
+- **Film door.** Mirrors the editor's card flow (cards, then options) and adds GRAIN rows (finder off or live, amount, size).
+- **Exposure and focus.** An EV dial in thirds, tap to focus and meter, AE/AF lock, white balance presets and a WB lock.
+- **Film-aware meter.** A needle plus UNDER and OVER counts, measured against the stock's latitude, so slide and negative film read differently.
+- **Capture.** ProRAW plus HEIC on phones that have ProRAW, HEIC elsewhere, at 12 MP.
+- **Two-step save.** The original is saved first and the recipe attached after, with a retry queue. When Photos access is limited, you get the original plus a baked copy and a notice. If the app quits between capture and developed, the next launch attaches the recipe.
+- **Native grain, halation and bloom** in the finder, with an AUTO quality ladder.
+- **Lenses** shown in 35 mm equivalents, with chips and pinch to zoom.
+- **Hardware shutter.** Volume buttons, the Action button and Camera Control fire on release.
+- **Feedback.** Haptics and the system shutter sound. A silent option exists only where the region allows it, and is off by default.
+- **Rotation.** Readouts rotate; the chrome stays.
+- **Privacy.** Camera permission only. Location is off by default and there is no microphone use.
+- **Entry points.** A CAMERA button in the gallery and a "Load film" Home Screen quick action.
+
+### Changed
+- `FilmsPanel` is now shared between the editor and the camera.
+- MiraCore `Renderer` gains `withGrainSeed` and `withTextureScale` for the finder. Capture and export use the defaults and render as before.
+
+### Tests
+- New `MiraCamera` package. `swift test --package-path Packages/MiraCamera` runs 65 tests: camera state, capture support, exposure, lens formatting, save and retry, finder quality ladder, pending prints.
+
+### Notes
+- Not yet verified on an iPhone. The first device check is the 30 fps finder gate on an iPhone 16 Pro; see [TESTING.md](TESTING.md).
+
 ## [Unreleased 1.0.2]
 
 ### Fixed
