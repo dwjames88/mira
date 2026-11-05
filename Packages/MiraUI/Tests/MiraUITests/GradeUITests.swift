@@ -112,7 +112,10 @@ import Testing
     @Test func histogramFollowsTheDisplayedFrame() async throws {
         let model = try await Self.model(color: (0, 0, 0))
         model.histogramFrameChanged(model.displayedFrame)
-        let deadline = Date().addingTimeInterval(10)
+        // The histogram runs at utility priority on purpose (it must never compete with rendering), so under
+        // the full suite's parallel CPU load it can be starved for many seconds; wait as long as the other
+        // UI tests do.
+        let deadline = Date().addingTimeInterval(60)
         while model.histogram == nil, Date() < deadline { try await Task.sleep(for: .milliseconds(20)) }
         let h = try #require(model.histogram)
         #expect(h.luminance[0] > 0.99 && h.isClippingLow)
