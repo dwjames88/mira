@@ -1,4 +1,5 @@
 import MiraCore
+import MiraUI
 import Photos
 import SwiftUI
 import UIKit
@@ -106,7 +107,15 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
     private(set) var changeCount = 0
     /// Per-album cover refreshes: an album whose membership changed gets a new cover.
     private(set) var coverVersions: [String: Int] = [:]
-    private(set) var isOpening = false
+    private(set) var openPhase: OpenPhase = .idle
+    var isOpening: Bool { if case .opening = openPhase { true } else { false } }
+    @ObservationIgnored private var openSerial = 0
+
+    enum OpenPhase {
+        case idle
+        case opening(detail: String?)
+        case failed(asset: PHAsset, message: String)
+    }
 
     @ObservationIgnored private var observing = false
     /// Shared by every cover tile: one caching manager and an in-memory cover cache.
@@ -174,9 +183,38 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
     /// Mira recipe stored in the asset's adjustment data.
     func open(_ asset: PHAsset, in editor: EditorViewModel) async {
         guard !isOpening else { return }
-        isOpening = true
-        defer { isOpening = false }
-        await editor.openAsset(asset)
+        openSerial += 1
+        let serial = openSerial
+        openPhase = .opening(detail: nil)
+        let result = await editor.openAsset(asset) { [weak self] event in
+            Task { @MainActor in
+                guard let self, self.openSerial == serial, self.isOpening else { return }
+                self.openPhase = .opening(detail: EditingInputStatus.text(for: event))
+            }
+        }
+        guard openSerial == serial else { return }
+        switch result {
+        case .opened, .superseded:
+            openPhase = .idle
+        case .failed(let error):
+            if error is CancellationError {
+                openPhase = .idle
+            } else if case AssetEditError.photosDidNotDeliver = error {
+                openPhase = .failed(asset: asset, message: FFOpenFailureCard.defaultMessage)
+            } else {
+                openPhase = .failed(asset: asset, message: error.localizedDescription)
+            }
+        }
+    }
+
+    /// Re-opens the asset whose open failed.
+    func retry(in editor: EditorViewModel) async {
+        guard case .failed(let asset, _) = openPhase else { return }
+        await open(asset, in: editor)
+    }
+
+    func dismissFailure() {
+        if case .failed = openPhase { openPhase = .idle }
     }
 
     /// An album's membership changed: its cover is stale, other covers are not.

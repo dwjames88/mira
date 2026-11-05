@@ -4,7 +4,7 @@ private typealias T = FieldFramesTheme
 
 /// Shown when Photos never hands over the editable original: the message, then RETRY and BACK.
 public struct FFOpenFailureCard: View {
-    public static let defaultMessage = "Photos didn't hand over this photo."
+    nonisolated public static let defaultMessage = "Photos didn't hand over this photo."
 
     private let message: String
     private let detail: String?

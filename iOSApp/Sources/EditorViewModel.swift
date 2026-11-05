@@ -270,17 +270,19 @@ final class EditorViewModel {
 
     /// Opens a library asset non-destructively: the ORIGINAL pixels become the base and any stored
     /// Mira recipe is restored on top, so a saved edit reopens exactly and stays adjustable.
-    func openAsset(_ asset: PHAsset) async {
+    @discardableResult
+    func openAsset(_ asset: PHAsset, onEvent: @escaping @Sendable (EditingInputEvent) -> Void = { _ in }) async -> OpenResult {
         status = "LOADING"
         openGeneration += 1
         let generation = openGeneration
-        let session = AssetEditSession(asset: asset)
+        let session = makeSession(asset)
         do {
-            let loaded = try await session.load()
+            let loaded = try await session.load(onEvent: onEvent)
+            guard generation == openGeneration else { return .superseded }
             let adopted = LoadedSource(image: loaded.source, colorSpace: loaded.colorSpace, size: loaded.size)
             try await engine.adopt(adopted)
             // A newer open (another asset or a picked photo) started while this one loaded: it wins.
-            guard generation == openGeneration else { return }
+            guard generation == openGeneration else { return .superseded }
             live.setSource(loaded.source, colorSpace: loaded.colorSpace, size: loaded.size)
             sourceExposureTime = loaded.source.miraExposureTime
             sourcePixelSize = loaded.size
@@ -306,11 +308,20 @@ final class EditorViewModel {
             scheduleHistogram()
             startThumbnails()
             if loaded.isRaw { scheduleRawDevelop(draftFirst: false) }
+            return .opened
         } catch {
-            guard generation == openGeneration else { return }
+            guard generation == openGeneration else { return .superseded }
             status = "ERROR · \(error.localizedDescription.uppercased())"
+            return .failed(error)
         }
     }
+
+    enum OpenResult {
+        case opened, superseded, failed(Error)
+    }
+
+    /// Test seam: how a library asset gets its edit session.
+    @ObservationIgnored var makeSession: (PHAsset) -> AssetEditSession = { AssetEditSession(asset: $0) }
 
     /// Develops the RAW again for the current recipe off the main actor and swaps it in: a draft at preview
     /// size first (unless `draftFirst` is false), then the full-quality full-size develop. Newer requests win.

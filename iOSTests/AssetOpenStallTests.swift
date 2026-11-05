@@ -1,3 +1,4 @@
+import MiraCore
 import Photos
 import UIKit
 import XCTest
@@ -174,7 +175,9 @@ final class AssetOpenStallTests: XCTestCase {
     }
 
     nonisolated static func request(_ box: AssetBox, _ state: ReqState, done: @escaping @Sendable () -> Void) {
-        let options = EditKit.makeOptions()
+        let options = PHContentEditingInputRequestOptions()
+        options.canHandleAdjustmentData = { @Sendable data in MiraAdjustment.canHandle(data) }
+        options.isNetworkAccessAllowed = true
         let id = box.asset.requestContentEditingInput(with: options) { @Sendable input, _ in
             state.finish(input != nil)
             done()

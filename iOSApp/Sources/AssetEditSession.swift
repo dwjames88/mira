@@ -1,11 +1,13 @@
 import CoreImage
 import ImageIO
 import MiraCore
+import MiraUI
 import Photos
 import UIKit
 
 enum AssetEditError: Error, LocalizedError {
     case inputUnavailable
+    case photosDidNotDeliver
     case noFullSizeImage
     case noRenderer
     case rawOriginalMissing
@@ -13,6 +15,7 @@ enum AssetEditError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .inputUnavailable: "Photos could not provide this picture for editing"
+        case .photosDidNotDeliver: FFOpenFailureCard.defaultMessage
         case .noFullSizeImage: "The full-size picture is not available, so it cannot be saved"
         case .noRenderer: "Film library missing from the app bundle"
         case .rawOriginalMissing: "This edit was made on the RAW original, which Photos could not provide. Check the connection to iCloud and try again"
@@ -23,22 +26,6 @@ enum AssetEditError: Error, LocalizedError {
 /// PhotoKit calls made off the main actor. Closures handed to Photos are built in a `nonisolated`
 /// context and marked `@Sendable` (Photos calls back on its own queues).
 enum EditKit {
-    nonisolated static func makeOptions() -> PHContentEditingInputRequestOptions {
-        let options = PHContentEditingInputRequestOptions()
-        options.canHandleAdjustmentData = { @Sendable data in MiraAdjustment.canHandle(data) }
-        options.isNetworkAccessAllowed = true
-        return options
-    }
-
-    nonisolated static func requestEditingInput(asset: Unchecked<PHAsset>) async -> Unchecked<PHContentEditingInput>? {
-        let options = Unchecked(value: makeOptions())
-        return await withCheckedContinuation { continuation in
-            asset.value.requestContentEditingInput(with: options.value) { @Sendable input, _ in
-                continuation.resume(returning: input.map(Unchecked.init))
-            }
-        }
-    }
-
     nonisolated static func saveEdit(asset: Unchecked<PHAsset>, output: Unchecked<PHContentEditingOutput>) async throws {
         try await PHPhotoLibrary.shared().performChanges { @Sendable in
             let request = PHAssetChangeRequest(for: asset.value)
@@ -78,10 +65,18 @@ final class AssetEditSession {
     /// True when the RAW is a separately fetched resource: saved edits are marked as RAW-based.
     private var rawIsFetched = false
 
-    init(asset: PHAsset) { self.asset = asset }
+    private let policy: EditingInputPolicy
+    private let makeRequester: @Sendable (PHAsset) -> any EditingInputRequesting<PHContentEditingInput>
 
-    func load() async throws -> Loaded {
-        let input = try await requestInput()
+    init(asset: PHAsset, policy: EditingInputPolicy = .standard,
+         makeRequester: @escaping @Sendable (PHAsset) -> any EditingInputRequesting<PHContentEditingInput> = { PhotoKitEditingInputRequester(asset: $0) }) {
+        self.asset = asset
+        self.policy = policy
+        self.makeRequester = makeRequester
+    }
+
+    func load(onEvent: @escaping @Sendable (EditingInputEvent) -> Void = { _ in }) async throws -> Loaded {
+        let input = try await requestInput(onEvent: onEvent)
         self.input = input
 
         var recipe = Recipe.neutral
@@ -181,11 +176,17 @@ final class AssetEditSession {
         return loaded
     }
 
-    private func requestInput() async throws -> PHContentEditingInput {
-        guard let input = await EditKit.requestEditingInput(asset: Unchecked(value: asset))?.value else {
-            throw AssetEditError.inputUnavailable
+    private func requestInput(onEvent: @escaping @Sendable (EditingInputEvent) -> Void = { _ in }) async throws -> PHContentEditingInput {
+        let requester = makeRequester(asset)
+        do {
+            return try await EditingInputFetch.fetch(requester, policy: policy, onEvent: onEvent)
+        } catch {
+            switch error {
+            case .timedOut: throw AssetEditError.photosDidNotDeliver
+            case .unavailable: throw AssetEditError.inputUnavailable
+            case .cancelled: throw CancellationError()
+            }
         }
-        return input
     }
 
     /// Renders `recipe` over the pristine original at full size and commits it as an edit of the asset.

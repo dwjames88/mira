@@ -16,27 +16,6 @@ enum PhotoKitBridge {
         var value: Value? { lock.lock(); defer { lock.unlock() }; return stored }
     }
 
-    nonisolated static func makeOptions(progress: (@Sendable (Double) -> Void)?) -> PHContentEditingInputRequestOptions {
-        let options = PHContentEditingInputRequestOptions()
-        options.canHandleAdjustmentData = { @Sendable data in MiraAdjustment.canHandle(data) }
-        options.isNetworkAccessAllowed = true
-        if let progress {
-            options.progressHandler = { @Sendable value, _ in progress(value) }
-        }
-        return options
-    }
-
-    nonisolated static func requestEditingInput(
-        asset: Unchecked<PHAsset>, progress: (@Sendable (Double) -> Void)?
-    ) async -> Unchecked<PHContentEditingInput>? {
-        let options = Unchecked(value: makeOptions(progress: progress))
-        return await withCheckedContinuation { continuation in
-            asset.value.requestContentEditingInput(with: options.value) { @Sendable input, _ in
-                continuation.resume(returning: input.map(Unchecked.init))
-            }
-        }
-    }
-
     nonisolated static func saveEdit(asset: Unchecked<PHAsset>, output: Unchecked<PHContentEditingOutput>) async throws {
         try await performLibraryChanges { @Sendable in
             let request = PHAssetChangeRequest(for: asset.value)

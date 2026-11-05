@@ -56,6 +56,13 @@ final class AppState {
     private(set) var editor: EditorModel?
     private(set) var target: Target?
     var errorMessage: String?
+    /// A Photos picture the open could not get from Photos (timed out twice); shown as a card with RETRY and BACK.
+    struct OpenFailure: Equatable {
+        let asset: PHAsset
+        let readOnly: Bool
+        let message: String
+    }
+    private(set) var openFailure: OpenFailure?
     var showExportSheet = false
     private(set) var isExporting = false
     /// A share render is running (Share button spinner); `shareBusyText` is the overlay line once it runs long.
@@ -301,9 +308,18 @@ final class AppState {
 
     func openAsset(_ asset: PHAsset, readOnly: Bool = false) {
         guardedLeave { [self] in
+            openFailure = nil
             Task { await loadAsset(AssetEditSession(asset: asset, isReadOnly: readOnly)) }
         }
     }
+
+    func retryOpenFailure() {
+        guard let failure = openFailure else { return }
+        openFailure = nil
+        openAsset(failure.asset, readOnly: failure.readOnly)
+    }
+
+    func dismissOpenFailure() { openFailure = nil }
 
     /// Tracks the stand-in while an asset opens (main-actor only).
     private final class OpenProgress {
@@ -322,6 +338,7 @@ final class AppState {
         }
         loadGeneration += 1
         let generation = loadGeneration
+        openFailure = nil
         busyProgress = nil
         let model = EditorModel(library: library, transfer: presetTransfer)
         let progress = OpenProgress()
@@ -358,6 +375,9 @@ final class AppState {
         do {
             let loaded = try await session.load(progress: { [weak self] p in
                 if self?.loadGeneration == generation { self?.busyProgress = p }
+            }, onEvent: { [weak self] event in
+                guard let self, self.loadGeneration == generation, !progress.finished, progress.showing else { return }
+                self.statusLine = EditingInputStatus.text(for: event)
             })
             progress.finished = true
             guard generation == loadGeneration else { return }
@@ -394,8 +414,16 @@ final class AppState {
         } catch {
             progress.finished = true
             if generation == loadGeneration {
-                errorMessage = "Could not open the picture: \(error)"
-                if progress.showing { closeEditor() }
+                if case AssetEditError.photosDidNotDeliver = error {
+                    if progress.showing { closeEditor() }
+                    isOpening = false
+                    busyProgress = nil
+                    openFailure = OpenFailure(asset: session.asset, readOnly: session.isReadOnly,
+                                              message: FFOpenFailureCard.defaultMessage)
+                } else {
+                    errorMessage = "Could not open the picture: \(error)"
+                    if progress.showing { closeEditor() }
+                }
             }
         }
     }

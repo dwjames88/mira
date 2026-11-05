@@ -28,9 +28,23 @@ struct GalleryView: View {
                         }
                     }
             }
-            if gallery.isOpening {
+            switch gallery.openPhase {
+            case .idle:
+                EmptyView()
+            case .opening(let detail):
                 Color.black.opacity(0.45).ignoresSafeArea()
-                Text("OPENING").ffLabel(size: 11, color: FieldFramesTheme.paper)
+                VStack(spacing: FieldFramesTheme.rows(1)) {
+                    Text("OPENING").ffLabel(size: 11, color: FieldFramesTheme.paper)
+                    if let detail {
+                        Text(detail).ffLabel(size: 11, color: FieldFramesTheme.paper)
+                    }
+                }
+            case .failed(_, let message):
+                Color.black.opacity(0.45).ignoresSafeArea()
+                FFOpenFailureCard(message: message,
+                                  onRetry: { Task { await gallery.retry(in: editor) } },
+                                  onBack: { gallery.dismissFailure() })
+                    .padding(FieldFramesTheme.cells(2))
             }
         }
         .task { await gallery.start() }
