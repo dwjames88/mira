@@ -410,7 +410,10 @@ extension StepConsistencyTests {
             m.recipe = keep
             let far = diff(none, b)
             print("RAW \(d.name) film-off render vs preset: mean \(far.mean)")
-            XCTAssertGreaterThan(far.mean, tol * 2)
+            // The film-off render must be clearly further away than the draft is from the full develop. (Before the shadow
+            // relight fix this gap was ~13, inflated by exploded near-black chroma in this DNG; it is ~7 now.)
+            XCTAssertGreaterThan(far.mean, tol)
+            XCTAssertGreaterThan(far.mean, dv.mean * 1.4)
 
             // Legacy policy: the full develop through an 8-bit proxy that clips above 1 but keeps the headroom tag.
             let renderer = try XCTUnwrap(m.live.renderer)
