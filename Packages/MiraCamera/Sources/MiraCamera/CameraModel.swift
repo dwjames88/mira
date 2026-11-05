@@ -66,7 +66,6 @@ public final class CameraModel {
     public var frameAspect: Double = 3.0 / 4.0
     /// Degrees the sensor image is rotated to be upright (90 = portrait phone). Drives the readouts' rotation.
     public var rotationAngle: Double = 90
-    public var cardThumbnails: [String: CGImage] = [:]
     public var wb = WhiteBalanceState() {
         didSet {
             guard wb != oldValue else { return }
@@ -180,7 +179,6 @@ public final class CameraModel {
         wb = WhiteBalanceState(kelvin: loaded.whiteBalanceKelvin)   // restored without a command: start() sends it
         lastManualKelvin = wb.kelvin
         finder?.setLatitudeHandler(Self.makeLatitudeHandler(self))
-        finder?.setCardsHandler(Self.makeCardsHandler(self))
         if statsEnabled { finder?.setStatsHandler(Self.makeStatsHandler(self)) }
         startConsumers(commands: commands)
     }
@@ -229,10 +227,6 @@ public final class CameraModel {
 
     private nonisolated static func makeLatitudeHandler(_ model: CameraModel) -> @Sendable (LatitudeReading?) -> Void {
         { [weak model] reading in Task { @MainActor in model?.latitude = LatitudeReadout(reading: reading) } }
-    }
-
-    private nonisolated static func makeCardsHandler(_ model: CameraModel) -> @Sendable ([String: CGImage]) -> Void {
-        { [weak model] cards in Task { @MainActor in model?.cardThumbnails.merge(cards) { _, new in new } } }
     }
 
     private nonisolated static func makeStatsHandler(_ model: CameraModel) -> @Sendable (FinderStats) -> Void {
@@ -563,14 +557,6 @@ public final class CameraModel {
             try? await Task.sleep(for: .milliseconds(1400))
             if token == focusToken, !aeAfLocked { focusPoint = nil }
         }
-    }
-
-    // MARK: Film door support
-
-    /// Film IDs the door wants thumbnails of (the finder renders them from the live frame, each published as it is done, refreshed at about 2 Hz); empty when closed.
-    public func setWantedCardIDs(_ ids: [String]) {
-        finder?.update { $0.cardFilmIDs = ids }
-        if ids.isEmpty { cardThumbnails = [:] }
     }
 
     // MARK: Settings
