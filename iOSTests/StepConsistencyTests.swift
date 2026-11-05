@@ -1,0 +1,352 @@
+import CoreImage
+import Metal
+import MiraCore
+import SwiftUI
+import XCTest
+@testable import Mira
+
+/// The main preview must show the COMPLETE recipe, with the same graded pixels, in every editor step.
+/// Bug report: "the film looks one way when it's applied, then it changes when moving to Develop".
+///
+/// What differs between steps is only the size of the photo rect (the panel under the photo changes height).
+/// These tests take the photo rect each step really gets (the real `EditorScaffold` with the real panels,
+/// at iPhone 16 Pro 402x874 @3x and iPhone SE 375x667 @2x), drive `EditorViewModel` + `LivePreview` the way
+/// `RootView` / `MetalPreviewView` do (`LivePreview.frame`), and compare the pixels.
+///
+/// Tolerances: the GRADED image (what the engine produced from the proxy) must match exactly (0). The drawn
+/// frames at two different sizes can only be compared after resampling both to a common size, so there the
+/// bound is `placementTolerance` mean absolute error (of 255): the frame centres the photo, so two sizes can place it half
+/// a pixel apart and Core Image resamples it once; the frames are compared after a low-pass to 48 x 32. A missing develop / texture stage
+/// moves the mean by ~25, asserted below as a sanity check.
+@MainActor
+final class StepConsistencyTests: XCTestCase {
+    static let placementTolerance = 3.0
+    static let ink = CIColor(red: 0.082, green: 0.078, blue: 0.059)
+
+    // MARK: Fixtures
+
+    struct Look { let film: Film; let recipe: Recipe }
+
+    static func film(mono: Bool, skipping: String? = nil) -> Film {
+        PhotoEngine.filmList.first { $0.isMonochrome == mono && $0.id != skipping && $0.family != .print }!
+    }
+
+    /// A preset that sets develop values and texture, like the one in the bug report.
+    static func preset(_ name: String, film: Film, exposure: Double = 0.12, grain: Double = 0.6,
+                       halation: Double = 0.7, bloom: Double = 0.8) -> Preset {
+        var r = Recipe(filmID: film.id)
+        r.pipeline = Recipe.currentPipeline
+        r.exposure = exposure; r.highlights = -0.35; r.shadows = 0.3; r.contrast = 0.2; r.saturation = -0.05
+        r.grainAmount = grain; r.halationAmount = halation; r.bloomAmount = bloom
+        r.push = 0.5
+        return Preset(nickname: name, recipe: r, filmName: film.displayName)
+    }
+
+    func jpegModel() async -> EditorViewModel {
+        let m = EditorViewModel()
+        let url = Bundle.main.url(forResource: "sample", withExtension: "jpg")!
+        await m.openData(try! Data(contentsOf: url))
+        XCTAssertTrue(m.hasPhoto)
+        return m
+    }
+
+    func dngModel(film: Bool) -> EditorViewModel? {
+        let url = Snapshot.root.appendingPathComponent("Fixtures/raw/iphone-xs.dng")
+        guard FileManager.default.fileExists(atPath: url.path),
+              let frame = RawOpener.openDraft(url: url, orientation: nil, settings: .identity, filmApplied: film, cacheKey: nil)
+        else { return nil }
+        let m = EditorViewModel()
+        m.present(LoadedSource(image: frame.source.image,
+                               colorSpace: ImageSource.outputColorSpace(url: url, image: frame.source.image),
+                               size: frame.source.image.extent.size))
+        return m
+    }
+
+    // MARK: Photo rects per step
+
+    enum StepKind: String, CaseIterable { case filmsStrip, filmsOptions, develop }
+
+    /// The drawable (pixels) the Metal view gets in each step: the scaffold's photo frame less the canvas padding.
+    func drawables(for device: TestDevice, model: EditorViewModel) async -> [StepKind: CGSize] {
+        var out: [StepKind: CGSize] = [:]
+        for kind in StepKind.allCases {
+            let box = FrameBox()
+            model.filmsDetail = kind == .filmsOptions
+            let tab: EditorTab = kind == .develop ? .develop : .films
+            let view = EditorScaffold(model: model, tab: .constant(tab), onClose: {}, onLayout: { box.frames = $0 }) {
+                Color.clear
+            } panel: {
+                if kind == .develop { DevelopPanel(model: model, focus: "exposure") } else { FilmsPanel(model: model) }
+            }
+            await Snapshot.render(view, device: device, name: "step-\(kind.rawValue)", settle: .milliseconds(400))
+            let f = box.frames["photo"]!
+            out[kind] = CGSize(width: (f.width - 4) * device.scale, height: f.height * device.scale)
+        }
+        model.filmsDetail = false
+        return out
+    }
+
+    // MARK: Pixels
+
+    struct Bitmap { var w: Int; var h: Int; var px: [UInt8] }
+
+    func bitmap(_ image: CIImage, _ ctx: CIContext, rect: CGRect? = nil) -> Bitmap {
+        let r = (rect ?? image.extent).integral
+        let w = Int(r.width), h = Int(r.height)
+        var px = [UInt8](repeating: 0, count: w * h * 4)
+        px.withUnsafeMutableBytes {
+            ctx.render(image, toBitmap: $0.baseAddress!, rowBytes: w * 4, bounds: r, format: .RGBA8,
+                       colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
+        }
+        return Bitmap(w: w, h: h, px: px)
+    }
+
+    func diff(_ a: Bitmap, _ b: Bitmap) -> (mean: Double, max: Int) {
+        XCTAssertEqual(a.h, b.h); XCTAssertEqual(a.w, b.w)
+        var sum = 0, mx = 0, n = 0
+        for i in 0..<min(a.px.count, b.px.count) where i % 4 != 3 {
+            let d = abs(Int(a.px[i]) - Int(b.px[i])); sum += d; mx = max(mx, d); n += 1
+        }
+        return (Double(sum) / Double(max(n, 1)), mx)
+    }
+
+    /// The photo inside a frame of `size`, cut out at whole-pixel offsets (a 2 px inset) and resampled to a common
+    /// 48 x 32 grid, so frames of any size (width- or height-limited fit) can be compared. A low-pass: half-pixel
+    /// placement differences and grain cancel out, a missing stage does not (see `assertToleranceIsTight`).
+    func photoRegion(_ model: EditorViewModel, size: CGSize, scale: CGFloat) -> Bitmap {
+        let live = model.live
+        let full = appFrame(model, size: size, scale: scale)
+        let frame = CIImage(bitmapData: Data(full.px), bytesPerRow: full.w * 4, size: size, format: .RGBA8,
+                            colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
+        let src = live.gradedImage(for: model.liveRecipe, cropping: false, showingOriginal: false)!.extent.size   // after crop / rotation
+        let fit = min(size.width / src.width, size.height / src.height)
+        let w = src.width * fit, h = src.height * fit
+        let r = CGRect(x: ((size.width - w) / 2).rounded(.down) + 2, y: ((size.height - h) / 2).rounded(.down) + 2,
+                       width: floor(w) - 4, height: floor(h) - 4)
+        // CI space is bottom-left: the photo's top edge is `size.height - (top + h)`.
+        let ciY = size.height - ((size.height - h) / 2).rounded(.down) - 2 - r.height
+        let moved = frame.transformed(by: CGAffineTransform(translationX: -r.minX, y: -ciY))
+            .cropped(to: CGRect(x: 0, y: 0, width: r.width, height: r.height))
+        let lanczos = CIFilter.lanczosScaleTransform()
+        lanczos.inputImage = moved
+        lanczos.scale = Float(32 / r.height)   // aspectRatio is an extra HORIZONTAL factor
+        lanczos.aspectRatio = Float((48 / r.width) / (32 / r.height))
+        return bitmap(lanczos.outputImage!, live.ciContext, rect: CGRect(x: 0, y: 0, width: 48, height: 32))
+    }
+
+    /// What the Metal view puts on screen for the model's current state: `LivePreview.render` into an offscreen
+    /// texture of the drawable's size (the same call `MetalPreviewView.draw` makes), read back as RGBA.
+    func appFrame(_ model: EditorViewModel, size: CGSize, scale: CGFloat, zoom: CGFloat = 1) -> Bitmap {
+        let live = model.live
+        let w = Int(size.width), h = Int(size.height)
+        let d = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: w, height: h, mipmapped: false)
+        d.usage = [.shaderRead, .shaderWrite, .renderTarget]
+        d.storageMode = .shared
+        let tex = live.device!.makeTexture(descriptor: d)!
+        let cb = live.commandQueue!.makeCommandBuffer()!
+        live.render(into: tex, commandBuffer: cb, recipe: model.liveRecipe, cropping: false, showingOriginal: false,
+                    zoom: zoom, offset: .zero, contentScale: scale, ink: Self.ink)
+        cb.commit()
+        cb.waitUntilCompleted()
+        var px = [UInt8](repeating: 0, count: w * h * 4)
+        tex.getBytes(&px, bytesPerRow: w * 4, from: MTLRegionMake2D(0, 0, w, h), mipmapLevel: 0)
+        for i in stride(from: 0, to: px.count, by: 4) { px.swapAt(i, i + 2) }   // BGRA -> RGBA
+        return Bitmap(w: w, h: h, px: px)
+    }
+
+    func graded(_ model: EditorViewModel, zoom: CGFloat = 1) -> Bitmap {
+        let live = model.live
+        live.updateProxyTarget(zoom: zoom)
+        return bitmap(live.gradedImage(for: model.liveRecipe, cropping: false, showingOriginal: false)!, live.ciContext)
+    }
+
+    func setBox(_ model: EditorViewModel, _ d: TestDevice) {
+        model.live.proxyBox = CGSize(width: d.size.width * d.scale, height: d.size.height * d.scale)
+    }
+
+    // MARK: Assertions
+
+    /// FILMS (strip and options) and DEVELOP show the same photo for the model's current recipe.
+    func assertStepsAgree(_ model: EditorViewModel, device: TestDevice, label: String,
+                          file: StaticString = #filePath, line: UInt = #line) async {
+        setBox(model, device)
+        let sizes = await drawables(for: device, model: model)
+        let reference = graded(model)
+        var proxySides: Set<CGFloat> = []
+        var thumbs: [StepKind: Bitmap] = [:]
+        // Visit the steps in the order a user would, and back again: the look must not depend on the path.
+        for kind in [StepKind.filmsStrip, .develop, .filmsOptions, .develop, .filmsStrip] {
+            let size = sizes[kind]!
+            thumbs[kind] = photoRegion(model, size: size, scale: device.scale)
+            proxySides.insert(model.live.builtLongSide)
+            let g = graded(model)
+            let d = diff(reference, g)
+            XCTAssertEqual(d.max, 0, "\(label) \(device.name) \(kind): graded pixels differ from the first render (max \(d.max))", file: file, line: line)
+        }
+        XCTAssertEqual(proxySides.count, 1, "\(label) \(device.name): proxy size changed between steps: \(proxySides)", file: file, line: line)
+        let films = thumbs[.filmsStrip]!, develop = thumbs[.develop]!, options = thumbs[.filmsOptions]!
+        for (name, other) in [("develop", develop), ("filmsOptions", options)] {
+            let d = diff(films, other)
+            print("STEPS \(label) \(device.name) strip(\(sizes[.filmsStrip]!.width)x\(sizes[.filmsStrip]!.height)) vs \(name)(\(sizes[name == "develop" ? .develop : .filmsOptions]!.width)x\(sizes[name == "develop" ? .develop : .filmsOptions]!.height)): mean \(d.mean) max \(d.max)")
+            XCTAssertLessThanOrEqual(d.mean, Self.placementTolerance, "\(label) \(device.name) strip vs \(name)", file: file, line: line)
+        }
+    }
+
+    /// Sanity: dropping the preset's develop and texture values moves the picture far beyond the tolerance, so the
+    /// tolerance cannot hide a missing stage.
+    func assertToleranceIsTight(_ model: EditorViewModel, device: TestDevice,
+                                file: StaticString = #filePath, line: UInt = #line) {
+        setBox(model, device)
+        let size = CGSize(width: 1000, height: 1400)
+        let full = photoRegion(model, size: size, scale: device.scale)
+        let keep = model.recipe
+        var filmOnly = Recipe(filmID: keep.filmID); filmOnly.pipeline = keep.pipeline
+        model.recipe = filmOnly
+        let bare = photoRegion(model, size: size, scale: device.scale)
+        model.recipe = keep
+        let d = diff(full, bare)
+        print("STEPS film-only vs complete (\(device.name)): mean \(d.mean) max \(d.max)")
+        XCTAssertGreaterThan(d.mean, Self.placementTolerance * 5, "film-only must be visibly different", file: file, line: line)
+    }
+
+    // MARK: (a) colour film + preset with develop and texture
+
+    func testColourFilmPresetSameInEveryStep() async throws {
+        for d in TestDevice.all {
+            let m = await jpegModel()
+            let p = Self.preset("Beach", film: Self.film(mono: false))
+            m.apply(p)
+            XCTAssertEqual(m.recipe.exposure, 0.12)
+            XCTAssertEqual(m.recipe.bloomAmount, 0.8)
+            await assertStepsAgree(m, device: d, label: "colour+preset")
+            assertToleranceIsTight(m, device: d)
+        }
+    }
+
+    // MARK: (b) B&W
+
+    func testBlackAndWhiteSameInEveryStep() async throws {
+        for d in TestDevice.all {
+            let m = await jpegModel()
+            m.apply(Self.preset("Mono", film: Self.film(mono: true), exposure: -0.2, grain: 0.8, halation: 0.4, bloom: 0.5))
+            await assertStepsAgree(m, device: d, label: "mono+preset")
+            // Tapping the film card itself (no preset): native texture, then the Develop step.
+            let m2 = await jpegModel()
+            m2.select(Self.film(mono: true).id)
+            await assertStepsAgree(m2, device: d, label: "mono film card")
+        }
+    }
+
+    // MARK: (c) RAW
+
+    func testRawDNGSameInEveryStep() async throws {
+        for d in TestDevice.all {
+            guard let m = dngModel(film: true) else { throw XCTSkip("iphone-xs.dng not present") }
+            m.apply(Self.preset("Raw look", film: Self.film(mono: false)))
+            await assertStepsAgree(m, device: d, label: "dng+preset")
+        }
+    }
+
+    // MARK: original -> preset A -> preset B
+
+    func testPresetAThenBReplacesEverythingAndMatchesAFreshRender() async throws {
+        for d in TestDevice.all {
+            let colour = Self.film(mono: false)
+            let a = Self.preset("A", film: colour, exposure: 0.4, grain: 0.9, halation: 0.9, bloom: 1.0)
+            var br = Recipe(filmID: Self.film(mono: false, skipping: colour.id).id)
+            br.pipeline = Recipe.currentPipeline
+            br.contrast = -0.1   // B defines only a little of its own: nothing of A may survive
+            br.push = -0.5; br.scanProfile = .neutral; br.reciprocity = .off
+            let b = Preset(nickname: "B", recipe: br, filmName: "B")
+
+            let m = await jpegModel()
+            var crop = CropSettings.identity; crop.rotate90 = 1
+            m.recipe.crop = crop
+            let kept = m.recipe.dodgeBurn
+            m.apply(a)
+            XCTAssertEqual(m.recipe.exposure, 0.4)
+            m.apply(b)
+            // Everything B defines replaced A's; the photo's own crop and strokes survived.
+            var expected = b.recipe
+            expected.crop = crop; expected.dodgeBurn = kept
+            XCTAssertEqual(m.recipe, expected, "preset B must replace A completely")
+            XCTAssertEqual(m.recipe.exposure, 0, "A's exposure must not leak into B")
+            XCTAssertEqual(m.recipe.bloomAmount, b.recipe.bloomAmount)
+            XCTAssertEqual(m.recipe.push, -0.5)
+            XCTAssertEqual(m.recipe.crop, crop)
+
+            await assertStepsAgree(m, device: d, label: "A->B")
+            // Fresh render of B's recipe on a fresh model.
+            let fresh = await jpegModel()
+            fresh.recipe = expected
+            setBox(fresh, d)
+            XCTAssertEqual(diff(graded(m), graded(fresh)).max, 0, "A->B must equal a fresh render of B")
+        }
+    }
+
+    /// The RAW settings belong to the photo: applying a preset keeps its own white balance (the Mac does the same).
+    func testPresetKeepsTheRawWhiteBalance() async throws {
+        let m = await jpegModel()
+        m.recipe.raw.temperature = 4300
+        m.apply(Self.preset("P", film: Self.film(mono: false)))
+        XCTAssertEqual(m.recipe.raw.temperature, 4300)
+    }
+
+    /// Switching zoom levels and back gives the proxy it had: no path dependence, no history.
+    func testProxyDependsOnlyOnZoomLevel() async throws {
+        let m = await jpegModel()
+        setBox(m, .iPhone16Pro)
+        m.apply(Self.preset("P", film: Self.film(mono: false)))
+        let first = graded(m)
+        _ = graded(m, zoom: 3)
+        let back = graded(m, zoom: 1)
+        XCTAssertEqual(diff(first, back).max, 0)
+    }
+}
+
+
+// MARK: Evidence for the old policy
+
+extension StepConsistencyTests {
+    /// The proxy the old code built: sized to the drawable of the step on screen, rebuilt only on >25 % growth.
+    /// Prints how far the same recipe's picture moved between the steps (evidence only; the fix removes the cause).
+    func testLegacyDrawableSizedProxyChangedTheLook() async throws {
+        let d = TestDevice.iPhone16Pro
+        let m = await jpegModel()
+        m.apply(Self.preset("Beach", film: Self.film(mono: false)))
+        let live = m.live
+        let renderer = live.renderer!, source = live.source!
+        func legacy(drawable: CGFloat) -> Bitmap {
+            let proxy = PreviewProxy.make(from: source, renderer: renderer, context: live.ciContext, wanted: min(1206, drawable))
+            let scale = min(1, proxy.extent.width / source.extent.width)
+            let img = renderer.withPreviewScale(scale).apply(m.liveRecipe, to: proxy)
+            let lanczos = CIFilter.lanczosScaleTransform()
+            lanczos.inputImage = img; lanczos.scale = Float(14 / img.extent.height); lanczos.aspectRatio = Float((24 / img.extent.width) / (14 / img.extent.height))
+            let scaled = lanczos.outputImage!
+            let out = scaled.transformed(by: CGAffineTransform(translationX: -scaled.extent.minX, y: -scaled.extent.minY))
+            return bitmap(out, live.ciContext, rect: CGRect(x: 1, y: 1, width: 22, height: 14))
+        }
+        let small = legacy(drawable: 600), big = legacy(drawable: 1194)
+        print("LEGACY proxy 600 vs 1194 (same recipe): \(diff(small, big))  [\(d.name)]")
+    }
+}
+
+// MARK: The staged render is the lazy render
+
+extension StepConsistencyTests {
+    /// `LivePreview.render` (grade into a stage texture, resample) shows the same picture, the right way up, as
+    /// drawing the lazy graph straight to the drawable. Film only: a recipe whose render is deterministic.
+    func testStagedFrameEqualsLazyFrame() async throws {
+        let m = await jpegModel()
+        setBox(m, .iPhone16Pro)
+        m.select(Self.film(mono: false).id)
+        m.recipe.grainAmount = 0
+        let size = CGSize(width: 1194, height: 978)
+        let staged = appFrame(m, size: size, scale: 3)
+        let lazy = m.live.frame(for: m.liveRecipe, cropping: false, showingOriginal: false, size: size, zoom: 1,
+                                offset: .zero, contentScale: 3, ink: Self.ink)
+        let d = diff(staged, bitmap(lazy, m.live.ciContext, rect: CGRect(origin: .zero, size: size)))
+        print("STAGED vs lazy: mean \(d.mean) max \(d.max)")
+        XCTAssertLessThan(d.mean, 0.5, "the stage must neither flip nor shift nor re-tone the picture")
+    }
+}

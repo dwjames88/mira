@@ -369,6 +369,11 @@ final class EditorViewModel {
         let generation = openGeneration
         let loaded = try await engine.load(data: data)
         guard generation == openGeneration else { return }
+        present(loaded)
+    }
+
+    /// Shows a decoded source as a freshly opened import (default recipe, nothing to save).
+    func present(_ loaded: LoadedSource) {
         live.setSource(loaded.image, colorSpace: loaded.colorSpace, size: loaded.size)
         sourceExposureTime = loaded.image.miraExposureTime
         sourcePixelSize = loaded.size
