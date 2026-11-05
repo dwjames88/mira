@@ -63,6 +63,12 @@ enum GalleryKit {
         return ids
     }
 
+    /// True for the Hidden and Recently Deleted albums, whose pictures the RAW smart album leaves out.
+    nonisolated static func excludedFromRAWAlbum(nodeID id: String) -> Bool {
+        guard id.hasPrefix("smart:"), let raw = Int(id.dropFirst(6)) else { return false }
+        return SidebarLoader.includesHidden(raw: raw)
+    }
+
     /// Local identifiers of a fetch, in order. Runs off the main actor.
     nonisolated static func identifiers(of result: Unchecked<PHFetchResult<PHAsset>>) -> [String] {
         let r = result.value
@@ -78,10 +84,8 @@ enum GalleryKit {
     /// (isRAW, isEdited) from the asset's resources; runs off the main actor.
     nonisolated static func badges(of asset: Unchecked<PHAsset>) -> (raw: Bool, edited: Bool) {
         let resources = PHAssetResource.assetResources(for: asset.value)
-        let rawTypes: Set<String> = ["public.camera-raw-image", "com.adobe.raw-image"]
-        let raw = resources.contains {
-            ($0.type == .photo || $0.type == .alternatePhoto) && rawTypes.contains($0.uniformTypeIdentifier)
-        }
+        // Same rule as the RAW filter (any camera-RAW type, not just DNG), so badge and filter agree.
+        let raw = RAWScan.isRAW(asset.value)
         let edited = resources.contains { $0.type == .adjustmentData }
         return (raw, edited)
     }
@@ -97,6 +101,9 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
     /// Bumps when pictures were added, removed or reordered library-wide (covers are stale then).
     /// Pure content edits do not bump it; they reach the open album as per-asset versions.
     private(set) var revision = 0
+    /// Bumps on every library change. Album membership can change without the library's picture list
+    /// changing (a picture added to an album), so covers re-check their asset on each change.
+    private(set) var changeCount = 0
     /// Per-album cover refreshes: an album whose membership changed gets a new cover.
     private(set) var coverVersions: [String: Int] = [:]
     private(set) var isOpening = false
@@ -146,6 +153,7 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 self.status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+                self.changeCount += 1
                 if self.hasAccess {
                     if membershipChanged {
                         self.revision += 1
@@ -178,7 +186,7 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
     }
 
     func coverToken(for nodeID: String?) -> String {
-        "\(revision).\(nodeID.flatMap { coverVersions[$0] } ?? 0)"
+        "\(revision).\(changeCount).\(nodeID.flatMap { coverVersions[$0] } ?? 0)"
     }
 
     func presentLimitedPicker() {
@@ -300,7 +308,9 @@ final class AlbumModel {
             let ids = await Task.detached(priority: .userInitiated) { GalleryKit.identifiers(of: box) }.value
             guard !Task.isCancelled, let self else { return }
             var classification = gallery.rawClassification
-            if classification == nil {
+            // Hidden and Recently Deleted pictures are not in the RAW smart album: those two are scanned.
+            if GalleryKit.excludedFromRAWAlbum(nodeID: self.nodeID) { classification = RAWClassification(authoritative: false) }
+            else if classification == nil {
                 let album = await Task.detached(priority: .userInitiated) { GalleryKit.rawAlbumIdentifiers() }.value
                 classification = album.map { RAWClassification(rawIDs: $0) } ?? RAWClassification(authoritative: false)
                 if album != nil { gallery.rawClassification = classification }
@@ -439,12 +449,19 @@ final class CoverStore {
     func key(_ nodeID: String, _ size: CGSize) -> String { "\(nodeID)@\(Int(size.width))x\(Int(size.height))" }
     func image(for key: String) -> UIImage? { cache.object(forKey: key as NSString) }
     private var keysByNode: [String: Set<String>] = [:]
-    func store(_ image: UIImage, for key: String, nodeID: String) {
+    /// Which asset each cached cover shows, so a later lookup can tell the cover went stale.
+    private var assetIDs: [String: String] = [:]
+    func assetID(for key: String) -> String? { assetIDs[key] }
+    func store(_ image: UIImage, for key: String, nodeID: String, assetID: String) {
         cache.setObject(image, forKey: key as NSString)
+        assetIDs[key] = assetID
         keysByNode[nodeID, default: []].insert(key)
     }
     func remove(nodeID: String) {
-        for key in keysByNode.removeValue(forKey: nodeID) ?? [] { cache.removeObject(forKey: key as NSString) }
+        for key in keysByNode.removeValue(forKey: nodeID) ?? [] {
+            cache.removeObject(forKey: key as NSString)
+            assetIDs[key] = nil
+        }
     }
-    func removeAll() { cache.removeAllObjects(); keysByNode = [:] }
+    func removeAll() { cache.removeAllObjects(); keysByNode = [:]; assetIDs = [:] }
 }

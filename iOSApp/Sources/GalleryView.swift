@@ -249,17 +249,26 @@ private struct CoverImage: View {
         let store = gallery.covers
         let pixels = CGSize(width: size.width * displayScale, height: size.height * displayScale)
         let key = store.key(nodeID, pixels)
-        if let hit = store.image(for: key) { image = hit; return }
+        let hit = store.image(for: key)
+        if let hit { image = hit }
         let found = await Task.detached(priority: .userInitiated) { GalleryKit.coverAsset(nodeID: nodeID) }.value
-        guard let found, !Task.isCancelled else { return }
+        guard !Task.isCancelled else { return }
+        guard let found else {
+            // The album is empty or gone: drop a cover that no longer exists.
+            if hit != nil { store.remove(nodeID: nodeID); image = nil }
+            return
+        }
+        // A cached cover is shown at once, then kept only if it still is this node's cover asset.
+        if hit != nil, store.assetID(for: key) == found.value.localIdentifier { return }
         ThumbnailMetrics.shared.recordRequest()
+        let assetID = found.value.localIdentifier
         requestID = GalleryKit.requestThumbnail(
             manager: store.manager, asset: found, size: pixels, options: Unchecked(value: store.options)
         ) { box, _ in
             MainActor.assumeIsolated {
                 guard let img = box.value else { return }
                 image = img
-                store.store(img, for: key, nodeID: nodeID)
+                store.store(img, for: key, nodeID: nodeID, assetID: assetID)
             }
         }
     }
