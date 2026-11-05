@@ -33,6 +33,14 @@ struct PaperChipsTests {
         #expect(!model.showsPaperChips)
     }
 
+    @Test func paperChipsAreHiddenOnMonochromeFilms() throws {
+        let lib = try Self.library()
+        let mono = try #require(lib.films.first { $0.isMonochrome && $0.family != .print })
+        let model = EditorModel(library: lib, recipe: Recipe(filmID: mono.id))
+        #expect(model.showsToning)
+        #expect(!model.showsPaperChips)
+    }
+
     @Test func familyTabsIncludeMotionPictureAndPrint() throws {
         let model = EditorModel(library: try Self.library())
         #expect(model.availableFamilies.contains(.motionPicture))

@@ -88,7 +88,7 @@ import Testing
         let preset = Preset(nickname: "Painted", recipe: Self.painted, filmName: "Portra 400")
         #expect(preset.recipe.dodgeBurn.isIdentity)
         #expect(preset.recipe.exposure == 0.1)
-        let data = try PresetFile.encode(Preset(nickname: "P", recipe: Self.painted), appVersion: "0.4.0")
+        let data = try PresetFile.encode(Preset(nickname: "P", recipe: Self.painted), appVersion: "0.5.0")
         #expect(!String(decoding: data, as: UTF8.self).contains("dodgeBurn"))
         // A file that smuggles strokes in has them removed on import.
         let doctored = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])

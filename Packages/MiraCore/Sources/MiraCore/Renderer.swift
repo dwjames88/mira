@@ -46,14 +46,16 @@ public enum RendererError: Error, CustomStringConvertible {
 ///     A scene-referred source (RAW with extended range) carries a headroom H > 1: the white point
 ///     gain x H then maps to 1 through a shoulder with a knee at 0.6, instead of clipping at the LUT.
 ///  2. White balance (warmth / tint): the light the film is exposed to, so before the film.
+///  2b. Reciprocity (`miraReciprocity`): the film's response to the exposure time (cast, contrast).
 ///  3. Dodge and burn, colour mixer, curves (unchanged).
 ///  4. Halation, in the exposure and in linear light: the highlights (`miraHighlights`) are blurred
 ///     by the film's radius and put back tinted (`miraHalationCombine`), so luminance is
 ///     redistributed, not added. The slider scales the film's own halation (0.5 is native).
 ///  5. Film LUT with strength blend (the Hald CLUTs are sRGB display referred).
 ///  6. Contrast, tone, texture, clarity, saturation, vibrance: printing and scanning, after the film.
-///     Between the LUT and contrast: scan profile and push / pull contrast and base fog
-///     (`miraScan`), then toning of monochrome films (`miraToning`). Push / pull also changes the
+///     Between the LUT and contrast: Paper (a print look cube, not for monochrome films) or the
+///     scan profile, with push / pull contrast and base fog (`miraScan`), then toning of
+///     monochrome films (`miraToning`). Push / pull also changes the
 ///     exposure gain (2^(0.33 N)), slide / Kodachrome latitude, and the grain strength.
 ///  7. Bloom.
 ///  8. Grain (`miraGrain`): band-limited smooth noise on the sRGB-encoded image, in frame-relative
@@ -239,11 +241,14 @@ public struct Renderer: Sendable {
 
         // 2b. Pipeline 2: print stock (replaces the scan), push / pull contrast and base fog, then B&W toning.
         if filmScience {
-            if let paperID = ProceduralLooks.id(for: recipe.paper), let paperLUT = try? ProceduralLooks.lut(paperID) {
+            // A black-and-white negative is printed on black-and-white paper (Toning covers that): a
+            // colour print stock would tint it, so the paper is ignored for monochrome films.
+            let paper: PaperProfile = film?.isMonochrome == true ? .none : recipe.paper
+            if let paperID = ProceduralLooks.id(for: paper), let paperLUT = try? ProceduralLooks.lut(paperID) {
                 image = applyPaper(paperLUT, id: paperID, to: image, strength: clamp(recipe.strength, 0, 1), extent: extent)
             }
             // With a paper set the scan profile is ignored; push / pull contrast and base fog still apply.
-            var scan = ScanParameters.profile(recipe.paper == .none ? recipe.scanProfile : .neutral)
+            var scan = ScanParameters.profile(paper == .none ? recipe.scanProfile : .neutral)
             scan.contrast += push * character.pushContrastPerStop
             if push > 0, let family, family == .colorNegative || family == .motionPicture || family == .blackAndWhite {
                 scan.blackLift += 0.012 * push

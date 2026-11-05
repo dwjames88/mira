@@ -121,4 +121,21 @@ import Testing
         let pushed = Pixels(r.apply(Recipe(filmID: "neg", push: 2, paper: .colorPaper), to: input), context: ctx)
         #expect(base.rgba != pushed.rgba)
     }
+
+    @Test func paperIsIgnoredForMonochromeFilms() throws {
+        let lib = try SyntheticFilms.library([.init(id: "bw", family: .blackAndWhite), .init(id: "neg", family: .colorNegative)])
+        let r = Renderer(library: lib)
+        let input = Fixture.gradientAndPatches(size: 96)
+        let ctx = Renderer.makeContext()
+        let plain = Pixels(r.apply(Recipe(filmID: "bw"), to: input), context: ctx)
+        let papered = Pixels(r.apply(Recipe(filmID: "bw", paper: .colorPaper), to: input), context: ctx)
+        #expect(plain.rgba == papered.rgba)
+        // The scan profile still applies when the (ignored) paper is set.
+        let scanned = Pixels(r.apply(Recipe(filmID: "bw", scanProfile: .frontier, paper: .colorPaper), to: input), context: ctx)
+        let scanOnly = Pixels(r.apply(Recipe(filmID: "bw", scanProfile: .frontier), to: input), context: ctx)
+        #expect(scanned.rgba == scanOnly.rgba)
+        // A colour negative still takes the paper.
+        let colour = Pixels(r.apply(Recipe(filmID: "neg", paper: .colorPaper), to: input), context: ctx)
+        #expect(colour.rgba != Pixels(r.apply(Recipe(filmID: "neg"), to: input), context: ctx).rgba)
+    }
 }
