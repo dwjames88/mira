@@ -98,7 +98,7 @@ struct FilmsPanel: View {
         }
     }
 
-    /// PUSH / PULL, SCAN and (monochrome films) TONING.
+    /// PUSH / PULL, SCAN, PAPER (not on print cards) and (monochrome films) TONING.
     @ViewBuilder private var filmControls: some View {
         if model.showsFilmControls {
             FFSlider("Push / Pull", value: Binding(get: { model.recipe.push },
@@ -108,7 +108,16 @@ struct FilmsPanel: View {
                 .help("Shoot the film at a different speed and develop to compensate, in stops")
             LatitudeCompact(model: model)
             chipSection("Scan", ScanProfile.allCases.map { ($0.displayName, $0 == model.recipe.scanProfile, $0) }) {
-                model.recipe.scanProfile = $0
+                model.selectScan($0)
+            }
+            if model.showsPaperChips {
+                chipSection("Paper", PaperProfile.allCases.map { ($0.displayName, $0 == model.recipe.paper, $0) }) {
+                    model.selectPaper($0)
+                }
+                Text("Mira originals, inspired by published print behavior. Replaces Scan. No affiliation with Kodak or Fujifilm.")
+                    .ffLabel(color: T.paperDim)
+                    .lineLimit(3)
+                    .help("Cinema Print and Color Paper are Mira original looks; choosing one sets Scan to Neutral")
             }
             if model.showsToning {
                 chipSection("Toning", Toning.allCases.map { ($0.displayName, $0 == model.recipe.toning, $0) }) {
