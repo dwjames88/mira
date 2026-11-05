@@ -392,15 +392,21 @@ public actor CaptureController: CameraDevice {
                 horizontalAccuracy: $0.horizontalAccuracy)
         }
         let delegate = PhotoCaptureDelegate(signals: signalsOut, location: snapshot)
-        if let connection = photoOutput.connection(with: .video), let angle = rotationCoordinator?.videoRotationAngleForHorizonLevelCapture,
-           connection.isVideoRotationAngleSupported(angle) {
-            connection.videoRotationAngle = angle
+        var angle = 90.0
+        if let connection = photoOutput.connection(with: .video) {
+            angle = Double(connection.videoRotationAngle)
+            if let wanted = rotationCoordinator?.videoRotationAngleForHorizonLevelCapture, connection.isVideoRotationAngleSupported(wanted) {
+                connection.videoRotationAngle = wanted
+                angle = Double(wanted)
+            }
         }
         readinessCoordinator?.startTrackingCaptureRequest(using: settings)
-        return try await withCheckedThrowingContinuation { continuation in
+        var frame: CapturedFrame = try await withCheckedThrowingContinuation { continuation in
             delegate.begin(continuation)
             photoOutput.capturePhoto(with: settings, delegate: delegate)
         }
+        frame.rotationAngle = angle
+        return frame
     }
 
     private func makePhotoSettings(format: CaptureFormat) -> AVCapturePhotoSettings {

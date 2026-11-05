@@ -241,7 +241,7 @@ public actor FakeCaptureDevice: CameraDevice {
         let properties = [kCGImageDestinationLossyCompressionQuality: 0.9] as CFDictionary
         if let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.heic.identifier as CFString, 1, nil) {
             CGImageDestinationAddImage(destination, cg, properties)
-            if CGImageDestinationFinalize(destination) { return CapturedFrame(heicURL: url, pixelSize: PixelSize(width: cg.width, height: cg.height), exposureTime: FakeFrameSource.exposureTime) }
+            if CGImageDestinationFinalize(destination) { return CapturedFrame(heicURL: url, pixelSize: PixelSize(width: cg.width, height: cg.height), exposureTime: FakeFrameSource.exposureTime, rotationAngle: 0) }
         }
         // No HEIC encoder (some simulators): JPEG data under a .jpg name.
         url = directory.appending(path: "\(name).jpg")
@@ -250,7 +250,7 @@ public actor FakeCaptureDevice: CameraDevice {
         }
         CGImageDestinationAddImage(destination, cg, properties)
         guard CGImageDestinationFinalize(destination) else { throw CaptureError.failed("The picture could not be encoded") }
-        return CapturedFrame(heicURL: url, pixelSize: PixelSize(width: cg.width, height: cg.height), exposureTime: FakeFrameSource.exposureTime)
+        return CapturedFrame(heicURL: url, pixelSize: PixelSize(width: cg.width, height: cg.height), exposureTime: FakeFrameSource.exposureTime, rotationAngle: 0)
     }
 }
 

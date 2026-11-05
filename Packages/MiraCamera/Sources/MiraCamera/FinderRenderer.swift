@@ -22,6 +22,8 @@ public struct FinderState: Sendable {
     public var captureLongSide: Double = 4032
     /// Digital zoom crop, normalized (0...1) in the upright frame with the origin at the TOP LEFT. nil = whole frame.
     public var cropRect: CGRect?
+    /// The aspect crop (settings). The rect depends on the upright frame's orientation, so it is derived per frame.
+    public var aspect: CaptureAspect = .fourThree
     public var thermal: FinderThermalLevel = .nominal
     /// Film IDs the film door wants thumbnails of. Empty = the door is closed and no thumbnails are made.
     public var cardFilmIDs: [String] = []
@@ -168,6 +170,9 @@ public final class FinderRenderer: @unchecked Sendable {
 
     // MARK: State
 
+    /// The aspect crop the finder is drawing with.
+    public var aspect: CaptureAspect { core.withLock { $0.state.aspect } }
+
     /// Mutates the finder state under the lock. Safe from any thread; the body must be quick.
     public func update(_ body: (inout FinderState) -> Void) {
         let cardsChanged: Bool = core.withLock { c in
@@ -261,7 +266,7 @@ public final class FinderRenderer: @unchecked Sendable {
         guard let plan else { return false }
         func release() { core.withLock { $0.inflight = false } }
 
-        let upright = Self.upright(frame, crop: plan.state.cropRect)
+        let upright = Self.upright(frame, crop: plan.state.cropRect, aspect: plan.state.aspect)
         let extent = upright.extent
         guard extent.width >= 1, extent.height >= 1, extent.width.isFinite, extent.height.isFinite else { release(); return false }
 
@@ -349,7 +354,8 @@ public final class FinderRenderer: @unchecked Sendable {
     }
 
     /// The frame rotated upright (a multiple of 90 degrees by orientation, else a rotation) and cropped, origin at zero.
-    public static func upright(_ frame: FinderFrame, crop: CGRect?) -> CIImage {
+    /// `aspect` (not `.fourThree`) first takes the centred aspect crop of the upright frame (`CaptureCrop`), then `crop` applies to that.
+    public static func upright(_ frame: FinderFrame, crop: CGRect?, aspect: CaptureAspect = .fourThree) -> CIImage {
         var angle = frame.rotationAngle.truncatingRemainder(dividingBy: 360)
         if angle < 0 { angle += 360 }
         var image = frame.image
@@ -367,6 +373,12 @@ public final class FinderRenderer: @unchecked Sendable {
             image = image.transformed(by: CGAffineTransform(rotationAngle: -angle * .pi / 180))
         }
         var e = image.extent
+        if aspect != .fourThree, e.width >= 1, e.height >= 1, e.width.isFinite, e.height.isFinite {
+            let a = CaptureCrop.cropRect(frameSize: e.size, aspect: aspect)
+            let r = CGRect(x: e.minX + a.minX * e.width, y: e.minY + (1 - a.maxY) * e.height,
+                           width: a.width * e.width, height: a.height * e.height).intersection(e)
+            if !r.isNull, r.width >= 1, r.height >= 1 { image = image.cropped(to: r); e = r }
+        }
         if let crop, crop.width > 0, crop.height > 0 {
             let r = CGRect(x: e.minX + crop.minX * e.width, y: e.minY + (1 - crop.maxY) * e.height,
                            width: crop.width * e.width, height: crop.height * e.height).intersection(e)

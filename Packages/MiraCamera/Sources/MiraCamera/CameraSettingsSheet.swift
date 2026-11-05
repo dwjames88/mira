@@ -32,6 +32,10 @@ struct CameraSettingsSheet: View {
                     FFToggle("ADD LOCATION TO FRAMES", isOn: $model.settings.addLocation)
                     Text("Off by default. The location goes into the picture's metadata only; Mira sends nothing anywhere.")
                         .font(.system(size: 12)).foregroundStyle(T.paperDim)
+                    FFSectionLabel("ASPECT")
+                    aspectRow
+                    Text("Crops the finder and the recipe of each frame. The saved picture stays full-frame; change the crop later in the editor.")
+                        .font(.system(size: 12)).foregroundStyle(T.paperDim)
                     FFSectionLabel("ADVANCED")
                     FFToggle("FINDER GRAIN: LIVE", isOn: $model.settings.finderGrainLive)
                     qualityRow
@@ -46,6 +50,24 @@ struct CameraSettingsSheet: View {
         }
         .foregroundStyle(T.paper)
         .tint(T.lichen)
+    }
+
+    private var aspectRow: some View {
+        HStack(spacing: 6) {
+            ForEach(CaptureAspect.allCases, id: \.self) { aspect in
+                let on = model.settings.aspect == aspect
+                Button { model.settings.aspect = aspect } label: {
+                    Text(aspect.label).ffLabel(size: 9, color: on ? T.paper : T.paperDim)
+                        .lineLimit(1).minimumScaleFactor(0.6)
+                        .padding(.horizontal, 6).frame(maxWidth: .infinity, minHeight: 32)
+                        .overlay(Rectangle().stroke(on ? T.lichen : T.hair, lineWidth: 1))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Aspect \(aspect.label.lowercased())")
+                .accessibilityAddTraits(on ? .isSelected : [])
+            }
+        }
     }
 
     private var qualityRow: some View {

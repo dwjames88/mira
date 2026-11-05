@@ -81,6 +81,22 @@ final class CameraModelTests: XCTestCase {
         await model.stop()
     }
 
+    func testAspectIsRecordedInTheSavedRecipeOnly() async {
+        let log = CallRecorder()
+        let model = makeModel(access: .full, log: log)
+        await model.start()
+        await until("ready") { model.readiness == .ready && model.state.canCapture }
+        model.settings.aspect = .square
+        model.shutter()
+        await until("print attached") { await log.attached.count == 1 }
+        let saved = await log.attached.first?.recipe
+        XCTAssertEqual(saved?.crop.aspect, "square")
+        XCTAssertFalse(saved?.crop.rect.isFull ?? true, "the square crop cuts the fixture")
+        XCTAssertTrue(model.recipe.crop.isIdentity, "the user's recipe carries no crop")
+        XCTAssertTrue(model.settings.lastRecipe?.crop.isIdentity ?? true)
+        await model.stop()
+    }
+
     func testLimitedAccessShowsTheNotice() async {
         let log = CallRecorder()
         let model = makeModel(access: .limited, log: log)

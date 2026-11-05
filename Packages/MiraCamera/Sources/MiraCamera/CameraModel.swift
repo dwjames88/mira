@@ -17,6 +17,8 @@ public enum CameraAuthorization: Sendable, Equatable { case authorized, denied, 
 struct FrameReport: Sendable, Equatable {
     var aspect: Double
     var angle: Double
+    /// The aspect crop of the upright frame (normalized, top-left origin); the whole frame without a crop.
+    var crop: CGRect
     var first: Bool
 }
 
@@ -63,8 +65,10 @@ public final class CameraModel {
     }
     public var stats: FinderStats?
     public var silentShutterSupported = false
-    /// Upright width / height of the frames on screen (what the finder aspect-fits).
+    /// Width / height of the frames on screen after the aspect crop (what the finder aspect-fits).
     public var frameAspect: Double = 3.0 / 4.0
+    /// The part of the upright frame that is on screen (normalized, top-left origin); touches map through it.
+    public var frameCrop = CGRect(x: 0, y: 0, width: 1, height: 1)
     /// Degrees the sensor image is rotated to be upright (90 = portrait phone). Maps touches back to the device.
     public var rotationAngle: Double = 90
     public var cardThumbnails: [String: CGImage] = [:]
@@ -168,6 +172,7 @@ public final class CameraModel {
             state.recipe = recipe
             state.mode = loaded.finderQuality
             state.grainLive = loaded.finderGrainLive
+            state.aspect = loaded.aspect
         }
         finder?.setLatitudeHandler(Self.makeLatitudeHandler(self))
         finder?.setCardsHandler(Self.makeCardsHandler(self))
@@ -235,9 +240,11 @@ public final class CameraModel {
         return { [weak model] frame in
             finder?.consume(frame)
             let size = frame.image.extent.size
+            let shape = finder?.aspect ?? .fourThree
             let report = FrameReport(
-                aspect: FinderGeometry.uprightAspect(sensorSize: size, rotationAngle: frame.rotationAngle),
-                angle: frame.rotationAngle, first: false)
+                aspect: FinderGeometry.croppedAspect(sensorSize: size, rotationAngle: frame.rotationAngle, aspect: shape),
+                angle: frame.rotationAngle,
+                crop: FinderGeometry.cropRect(sensorSize: size, rotationAngle: frame.rotationAngle, aspect: shape), first: false)
             let send: FrameReport? = last.withLock { (previous: inout FrameReport?) -> FrameReport? in
                 guard let old = previous else {
                     var first = report
@@ -245,7 +252,7 @@ public final class CameraModel {
                     previous = report
                     return first
                 }
-                guard abs(old.aspect - report.aspect) > 0.001 || old.angle != report.angle else { return nil }
+                guard abs(old.aspect - report.aspect) > 0.001 || old.angle != report.angle || old.crop != report.crop else { return nil }
                 previous = report
                 return report
             }
@@ -255,6 +262,7 @@ public final class CameraModel {
 
     private func apply(_ report: FrameReport) {
         frameAspect = report.aspect
+        frameCrop = report.crop
         rotationAngle = report.angle
         guard report.first, !deferredStartDone else { return }
         deferredStartDone = true
@@ -363,11 +371,12 @@ public final class CameraModel {
         impact.impactOccurred()
         developingCount += 1
         let recipe = self.recipe
+        let aspect = settings.aspect
         let there = settings.addLocation ? location.latest : nil
-        Task { await capture(recipe: recipe, location: there) }
+        Task { await capture(recipe: recipe, aspect: aspect, location: there) }
     }
 
-    private func capture(recipe: Recipe, location there: CLLocation?) async {
+    private func capture(recipe: Recipe, aspect: CaptureAspect, location there: CLLocation?) async {
         defer { developingCount = max(0, developingCount - 1) }
         if await library.access() == .notDetermined { _ = await requestLibraryAccess() }
         await saver.captureStarted()
@@ -383,7 +392,13 @@ public final class CameraModel {
         }
         state.handle(.captureFinished)
         do {
-            let outcome = try await saver.save(frame, recipe: recipe)
+            // The negative stays full-frame; the aspect goes into this frame's recipe (not the user's recipe or settings).
+            var printed = recipe
+            if let crop = CaptureCrop.recipeCrop(sensorSize: frame.pixelSize, rotationAngle: frame.rotationAngle, aspect: aspect) {
+                printed.crop.rect = crop.rect
+                printed.crop.aspect = crop.aspectID
+            }
+            let outcome = try await saver.save(frame, recipe: printed)
             handle(outcome)
         } catch {
             show(notice: (error as? CaptureSaveError)?.monoCopy ?? "FRAME NOT SAVED")
@@ -522,7 +537,8 @@ public final class CameraModel {
         focusToken += 1
         let token = focusToken
         // The device wants sensor coordinates: undo the aspect-fit and the rotation.
-        let devicePoint = FinderGeometry.devicePoint(viewPoint: point, viewSize: size, uprightAspect: frameAspect, rotationAngle: rotationAngle)
+        let devicePoint = FinderGeometry.devicePoint(
+            viewPoint: point, viewSize: size, uprightAspect: frameAspect, rotationAngle: rotationAngle, crop: frameCrop)
         send(.focus(devicePoint, lock: lock))
         guard !lock else { return }
         Task {
@@ -554,6 +570,7 @@ public final class CameraModel {
                 $0.grainLive = settings.finderGrainLive
             }
         }
+        if settings.aspect != old.aspect { finder?.update { [aspect = settings.aspect] in $0.aspect = aspect } }
         if settings.addLocation != old.addLocation, wantsRunning { location.setEnabled(settings.addLocation) }
         if settings.silentShutter != old.silentShutter {
             Task { format = await device.configure(settings: settings) }

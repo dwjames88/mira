@@ -77,4 +77,16 @@ final class FinderUprightTests: XCTestCase {
         XCTAssertEqual(c.br, blue, "buffer bottom-left -> upright bottom-right")
         XCTAssertEqual(c.tr, yellow, "buffer bottom-right -> upright top-right")
     }
+
+    func testAspectCropIsCentredOnTheUprightFrame() {
+        // 400x300 buffer at 90 degrees is 300x400 upright; 3:2 keeps the full height and 266.67 of the width.
+        let frame = FinderFrame(image: buffer(), rotationAngle: 90, exposureTime: nil, timestamp: 0, index: 0)
+        let cropped = FinderRenderer.upright(frame, crop: nil, aspect: .threeTwo)
+        XCTAssertEqual(cropped.extent.minX, 0); XCTAssertEqual(cropped.extent.minY, 0)
+        XCTAssertEqual(cropped.extent.width, 400 / 1.5, accuracy: 1)
+        XCTAssertEqual(cropped.extent.height, 400, accuracy: 1)
+        XCTAssertEqual(cropped.extent.height / cropped.extent.width, 1.5, accuracy: 0.01)
+        let none = FinderRenderer.upright(frame, crop: nil, aspect: .fourThree)
+        XCTAssertEqual(none.extent, CGRect(x: 0, y: 0, width: 300, height: 400))
+    }
 }
