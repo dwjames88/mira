@@ -98,6 +98,10 @@ extension ShadowSpeckle {
                 for (cname, set) in ShadowSpeckle.controls {
                     for (sname, src, limit) in sources {
                         if film == nil && grain > 0.5 { continue }
+                        // The P3 card is itself saturated: lifted three stops its colours are legitimately saturated
+                        // (the luma-ratio scale keeps their saturation), so only the unlifted controls are held to it;
+                        // the lifts are held to the chroma-noise card and to the chroma-gain test below.
+                        if sname == "darkP3" && (cname == "lift" || cname == "curves") { continue }
                         var r = Recipe(filmID: film, grainAmount: film == nil ? 0 : grain,
                                        halationAmount: film == nil ? 0 : hal, bloomAmount: film == nil ? 0 : bloom)
                         set(&r)
@@ -127,5 +131,33 @@ extension ShadowSpeckle {
         let y2 = y + 0.33 * 0.5 * y * y * y
         let k = y2 / y
         #expect(abs(e.0 - 0.5 * k) < 0.004 && abs(e.1 - 0.4 * k) < 0.004 && abs(e.2 - 0.3 * k) < 0.004, "\(e) vs ratio \(k)")
+    }
+
+    /// A legitimately dark, coloured patch (encoded luma ~0.08, non-negative channels) lifted by shadows must keep the
+    /// chroma gain of the plain luma-ratio scaling (1.0.0): the speckle guard may only bite for tiny luma.
+    @Test func darkColouredPatchKeepsTheRatioChromaGain() throws {
+        let renderer = Renderer(library: try emptyLibrary())
+        let ctx = Renderer.makeContext()
+        func lin(_ e: Float) -> Float { e <= 0.04045 ? e / 12.92 : pow((e + 0.055) / 1.055, 2.4) }
+        func enc(_ v: Float) -> Float { v <= 0.0031308 ? 12.92 * v : 1.055 * pow(v, 1 / 2.4) - 0.055 }
+        func smooth(_ a: Float, _ b: Float, _ x: Float) -> Float { let t = min(max((x - a) / (b - a), 0), 1); return t * t * (3 - 2 * t) }
+        let patches: [(Float, Float, Float)] = [(0.17, 0.10, 0.05), (0.04, 0.13, 0.05), (0.06, 0.09, 0.22), (0.14, 0.04, 0.04)]
+        for shadows in [Float(0.5), 1] {
+            for p in patches {
+                let src = PipelineFixture.linearImage(width: 64, height: 64) { _, _ in (lin(p.0), lin(p.1), lin(p.2)) }
+                var r = Recipe(); r.shadows = Double(shadows)
+                let out = LinearPixels(renderer.apply(r, to: src), context: ctx)
+                let i = (32 * 64 + 32) * 4
+                let got = (enc(out.rgba[i]), enc(out.rgba[i + 1]), enc(out.rgba[i + 2]))
+                let y = 0.2126 * p.0 + 0.7152 * p.1 + 0.0722 * p.2
+                let y2 = y + shadows * (1 - smooth(0.05, 0.65, y)) * 0.3 * (1 - y)
+                let k = y2 / y
+                let want = (p.0 * k, p.1 * k, p.2 * k)
+                func chroma(_ c: (Float, Float, Float)) -> Float { max(c.0, c.1, c.2) - min(c.0, c.1, c.2) }
+                let gainWanted = chroma(want) - chroma(p), gainGot = chroma(got) - chroma(p)
+                #expect(y > 0.05 && y < 0.12)
+                #expect(gainGot >= 0.9 * gainWanted, "shadows \(shadows) patch \(p) luma \(y): chroma gain \(gainGot) vs 1.0.0 \(gainWanted)")
+            }
+        }
     }
 }

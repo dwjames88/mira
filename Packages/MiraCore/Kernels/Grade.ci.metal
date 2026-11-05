@@ -49,18 +49,23 @@ static inline float miraLuma(float3 c) { return dot(c, float3(0.2126, 0.7152, 0.
 
 // Applies a new luminance y2 to an sRGB-encoded colour whose luminance is y, keeping hue.
 //
-// The textbook way is e * (y2 / y). That is ill-conditioned in deep shadows: there y is tiny while the
-// colour keeps its (noisy, often wide-gamut and partly negative) chroma, so a lift of 0.3 in luminance
-// at y = 0.003 multiplies every channel by 100 and a near-black colour becomes a saturated orange or
-// green speck. So the colour is split into its luminance and its chroma offset (e - y) and only the
-// chroma is scaled, by the luminance ratio where there is enough luminance to carry it and by 1 (the
-// pure additive change) where there is not. Darkening, and normal pixels (y above ~0.25), are exactly
-// the ratio scale as before; a lift is blended in between, so the chroma of a lifted shadow grows by
-// at most the ratio and never more than the tone it came from can justify.
+// The textbook way is e * (y2 / y): split into luminance and chroma offset (e - y) it is y2 + (e - y) * (y2 / y).
+// That chroma gain is ill-conditioned in deep shadows: y is tiny while the colour keeps its (noisy, often
+// wide-gamut and partly negative) chroma, so a lift of 0.3 at y = 0.003 multiplies the chroma by 100 and a
+// near-black colour becomes a saturated orange or green speck. So the chroma gain on a lift is capped by
+// sMax(y) = 1 + (y / 0.02)^2: about 1 for truly tiny luma (0.003 -> 1.02), 2 at 0.02, 5 at 0.04 and 17 at
+// 0.08, i.e. the full ratio for any legitimately dark colour (a lift never gains more than ~y2 / y = 4 above
+// y = 0.1) while it cannot explode below ~0.03. Channels below zero (out of gamut, where luma cancels) divide
+// the cap further. Darkening (ratio <= 1) and every pixel the cap does not bind are exactly the ratio scale.
 static inline float3 miraRelight(float3 e, float y, float y2) {
     if (y <= 1.0e-4) { return e + (y2 - y); }
     float ratio = y2 / y;
-    float s = ratio > 1.0 ? 1.0 + (ratio - 1.0) * smoothstep(0.03, 0.25, y) : ratio;
+    float s = ratio;
+    if (ratio > 1.0) {
+        float q = y * 50.0;
+        float neg = max(-min(e.r, min(e.g, e.b)), 0.0);
+        s = min(ratio, (1.0 + q * q) / (1.0 + 8.0 * neg / y));
+    }
     return y2 + (e - y) * s;
 }
 
