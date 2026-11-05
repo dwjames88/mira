@@ -163,8 +163,8 @@ scripts/contact-sheet.sh     # renders build/contact-sheet.png and build/contact
 ## Tests
 
 ```sh
-swift test --package-path Packages/MiraCore   # 282 tests (MiraCore 247 + MiraUpdates 35)
-swift test --package-path Packages/MiraUI     # 119 tests (opt-in perf tests skip without MIRA_PERF=1)
+swift test --package-path Packages/MiraCore   # 380 tests (MiraCore 345 + MiraUpdates 35)
+swift test --package-path Packages/MiraUI     # 153 tests (opt-in perf tests skip without MIRA_PERF=1)
 ```
 
 MiraUI also writes headless snapshots to `build/snapshots`. The test list is in [TESTING.md](TESTING.md).
