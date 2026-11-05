@@ -27,16 +27,20 @@ public enum FinderQualityMode: String, Sendable, Equatable, Codable, CaseIterabl
     case auto, full, halfTexture, grainOff, reduced
 }
 
-/// The rungs of the ladder, best first. Each includes the savings of the ones above it.
+/// The rungs, best first. AUTO walks `automatic` (full, grain off, reduced, low frame rate);
+/// `halfTexture` is only reachable as a pinned override (it measured slightly slower than full).
 public enum FinderLevel: Int, Sendable, Comparable, CaseIterable {
     case full, halfTexture, grainOff, reduced, lowFrameRate
 
     public static func < (a: FinderLevel, b: FinderLevel) -> Bool { a.rawValue < b.rawValue }
 
+    /// The levels AUTO steps through, best first. Each includes the savings of the ones above it.
+    public static let automatic: [FinderLevel] = [.full, .grainOff, .reduced, .lowFrameRate]
+
     /// The quality for this rung. `grainLiveSetting` false (the user's FINDER: OFF) removes grain on every rung.
     public func quality(grainLiveSetting: Bool = true) -> FinderQuality {
         var q = FinderQuality(grainLive: grainLiveSetting)
-        if self >= .halfTexture { q.textureScale = 0.5 }
+        if self == .halfTexture { q.textureScale = 0.5 }
         if self >= .grainOff { q.grainLive = false }
         if self >= .reduced { q.renderScale = 0.75 }
         if self >= .lowFrameRate { q.frameRate = 24 }
@@ -110,16 +114,17 @@ public struct FallbackLadder: Sendable {
             fastSince = nil
             let since = slowSince ?? timestamp
             slowSince = since
-            if timestamp - since > Self.stepDownAfter, let next = FinderLevel(rawValue: adaptive.rawValue + 1) {
-                adaptive = next
+            if timestamp - since > Self.stepDownAfter, let i = FinderLevel.automatic.firstIndex(of: adaptive),
+               i + 1 < FinderLevel.automatic.count {
+                adaptive = FinderLevel.automatic[i + 1]
                 resetWindow()
             }
         } else if median < Self.fastThreshold {
             slowSince = nil
             let since = fastSince ?? timestamp
             fastSince = since
-            if timestamp - since >= Self.stepUpAfter, adaptive > .full {
-                adaptive = FinderLevel(rawValue: adaptive.rawValue - 1) ?? .full
+            if timestamp - since >= Self.stepUpAfter, let i = FinderLevel.automatic.firstIndex(of: adaptive), i > 0 {
+                adaptive = FinderLevel.automatic[i - 1]
                 resetWindow()
             }
         } else {

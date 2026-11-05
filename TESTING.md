@@ -229,7 +229,7 @@ Writes `build/contact-sheet.png` (every film) and `build/contact-sheet-effects.p
 
 ### Camera
 
-`MiraCameraKit` has 75 tests in `Packages/MiraCamera/Tests`: `CameraStateTests`, `CaptureSupportTests`, `ExposureTests`, `LensFormatTests`, `SaveTests`, `SettingsFinderTests` and more (retry queue, pending prints, fallback ladder). Run `swift test --package-path Packages/MiraCamera`. The device checklist is under "Camera (iPhone, device only)".
+`MiraCameraKit` has 76 tests in `Packages/MiraCamera/Tests`: `CameraStateTests`, `CaptureSupportTests`, `ExposureTests`, `LensFormatTests`, `SaveTests`, `SettingsFinderTests` and more (retry queue, pending prints, fallback ladder). Run `swift test --package-path Packages/MiraCamera`. The device checklist is under "Camera (iPhone, device only)".
 
 ## Manual checklist
 
@@ -252,7 +252,7 @@ Writes `build/contact-sheet.png` (every film) and `build/contact-sheet-effects.p
 
 The camera cannot be fully tested in the simulator. Simulator tests: `swift test --package-path Packages/MiraCamera` (pure layer), and `xcodebuild test -scheme MiraiOS -only-testing:MiraiOSTests` with `MIRA_CAMERA_FAKE=1` for the screen. Everything below needs a real iPhone.
 
-- [ ] **30 fps gate (first).** On an iPhone 16 Pro, run the finder for 10 minutes with grain LIVE. Read frame time from the Instruments "finder frame" signpost, or from the `MIRA_CAMERA_STATS=1` readout (Camera settings, ADVANCED). Record median, p95 and thermal state. Pass is 30 fps sustained. If it fails, pin the fallback that holds 30 fps (on the Mac and simulator the half-texture level alone did not save time; grain off and 0.75x did, see docs/PERFORMANCE.md) and make it the default.
+- [ ] **30 fps gate (first).** On an iPhone 16 Pro, run the finder for 10 minutes with grain LIVE. Read frame time from the Instruments "finder frame" signpost, or from the `MIRA_CAMERA_STATS=1` readout (Camera settings, ADVANCED). Record median, p95 and thermal state. Pass is 30 fps sustained. If it fails, pin the fallback that holds 30 fps (on the Mac and simulator the half-texture level alone did not save time, so AUTO skips it; grain off and 0.75x did, see docs/PERFORMANCE.md) and make it the default.
 - [ ] Capture on a ProRAW phone. Photos shows the edit, Revert to Original works, and the asset is a RAW+HEIC pair.
 - [ ] Tap the last-frame thumbnail. The editor opens on that film with the recipe. Reopen the photo from the gallery and it does the same.
 - [ ] Non-ProRAW phone: the HEIC-only path saves and opens the same way.

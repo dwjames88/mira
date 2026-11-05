@@ -126,7 +126,7 @@ iOS simulator (iOS 27.2 "iPhone Duo" type on the same Mac, so the Mac GPU throug
 Reading:
 - The full finder grade with native grain, halation and bloom fits a 33 ms (30 fps) frame with room on the Mac (9 ms) and in the simulator (18 ms). The plan's guess for an A18 Pro is 2 to 3x the Mac, about 20 to 30 ms: tight but inside the budget. Only the device can say.
 - Grain is the stage that matters: grain off saves 25 to 35 %.
-- **Half-resolution texture does not save time at finder sizes on these GPUs** (slightly slower: the reduce/enlarge passes cost about what the smaller blurs and grain save, because `softBlur` already downsamples wide blurs). It only pays together with grain off. It is built and switchable at runtime (camera settings, ADVANCED, FINDER QUALITY), and the AUTO ladder steps through it, but if the device shows the same, the ladder should go straight to grain off. Decide on the device.
+- **Half-resolution texture does not save time at finder sizes on these GPUs** (slightly slower: the reduce/enlarge passes cost about what the smaller blurs and grain save, because `softBlur` already downsamples wide blurs). It only pays together with grain off. It is built and switchable at runtime (camera settings, ADVANCED, FINDER QUALITY), but AUTO no longer steps through it (full, grain off, 0.75x, 24 fps). Confirm on the device.
 - 0.75 render scale is the strongest single step in the simulator.
 
 Reproduce:

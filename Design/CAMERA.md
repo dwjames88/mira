@@ -428,7 +428,7 @@ These are targets, to be measured with the "finder frame" signpost on a real pho
 | Finder size | the drawable: 1206 x 1809 px for a 3:2 finder on the 16 Pro (402 pt x 3) | `LivePreview` sizes to the drawable |
 | Finder rate, A18 Pro (16 Pro) | 30 fps sustained, 60 fps stretch, grain LIVE | Mac M1 Pro: 3.9-5.1 ms per 1.5 MP effects frame (`docs/PERFORMANCE.md`). At about 2.2 MP and an A18 Pro GPU **[ASSUMPTION]** 2-3x slower, that is about 15-25 ms, so within the 33 ms of 30 fps |
 | Finder rate, A17 Pro (15 Pro) | 30 fps with grain LIVE; fallback is grain OFF or 0.75x resolution | **[ASSUMPTION]** about 20 % slower than A18 Pro |
-| Fallback ladder | 1) grain FINDER OFF, 2) finder at 0.75x drawable with GPU upscale, 3) 24 fps | `systemPressureState` and a measured frame time over 30 ms for more than 1 s |
+| Fallback ladder | 1) grain FINDER OFF (half texture is manual only), 2) finder at 0.75x drawable with GPU upscale, 3) 24 fps | `systemPressureState` and a measured frame time over 30 ms for more than 1 s |
 | Meter | `latitudeReading` at 4 Hz, under 3 ms each | 256 px CPU read |
 | Cards | 8 cards at 220 px, 2 Hz, under 10 ms per batch | |
 | Shutter to "closed" blink | under 50 ms (ZSL) | `isZeroShutterLagEnabled` default |

@@ -59,8 +59,8 @@ import MiraCore
         feed(&l, ms: 35, from: 0, seconds: 0.9)
         #expect(l.level == .full)
         feed(&l, ms: 35, from: 0.9, seconds: 0.5)
-        #expect(l.level == .halfTexture)
-        #expect(l.quality.textureScale == 0.5 && l.quality.grainLive && l.quality.renderScale == 1)
+        #expect(l.level == .grainOff)
+        #expect(l.quality.textureScale == 1 && !l.quality.grainLive && l.quality.renderScale == 1)
     }
 
     @Test func walksAllTheWayDown() {
@@ -71,9 +71,10 @@ import MiraCore
             t = feed(&l, ms: 40, from: t, seconds: 0.1)
             if seen.last != l.level { seen.append(l.level) }
         }
-        #expect(seen == [.full, .halfTexture, .grainOff, .reduced, .lowFrameRate])
+        #expect(seen == [.full, .grainOff, .reduced, .lowFrameRate])
+        #expect(!seen.contains(.halfTexture))
         let q = l.quality
-        #expect(q.renderScale == 0.75 && q.textureScale == 0.5 && !q.grainLive && q.frameRate == 24)
+        #expect(q.renderScale == 0.75 && q.textureScale == 1 && !q.grainLive && q.frameRate == 24)
     }
 
     @Test func aSingleSpikeDoesNothing() {
@@ -87,13 +88,13 @@ import MiraCore
     @Test func hysteresisBeforeStepUp() {
         var l = FallbackLadder()
         var t = feed(&l, ms: 40, from: 0, seconds: 1.5)
-        #expect(l.level == .halfTexture)
+        #expect(l.level == .grainOff)
         // 25 ms is between the thresholds: stays put however long it lasts.
         t = feed(&l, ms: 25, from: t, seconds: 10)
-        #expect(l.level == .halfTexture)
+        #expect(l.level == .grainOff)
         // Fast frames: not before 5 s, then one level.
         t = feed(&l, ms: 12, from: t, seconds: 4.5)
-        #expect(l.level == .halfTexture)
+        #expect(l.level == .grainOff)
         t = feed(&l, ms: 12, from: t, seconds: 1)
         #expect(l.level == .full)
     }
@@ -125,6 +126,12 @@ import MiraCore
         #expect(l.level == .full)
         l.mode = .auto
         #expect(l.level == .lowFrameRate)
+    }
+
+    @Test func autoNeverUsesHalfTexture() {
+        #expect(!FinderLevel.automatic.contains(.halfTexture))
+        for level in [FinderLevel.grainOff, .reduced, .lowFrameRate] { #expect(level.quality().textureScale == 1) }
+        #expect(FinderLevel.halfTexture.quality().textureScale == 0.5 && FinderLevel.halfTexture.quality().grainLive)
     }
 
     @Test func grainSettingOffAppliesToEveryLevel() {

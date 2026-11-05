@@ -159,7 +159,7 @@ Where the code lives:
 
 **Privacy.** The camera asks for camera permission only. Location is opt-in and off by default. There is no microphone use and no network.
 
-**Finder quality.** If the phone runs hot or the finder falls behind, AUTO steps down a ladder: half-resolution texture, then grain off, then 0.75x, then 24 fps. You can pin a level in camera settings. See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for the Mac proxy numbers.
+**Finder quality.** If the phone runs hot or the finder falls behind, AUTO steps down a ladder: grain off, then 0.75x, then 24 fps. Half-resolution texture is not an automatic step (it measured no faster); you can pin it, or any level, in camera settings. See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for the Mac proxy numbers.
 
 ## Build and run the Mac app
 
