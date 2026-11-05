@@ -1,0 +1,33 @@
+{
+  "device": "iPhone 15 Pro",
+  "source": "derived from published equivalents, not recorded [ASSUMPTION]",
+  "descriptor": {
+    "fieldOfViewDegrees": 106.1797,
+    "constituentFieldsOfView": [
+      106.1797,
+      71.5958,
+      25.3367
+    ],
+    "switchOverZoomFactors": [
+      2,
+      6
+    ],
+    "displayZoomMultiplier": 0.5,
+    "minZoom": 1,
+    "maxZoom": 30,
+    "constituentCount": 3
+  },
+  "expectedLabels": [
+    "13",
+    "24",
+    "48",
+    "77"
+  ],
+  "expectedZoomFactors": [
+    1,
+    2,
+    4,
+    6
+  ],
+  "expectedCropIndex": 2
+}
