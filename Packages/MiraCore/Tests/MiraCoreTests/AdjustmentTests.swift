@@ -213,7 +213,7 @@ import Testing
         defer { try? FileManager.default.removeItem(at: cache) }
         let lib = try FilmLibrary(directory: FilmTests.filmsDirectory(), cacheDirectory: cache)
         lib.prewarmSync(concurrency: 4)
-        #expect(lib.memoryCacheCount == min(lib.stocks.count, FilmLibrary.memoryCacheLimit))
+        #expect(lib.memoryCacheCount == min(lib.stocks.filter { $0.proceduralID == nil }.count, FilmLibrary.memoryCacheLimit))
         // Packed films never write the disk cache.
         #expect(!FileManager.default.fileExists(atPath: cache.path))
     }

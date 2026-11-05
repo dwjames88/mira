@@ -43,6 +43,8 @@ public enum RendererError: Error, CustomStringConvertible {
 /// Pipeline 2 (film science, see `FilmCharacter` for the physics): the order follows the light.
 ///  1. Exposure with latitude (`miraFilmExposure`): a gain in linear light whose highlights roll off
 ///     like a negative's shoulder, by the film's latitude, instead of clipping.
+///     A scene-referred source (RAW with extended range) carries a headroom H > 1: the white point
+///     gain x H then maps to 1 through a shoulder with a knee at 0.6, instead of clipping at the LUT.
 ///  2. White balance (warmth / tint): the light the film is exposed to, so before the film.
 ///  3. Dodge and burn, colour mixer, curves (unchanged).
 ///  4. Halation, in the exposure and in linear light: the highlights (`miraHighlights`) are blurred
@@ -90,10 +92,14 @@ public struct Renderer: Sendable {
 
     // MARK: Graph
 
-    public func apply(_ recipe: Recipe, to source: CIImage) -> CIImage {
+    /// `sourceHeadroom` is the largest linear value the source holds (1 for SDR; a RAW developed with
+    /// extended range reports its measured peak). nil reads the headroom a developed source carries
+    /// (`CIImage.miraHeadroom`, set by `ImageSource.developedSource`), else 1.
+    public func apply(_ recipe: Recipe, to source: CIImage, sourceHeadroom: CGFloat? = nil) -> CIImage {
         // 0. Crop, rotation, flips and straighten first, so every stage below (and the
         // resolution-independent `scale`) sees the cropped output.
-        grade(recipe, cropped: CropGeometry.apply(recipe.crop, to: source), sourceSize: source.extent.size)
+        grade(recipe, cropped: CropGeometry.apply(recipe.crop, to: source), sourceSize: source.extent.size,
+              sourceHeadroom: sourceHeadroom ?? source.miraHeadroom)
     }
 
     /// Everything after the crop: film, tone, colour, halation, bloom, grain, vignette and border.
@@ -107,8 +113,13 @@ public struct Renderer: Sendable {
     ///
     /// `maskOverlay` paints the dodge and burn masks as a translucent red wash over the result (the
     /// editor's mask view); it is never part of an export.
+    ///
+    /// `sourceHeadroom` (default 1, SDR) is the largest linear value `input` holds. Above 1 the
+    /// exposure stage maps the white point (gain x headroom) to 1 through the film's shoulder
+    /// instead of clipping at the LUT (pipeline 2 only; see `miraFilmExposure`).
     public func grade(_ recipe: Recipe, cropped input: CIImage, sourceSize: CGSize? = nil,
-                      maskRegion: CGRect? = nil, maskOverlay: Bool = false) -> CIImage {
+                      maskRegion: CGRect? = nil, maskOverlay: Bool = false,
+                      sourceHeadroom: CGFloat = 1) -> CIImage {
         let extent = input.extent
         guard !extent.isInfinite, !extent.isEmpty else { return input }
         let scale = min(extent.width, extent.height) / 1000
@@ -124,14 +135,15 @@ public struct Renderer: Sendable {
         // 1. Exposure. Pipeline 2: a gain in linear light with the film's highlight latitude, then
         // white balance (the light the film is exposed to).
         if filmScience {
-            if abs(recipe.exposure) > eps || abs(push) > eps {
+            let headroom = Double(min(max(sourceHeadroom, 1), 8))
+            if abs(recipe.exposure) > eps || abs(push) > eps || headroom > 1 {
                 // Pushing develops for more density (a gain of 2^(0.33 N) before the film); slide
                 // and Kodachrome lose latitude (clip harder) when pushed.
                 var latitude = character.latitude
                 if film == nil { latitude = 0 }
                 if push > 0, family == .slide || family == .kodachrome { latitude *= max(0, 1 - 0.3 * push) }
                 image = GradeKernels.applyFilmExposure(gain: exp2(clamp(recipe.exposure, -2, 2) + 0.33 * push),
-                                                       latitude: latitude, to: image)
+                                                       latitude: latitude, headroom: headroom, to: image)
             }
             image = whiteBalance(image, recipe)
         } else if abs(recipe.exposure) > eps {
@@ -201,9 +213,13 @@ public struct Renderer: Sendable {
             }
         }
 
-        // 2b. Pipeline 2: scan profile, push / pull contrast and base fog, then B&W toning.
+        // 2b. Pipeline 2: print stock (replaces the scan), push / pull contrast and base fog, then B&W toning.
         if filmScience {
-            var scan = ScanParameters.profile(recipe.scanProfile)
+            if let paperID = ProceduralLooks.id(for: recipe.paper), let paperLUT = try? ProceduralLooks.lut(paperID) {
+                image = applyPaper(paperLUT, to: image, strength: clamp(recipe.strength, 0, 1), extent: extent)
+            }
+            // With a paper set the scan profile is ignored; push / pull contrast and base fog still apply.
+            var scan = ScanParameters.profile(recipe.paper == .none ? recipe.scanProfile : .neutral)
             scan.contrast += push * character.pushContrastPerStop
             if push > 0, let family, family == .colorNegative || family == .motionPicture || family == .blackAndWhite {
                 scan.blackLift += 0.012 * push
@@ -472,6 +488,24 @@ public struct Renderer: Sendable {
     }
 
     // MARK: Helpers
+
+    /// The Paper stage: the print look's cube (the same one the print cards use) applied in sRGB, blended
+    /// with the unprinted image by film strength.
+    private func applyPaper(_ lut: LUT, to image: CIImage, strength: Double, extent: CGRect) -> CIImage {
+        guard strength > 1e-4 else { return image }
+        let f = CIFilter.colorCubeWithColorSpace()
+        f.inputImage = image
+        f.cubeDimension = Float(lut.dimension)
+        f.cubeData = lut.data
+        f.colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
+        guard let printed = f.outputImage else { return image }
+        guard strength < 1 - 1e-4 else { return printed.cropped(to: extent) }
+        let mix = CIFilter.dissolveTransition()
+        mix.inputImage = image
+        mix.targetImage = printed
+        mix.time = Float(strength)
+        return (mix.outputImage ?? printed).cropped(to: extent)
+    }
 
     private func toGamma(_ image: CIImage) -> CIImage {
         let f = CIFilter.linearToSRGBToneCurve()

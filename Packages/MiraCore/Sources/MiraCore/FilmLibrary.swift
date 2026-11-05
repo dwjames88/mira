@@ -70,6 +70,7 @@ public final class FilmLibrary: @unchecked Sendable {
     }
 
     public func lut(for film: Film) throws -> LUT {
+        if let id = film.proceduralID { return try ProceduralLooks.lut(id) }
         lock.lock()
         if let hit = cached(film.id) { lock.unlock(); return hit }
         // One loader per film at a time, so concurrent callers don't decode the same PNG twice.

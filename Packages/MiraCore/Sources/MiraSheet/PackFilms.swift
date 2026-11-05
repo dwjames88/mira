@@ -16,8 +16,8 @@ enum PackFilms {
         for film in library.films where film.proceduralID == nil {
             guard let png = film.png else { throw PackError.noSource(film.id) }
             let (n, rgb) = try LUT.haldSamples(url: src.appendingPathComponent(png))
-            guard n <= LUT.maxHaldDimension else { throw PackError.tooLarge(film.id, n) }
-            let data = try PackedLUT.pack(dimension: n, rgb: rgb)
+            let m = PackedLUT.shippedDimension
+            let data = try PackedLUT.pack(dimension: m, rgb: n == m ? rgb : PackedLUT.resampled(rgb, from: n, to: m))
             try data.write(to: dst.appendingPathComponent(film.file), options: .atomic)
             total += data.count; count += 1
         }
@@ -29,7 +29,11 @@ enum PackFilms {
         let dir = URL(fileURLWithPath: sources, isDirectory: true).appendingPathComponent("HaldCLUT")
         let all = try FileManager.default.contentsOfDirectory(atPath: dir.path).filter { $0.hasSuffix(".png") }.sorted()
         let sample = all.enumerated().filter { $0.offset % 13 == 0 }.map(\.element)
-        let cubes = try sample.map { try LUT.haldSamples(url: dir.appendingPathComponent($0)) }
+        let cubes = try sample.map { name -> (dimension: Int, rgb: [UInt16]) in
+            let (n, rgb) = try LUT.haldSamples(url: dir.appendingPathComponent(name))
+            let m = PackedLUT.shippedDimension
+            return (m, PackedLUT.resampled(rgb, from: n, to: m))
+        }
         print("sample: \(cubes.count) of \(all.count) cubes")
         func measure(_ t: PackedLUT.Transform, _ codec: PackedLUT.Codec, _ cubes: ArraySlice<(dimension: Int, rgb: [UInt16])>) throws -> Double {
             var bytes = 0
@@ -49,36 +53,80 @@ enum PackFilms {
             fflush(stdout)
             return avg
         }
-        // Lossless best candidates (LZMA is slow to encode, so few cubes).
-        let left = PackedLUT.Transform(predictor: .left, zigzag: false, split: false)
-        _ = try measure(left, .lzma, cubes.prefix(2))
-        // Exploration (lossy, NOT shipped): drop low bits / resample, to see how much is noise.
-        for shift in [0, 2, 4, 6, 8] {
-            let q = cubes.map { c in (dimension: c.dimension, rgb: c.rgb.map { v in shift == 0 ? v : UInt16(min(65535, ((Int(v) + (1 << (shift - 1))) >> shift) << shift)) }) }
-            print("quantize low \(shift) bits:", terminator: " ")
-            _ = try measure(left, .lzfse, q[...])
-        }
-        for m in [48, 32] {
-            let q = cubes.map { c -> (dimension: Int, rgb: [UInt16]) in
-                let r = LUT(dimension: c.dimension, rgb16: c.rgb).resampled(to: m)
-                let f = r.data.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
-                var out = [UInt16](repeating: 0, count: m * m * m * 3)
-                for i in 0..<(m * m * m) { for ch in 0..<3 { out[i * 3 + ch] = UInt16((min(max(f[i * 4 + ch], 0), 1) * 65535).rounded()) } }
-                return (m, out)
+        for predictor in PackedLUT.Transform.Predictor.allCases {
+            for zigzag in [false, true] {
+                for split in [false, true] {
+                    let t = PackedLUT.Transform(predictor: predictor, zigzag: zigzag, split: split)
+                    _ = try measure(t, .lzma, cubes.prefix(4))
+                }
             }
-            print("resample \(m)^3:", terminator: " ")
-            _ = try measure(left, .lzfse, q[...])
         }
     }
 
     enum PackError: Error, CustomStringConvertible {
         case noSource(String)
-        case tooLarge(String, Int)
         var description: String {
             switch self {
             case .noSource(let id): "\(id): films.json has no \"png\" source"
-            case .tooLarge(let id, let n): "\(id): cube dimension \(n) exceeds \(LUT.maxHaldDimension)"
             }
+        }
+    }
+}
+
+/// `--pack-fidelity <FilmSources> <Films>`: error of each shipped cube against its 64^3 original (exploration/report).
+extension PackFilms {
+    static func fidelity(sources: String, films: String) throws {
+        let src = URL(fileURLWithPath: sources, isDirectory: true)
+        let dst = URL(fileURLWithPath: films, isDirectory: true)
+        let library = try FilmLibrary(directory: dst)
+        var worstMax: (Float, String) = (0, ""), worstMean: (Float, String) = (0, "")
+        var p99s: [Float] = []
+        for film in library.films where film.proceduralID == nil {
+            let orig = try LUT.loadHald(url: src.appendingPathComponent(film.png!))
+            let packed = try PackedLUT.unpack(Data(contentsOf: dst.appendingPathComponent(film.file)))
+            let up = packed.resampled(to: 64)   // trilinear at the 64^3 lattice points
+            let a = orig.data.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
+            let b = up.data.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
+            var errs: [Float] = []; errs.reserveCapacity(a.count / 4 * 3)
+            var sums = [Double](repeating: 0, count: 3)
+            for i in 0..<(a.count / 4) { for c in 0..<3 { let e = abs(a[i * 4 + c] - b[i * 4 + c]); errs.append(e); sums[c] += Double(e) } }
+            errs.sort()
+            let mx = errs.last!, mean = Float(sums.max()! / Double(a.count / 4))
+            p99s.append(errs[Int(Double(errs.count) * 0.999)])
+            if mx > worstMax.0 { worstMax = (mx, film.id) }
+            if mean > worstMean.0 { worstMean = (mean, film.id) }
+        }
+        p99s.sort()
+        print(String(format: "worst max %.2f/255 (%@), worst mean %.3f/255 (%@), median p99.9 %.2f/255, worst p99.9 %.2f/255",
+                     worstMax.0 * 255, worstMax.1, worstMean.0 * 255, worstMean.1, p99s[p99s.count / 2] * 255, p99s.last! * 255))
+    }
+}
+
+extension PackFilms {
+    /// `--pack-dims <FilmSources>`: error and LZMA size for several cube dimensions on a 20-cube sample.
+    static func dims(sources: String) throws {
+        let dir = URL(fileURLWithPath: sources, isDirectory: true).appendingPathComponent("HaldCLUT")
+        let all = try FileManager.default.contentsOfDirectory(atPath: dir.path).filter { $0.hasSuffix(".png") }.sorted()
+        let sample = all.enumerated().filter { $0.offset % 13 == 0 }.map(\.element)
+        for m in [40, 48, 56, 64] {
+            var worstMax: Float = 0, worstMean: Float = 0, bytes = 0
+            for (k, name) in sample.enumerated() {
+                let orig = try LUT.loadHald(url: dir.appendingPathComponent(name))
+                let rgb = PackedLUT.resampled(orig.data.withUnsafeBytes { raw -> [UInt16] in
+                    let f = Array(raw.bindMemory(to: Float.self))
+                    var o = [UInt16](repeating: 0, count: 64 * 64 * 64 * 3)
+                    for i in 0..<(64 * 64 * 64) { for c in 0..<3 { o[i * 3 + c] = UInt16((f[i * 4 + c] * 65535).rounded()) } }
+                    return o }, from: 64, to: m)
+                if k < 3 { bytes += try PackedLUT.pack(dimension: m, rgb: rgb).count }
+                let up = LUT(dimension: m, rgb16: rgb).resampled(to: 64)
+                let a = orig.data.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
+                let b = up.data.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
+                var mx: Float = 0; var sums = [Double](repeating: 0, count: 3)
+                for i in 0..<(a.count / 4) { for c in 0..<3 { let e = abs(a[i * 4 + c] - b[i * 4 + c]); mx = max(mx, e); sums[c] += Double(e) } }
+                worstMax = max(worstMax, mx); worstMean = max(worstMean, Float(sums.max()! / Double(a.count / 4)))
+            }
+            print(String(format: "%d^3: worst max %.2f/255, worst mean %.3f/255, LZMA avg %d KB -> ~%d MB for 260", m, worstMax * 255, worstMean * 255, bytes / 3 / 1024, bytes / 3 * 260 / 1_048_576))
+            fflush(stdout)
         }
     }
 }

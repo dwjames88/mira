@@ -15,15 +15,32 @@ public enum PackedLUTError: Error, Equatable, CustomStringConvertible {
     }
 }
 
-/// `.mlut`: a lossless, compressed 3D cube of 16-bit RGB samples (the payload of a Hald CLUT PNG).
+/// `.mlut`: a compressed 3D cube of 16-bit RGB samples. The container is lossless; the app ships each film's
+/// 64^3 Hald cube resampled to `shippedDimension`^3 (`resampled`) to keep the bundle small.
 ///
 /// Layout, little endian: `"MLUT"`, UInt16 version, UInt16 dimension, UInt8 channels (3), UInt8 transform,
 /// UInt8 codec, UInt8 reserved (0), UInt32 raw payload length; then the compressed payload.
 /// The raw payload holds the `dimension^3 * 3` UInt16 samples (red fastest, then green, then blue) after the
-/// reversible `Transform`. Decoding gives back exactly the samples `LUT.haldSamples` read from the PNG.
+/// reversible `Transform`. Decoding gives back exactly the samples that were packed.
 public enum PackedLUT {
     public static let fileExtension = "mlut"
     public static let version: UInt16 = 1
+    /// Cube dimension of the bundled films (the source Hald PNGs hold 64^3).
+    public static let shippedDimension = 48
+
+    /// Trilinear resample of interleaved 16-bit RGB samples from `n`^3 (via 64^3 when larger) to `m`^3 at lattice points (in Float),
+    /// rounded to the nearest UInt16. This is what `mira-sheet --pack-films` stores.
+    public static func resampled(_ rgb: [UInt16], from n: Int, to m: Int) -> [UInt16] {
+        // Hald images larger than 64^3 go through 64^3 first, exactly like `LUT.loadHald` (all in Float).
+        var lut = LUT(dimension: n, rgb16: rgb)
+        if n > LUT.maxHaldDimension { lut = lut.resampled(to: LUT.maxHaldDimension) }
+        let f = lut.resampled(to: m).data.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
+        var out = [UInt16](repeating: 0, count: m * m * m * 3)
+        for i in 0..<(m * m * m) {
+            for c in 0..<3 { out[i * 3 + c] = UInt16((min(max(f[i * 4 + c], 0), 1) * 65535).rounded()) }
+        }
+        return out
+    }
     static let magic: [UInt8] = Array("MLUT".utf8)
     static let headerSize = 16
 
@@ -54,8 +71,8 @@ public enum PackedLUT {
             self.init(predictor: p, zigzag: rawValue & 4 != 0, split: rawValue & 8 != 0)
         }
 
-        /// What `mira-sheet --pack-films` writes (chosen by measurement: smallest with LZMA).
-        public static let standard = Transform(predictor: .left, zigzag: false, split: false)
+        /// What `mira-sheet --pack-films` writes (chosen by measurement).
+        public static let standard = Transform(predictor: .left, zigzag: false, split: true)
     }
 
     public enum Codec: UInt8, Sendable, CaseIterable {

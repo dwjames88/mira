@@ -392,6 +392,9 @@ private struct FilmStrip: View {
                     isSelected: model.selectedStockID == film.id,
                     onHoverChange: { hover($0, film.id) }
                 ) { model.selectFilm(film.id) }
+                // The strip is lazy: a card's thumbnail is rendered while the card is on screen or near it.
+                .onAppear { model.cardAppeared(film.id) }
+                .onDisappear { model.cardDisappeared(film.id) }
             }
         }
     }

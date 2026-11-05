@@ -273,3 +273,12 @@ Film stock names are used for information only; no affiliation with or endorseme
 | polaroid-time-zero-expired-cold-minus-2 | HaldCLUT/Color/Polaroid/Polaroid Time Zero (Expired) Cold 2 --.png |
 | polaroid-time-zero-expired-cold-minus-1 | HaldCLUT/Color/Polaroid/Polaroid Time Zero (Expired) Cold 3 -.png |
 | polaroid-time-zero-expired-cold | HaldCLUT/Color/Polaroid/Polaroid Time Zero (Expired) Cold 4.png |
+
+## Mira original looks
+
+These four looks are generated in code (`ProceduralLooks`) from Mira's own parametric transforms (tone curves, hue and saturation matrices, split colour balance). They are not derived from the collection above and are not part of the CC BY-SA material; they are covered by the app's own licence, PolyForm Noncommercial 1.0.0 (see LICENSE). They are inspired by published characteristic behavior of cinema negative, cinema print film and colour paper; no affiliation with Kodak or Fujifilm.
+
+- vision3-500t (500T Tungsten)
+- vision3-250d (250D Daylight)
+- cinema-print (Cinema Print)
+- color-paper (Color Paper)

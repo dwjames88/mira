@@ -128,9 +128,10 @@ enum GradeKernels {
     // MARK: Film science stages (pipeline 2)
 
     /// Exposure gain `gain` (linear) with the film's highlight latitude.
-    static func applyFilmExposure(gain: Double, latitude: Double, to image: CIImage) -> CIImage {
+    /// `headroom` is the largest linear value the source holds (1 for SDR); see `miraFilmExposure`.
+    static func applyFilmExposure(gain: Double, latitude: Double, headroom: Double = 1, to image: CIImage) -> CIImage {
         guard let kernel = filmExposure else { return image }
-        return kernel.apply(extent: image.extent, arguments: [image, Float(gain), Float(latitude)]) ?? image
+        return kernel.apply(extent: image.extent, arguments: [image, Float(gain), Float(latitude), Float(max(headroom, 1))]) ?? image
     }
 
     /// The part of the image that halation scatters (blur this).

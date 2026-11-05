@@ -83,7 +83,7 @@ struct PerformanceModelTests {
 
     @Test func thumbnailsFollowTheCommittedCrop() async throws {
         let model = try Self.model()
-        try await HoverTests.waitFor(60) { model.thumbnails.count == model.visibleFilms.count + 1 }
+        try await HoverTests.waitFor(60) { model.thumbnailsSettled }
         let tile = try #require(model.thumbnails[EditorModel.originalTileID])
         let before = tile.size
         #expect(before.width > before.height) // 3:2 landscape

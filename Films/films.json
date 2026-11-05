@@ -3282,5 +3282,53 @@
     "source": "HaldCLUT/Color/Polaroid/Polaroid Time Zero (Expired) Cold 4.png",
     "parent": "polaroid-time-zero-expired",
     "variant": "Cold"
+  },
+  {
+    "id": "vision3-500t",
+    "displayName": "500T Tungsten",
+    "brand": "Mira",
+    "family": "motionPicture",
+    "iso": 500,
+    "description": "Mira original inspired by tungsten cinema negative: soft contrast, teal shadows, warm highlights. Balanced for tungsten, so daylight runs cool until you warm it.",
+    "file": "procedural:vision3-500t",
+    "source": null,
+    "character": {
+      "grainStrength": 1.0,
+      "grainSize": 0.0005
+    }
+  },
+  {
+    "id": "vision3-250d",
+    "displayName": "250D Daylight",
+    "brand": "Mira",
+    "family": "motionPicture",
+    "iso": 250,
+    "description": "Mira original inspired by daylight cinema negative: neutral balance, a touch more contrast, fine grain.",
+    "file": "procedural:vision3-250d",
+    "source": null,
+    "character": {
+      "grainStrength": 0.62,
+      "grainSize": 0.00038
+    }
+  },
+  {
+    "id": "cinema-print",
+    "displayName": "Cinema Print",
+    "brand": "Mira",
+    "family": "print",
+    "iso": 0,
+    "description": "Mira original inspired by cinema print film: deep contrast, dense cool blacks, rich hue-stable color.",
+    "file": "procedural:cinema-print",
+    "source": null
+  },
+  {
+    "id": "color-paper",
+    "displayName": "Color Paper",
+    "brand": "Mira",
+    "family": "print",
+    "iso": 0,
+    "description": "Mira original inspired by color photographic paper: clean whites, moderate contrast, gentle warmth.",
+    "file": "procedural:color-paper",
+    "source": null
   }
 ]
