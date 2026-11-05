@@ -149,6 +149,6 @@ public final class ThumbnailDiskCache: @unchecked Sendable {
     /// Total size of the cached files, in bytes.
     public var totalBytes: Int {
         let urls = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.fileSizeKey])) ?? []
-        return urls.filter { $0.pathExtension == "jpg" }.reduce(0) { $0 + ((try? $1.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0) ?? 0 }
+        return urls.filter { $0.pathExtension == "jpg" }.reduce(0) { $0 + ((try? $1.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0) }
     }
 }

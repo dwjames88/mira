@@ -113,4 +113,28 @@ import Testing
         #expect(diff > plain.rgba.count)   // clearly different from the ungraded image
         #expect((0..<3).allSatisfy { mean(graded.channel($0)) > 0.05 && mean(graded.channel($0)) < 0.95 })
     }
+
+    /// Every one of the bundled packed cubes decodes to a well-formed cube: an accepted dimension, exactly
+    /// dimension^3 RGBA texels, every value finite and inside 0...1, opaque alpha, and a black corner that
+    /// is darker than the white corner (a corrupt or mis-ordered cube fails here, not in front of a photo).
+    @Test func everyBundledCubeDecodesToAWellFormedCube() throws {
+        let lib = try FilmLibrary(directory: FilmTests.filmsDirectory())
+        let files = Set(lib.films.filter { $0.proceduralID == nil }.map(\.file))
+        try #require(files.count > 200)
+        for file in files.sorted() {
+            let data = try Data(contentsOf: lib.directory.appendingPathComponent(file))
+            let lut = try PackedLUT.unpack(data)
+            let n = lut.dimension
+            #expect(PackedLUT.candidateDimensions.contains(n), "\(file): dimension \(n)")
+            #expect(lut.data.count == n * n * n * 4 * MemoryLayout<Float>.size, "\(file): size")
+            let values = lut.data.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
+            #expect(values.allSatisfy { $0.isFinite && $0 >= -0.001 && $0 <= 1.001 }, "\(file): out-of-range or non-finite texel")
+            func luma(_ r: Int, _ g: Int, _ b: Int) -> Float {
+                let i = ((b * n + g) * n + r) * 4
+                return 0.2126 * values[i] + 0.7152 * values[i + 1] + 0.0722 * values[i + 2]
+            }
+            #expect(luma(0, 0, 0) < luma(n - 1, n - 1, n - 1), "\(file): black is not darker than white")
+            #expect(values[3] == 1 && values[values.count - 1] == 1, "\(file): alpha")
+        }
+    }
 }

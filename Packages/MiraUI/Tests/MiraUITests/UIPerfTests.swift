@@ -114,24 +114,31 @@ struct UIPerfTests {
         host.displayIfNeeded()
         #expect(await Self.waitUntil { model.isPreviewIdle })
         for _ in 0..<3 { host.layoutSubtreeIfNeeded() }
-        var ui: [Double] = []
-        var cards = 0, strips = 0
-        let n = 60
-        for i in 0..<n {
-            let c0 = PerfCounters.filmCard, s0 = PerfCounters.filmStrip
-            let t = ContinuousClock.now
-            model.recipe.contrast = Double(i % 20) / 40
-            host.layoutSubtreeIfNeeded()
-            host.displayIfNeeded()
-            let dt = Self.ms(t)
-            cards += PerfCounters.filmCard - c0; strips += PerfCounters.filmStrip - s0
-            ui.append(dt)
-            // Let the render finish between ticks so renders do not pollute the next measurement.
-            _ = await Self.waitUntil { model.isPreviewIdle }
-            host.layoutSubtreeIfNeeded()
+        // The slider lives on DEVELOP, but the editor opens on FILMS: measure the tick on both tabs.
+        for tab in [EditorTab.develop, EditorTab.films] {
+            model.selectTab(tab)
+            #expect(await Self.waitUntil { model.isPreviewIdle })
+            for _ in 0..<3 { host.layoutSubtreeIfNeeded() }
+            var ui: [Double] = []
+            var cards = 0, strips = 0
+            let n = 60
+            for i in 0..<n {
+                let c0 = PerfCounters.filmCard, s0 = PerfCounters.filmStrip
+                let t = ContinuousClock.now
+                model.recipe.contrast = Double(i % 20) / 40
+                host.layoutSubtreeIfNeeded()
+                host.displayIfNeeded()
+                let dt = Self.ms(t)
+                cards += PerfCounters.filmCard - c0; strips += PerfCounters.filmStrip - s0
+                ui.append(dt)
+                // Let the render finish between ticks so renders do not pollute the next measurement.
+                _ = await Self.waitUntil { model.isPreviewIdle }
+                host.layoutSubtreeIfNeeded()
+            }
+            let name = tab == .develop ? "DEVELOP tab" : "FILMS tab"
+            Self.line("SwiftUI per slider tick, \(name) (mutate + layout + display)", String(format: "median %6.2f ms  p95 %6.2f ms", Self.median(ui), Self.p95(ui)))
+            Self.line("film strip body evaluations per tick, \(name)", String(format: "%.2f strip, %.1f cards", Double(strips) / Double(n), Double(cards) / Double(n)))
         }
-        Self.line("SwiftUI per slider tick (mutate + layout + display)", String(format: "median %6.2f ms  p95 %6.2f ms", Self.median(ui), Self.p95(ui)))
-        Self.line("film strip body evaluations per tick", String(format: "%.2f strip, %.1f cards", Double(strips) / Double(n), Double(cards) / Double(n)))
 
         // Thumbnails arriving one by one: SwiftUI cost of the whole batch.
         // The film strip refilling after a crop: thumbnails arrive one at a time.
@@ -152,5 +159,46 @@ struct UIPerfTests {
         try? Self.report.write(to: dir.appendingPathComponent("perf-ui.txt"), atomically: true, encoding: .utf8)
         model.cancelWork()
         window.contentView = nil
+    }
+
+    /// Slider-to-frame latency on a RAW file (the iPhone XS DNG fixture): the develop sliders re-render
+    /// the graded frame from the cached developed source, a RAW slider re-develops it. Skipped without the fixture.
+    @Test func rawSliderLatency() async throws {
+        let dng = SnapshotTests.root.appendingPathComponent("Fixtures/raw/iphone-xs.dng")
+        try #require(FileManager.default.fileExists(atPath: dng.path), "Fixtures/raw/iphone-xs.dng is not present")
+        let library = try FilmLibrary(directory: SnapshotTests.root.appendingPathComponent("Films"))
+        library.prewarmSync()
+        let model = EditorModel(library: library)
+        #expect(model.loadSource(url: dng))
+        model.setCanvas(pixels: CGSize(width: 1500, height: 1000))
+        #expect(await Self.waitUntil { model.isRawSource && model.isSourceFull && model.previewImage != nil && model.isPreviewIdle })
+        #expect(await Self.waitUntil { model.rawSession.refinedKey != nil })
+        model.recipe = Recipe(filmID: "fuji-velvia-50", grainAmount: 0.4, halationAmount: 0.3)
+        #expect(await Self.waitUntil { model.isPreviewIdle })
+        Self.report = ""
+        Self.line("mira UI perf, RAW", "iphone-xs.dng, canvas 1500x1000")
+        var develop: [Double] = []
+        for i in 0..<40 {
+            let before = model.publishedFrames
+            let t0 = ContinuousClock.now
+            model.recipe.exposure = -1 + 2 * Double(i) / 39
+            #expect(await Self.waitUntil { model.publishedFrames > before })
+            if i >= 5 { develop.append(Self.ms(t0)) }
+        }
+        Self.line("RAW: exposure slider -> published frame", String(format: "median %6.1f ms  p95 %6.1f ms", Self.median(develop), Self.p95(develop)))
+        var raw: [Double] = []
+        for i in 0..<12 {
+            let before = model.publishedFrames
+            let t0 = ContinuousClock.now
+            model.recipe.raw.temperature = 4500 + 150 * Double(i)
+            #expect(await Self.waitUntil(60) { model.publishedFrames > before && model.isPreviewIdle
+                && model.rawSession.refinedKey == RawDevelopKey(model.recipe) })
+            raw.append(Self.ms(t0))
+        }
+        Self.line("RAW: white balance slider -> settled frame", String(format: "median %6.1f ms  p95 %6.1f ms", Self.median(raw), Self.p95(raw)))
+        let dir = SnapshotTests.root.appendingPathComponent("build", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try? Self.report.write(to: dir.appendingPathComponent("perf-ui-raw.txt"), atomically: true, encoding: .utf8)
+        model.cancelWork()
     }
 }
