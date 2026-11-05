@@ -21,7 +21,7 @@ final class LivePreview {
         device = dev
         if let dev, let queue = dev.makeCommandQueue() {
             commandQueue = queue
-            ciContext = CIContext(mtlCommandQueue: queue, options: [.cacheIntermediates: true])
+            ciContext = Renderer.makeContext(commandQueue: queue)
         } else {
             commandQueue = nil
             ciContext = Renderer.sharedContext
@@ -47,20 +47,9 @@ final class LivePreview {
         let sourceLongest = max(source.extent.width, source.extent.height)
         let wanted = min(sourceLongest, max(drawable, drawable * max(zoom, 1)).rounded(.up))
         if proxy != nil, wanted <= proxyLongSide * 1.25 { return }
-        // Materialise once so per-frame work is grading only, not a Lanczos over the full source.
-        let scaled = renderer.previewImage(from: source, maxPixelSize: wanted)
-        let extent = scaled.extent
-        if wanted >= sourceLongest {
-            proxy = source
-        } else if let cg = ciContext.createCGImage(scaled, from: extent, format: .RGBA8, colorSpace: colorSpace) {
-            // A bitmap-backed image has no properties: carry the source's EXIF exposure time and headroom over
-            // so the reciprocity and exposure stages see them on the proxy too.
-            proxy = CIImage(cgImage: cg, options: [.colorSpace: colorSpace])
-                .withMiraExposureTime(source.miraExposureTime)
-                .withMiraHeadroom(source.miraHeadroom)
-        } else {
-            proxy = scaled
-        }
+        // Materialise once so per-frame work is grading only, not a Lanczos over the full source. The proxy keeps
+        // the source's range (half-float, extended linear) and its headroom tag: see `PreviewProxy`.
+        proxy = PreviewProxy.make(from: source, renderer: renderer, context: ciContext, wanted: wanted)
         proxyLongSide = wanted
     }
 
