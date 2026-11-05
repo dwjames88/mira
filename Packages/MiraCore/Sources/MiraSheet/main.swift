@@ -26,6 +26,8 @@ struct Options {
     var bench = false
     var benchDir = "build/bench"
     var fixture = "Fixtures/sample.jpg"
+    var packFilms: (String, String)?
+    var packBench: String?
 }
 
 func parseArguments() -> Options {
@@ -54,6 +56,8 @@ func parseArguments() -> Options {
         case "--bench": o.bench = true
         case "--bench-dir": o.benchDir = next(flag)
         case "--fixture": o.fixture = next(flag)
+        case "--pack-films": let a = next(flag); o.packFilms = (a, next(flag))
+        case "--pack-bench": o.packBench = next(flag)
         default: fail("unknown argument \(flag)")
         }
     }
@@ -88,6 +92,12 @@ func timeLUTs(filmsPath: String) -> Never {
         try? FileManager.default.removeItem(at: parCache)
         exit(0)
     } catch { fail("time-luts failed: \(error)") }
+}
+if let (sources, films) = opts.packFilms {
+    do { try PackFilms.run(sources: sources, films: films); exit(0) } catch { fail("pack-films failed: \(error)") }
+}
+if let sources = opts.packBench {
+    do { try PackFilms.bench(sources: sources); exit(0) } catch { fail("pack-bench failed: \(error)") }
 }
 if opts.timeLUTs {
     guard let p = opts.films else { fail("--time-luts needs --films <dir>") }

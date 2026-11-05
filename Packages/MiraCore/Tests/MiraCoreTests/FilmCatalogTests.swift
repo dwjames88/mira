@@ -14,9 +14,20 @@ import Testing
         let films = try Self.library().films
         #expect(Set(films.map(\.id)).count == films.count, "duplicate ids")
         #expect(Set(films.map(\.file)).count == films.count, "two films share a file")
-        for f in films {
+        for f in films where f.proceduralID == nil {
+            #expect(f.file == "Packed/\(f.id).mlut", "\(f.id): unexpected file \(f.file)")
             #expect(FileManager.default.fileExists(atPath: Self.dir.appendingPathComponent(f.file).path), "\(f.id): missing \(f.file)")
         }
+    }
+
+    @Test func bundledFilmsFolderHasNoPNGs() throws {
+        let en = try #require(FileManager.default.enumerator(atPath: Self.dir.path))
+        let all = en.compactMap { $0 as? String }
+        #expect(!all.isEmpty)
+        #expect(!all.contains { $0.lowercased().hasSuffix(".png") }, "PNGs would be bundled into the app")
+        let packed = all.filter { $0.hasSuffix(".mlut") }
+        #expect(Set(packed) == Set(try Self.library().films.filter { $0.proceduralID == nil }.map(\.file)),
+                "Packed/ must hold exactly one .mlut per non-procedural film")
     }
 
     @Test func parentsAndVariantLabels() throws {
@@ -52,30 +63,53 @@ import Testing
         #expect(rows.count == films.count, "attribution has rows for films that don't exist")
     }
 
-    @Test func everyHaldFileIsReferencedOnceAndValid() throws {
-        let films = try Self.library().films
-        let hald = Self.dir.appendingPathComponent("HaldCLUT", isDirectory: true)
+    static let sources = Self.dir.deletingLastPathComponent().appendingPathComponent("FilmSources", isDirectory: true)
+
+    @Test func everySourcePNGIsReferencedOnceAndValid() throws {
+        let films = try Self.library().films.filter { $0.proceduralID == nil }
+        let hald = Self.sources.appendingPathComponent("HaldCLUT", isDirectory: true)
         let onDisk = try FileManager.default.contentsOfDirectory(atPath: hald.path).filter { !$0.hasPrefix(".") }
-        let referenced = films.map { ($0.file as NSString).lastPathComponent }
+        let referenced = try films.map { try #require($0.png) }.map { ($0 as NSString).lastPathComponent }
         #expect(Set(referenced).count == referenced.count)
         #expect(Set(onDisk) == Set(referenced), "unreferenced or missing files: \(Set(onDisk).symmetricDifference(referenced).sorted())")
+        #expect(films.allSatisfy { $0.png == "HaldCLUT/\($0.id).png" })
 
         // Header check for every file (cheap): square, side a perfect cube (Hald level L, side L^3).
         for f in films {
-            let url = Self.dir.appendingPathComponent(f.file)
+            let url = Self.sources.appendingPathComponent(try #require(f.png))
             let props = CGImageSourceCreateWithURL(url as CFURL, nil)
                 .flatMap { CGImageSourceCopyPropertiesAtIndex($0, 0, nil) as? [CFString: Any] }
             let w = props?[kCGImagePropertyPixelWidth] as? Int ?? 0
             let h = props?[kCGImagePropertyPixelHeight] as? Int ?? 0
             #expect(w == h && (2...32).contains { $0 * $0 * $0 == w }, "\(f.id): \(w)x\(h) is not a Hald CLUT")
         }
-        // Full decode of a sample (every 25th film): the cube has 4 Float32 channels per texel.
-        for f in films.enumerated().filter({ $0.offset % 25 == 0 }).map(\.element) {
-            let lut = try LUT.loadHald(url: Self.dir.appendingPathComponent(f.file))
-            #expect(lut.dimension >= 2 && lut.dimension <= LUT.maxHaldDimension, "\(f.id): dimension \(lut.dimension)")
-            #expect(lut.data.count == lut.dimension * lut.dimension * lut.dimension * 16)
-        }
     }
+
+    @Test func proceduralEntriesNeedNoFiles() {
+        let procedural = Film(id: "p", displayName: "P", brand: "T", family: .slide, iso: 100, description: "",
+                              file: "procedural:vision3-500t")
+        #expect(procedural.proceduralID == "vision3-500t")
+        #expect(procedural.png == nil)
+    }
+
+    /// Every packed cube decodes to exactly what `LUT.loadHald` reads from its PNG.
+    @Test func packedCubesEqualTheirPNGs() throws {
+        let films = try Self.library().films.filter { $0.proceduralID == nil }
+        var full = 0
+        for (i, f) in films.enumerated() {
+            let data = try Data(contentsOf: Self.dir.appendingPathComponent(f.file))
+            let (n, rgb) = try PackedLUT.unpackSamples(data)   // header + payload for all
+            #expect(n == 64 && rgb.count == 64 * 64 * 64 * 3, "\(f.id)")
+            if i % Self.fullCompareStride == 0 {
+                let packed = try PackedLUT.unpack(data)
+                let png = try LUT.loadHald(url: Self.sources.appendingPathComponent(try #require(f.png)))
+                #expect(packed.dimension == png.dimension && packed.data == png.data, "\(f.id): packed cube differs from its PNG")
+                full += 1
+            }
+        }
+        #expect(full > 0)
+    }
+    static let fullCompareStride = 1
 
     // MARK: stock / variant grouping
 

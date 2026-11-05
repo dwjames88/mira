@@ -7,7 +7,7 @@ Related pages named in the README: http://rawpedia.rawtherapee.com/Film_Simulati
 
 **Licence:** Creative Commons Attribution-ShareAlike. The archive README states "CC BY-SA 4.0" (https://creativecommons.org/licenses/by-sa/4.0/). The collection is also commonly cited as CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/); the version the archive itself declares is 4.0, which is what applies here. See LICENSE-LUTS.
 
-The PNG files in HaldCLUT/ are redistributed **unmodified**, byte for byte, only renamed. Derivative works of the LUTs must be shared under the same licence.
+The original PNG files are kept **unmodified**, byte for byte, only renamed, in `FilmSources/HaldCLUT/` of the source repository. The app does not bundle the PNGs: it ships each PNG's 16-bit samples losslessly repacked into `Packed/<id>.mlut` (byte-for-byte reproducible from the PNG with `mira-sheet --pack-films FilmSources Films`; decoding gives back exactly the samples of the PNG). The packed files are the same work under the same CC BY-SA 4.0 licence, and derivative works of the LUTs must be shared under the same licence.
 
 Film stock names are used for information only; no affiliation with or endorsement by the trademark owners (from the archive README disclaimer).
 
