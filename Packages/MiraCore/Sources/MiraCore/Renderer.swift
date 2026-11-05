@@ -172,7 +172,7 @@ public struct Renderer: Sendable {
 
         // 1c. Pipeline 2 halation: in the exposure, before the film, in linear light.
         if filmScience {
-            var amount = recipe.halationAmount * 2 * character.halationStrength * 0.35
+            var amount = recipe.halationAmount * 2 * character.halationStrength * 0.5
             var haloCharacter = character
             if character.remJet {
                 // Rem-jet backing absorbs most halation; with it removed the film bleeds red.
@@ -183,7 +183,7 @@ public struct Renderer: Sendable {
                     amount *= 0.15
                 }
             }
-            amount = clamp(amount, 0, 0.7)
+            amount = clamp(amount, 0, 0.9)
             if amount > 1e-4 {
                 image = filmHalation(image, extent: extent, amount: amount, character: haloCharacter,
                                      radiusSlider: clamp(recipe.halationRadius, 0, 1), diagonal: diagonal)
@@ -194,12 +194,10 @@ public struct Renderer: Sendable {
         if let film, let lut = try? library.lut(for: film) {
             let strength = clamp(recipe.strength, 0, 1)
             if strength > eps {
-                let f = CIFilter.colorCubeWithColorSpace()
-                f.inputImage = image
-                f.cubeDimension = Float(lut.dimension)
-                f.cubeData = lut.data
-                f.colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
-                if let graded = f.outputImage {
+                let graded = filmScience
+                    ? (GradeKernels.applyLUT3D(lut, cacheKey: "film:\(film.id)", to: image) ?? legacyCube(lut, image))
+                    : legacyCube(lut, image)
+                if let graded {
                     if strength < 1 - eps {
                         let mix = CIFilter.dissolveTransition()
                         mix.inputImage = image
@@ -216,7 +214,7 @@ public struct Renderer: Sendable {
         // 2b. Pipeline 2: print stock (replaces the scan), push / pull contrast and base fog, then B&W toning.
         if filmScience {
             if let paperID = ProceduralLooks.id(for: recipe.paper), let paperLUT = try? ProceduralLooks.lut(paperID) {
-                image = applyPaper(paperLUT, to: image, strength: clamp(recipe.strength, 0, 1), extent: extent)
+                image = applyPaper(paperLUT, id: paperID, to: image, strength: clamp(recipe.strength, 0, 1), extent: extent)
             }
             // With a paper set the scan profile is ignored; push / pull contrast and base fog still apply.
             var scan = ScanParameters.profile(recipe.paper == .none ? recipe.scanProfile : .neutral)
@@ -363,11 +361,23 @@ public struct Renderer: Sendable {
     }
 
     /// Pipeline 2 halation: blur the highlights at the film's radius, take them out of the image and put
-    /// the same luminance back as a tinted glow (energy conserving).
+    /// a (nearly) equal luminance back as a tinted glow. The glow is two Gaussians, 0.65 at sigma and 0.35 at
+    /// sigma / 3: the tight one makes the fringe hug the edge of the light, the wide one is the soft tail.
+    /// The source loses only `halationCompensation` of the scattered light (see `miraHalationCombine`).
     private func filmHalation(_ image: CIImage, extent: CGRect, amount: Double, character: FilmCharacter,
                               radiusSlider: Double, diagonal: CGFloat) -> CIImage {
         let sigma = character.halationRadius * diagonal * exp2((radiusSlider - 0.5) * 2)
-        let blurred = Self.softBlur(GradeKernels.halationHighlights(of: image), extent: extent, sigma: sigma)
+        let h = GradeKernels.halationHighlights(of: image)
+        let wide = Self.softBlur(h, extent: extent, sigma: sigma)
+        let tight = Self.softBlur(h, extent: extent, sigma: sigma / 3)
+        let mix = CIFilter.additionCompositing()
+        mix.inputImage = tight.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": CIVector(x: 0.35, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: 0.35, z: 0, w: 0),
+            "inputBVector": CIVector(x: 0, y: 0, z: 0.35, w: 0), "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)])
+        mix.backgroundImage = wide.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": CIVector(x: 0.65, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: 0.65, z: 0, w: 0),
+            "inputBVector": CIVector(x: 0, y: 0, z: 0.65, w: 0), "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)])
+        let blurred = (mix.outputImage ?? wide).cropped(to: extent)
         return GradeKernels.applyHalation(amount: amount, tint: character.halationTint, to: image, blurred: blurred)
             .cropped(to: extent)
     }
@@ -489,16 +499,24 @@ public struct Renderer: Sendable {
 
     // MARK: Helpers
 
-    /// The Paper stage: the print look's cube (the same one the print cards use) applied in sRGB, blended
-    /// with the unprinted image by film strength.
-    private func applyPaper(_ lut: LUT, to image: CIImage, strength: Double, extent: CGRect) -> CIImage {
-        guard strength > 1e-4 else { return image }
+    /// Pipeline 1's lookup: `CIColorCubeWithColorSpace` in sRGB (output quantised to about 8 bits; kept so
+    /// saved legacy edits render exactly as before).
+    private func legacyCube(_ lut: LUT, _ image: CIImage) -> CIImage? {
         let f = CIFilter.colorCubeWithColorSpace()
         f.inputImage = image
         f.cubeDimension = Float(lut.dimension)
         f.cubeData = lut.data
         f.colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
-        guard let printed = f.outputImage else { return image }
+        return f.outputImage
+    }
+
+    /// The Paper stage: the print look's cube (the same one the print cards use) applied in sRGB, blended
+    /// with the unprinted image by film strength.
+    private func applyPaper(_ lut: LUT, id: String, to image: CIImage, strength: Double, extent: CGRect) -> CIImage {
+        guard strength > 1e-4 else { return image }
+        // Pipeline 2 only: the float kernel (see `miraLUT3D`).
+        guard let printed = GradeKernels.applyLUT3D(lut, cacheKey: "paper:\(id)", to: image)
+                ?? legacyCube(lut, image) else { return image }
         guard strength < 1 - 1e-4 else { return printed.cropped(to: extent) }
         let mix = CIFilter.dissolveTransition()
         mix.inputImage = image
