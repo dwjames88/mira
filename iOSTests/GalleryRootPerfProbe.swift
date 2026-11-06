@@ -76,8 +76,8 @@ final class GalleryRootPerfProbe: XCTestCase {
         var ids: [String] = []
         for section in gallery.sections {
             let nodes = SidebarModel.visible(section.nodes).filter { !$0.isFolder }
-            ids += nodes.prefix(section.id == "library" ? 3 : 8).map(\.id)
-            if ids.count >= 11 { break }
+            ids += nodes.prefix(section.id == "library" ? 3 : 2).map(\.id)
+            if ids.count >= 5 { break }
         }
         return ids
     }
@@ -195,6 +195,15 @@ final class GalleryRootPerfProbe: XCTestCase {
                 let t = CACurrentMediaTime(); let v = work(); return (v, (CACurrentMediaTime() - t) * 1000)
             }
             var out: [(String, Double)] = []
+            // The first-screen structure the iPhone builds now (collection lists + three library counts), and the
+            // background pass that counts media types / utilities. loadAll below is the old all-at-once path (still the Mac's).
+            out.append(("structure", time {
+                SidebarLoader.structure(filter: LibraryFilter()) { SidebarLoader.fetchAssets(nodeID: $0).count }
+            }.1))
+            let smart = SidebarLoader.smartNodes()
+            out.append(("secondary_counts", time {
+                (smart.media + smart.utilities).map { SidebarLoader.fetchAssets(nodeID: $0.id).count }
+            }.1))
             out.append(("loadAll_with_entries", time { SidebarLoader.loadAll() }.1))
             let (sectionsOnly, ms) = time { SidebarLoader.loadAll(withAlbumEntries: false) }
             out.append(("loadAll_sections", ms))
@@ -203,7 +212,7 @@ final class GalleryRootPerfProbe: XCTestCase {
             let (tree, treeMs) = time { SidebarLoader.userCollections(in: nil) }
             out.append(("user_album_counts", treeMs))
             out.append(("capabilities", time { SidebarLoader.albumEntries(from: tree) }.1))
-            out.append(("other_sections", max(0, ms - treeMs - out[2].1 - out[3].1)))
+            out.append(("other_sections", max(0, ms - treeMs - out[4].1 - out[5].1)))
             _ = sectionsOnly
             return out
         }.value

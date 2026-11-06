@@ -53,6 +53,12 @@ public protocol CollectionNodeSource: Sendable {
     var children: [any CollectionNodeSource] { get }
     /// Number of pictures in an album; ignored for folders.
     var assetCount: Int { get }
+    /// False when the count was not fetched (the node then has no count until one is supplied).
+    var assetCountKnown: Bool { get }
+}
+
+extension CollectionNodeSource {
+    public var assetCountKnown: Bool { true }
 }
 
 /// Pure sidebar construction and lookup, kept free of PhotoKit so it can be unit tested.
@@ -67,7 +73,8 @@ public enum SidebarModel {
                 guard !children.isEmpty else { continue }
                 nodes.append(SidebarNode(id: source.identifier, title: source.title, kind: .folder, children: children))
             } else {
-                nodes.append(SidebarNode(id: source.identifier, title: source.title, kind: .album, count: source.assetCount))
+                nodes.append(SidebarNode(id: source.identifier, title: source.title, kind: .album,
+                                         count: source.assetCountKnown ? source.assetCount : nil))
             }
         }
         return nodes
@@ -92,6 +99,16 @@ public enum SidebarModel {
             SidebarSection(id: "utilities", title: "Utilities", nodes: visible(utilities)),
         ]
         return all.filter { !$0.nodes.isEmpty }
+    }
+
+    /// What the library scope leaves in the sidebar: PERSONAL has no shared albums; SHARED keeps the LIBRARY
+    /// section (the shared-album pictures) and the SHARED ALBUMS section only; ALL keeps everything.
+    public static func applying(scope: LibraryFilter.Scope, to sections: [SidebarSection]) -> [SidebarSection] {
+        switch scope {
+        case .all: sections
+        case .myLibrary: sections.filter { $0.id != "shared" }
+        case .shared: sections.filter { $0.id == "library" || $0.id == "shared" }
+        }
     }
 
     // MARK: Lookup

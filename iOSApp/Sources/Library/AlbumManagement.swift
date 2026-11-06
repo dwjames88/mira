@@ -138,22 +138,32 @@ extension View {
         modifier(AlbumToolsModifier(tools: tools))
     }
 
-    /// Long-press RENAME / DELETE ALBUM on a user-album tile. `known` is the capability set the album list
-    /// already loaded off the main actor; without it (an album that list does not cover) PhotoKit is asked.
-    /// `contextMenu` runs its closure with every body pass, so the fallback is the only PhotoKit read here.
-    func albumContextMenu(node: SidebarNode, tools: AlbumToolsModel, limited: Bool,
-                          known: AlbumCapabilities? = nil) -> some View {
+    /// Long-press RENAME / DELETE ALBUM on a user-album tile. What the album allows is asked of PhotoKit when the
+    /// menu opens (the album list no longer loads it for every album up front).
+    func albumContextMenu(node: SidebarNode, tools: AlbumToolsModel, limited: Bool) -> some View {
         contextMenu {
-            if node.kind == .album, LibraryActionAvailability.canManageAlbums(limitedAccess: limited),
-               let caps = known ?? LibraryActions.albumCapabilities(id: node.id) {
-                if caps.canRename {
-                    Button { tools.rename(id: node.id, title: node.title) } label: { Label("RENAME", systemImage: "pencil") }
-                }
-                if caps.canDelete {
-                    Button(role: .destructive) {
-                        tools.deleteRequest = AlbumDeleteRequest(id: node.id, title: node.title)
-                    } label: { Label("DELETE ALBUM", systemImage: "trash") }
-                }
+            // The menu's views are built only when it opens, so the PhotoKit lookup happens then, not with every
+            // body pass of the tile (`contextMenu` runs this closure each time).
+            AlbumMenuItems(node: node, tools: tools, limited: limited)
+        }
+    }
+}
+
+private struct AlbumMenuItems: View {
+    let node: SidebarNode
+    let tools: AlbumToolsModel
+    let limited: Bool
+
+    var body: some View {
+        if node.kind == .album, LibraryActionAvailability.canManageAlbums(limitedAccess: limited),
+           let caps = LibraryActions.albumCapabilities(id: node.id) {
+            if caps.canRename {
+                Button { tools.rename(id: node.id, title: node.title) } label: { Label("RENAME", systemImage: "pencil") }
+            }
+            if caps.canDelete {
+                Button(role: .destructive) {
+                    tools.deleteRequest = AlbumDeleteRequest(id: node.id, title: node.title)
+                } label: { Label("DELETE ALBUM", systemImage: "trash") }
             }
         }
     }

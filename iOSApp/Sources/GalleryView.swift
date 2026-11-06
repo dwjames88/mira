@@ -118,8 +118,11 @@ struct GalleryView: View {
             } else if gallery.sections.isEmpty {
                 VStack(spacing: 0) {
                     DevelopCard(gallery: gallery)
+                    LibraryScopeHeader(gallery: gallery)
+                        .padding(.horizontal, FieldFramesTheme.cells(2)).padding(.top, FieldFramesTheme.cells(1))
                     FFEmptyState(title: "No photos", subtitle: gallery.status == .limited
-                                 ? "NO PHOTOS IN YOUR SELECTION" : "YOUR LIBRARY HAS NO PICTURES")
+                                 ? "NO PHOTOS IN YOUR SELECTION" : gallery.scope == .shared
+                                 ? "NO SHARED ALBUM PHOTOS" : "YOUR LIBRARY HAS NO PICTURES")
                 }
             } else {
                 AlbumListView(gallery: gallery, sections: gallery.sections)
@@ -155,7 +158,7 @@ private struct AlbumListView: View {
                     DevelopCard(gallery: gallery)
                     ForEach(sections) { section in
                         sectionHeader(section.title, id: section.id)
-                        let nodes = SidebarModel.visible(section.nodes)
+                        let nodes = visibleNodes(section)
                         switch section.id {
                         case "library": library(nodes, side: side, width: geo.size.width - margin * 2)
                         case "media", "utilities": rows(nodes)
@@ -169,14 +172,28 @@ private struct AlbumListView: View {
         .albumTools(albumTools)
     }
 
+    /// Nodes known to be empty are left out. The Library node stays under SHARED so the view can say so.
+    private func visibleNodes(_ section: SidebarSection) -> [SidebarNode] {
+        let shown = gallery.visible(section.nodes)
+        if section.id == "library", gallery.scope == .shared, !shown.contains(where: { $0.kind == .library }),
+           let library = section.nodes.first(where: { $0.kind == .library }) {
+            return [library] + shown
+        }
+        return shown
+    }
+
     private func sectionHeader(_ title: String, id: String = "") -> some View {
         VStack(alignment: .leading, spacing: FieldFramesTheme.cells(1)) {
+            if id == "library" {
+                LibraryScopeHeader(gallery: gallery, title: title)
+            } else {
             HStack {
                 Text(title.uppercased()).ffLabel(size: 10, color: FieldFramesTheme.paperMid)
                 Spacer(minLength: 0)
                 if id == "albums", LibraryActionAvailability.canManageAlbums(limitedAccess: gallery.status == .limited) {
                     NewAlbumButton { albumTools.newAlbum(existingTitles: AlbumToolsModel.albumTitles(in: sections)) }
                 }
+            }
             }
             FFHairline()
         }
@@ -207,8 +224,7 @@ private struct AlbumListView: View {
                     CoverTile(gallery: gallery, node: node, size: CGSize(width: side, height: side), titleSize: 17)
                 }
                 .buttonStyle(.plain)
-                .albumContextMenu(node: node, tools: albumTools, limited: gallery.status == .limited,
-                                  known: gallery.albumCapabilities[node.id])
+                .albumContextMenu(node: node, tools: albumTools, limited: gallery.status == .limited)
             }
         }
         .padding(.horizontal, padded ? margin : 0)
@@ -231,16 +247,29 @@ private func route(_ node: SidebarNode) -> AlbumRoute {
 /// The id whose pictures best represent a node: itself for an album, the first non-empty child for a folder.
 private func coverNodeID(_ node: SidebarNode) -> String? {
     guard node.isFolder else { return node.id }
-    for child in SidebarModel.visible(node.children) { if let id = coverNodeID(child) { return id } }
+    for child in node.children { if let id = coverNodeID(child) { return id } }
     return nil
 }
 
-private func subtitle(_ node: SidebarNode) -> String {
-    if node.isFolder {
-        let n = SidebarModel.visible(node.children).count
-        return "\(n) \(n == 1 ? "ITEM" : "ITEMS")"
+/// The mono line under a tile: a folder's item count, or the album's picture count once it has been fetched.
+/// A separate view so a count arriving re-evaluates this label, not the list.
+private struct CountLabel: View {
+    let gallery: GalleryModel
+    let node: SidebarNode
+    var size: CGFloat = 9
+
+    var body: some View {
+        Text(text).ffLabel(size: size, color: FieldFramesTheme.paperDim)
+            .task { if !node.isFolder, node.count == nil { await gallery.ensureCount(node.id) } }
     }
-    return node.count.map { "\($0)" } ?? ""
+
+    private var text: String {
+        if node.isFolder {
+            let n = gallery.visible(node.children).count
+            return "\(n) \(n == 1 ? "ITEM" : "ITEMS")"
+        }
+        return gallery.count(of: node).map { "\($0)" } ?? ""
+    }
 }
 
 /// Square (or wide) cover with a 1pt hairline, a Cormorant title and a mono count beneath.
@@ -263,7 +292,7 @@ private struct CoverTile: View {
                 }
                 .overlay(Rectangle().strokeBorder(FieldFramesTheme.hair, lineWidth: 1))
             Text(node.title).font(FieldFramesTheme.display(titleSize, weight: .regular)).lineLimit(1)
-            Text(subtitle(node)).ffLabel(size: 9, color: FieldFramesTheme.paperDim)
+            CountLabel(gallery: gallery, node: node)
         }
         .frame(width: size.width, alignment: .leading)
         .contentShape(Rectangle())
@@ -301,12 +330,16 @@ private struct CoverImage: View {
         // A request left over from the previous cover of this tile must not land after the new one.
         if let id = requestID { gallery.covers.manager.cancelImageRequest(id); requestID = nil }
         guard let nodeID else { image = nil; return }
+        // Counted (and watched for changes) once; the cover follows this node's own version from then on.
+        await gallery.ensureCount(nodeID)
+        guard !Task.isCancelled else { return }
         let store = gallery.covers
+        let filter = gallery.filter
         let pixels = CGSize(width: size.width * displayScale, height: size.height * displayScale)
         let key = store.key(nodeID, pixels)
         let hit = store.image(for: key)
         if let hit { image = hit }
-        let found = await Task.detached(priority: .userInitiated) { GalleryKit.coverAsset(nodeID: nodeID) }.value
+        let found = await Task.detached(priority: .userInitiated) { GalleryKit.coverAsset(nodeID: nodeID, filter: filter) }.value
         guard !Task.isCancelled else { return }
         guard let found else {
             // The album is empty or gone: drop a cover that no longer exists.
@@ -342,7 +375,7 @@ private struct NodeRow: View {
                     .overlay(Rectangle().strokeBorder(FieldFramesTheme.hair, lineWidth: 1))
                 Text(node.title).font(FieldFramesTheme.display(18, weight: .regular)).lineLimit(1)
                 Spacer(minLength: 0)
-                Text(subtitle(node)).ffLabel(size: 10, color: FieldFramesTheme.paperDim)
+                CountLabel(gallery: gallery, node: node, size: 10)
                 Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(FieldFramesTheme.paperDim)
             }
@@ -364,7 +397,7 @@ private struct FolderListView: View {
     var body: some View {
         ZStack {
             FFGroundBackground(grain: 0.07).ignoresSafeArea()
-            let children = SidebarModel.visible(SidebarModel.node(withID: folderID, in: gallery.sections)?.children ?? [])
+            let children = gallery.visible(SidebarModel.node(withID: folderID, in: gallery.sections)?.children ?? [])
             if children.isEmpty {
                 FFEmptyState(title: "Empty folder", subtitle: "NO ALBUMS IN THIS FOLDER")
             } else {
@@ -570,4 +603,42 @@ struct CameraLabel: View {
 
 struct ImportLabel: View {
     var body: some View { Text("IMPORT").ffLabel(size: 11, color: FieldFramesTheme.paperDim) }
+}
+
+/// The LIBRARY section header with the scope control on its trailing edge: PERSONAL (no shared albums), SHARED (shared
+/// albums only) or ALL. PhotoKit cannot tell iCloud Shared Library pictures from personal ones, so the hints say only
+/// what the control really does.
+private struct LibraryScopeHeader: View {
+    @Bindable var gallery: GalleryModel
+    var title = "Library"
+
+    var body: some View {
+        HStack(spacing: FieldFramesTheme.cells(1)) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title.uppercased()).ffLabel(size: 10, color: FieldFramesTheme.paperMid)
+                if let hint = LibraryScopeCopy.hint(for: gallery.scope) {
+                    Text(hint).ffLabel(size: 9, color: FieldFramesTheme.paperDim).lineLimit(1)
+                }
+            }
+            Spacer(minLength: 0)
+            FFTabBar(LibraryScopeCopy.options, selection: $gallery.scope, spacing: FieldFramesTheme.cells(2), height: 44)
+                .accessibilityIdentifier("library.scope")
+                .accessibilityLabel("Library scope")
+        }
+        .padding(.horizontal, 0)
+    }
+}
+
+enum LibraryScopeCopy {
+    static let options: [(value: LibraryFilter.Scope, title: String)] = [
+        (.myLibrary, "PERSONAL"), (.shared, "SHARED"), (.all, "ALL"),
+    ]
+
+    static func hint(for scope: LibraryFilter.Scope) -> String? {
+        switch scope {
+        case .all: nil
+        case .myLibrary: "WITHOUT SHARED ALBUMS"
+        case .shared: "SHARED ALBUMS ONLY"
+        }
+    }
 }

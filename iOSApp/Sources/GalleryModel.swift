@@ -41,7 +41,7 @@ enum GalleryKit {
 
     /// Cover for a sidebar node: the user album's key asset when it has one, else its most recent picture.
     /// Runs off the main actor.
-    nonisolated static func coverAsset(nodeID id: String) -> Unchecked<PHAsset>? {
+    nonisolated static func coverAsset(nodeID id: String, filter: LibraryFilter = LibraryFilter()) -> Unchecked<PHAsset>? {
         coverLookupCounter.withLock { $0 += 1 }
         let isUserAlbum = !(id == "all" || id == "fav" || id == "recent" || id.hasPrefix("smart:"))
         if isUserAlbum,
@@ -50,16 +50,18 @@ enum GalleryKit {
            key.mediaType == .image {
             return Unchecked(value: key)
         }
-        let result = SidebarLoader.fetchAssets(nodeID: id)
+        let result = SidebarLoader.fetchAssets(nodeID: id, filter: filter, limit: 1)
         guard let first = result.firstObject else { return nil }
         return Unchecked(value: first)
     }
 
     /// Identifiers of the library's RAW smart album, or nil when this device has none (then the
     /// filter falls back to per-asset resource lookups). Runs off the main actor.
-    nonisolated static func rawAlbumIdentifiers() -> Set<String>? {
+    nonisolated static func rawAlbumIdentifiers(scope: LibraryFilter.Scope = .all) -> Set<String>? {
         guard let album = SidebarLoader.smartCollection(PHAssetCollectionSubtype.smartAlbumRAW.rawValue) else { return nil }
-        let result = PHAsset.fetchAssets(in: album, options: nil)
+        let options = PHFetchOptions()
+        SidebarLoader.apply(scope: scope, to: options)
+        let result = PHAsset.fetchAssets(in: album, options: options)
         var ids = Set<String>()
         ids.reserveCapacity(result.count)
         for i in 0..<result.count { ids.insert(result.object(at: i).localIdentifier) }
@@ -104,15 +106,39 @@ enum GalleryKit {
 @MainActor @Observable
 final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
     private(set) var status: PHAuthorizationStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+    /// The sidebar structure for the current scope. Counts of user albums, shared albums, media types and utilities
+    /// are not in it: they arrive in `counts` as the tiles ask for them.
     private(set) var sections: [SidebarSection] = []
     private(set) var loadedSections = false
-    /// What each user album allows (rename, delete), loaded with the sections off the main actor.
-    private(set) var albumCapabilities: [String: AlbumCapabilities] = [:]
+    /// Library scope (PERSONAL / SHARED / ALL), persisted. Changing it reloads the sections and every cache.
+    var scope: LibraryFilter.Scope {
+        didSet {
+            guard scope != oldValue else { return }
+            LibraryScopeStore.save(scope, to: defaults)
+            scopeChanged()
+        }
+    }
+    /// Picture counts by node id, filled on demand off the main actor and kept current from library changes.
+    private(set) var counts: [String: Int] = [:]
+    /// Nodes known to hold no pictures (hidden from the lists).
+    private(set) var emptyIDs: Set<String> = []
+    /// Bumps when the scope changes: every cover is stale then.
+    private(set) var scopeEpoch = 0
+    /// Queued Develop photos that are in the current scope (nil: not looked up, or the scope is ALL).
+    private(set) var developInScope: Set<String>?
+    @ObservationIgnored let defaults: UserDefaults
+    @ObservationIgnored let tracker: LibraryTracker
+    @ObservationIgnored private var secondaryTask: Task<Void, Never>?
+    var filter: LibraryFilter {
+        var f = LibraryFilter()
+        f.scope = scope
+        return f
+    }
     /// Bumps when pictures were added, removed or reordered library-wide (covers are stale then).
     /// Pure content edits do not bump it; they reach the open album as per-asset versions.
     private(set) var revision = 0
-    /// Bumps on every library change. Album membership can change without the library's picture list
-    /// changing (a picture added to an album), so covers re-check their asset on each change.
+    /// Bumps on every library change (selection chrome re-reads flags on it). Covers do not use it: they
+    /// follow `coverVersions`, which only the albums that really changed bump.
     private(set) var changeCount = 0
     /// Per-album cover refreshes: an album whose membership changed gets a new cover.
     private(set) var coverVersions: [String: Int] = [:]
@@ -140,8 +166,75 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
 
     var hasAccess: Bool { status == .authorized || status == .limited }
 
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        let saved = LibraryScopeStore.load(from: defaults)
+        scope = saved
+        tracker = LibraryTracker(scope: saved)
+        super.init()
+    }
+
     /// The picture count of a node when it is known (nil: not loaded yet, or a folder).
-    func count(for nodeID: String) -> Int? { SidebarModel.node(withID: nodeID, in: sections)?.count }
+    func count(for nodeID: String) -> Int? {
+        counts[nodeID] ?? SidebarModel.node(withID: nodeID, in: sections)?.count
+    }
+
+    /// The count of a node already in hand (no tree walk).
+    func count(of node: SidebarNode) -> Int? { counts[node.id] ?? node.count }
+
+    /// Entries the lists show: nodes known to be empty are left out (Photos' own rule).
+    func visible(_ nodes: [SidebarNode]) -> [SidebarNode] {
+        // Reads `emptyIDs` (which changes only when a count of zero turns up), never `counts`: the list that calls
+        // this must not re-evaluate for every count that arrives.
+        nodes.filter { !emptyIDs.contains($0.id) && ($0.count ?? 1) > 0 }
+    }
+
+    /// Fetches a node's count off the main actor unless it is known, and keeps it current. Tiles call this from
+    /// `.task`, so a tile scrolled away before its turn is cancelled and never fetched.
+    func ensureCount(_ nodeID: String) async {
+        if counts[nodeID] != nil { return }
+        let tracker = tracker
+        let generation = tracker.currentGeneration
+        let found = await GalleryKit.detached(priority: .userInitiated) { () -> Int? in
+            if Task.isCancelled { return nil }
+            return tracker.count(nodeID: nodeID)
+        }
+        guard let found, !Task.isCancelled, generation == tracker.currentGeneration else { return }
+        publish(counts: [nodeID: found])
+    }
+
+    func publish(counts new: [String: Int]) {
+        var merged = counts
+        var empty = emptyIDs
+        var changed = false
+        for (id, value) in new where merged[id] != value {
+            merged[id] = value
+            changed = true
+            if value == 0 { empty.insert(id) } else { empty.remove(id) }
+        }
+        guard changed else { return }
+        counts = merged
+        if empty != emptyIDs { emptyIDs = empty }
+    }
+
+    private func scopeChanged() {
+        scopeEpoch += 1
+        tracker.reset(scope: scope)
+        counts = [:]
+        emptyIDs = []
+        developInScope = nil
+        covers.removeAll()
+        rawClassification = nil
+        rawCandidates = nil
+        sections = []
+        loadedSections = false
+        secondaryTask?.cancel()
+        guard hasAccess else { return }
+        Task {
+            await reloadSections()
+            for album in openAlbums.allObjects { await album.reload(rawOnly: album.rawOnly, gallery: self) }
+        }
+    }
 
     /// Picture count of the whole library ("all" node), once sections are loaded.
     var libraryCount: Int? { SidebarModel.node(withID: "all", in: sections)?.count }
@@ -159,9 +252,10 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
 
     deinit { PHPhotoLibrary.shared().unregisterChangeObserver(self) }
 
-    /// `SidebarLoader` is `nonisolated`; run it off the main actor and hop back with Sendable values.
-    /// Requests that arrive while a load is running (a burst of library changes) share it: one more pass
-    /// runs after it, so the sections always reflect the last change and loads never finish out of order.
+    /// Builds the section structure from collection lists only (no per-album counts), off the main actor, so the
+    /// first screen does not wait for the library to be counted. Media-type and utility counts follow in a
+    /// background pass. Requests that arrive while a load is running (a burst of library changes) share it: one
+    /// more pass runs after it, so the sections always reflect the last change and loads never finish out of order.
     func reloadSections() async {
         if let running = sectionsTask {
             sectionsPending = true
@@ -172,12 +266,28 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
             repeat {
                 guard let self else { return }
                 self.sectionsPending = false
-                let loaded = await Task.detached(priority: .userInitiated) { SidebarLoader.loadAll() }.value
-                // An unchanged tree is not re-published (the album list would re-evaluate for nothing).
-                if loaded.sections != self.sections { self.sections = loaded.sections }
-                let capabilities = Dictionary(loaded.albums.map { ($0.id, $0.capabilities) }, uniquingKeysWith: { first, _ in first })
-                if capabilities != self.albumCapabilities { self.albumCapabilities = capabilities }
-                self.loadedSections = true
+                let tracker = self.tracker
+                let generation = tracker.currentGeneration
+                let filter = self.filter
+                let loaded = await Task.detached(priority: .userInitiated) {
+                    () -> (sections: [SidebarSection], watched: [Unchecked<AnyObject>], counts: [String: Int]) in
+                    var counts: [String: Int] = [:]
+                    let built = SidebarLoader.structure(filter: filter) { id in
+                        let n = tracker.count(nodeID: id) ?? 0
+                        counts[id] = n
+                        return n
+                    }
+                    return (built.sections, built.watched, counts)
+                }.value
+                if generation == tracker.currentGeneration {
+                    tracker.watch(structure: loaded.watched, generation: generation)
+                    let scoped = SidebarModel.applying(scope: self.scope, to: loaded.sections)
+                    // An unchanged tree is not re-published (the album list would re-evaluate for nothing).
+                    if scoped != self.sections { self.sections = scoped }
+                    self.publish(counts: loaded.counts)
+                    self.loadedSections = true
+                    self.countSecondaryNodes()
+                }
             } while self?.sectionsPending == true
             self?.sectionsTask = nil
         }
@@ -185,26 +295,53 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
         await task.value
     }
 
+    /// Counts the Media Types and Utilities nodes in the background, right after the first paint (a dozen small
+    /// fetches), so rows that turn out empty leave the list before they are reached.
+    private func countSecondaryNodes() {
+        let ids = sections.filter { $0.id == "media" || $0.id == "utilities" }
+            .flatMap(\.nodes).map(\.id).filter { counts[$0] == nil }
+        guard !ids.isEmpty else { return }
+        secondaryTask?.cancel()
+        let tracker = tracker
+        let generation = tracker.currentGeneration
+        secondaryTask = Task { [weak self] in
+            let found = await GalleryKit.detached(priority: .utility) { () -> [String: Int] in
+                var out: [String: Int] = [:]
+                for id in ids {
+                    if Task.isCancelled { break }
+                    if let n = tracker.count(nodeID: id) { out[id] = n }
+                }
+                return out
+            }
+            guard let self, !Task.isCancelled, generation == tracker.currentGeneration else { return }
+            self.publish(counts: found)
+        }
+    }
+
     nonisolated func photoLibraryDidChange(_ changeInstance: PHChange) {
         let (dropped, membershipChanged) = rawChanges.inspect(changeInstance)
         let boxed = Unchecked(value: changeInstance)
+        // Applied here, on Photos' own queue and in delivery order: held results move forward one change at a time.
+        let outcome = tracker.process(changeInstance)
         Task.detached(priority: .utility) {
             if let dropped { await RAWScanStore.shared.invalidate(ids: dropped) } else { await RAWScanStore.shared.clearAll() }
         }
         DispatchQueue.main.async { [weak self] in
             MainActor.assumeIsolated {
                 guard let self else { return }
+                let before = self.status
                 self.status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
                 self.changeCount += 1
                 if self.hasAccess {
                     if membershipChanged {
                         self.revision += 1
-                        self.covers.removeAll()
                         self.rawClassification = nil
                         self.rawCandidates = nil
                     }
                     for album in self.openAlbums.allObjects { album.apply(boxed.value, gallery: self) }
-                    Task { await self.reloadSections() }
+                    for id in outcome.changedCounts.keys { self.invalidateCover(nodeID: id) }
+                    self.publish(counts: outcome.changedCounts)
+                    if outcome.structureChanged || before != self.status { Task { await self.reloadSections() } }
                 } else {
                     self.sections = []
                 }
@@ -256,8 +393,10 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
         coverVersions[nodeID, default: 0] += 1
     }
 
+    /// Changes when this node's cover may be a different picture. Only the albums a change touched move
+    /// (`coverVersions`), plus the scope; a library change elsewhere leaves every other tile alone.
     func coverToken(for nodeID: String?) -> String {
-        "\(revision).\(changeCount).\(nodeID.flatMap { coverVersions[$0] } ?? 0)"
+        "\(scopeEpoch).\(nodeID.flatMap { coverVersions[$0] } ?? 0)"
     }
 
     func presentLimitedPicker() {
@@ -358,8 +497,9 @@ final class AlbumModel {
 
     func reload(rawOnly: Bool, gallery: GalleryModel) async {
         let id = nodeID
+        let filter = gallery.filter
         let box = await Task.detached(priority: .userInitiated) {
-            Unchecked(value: SidebarLoader.fetchAssets(nodeID: id))
+            Unchecked(value: SidebarLoader.fetchAssets(nodeID: id, filter: filter))
         }.value
         self.gallery = gallery
         gallery.openAlbums.add(self)
@@ -401,7 +541,8 @@ final class AlbumModel {
             // Hidden and Recently Deleted pictures are not in the RAW smart album: those two are scanned.
             if GalleryKit.excludedFromRAWAlbum(nodeID: self.nodeID) { classification = RAWClassification(authoritative: false) }
             else if classification == nil {
-                let album = await GalleryKit.detached(priority: .userInitiated) { GalleryKit.rawAlbumIdentifiers() }
+                let scope = gallery.scope
+                let album = await GalleryKit.detached(priority: .userInitiated) { GalleryKit.rawAlbumIdentifiers(scope: scope) }
                 classification = album.map { RAWClassification(rawIDs: $0) } ?? RAWClassification(authoritative: false)
                 if album != nil { gallery.rawClassification = classification }
             }
@@ -572,11 +713,49 @@ final class CoverStore {
 }
 
 extension DevelopStore {
-    /// Of these identifiers, the ones Photos still has. Runs off the main actor.
+    /// Of these identifiers, the ones Photos still has, whatever their source (user library, shared albums, synced)
+    /// and hidden or not: the library scope never decides whether a queued photo exists. Runs off the main actor.
     nonisolated static func existingIdentifiers(among ids: [String]) -> Set<String> {
-        let result = PHAsset.fetchAssets(withLocalIdentifiers: ids, options: nil)
+        let result = PHAsset.fetchAssets(withLocalIdentifiers: ids, options: allSourcesOptions())
         var found = Set<String>()
         result.enumerateObjects { asset, _, _ in found.insert(asset.localIdentifier) }
         return found
+    }
+}
+
+extension DevelopStore {
+    /// Every source, hidden included: for lookups that ask "does this photo exist".
+    nonisolated static func allSourcesOptions() -> PHFetchOptions {
+        let o = PHFetchOptions()
+        o.includeHiddenAssets = true
+        o.includeAssetSourceTypes = [.typeUserLibrary, .typeCloudShared, .typeiTunesSynced]
+        return o
+    }
+
+    /// Of these identifiers, the ones the scope shows (by each picture's own source). Runs off the main actor.
+    nonisolated static func identifiers(among ids: [String], inScope scope: LibraryFilter.Scope) -> Set<String> {
+        let result = PHAsset.fetchAssets(withLocalIdentifiers: ids, options: allSourcesOptions())
+        let wanted = SidebarLoader.sourceTypes(for: scope)
+        var found = Set<String>()
+        result.enumerateObjects { asset, _, _ in
+            if wanted == nil || !asset.sourceType.isDisjoint(with: wanted!) { found.insert(asset.localIdentifier) }
+        }
+        return found
+    }
+}
+
+extension GalleryModel {
+    /// The queued entries the current scope shows (all of them under ALL, or until the lookup has answered).
+    func developEntries(_ queue: DevelopQueue) -> [DevelopQueue.Entry] {
+        DevelopScopeFilter.visible(queue.entries, scope: scope, inScope: developInScope)
+    }
+
+    /// Looks up which queued photos are in the scope, off the main actor. Not run under ALL.
+    func refreshDevelopScope(ids: [String]) async {
+        guard scope != .all, !ids.isEmpty else { developInScope = nil; return }
+        let scope = self.scope
+        let found = await GalleryKit.detached(priority: .utility) { DevelopStore.identifiers(among: ids, inScope: scope) }
+        guard !Task.isCancelled, scope == self.scope else { return }
+        developInScope = found
     }
 }
