@@ -749,7 +749,7 @@ window shown to all ready; scroll = scripted 12,000 pt at 2,400 pt/s through the
 |---|---|---|---|
 | first sections published (blank screen until then) | 2722 ms | 248 ms | -91 % |
 | all first-screen counts + covers ready | 2787 ms | 336 ms | -88 % |
-| open: main-thread max frame | 73.6 ms | 141.6 ms | worse (see below) |
+| open: main-thread max frame | 73.6 ms | 141.6 ms (after count batching: 122.3 ms, runs 122 / 67 / 125) | worse (see below) |
 | open: main-thread p95 frame | 16.7 ms | 37.3 ms | worse, few frames (about 20) |
 | open: frames > 50 ms | 2 | 1 | |
 | album-list scroll: p50 / p95 frame | 16.7 / 16.7 ms | 16.7 / 16.7 ms | same |
@@ -784,7 +784,12 @@ every visible cover tile look its cover up again.
 **Open frame.** The max frame while the screen opens went from 74 to about 140 ms. Before, the screen was blank for the
 whole 2.7 s, so the first frame that draws content (the album list with its tiles' first tasks) happened late and the
 stall was the same kind of event. Now it happens 250 ms in, and the same event is the 140 ms frame. It did not get
-cheaper; it got earlier. Reducing it (cheaper first layout of the list) was left for later.
+cheaper; it got earlier. A follow-up (fix/lib3-openhitch) tested whether count publishes were the cause: a trace of
+frame times against the model's events showed the long frame is the window appearing (about 50 ms) plus the album list's
+first layout (about 60 ms) landing in one display frame, and the count flushes inside it take under 1 ms. Batching
+count arrivals (one publish per ~24 ms) and observing each count on its own (`CountBox`) removes the avoidable
+re-evaluations (fewer on scroll and change) but moves the open max only inside run-to-run noise (20 to 185 ms across
+runs on a loaded machine); the max frame stays a first-layout cost. Reducing it (cheaper first layout of the list) was left for later.
 
 **What each fix was.**
 - First screen from a cheap pass: `SidebarLoader.structure` builds LIBRARY (three counts, about 12 ms), ALBUMS and
