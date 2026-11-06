@@ -156,6 +156,22 @@ struct MetadataStoreTests {
         #expect(again.metadata(for: "b")?.filename == "b.jpg")
     }
 
+    @Test func concurrentPutsAndCompactionsLoseNoLine() throws {
+        let url = tempFile()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let store = MetadataStore(fileURL: url)
+        // Appends seek to the end and then write: unserialised, two writers overwrite each other's lines.
+        DispatchQueue.concurrentPerform(iterations: 8) { lane in
+            for i in 0..<40 {
+                store.put([AssetMetadata(id: "l\(lane)-\(i)", filename: "f")])
+                if i % 13 == 0 { store.compact() }
+            }
+        }
+        #expect(store.count == 320)
+        let again = MetadataStore(fileURL: url)
+        #expect(again.load() == 320, "every appended entry reached the file")
+    }
+
     @Test func modificationDateChangeInvalidatesTheEntry() {
         let store = MetadataStore(fileURL: nil)
         #expect(store.needsIndex(id: "a", modificationDate: t0), "unknown asset")
