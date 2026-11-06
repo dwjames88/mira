@@ -186,7 +186,7 @@ Check by hand after a change to the editor chrome:
 Dodge & burn adds `DodgeBurnModelTests`, `DodgeBurnMaskTests`, `DodgeBurnRenderTests` (MiraCore, 28) and `DodgeBurnUITests` (MiraUI, 12, writing `dodgeburn-*.png` snapshots), plus the opt-in `DodgeBurnPerf`.
 
 ```sh
-swift test --no-parallel --package-path Packages/MiraCore   # 511 MiraCore tests, then 44 MiraUpdates tests
+swift test --no-parallel --package-path Packages/MiraCore   # 518 MiraCore tests, then 44 MiraUpdates tests
 swift test --no-parallel --package-path Packages/MiraUI     # 184 tests
 swift test --package-path Packages/MiraCamera               # 89 tests
 ```
