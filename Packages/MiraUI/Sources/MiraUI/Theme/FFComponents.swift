@@ -221,10 +221,12 @@ public struct FFTabBar<Value: Hashable>: View {
     private let options: [(value: Value, title: String)]
     @Binding private var selection: Value
     private let spacing: CGFloat
+    private let height: CGFloat
 
     public init(_ options: [(value: Value, title: String)], selection: Binding<Value>,
-                spacing: CGFloat = FieldFramesTheme.cells(3)) {
+                spacing: CGFloat = FieldFramesTheme.cells(3), height: CGFloat = FieldFramesTheme.rows(2)) {
         self.spacing = spacing
+        self.height = height
         self.options = options
         self._selection = selection
     }
@@ -237,7 +239,7 @@ public struct FFTabBar<Value: Hashable>: View {
                     Text(options[i].title)
                         .ffLabel(color: selected ? T.paper : T.paperDim, weight: selected ? .medium : .regular)
                         .lineLimit(1)
-                        .frame(height: T.rows(2))
+                        .frame(height: height)
                         .overlay(alignment: .bottom) {
                             Rectangle().fill(selected ? T.lichen : Color.clear).frame(height: 1)
                         }

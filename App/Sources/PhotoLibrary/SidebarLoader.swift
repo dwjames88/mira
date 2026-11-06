@@ -10,6 +10,8 @@ struct CollectionSnapshot: CollectionNodeSource {
     let isFolder: Bool
     let children: [any CollectionNodeSource]
     let assetCount: Int
+    /// False when the count was left out (the iPhone fetches album counts on demand).
+    var assetCountKnown = true
 }
 
 /// Builds the sidebar sections from PhotoKit. Everything here is `nonisolated` and uses no closures
@@ -31,8 +33,31 @@ enum SidebarLoader {
         options.predicate = NSPredicate(format: format, PHAssetMediaType.image.rawValue)
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         options.includeHiddenAssets = includeHidden
-        if filter.scope == .myLibrary { options.includeAssetSourceTypes = [.typeUserLibrary] }
+        apply(scope: filter.scope, to: options)
         return options
+    }
+
+    /// `PHAssetSourceType` for the scope. The Mac leaves ALL at PhotoKit's default (as it always did);
+    /// the iPhone spells out the user library plus shared albums.
+    nonisolated static func sourceTypes(for scope: LibraryFilter.Scope) -> PHAssetSourceType? {
+        #if os(iOS)
+        let ios = true
+        #else
+        let ios = false
+        #endif
+        guard let kinds = LibraryFilter.sourceKinds(for: scope, iOS: ios) else { return nil }
+        var types: PHAssetSourceType = []
+        for kind in kinds {
+            switch kind {
+            case .userLibrary: types.insert(.typeUserLibrary)
+            case .cloudShared: types.insert(.typeCloudShared)
+            }
+        }
+        return types
+    }
+
+    nonisolated static func apply(scope: LibraryFilter.Scope, to options: PHFetchOptions) {
+        if let types = sourceTypes(for: scope) { options.includeAssetSourceTypes = types }
     }
 
     nonisolated static func favoriteOptions() -> PHFetchOptions {
@@ -87,6 +112,91 @@ enum SidebarLoader {
         guard let collection = smartCollection(raw) else { return nil }
         return SidebarNode(id: smartID(raw), title: title, kind: .smart(raw),
                            count: imageCount(in: collection, includeHidden: includeHidden))
+    }
+
+    /// The iPhone's first screen: the section structure from collection lists only. Library counts come from
+    /// `libraryCount` (three cheap fetches); user albums and shared albums carry no count (the tiles ask for theirs);
+    /// media types and utilities list the smart albums that exist, also without counts (a background pass counts them).
+    /// Returns the fetch results the caller watches for structural changes.
+    nonisolated static func structure(
+        filter: LibraryFilter, libraryCount: (String) -> Int
+    ) -> (sections: [SidebarSection], watched: [Unchecked<AnyObject>]) {
+        var watched: [Unchecked<AnyObject>] = []
+        var library = [
+            SidebarNode(id: "all", title: "Library", kind: .library, count: libraryCount("all")),
+            SidebarNode(id: "fav", title: "Favorites", kind: .favorites, count: libraryCount("fav")),
+        ]
+        if smartCollection(PHAssetCollectionSubtype.smartAlbumRecentlyAdded.rawValue) != nil {
+            library.append(SidebarNode(id: "recent", title: "Recently Saved", kind: .recents, count: libraryCount("recent")))
+        }
+        func lightCollections(in list: PHCollectionList?) -> [CollectionSnapshot] {
+            let result: PHFetchResult<PHCollection> = list.map { PHCollection.fetchCollections(in: $0, options: nil) }
+                ?? PHCollectionList.fetchTopLevelUserCollections(with: nil)
+            watched.append(Unchecked(value: result))
+            var snapshots: [CollectionSnapshot] = []
+            for index in 0..<result.count {
+                let collection = result.object(at: index)
+                let title = collection.localizedTitle ?? "Untitled"
+                if let folder = collection as? PHCollectionList {
+                    snapshots.append(CollectionSnapshot(title: title, identifier: folder.localIdentifier, isFolder: true,
+                                                        children: lightCollections(in: folder), assetCount: 0))
+                } else if let album = collection as? PHAssetCollection {
+                    // An estimate of zero is trusted (as `imageCount` does); anything else is counted when the tile shows.
+                    let empty = album.estimatedAssetCount == 0
+                    snapshots.append(CollectionSnapshot(title: title, identifier: album.localIdentifier, isFolder: false,
+                                                        children: [], assetCount: 0, assetCountKnown: empty))
+                }
+            }
+            return snapshots
+        }
+        let albums = SidebarModel.albumNodes(from: lightCollections(in: nil))
+
+        var shared: [SidebarNode] = []
+        let sharedResult = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .albumCloudShared, options: nil)
+        watched.append(Unchecked(value: sharedResult))
+        for index in 0..<sharedResult.count {
+            let album = sharedResult.object(at: index)
+            shared.append(SidebarNode(id: album.localIdentifier, title: album.localizedTitle ?? "Untitled", kind: .album,
+                                      count: album.estimatedAssetCount == 0 ? 0 : nil))
+        }
+        let (media, utilities) = smartNodes()
+        let sections = SidebarModel.sections(library: library, albums: albums, shared: shared,
+                                             mediaTypes: media, utilities: utilities)
+        return (sections, watched)
+    }
+
+    /// The Media Types and Utilities nodes whose smart albums exist on this device, without counts.
+    nonisolated static func smartNodes() -> (media: [SidebarNode], utilities: [SidebarNode]) {
+        let mediaTypes: [(PHAssetCollectionSubtype, String)] = [
+            (.smartAlbumVideos, "Videos"), (.smartAlbumSelfPortraits, "Selfies"),
+            (.smartAlbumLivePhotos, "Live Photos"), (.smartAlbumDepthEffect, "Portrait"),
+            (.smartAlbumPanoramas, "Panoramas"), (.smartAlbumTimelapses, "Time-lapse"),
+            (.smartAlbumSlomoVideos, "Slo-mo"), (.smartAlbumBursts, "Bursts"),
+            (.smartAlbumScreenshots, "Screenshots"), (.smartAlbumScreenRecordings, "Screen Recordings"),
+            (.smartAlbumRAW, "RAW"), (.smartAlbumAnimated, "Animated"),
+        ]
+        let media = mediaTypes.compactMap { subtype, title -> SidebarNode? in
+            smartCollection(subtype.rawValue) == nil ? nil
+                : SidebarNode(id: smartID(subtype.rawValue), title: title, kind: .smart(subtype.rawValue))
+        }
+        var utilities: [SidebarNode] = []
+        let generic = PHAssetCollection.fetchAssetCollections(with: .smartAlbum, subtype: .smartAlbumGeneric, options: nil)
+        for index in 0..<generic.count {
+            let collection = generic.object(at: index)
+            if collection.localizedTitle?.caseInsensitiveCompare("Imports") == .orderedSame {
+                utilities.append(SidebarNode(id: collection.localIdentifier, title: "Imports", kind: .album))
+                break
+            }
+        }
+        if utilities.isEmpty,
+           let imported = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .albumImported, options: nil).firstObject {
+            utilities.append(SidebarNode(id: imported.localIdentifier, title: "Imports", kind: .album))
+        }
+        if smartCollection(hiddenRaw) != nil { utilities.append(SidebarNode(id: smartID(hiddenRaw), title: "Hidden", kind: .smart(hiddenRaw))) }
+        if smartCollection(recentlyDeletedRaw) != nil {
+            utilities.append(SidebarNode(id: smartID(recentlyDeletedRaw), title: "Recently Deleted", kind: .smart(recentlyDeletedRaw)))
+        }
+        return (media, utilities)
     }
 
     nonisolated static func load() -> [SidebarSection] { loadAll(withAlbumEntries: false).sections }
@@ -171,27 +281,32 @@ enum SidebarLoader {
     }
 
     /// The pictures of a sidebar node ("all", "fav", "recent", "smart:<raw>" or an album id), with the filter's fetch criteria.
-    nonisolated static func fetchAssets(nodeID id: String, filter: LibraryFilter = LibraryFilter()) -> PHFetchResult<PHAsset> {
+    nonisolated static func fetchAssets(nodeID id: String, filter: LibraryFilter = LibraryFilter(), limit: Int = 0) -> PHFetchResult<PHAsset> {
+        func options(includeHidden: Bool = false, _ f: LibraryFilter) -> PHFetchOptions {
+            let o = imageOptions(includeHidden: includeHidden, filter: f)
+            if limit > 0 { o.fetchLimit = limit }
+            return o
+        }
         switch id {
         case "all":
-            return PHAsset.fetchAssets(with: imageOptions(filter: filter))
+            return PHAsset.fetchAssets(with: options(filter))
         case "fav":
             var f = filter
             f.favoritesOnly = true
-            return PHAsset.fetchAssets(with: imageOptions(filter: f))
+            return PHAsset.fetchAssets(with: options(f))
         case "recent":
             if let c = smartCollection(PHAssetCollectionSubtype.smartAlbumRecentlyAdded.rawValue) {
-                return PHAsset.fetchAssets(in: c, options: imageOptions(filter: filter))
+                return PHAsset.fetchAssets(in: c, options: options(filter))
             }
         default:
             if id.hasPrefix("smart:"), let raw = Int(id.dropFirst(6)) {
                 if let c = smartCollection(raw) {
-                    return PHAsset.fetchAssets(in: c, options: imageOptions(includeHidden: includesHidden(raw: raw), filter: filter))
+                    return PHAsset.fetchAssets(in: c, options: options(includeHidden: includesHidden(raw: raw), filter))
                 }
             } else if let c = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [id], options: nil).firstObject {
-                return PHAsset.fetchAssets(in: c, options: imageOptions(filter: filter))
+                return PHAsset.fetchAssets(in: c, options: options(filter))
             }
         }
-        return PHAsset.fetchAssets(with: imageOptions(filter: filter))
+        return PHAsset.fetchAssets(with: options(filter))
     }
 }

@@ -13,6 +13,8 @@ struct DevelopCard: View {
     @State private var image: UIImage?
     @State private var requestID: PHImageRequestID?
     private let side: CGFloat = 64
+    /// Only the queued photos the library scope shows count here and give the thumbnail.
+    private var shown: [DevelopQueue.Entry] { gallery.developEntries(store.queue) }
 
     var body: some View {
         NavigationLink(value: AlbumRoute.develop) {
@@ -29,8 +31,8 @@ struct DevelopCard: View {
                     .clipped()
                     .overlay(Rectangle().strokeBorder(FieldFramesTheme.hair, lineWidth: 1))
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("DEVELOP \u{00B7} \(store.count)").ffLabel(size: 12, color: FieldFramesTheme.lichen)
-                    Text(store.count == 0 ? "FRAMES FROM THE CAMERA LAND HERE" : "NEWEST FIRST \u{00B7} TAP TO DEVELOP")
+                    Text("DEVELOP \u{00B7} \(shown.count)").ffLabel(size: 12, color: FieldFramesTheme.lichen)
+                    Text(shown.count == 0 ? "FRAMES FROM THE CAMERA LAND HERE" : "NEWEST FIRST \u{00B7} TAP TO DEVELOP")
                         .ffLabel(size: 9, color: FieldFramesTheme.paperDim).lineLimit(1)
                 }
                 Spacer(minLength: 0)
@@ -46,7 +48,8 @@ struct DevelopCard: View {
         .padding(.top, FieldFramesTheme.cells(1.5))
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("library.developCard")
-        .task(id: store.queue.newestID) { await load() }
+        .task(id: "\(gallery.scope.rawValue)|\(store.queue.ids.joined(separator: ","))") { await gallery.refreshDevelopScope(ids: store.queue.ids) }
+        .task(id: "\(shown.first?.id ?? "-")") { await load() }
         .onDisappear {
             if let id = requestID { gallery.covers.manager.cancelImageRequest(id) }
             requestID = nil
@@ -54,13 +57,13 @@ struct DevelopCard: View {
     }
 
     private func load() async {
-        guard let assetID = store.queue.newestID else { image = nil; return }
+        guard let assetID = shown.first?.id else { image = nil; return }
         let covers = gallery.covers
         let pixels = CGSize(width: side * displayScale, height: side * displayScale)
         let key = covers.key("develop", pixels)
         if let hit = covers.image(for: key), covers.assetID(for: key) == assetID { image = hit; return }
         let found = await Task.detached(priority: .userInitiated) {
-            PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil).firstObject.map { Unchecked(value: $0) }
+            PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: DevelopStore.allSourcesOptions()).firstObject.map { Unchecked(value: $0) }
         }.value
         guard !Task.isCancelled, let found else { return }
         ThumbnailMetrics.shared.recordRequest()
@@ -108,7 +111,7 @@ struct DevelopQueueView: View {
         .ffNavigationTitle("Develop")
         .libraryChrome(library, album: nil, gallery: gallery)
         .accessibilityIdentifier("develop.queue")
-        .task(id: store.queue.ids) { await reload() }
+        .task(id: "\(gallery.scope.rawValue)|\(store.queue.ids.joined(separator: ","))") { await reload() }
         .confirmationDialog("Clear the Develop queue?", isPresented: $confirmClear, titleVisibility: .visible) {
             Button("Clear", role: .destructive) { store.clear() }
         } message: { Text("Photos stay in your library.") }
@@ -122,7 +125,7 @@ struct DevelopQueueView: View {
                     onAll: { library.selection.selectAll(assets.map(\.localIdentifier)); library.refreshFlags() },
                     onNone: { library.selectNone() })
             } else {
-                Text("\(store.count) QUEUED").ffLabel(size: 9, color: FieldFramesTheme.paperDim)
+                Text("\(assets.count) QUEUED").ffLabel(size: 9, color: FieldFramesTheme.paperDim)
             }
             Spacer(minLength: 0)
             if !library.isSelecting {
@@ -162,10 +165,14 @@ struct DevelopQueueView: View {
     /// Fetches the queued assets (queue order) and which of them carry Mira adjustment data, off the main actor.
     private func reload() async {
         let ids = store.queue.ids
+        let scope = gallery.scope
         let result = await Task.detached(priority: .userInitiated) { () -> ([Unchecked<PHAsset>], Set<String>) in
-            let fetched = PHAsset.fetchAssets(withLocalIdentifiers: ids, options: nil)
+            let fetched = PHAsset.fetchAssets(withLocalIdentifiers: ids, options: DevelopStore.allSourcesOptions())
+            let wanted = SidebarLoader.sourceTypes(for: scope)
             var byID: [String: PHAsset] = [:]
-            fetched.enumerateObjects { asset, _, _ in byID[asset.localIdentifier] = asset }
+            fetched.enumerateObjects { asset, _, _ in
+                if wanted == nil || !asset.sourceType.isDisjoint(with: wanted!) { byID[asset.localIdentifier] = asset }
+            }
             let ordered = ids.compactMap { byID[$0] }
             let done = Set(ordered.filter { GalleryKit.isEdited(Unchecked(value: $0)) }.map(\.localIdentifier))
             return (ordered.map { Unchecked(value: $0) }, done)

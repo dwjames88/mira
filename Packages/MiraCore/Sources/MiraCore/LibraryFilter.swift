@@ -44,9 +44,28 @@ public struct LibraryFilter: Equatable, Sendable {
         /// Only the user's own library: no iCloud Shared Library, no shared albums.
         case myLibrary
         case all
+        /// Shared-album pictures only (iPhone). PhotoKit has no way to tell iCloud Shared Library pictures apart.
+        case shared
+    }
+
+    /// The PhotoKit asset sources a scope fetches from, as plain values (the app maps them to `PHAssetSourceType`).
+    public enum SourceKind: Sendable, Equatable {
+        case userLibrary
+        case cloudShared
     }
 
     public var scope: Scope = .all
+
+    /// The sources a fetch should include, or nil to leave PhotoKit's default alone.
+    /// `.all` is left at the default on the Mac (which then shows what it always showed); on iPhone it spells out
+    /// the user library plus shared albums.
+    public static func sourceKinds(for scope: Scope, iOS: Bool) -> [SourceKind]? {
+        switch scope {
+        case .myLibrary: [.userLibrary]
+        case .shared: [.cloudShared]
+        case .all: iOS ? [.userLibrary, .cloudShared] : nil
+        }
+    }
     public var rawOnly = false
     public var editedOnly = false
     public var favoritesOnly = false
@@ -173,5 +192,18 @@ public struct LibraryFilter: Equatable, Sendable {
         let text = dateText(date)
         let terms = query.lowercased().split(whereSeparator: \.isWhitespace)
         return !terms.isEmpty && terms.allSatisfy { text.contains($0) }
+    }
+}
+
+/// Persists the iPhone gallery's library scope (PERSONAL / SHARED / ALL).
+public enum LibraryScopeStore {
+    public static let key = "gallery.scope"
+
+    public static func load(from defaults: UserDefaults = .standard) -> LibraryFilter.Scope {
+        defaults.string(forKey: key).flatMap(LibraryFilter.Scope.init(rawValue:)) ?? .all
+    }
+
+    public static func save(_ scope: LibraryFilter.Scope, to defaults: UserDefaults = .standard) {
+        defaults.set(scope.rawValue, forKey: key)
     }
 }
