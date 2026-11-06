@@ -447,9 +447,11 @@ final class AppState {
     private func observe(_ model: EditorModel, _ generation: Int) {
         withObservationTracking {
             _ = model.recipe
-        } onChange: { [weak self] in
+        } onChange: { [weak self, weak model] in
+            // Weak: the registration lives in the model's own observation registrar until the next change,
+            // so a strong `model` here is a cycle that keeps a closed photo (source, frames, thumbnails) alive.
             Task { @MainActor in
-                guard let self, self.trackGeneration == generation else { return }
+                guard let self, let model, self.trackGeneration == generation else { return }
                 self.recipeChanged()
                 self.observe(model, generation)
             }
