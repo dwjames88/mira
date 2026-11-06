@@ -85,6 +85,8 @@ struct DevelopQueueView: View {
     @State private var edited: Set<String> = []
     @State private var loaded = false
     @State private var confirmClear = false
+    /// Library actions and SELECT mode, as in an album grid (library-wide availability: no move or remove).
+    @State private var library = GallerySelectionModel(nodeID: "all")
     @Environment(\.displayScale) private var displayScale
 
     private let columns = 3
@@ -104,6 +106,7 @@ struct DevelopQueueView: View {
             }
         }
         .ffNavigationTitle("Develop")
+        .libraryChrome(library, album: nil, gallery: gallery)
         .accessibilityIdentifier("develop.queue")
         .task(id: store.queue.ids) { await reload() }
         .confirmationDialog("Clear the Develop queue?", isPresented: $confirmClear, titleVisibility: .visible) {
@@ -113,8 +116,16 @@ struct DevelopQueueView: View {
 
     private var actions: some View {
         HStack(spacing: FieldFramesTheme.cells(2)) {
-            Text("\(store.count) QUEUED").ffLabel(size: 9, color: FieldFramesTheme.paperDim)
+            if library.isSelecting {
+                LibrarySelectionStatus(
+                    count: library.selection.count, canSelectAll: true,
+                    onAll: { library.selection.selectAll(assets.map(\.localIdentifier)); library.refreshFlags() },
+                    onNone: { library.selectNone() })
+            } else {
+                Text("\(store.count) QUEUED").ffLabel(size: 9, color: FieldFramesTheme.paperDim)
+            }
             Spacer(minLength: 0)
+            if !library.isSelecting {
             Button { store.remove(ids: edited) } label: {
                 Text("REMOVE DEVELOPED").ffLabel(size: 10, color: edited.isEmpty ? FieldFramesTheme.paperDim : FieldFramesTheme.lichen)
                     .frame(minHeight: 44)
@@ -125,6 +136,8 @@ struct DevelopQueueView: View {
                     .frame(minHeight: 44)
             }
             .buttonStyle(.plain).disabled(store.count == 0)
+            }
+            LibrarySelectControl(library: library)
         }
         .padding(.horizontal, FieldFramesTheme.cells(2))
     }
@@ -138,12 +151,8 @@ struct DevelopQueueView: View {
                         DevelopCell(manager: gallery.covers.manager, options: gallery.covers.options, asset: asset,
                                     pixels: cell * displayScale, edited: edited.contains(asset.localIdentifier))
                             .aspectRatio(1, contentMode: .fit)
-                            .onTapGesture { Task { await gallery.open(asset, in: editor) } }
-                            .contextMenu {
-                                Button(role: .destructive) { store.remove(asset.localIdentifier) } label: {
-                                    Label("Remove from Develop", systemImage: "minus.circle")
-                                }
-                            }
+                            .libraryCell(library, asset: asset, gallery: gallery, showsFavorite: false)
+                            .onTapGesture { if !library.handleTap(asset) { Task { await gallery.open(asset, in: editor) } } }
                     }
                 }
             }
@@ -164,6 +173,7 @@ struct DevelopQueueView: View {
         guard !Task.isCancelled else { return }
         assets = result.0.map(\.value)
         edited = result.1
+        library.selection.prune(keeping: Set(assets.map(\.localIdentifier)))
         loaded = true
     }
 }
