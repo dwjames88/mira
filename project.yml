@@ -20,6 +20,13 @@ settings:
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     MARKETING_VERSION: "1.0.1"
     CURRENT_PROJECT_VERSION: "8"
+  configs:
+    Release:
+      # Strip local symbols from the shipped app, extension and iOS binaries (about 19 MB less on the Mac). `xcodebuild
+      # build` only strips with DEPLOYMENT_POSTPROCESSING; the dSYMs are written first and keep the symbols
+      # (scripts/release.sh saves them next to the release). Release already compiles -O, whole module, with dSYMs.
+      DEPLOYMENT_POSTPROCESSING: YES
+      STRIP_INSTALLED_PRODUCT: YES
 packages:
   MiraCore:
     path: Packages/MiraCore

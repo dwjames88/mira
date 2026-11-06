@@ -50,6 +50,12 @@ xcodebuild -project Mira.xcodeproj -scheme Mira -configuration Release \
   build
 
 ditto "$DERIVED/Build/Products/Release/Mira.app" "$APP"
+# The shipped binaries are stripped of local symbols (project.yml, Release); keep the dSYMs next to the release so
+# crash reports of this exact build can be symbolicated later. They are not part of the zip, DMG or the publish command.
+mkdir -p "$OUT/dSYMs"
+for dsym in "$DERIVED/Build/Products/Release/Mira.app.dSYM" "$DERIVED/Build/Products/Release/MiraPhotos.appex.dSYM"; do
+  if [ -d "$dsym" ]; then ditto "$dsym" "$OUT/dSYMs/$(basename "$dsym")"; fi
+done
 
 BUILT="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")"
 if [ "$BUILT" != "$VERSION" ]; then
