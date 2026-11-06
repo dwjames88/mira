@@ -16,9 +16,16 @@ struct GalleryView: View {
     @Bindable var editor: EditorViewModel
     /// Opens the camera (the CAMERA control, top-left before the title).
     var onCamera: () -> Void = {}
-    @State private var gallery = GalleryModel()
+    @State private var gallery: GalleryModel
     @State private var path: [AlbumRoute] = []
     @State private var pickerItem: PhotosPickerItem?
+
+    /// `gallery` is injectable so the opt-in perf probe can watch the model the real screen uses.
+    init(editor: EditorViewModel, onCamera: @escaping () -> Void = {}, gallery: GalleryModel = GalleryModel()) {
+        self.editor = editor
+        self.onCamera = onCamera
+        _gallery = State(initialValue: gallery)
+    }
 
     var body: some View {
         ZStack {

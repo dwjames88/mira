@@ -3,6 +3,7 @@ import MiraUI
 import Photos
 import SwiftUI
 import UIKit
+import os
 
 /// PhotoKit and Core Image types are not Sendable; this box carries them across the few hops that need it.
 struct Unchecked<Value>: @unchecked Sendable {
@@ -12,6 +13,10 @@ struct Unchecked<Value>: @unchecked Sendable {
 /// Every closure handed to PhotoKit is built in a `nonisolated` context and marked `@Sendable`
 /// (Photos calls back on its own queues; a main-actor-inherited closure would trap in Swift 6).
 enum GalleryKit {
+    /// How many cover lookups ran (read by the opt-in gallery perf probe).
+    nonisolated static let coverLookupCounter = OSAllocatedUnfairLock(initialState: 0)
+    nonisolated static var coverLookups: Int { coverLookupCounter.withLock { $0 } }
+
     /// Runs `work` on its own detached task, but unlike a bare `Task.detached(...).value` the child is
     /// cancelled when the awaiting task is: a detached task does not inherit cancellation, so a RAW scan
     /// batch or a fetch walk would otherwise run to the end after its album was left.
@@ -37,6 +42,7 @@ enum GalleryKit {
     /// Cover for a sidebar node: the user album's key asset when it has one, else its most recent picture.
     /// Runs off the main actor.
     nonisolated static func coverAsset(nodeID id: String) -> Unchecked<PHAsset>? {
+        coverLookupCounter.withLock { $0 += 1 }
         let isUserAlbum = !(id == "all" || id == "fav" || id == "recent" || id.hasPrefix("smart:"))
         if isUserAlbum,
            let collection = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [id], options: nil).firstObject,
@@ -133,6 +139,9 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
     @ObservationIgnored let openAlbums = NSHashTable<AlbumModel>.weakObjects()
 
     var hasAccess: Bool { status == .authorized || status == .limited }
+
+    /// The picture count of a node when it is known (nil: not loaded yet, or a folder).
+    func count(for nodeID: String) -> Int? { SidebarModel.node(withID: nodeID, in: sections)?.count }
 
     /// Picture count of the whole library ("all" node), once sections are loaded.
     var libraryCount: Int? { SidebarModel.node(withID: "all", in: sections)?.count }
