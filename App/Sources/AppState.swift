@@ -284,9 +284,9 @@ final class AppState {
             return
         }
         flushSidecar()
-        scopedURL?.stopAccessingSecurityScopedResource()
-        _ = url.startAccessingSecurityScopedResource()
-        scopedURL = url
+        // The photo that is open keeps its security scope until the new file has loaded: a file that cannot
+        // be read leaves the old editor on screen, and its sidecar writes still need the scope.
+        let opened = url.startAccessingSecurityScopedResource()
         let model = EditorModel(library: library, transfer: presetTransfer)
         guard model.loadSource(url: url) else {
             errorMessage = "\(url.lastPathComponent) could not be opened as an image."
@@ -301,9 +301,12 @@ final class AppState {
         loadedRecipe = model.recipe
         canSaveToPhotos = false
         editorNote = nil
+            if opened { url.stopAccessingSecurityScopedResource() }
         resultLine = nil
         statusLine = SidecarStatus.line(location: location, imageURL: url)
         mode = .editor
+        scopedURL?.stopAccessingSecurityScopedResource()
+        scopedURL = url
         track()
     }
 
