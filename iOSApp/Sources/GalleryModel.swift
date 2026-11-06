@@ -101,6 +101,12 @@ enum GalleryKit {
     }
 }
 
+/// One node's picture count, observed on its own so only that node's label re-evaluates.
+@MainActor @Observable
+final class CountBox {
+    var value: Int?
+}
+
 /// Root gallery state: authorization, the album tree (shared `SidebarLoader` + MiraCore `SidebarModel`),
 /// and the change signal that tells open grids to refetch.
 @MainActor @Observable
@@ -119,7 +125,13 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
         }
     }
     /// Picture counts by node id, filled on demand off the main actor and kept current from library changes.
-    private(set) var counts: [String: Int] = [:]
+    /// Not observed itself: views read a node's count through `count(of:)`, which observes only that node's `CountBox`,
+    /// so one count arriving re-evaluates one label, not every label.
+    @ObservationIgnored private(set) var counts: [String: Int] = [:]
+    @ObservationIgnored private var countBoxes: [String: CountBox] = [:]
+    /// Counts fetched by tiles, waiting for the next flush (one publish per ~frame instead of one per tile).
+    @ObservationIgnored private var pendingCounts: [String: Int] = [:]
+    @ObservationIgnored private var flushTask: Task<Void, Never>?
     /// Nodes known to hold no pictures (hidden from the lists).
     private(set) var emptyIDs: Set<String> = []
     /// Bumps when the scope changes: every cover is stale then.
@@ -180,7 +192,15 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
     }
 
     /// The count of a node already in hand (no tree walk).
-    func count(of node: SidebarNode) -> Int? { counts[node.id] ?? node.count }
+    func count(of node: SidebarNode) -> Int? { countBox(node.id).value ?? node.count }
+
+    private func countBox(_ id: String) -> CountBox {
+        if let box = countBoxes[id] { return box }
+        let box = CountBox()
+        box.value = counts[id]
+        countBoxes[id] = box
+        return box
+    }
 
     /// Entries the lists show: nodes known to be empty are left out (Photos' own rule).
     func visible(_ nodes: [SidebarNode]) -> [SidebarNode] {
@@ -192,7 +212,7 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
     /// Fetches a node's count off the main actor unless it is known, and keeps it current. Tiles call this from
     /// `.task`, so a tile scrolled away before its turn is cancelled and never fetched.
     func ensureCount(_ nodeID: String) async {
-        if counts[nodeID] != nil { return }
+        if counts[nodeID] != nil || pendingCounts[nodeID] != nil { return }
         let tracker = tracker
         let generation = tracker.currentGeneration
         let found = await GalleryKit.detached(priority: .userInitiated) { () -> Int? in
@@ -200,20 +220,37 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
             return tracker.count(nodeID: nodeID)
         }
         guard let found, !Task.isCancelled, generation == tracker.currentGeneration else { return }
-        publish(counts: [nodeID: found])
+        pendingCounts[nodeID] = found
+        scheduleFlush()
+    }
+
+    /// Publishes the counts tiles have fetched since the last flush in one mutation, about one frame later.
+    private func scheduleFlush() {
+        guard flushTask == nil else { return }
+        flushTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(24))
+            guard let self else { return }
+            self.flushTask = nil
+            self.flushPending()
+        }
+    }
+
+    private func flushPending() {
+        guard !pendingCounts.isEmpty else { return }
+        let batch = pendingCounts
+        pendingCounts = [:]
+        publish(counts: batch)
     }
 
     func publish(counts new: [String: Int]) {
-        var merged = counts
         var empty = emptyIDs
-        var changed = false
-        for (id, value) in new where merged[id] != value {
-            merged[id] = value
-            changed = true
+        for (id, value) in new {
+            pendingCounts[id] = nil
+            guard counts[id] != value else { continue }
+            counts[id] = value
+            countBoxes[id]?.value = value
             if value == 0 { empty.insert(id) } else { empty.remove(id) }
         }
-        guard changed else { return }
-        counts = merged
         if empty != emptyIDs { emptyIDs = empty }
     }
 
@@ -221,6 +258,8 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
         scopeEpoch += 1
         tracker.reset(scope: scope)
         counts = [:]
+        pendingCounts = [:]
+        for box in countBoxes.values { box.value = nil }
         emptyIDs = []
         developInScope = nil
         covers.removeAll()
