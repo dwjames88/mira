@@ -8,8 +8,12 @@ public struct CapturedFrame: Sendable, Equatable {
     public var pixelSize: PixelSize
     /// Exposure time in seconds, if known.
     public var exposureTime: Double?
+    /// Degrees the photo is turned clockwise to be upright (`videoRotationAngleForHorizonLevelCapture` as applied to the
+    /// photo output): `pixelSize` is in sensor orientation, so 90 or 270 swap it. 90 = portrait phone.
+    public var rotationAngle: Double
 
-    public init(heicURL: URL, dngURL: URL? = nil, pixelSize: PixelSize, exposureTime: Double? = nil) {
+    public init(heicURL: URL, dngURL: URL? = nil, pixelSize: PixelSize, exposureTime: Double? = nil, rotationAngle: Double = 90) {
+        self.rotationAngle = rotationAngle
         self.heicURL = heicURL
         self.dngURL = dngURL
         self.pixelSize = pixelSize
@@ -32,6 +36,15 @@ public enum SaveOutcome: Sendable, Equatable {
         switch self {
         case .developed(let id), .printPending(let id): id
         case .bakedCopy(_, let id, _): id
+        case .originalOnly(let id, _): id
+        }
+    }
+
+    /// The asset the user ends up with: the developed frame, the baked copy (not the plain original), or the original.
+    public var savedAssetID: String {
+        switch self {
+        case .developed(let id), .printPending(let id): id
+        case .bakedCopy(_, _, let baked): baked
         case .originalOnly(let id, _): id
         }
     }

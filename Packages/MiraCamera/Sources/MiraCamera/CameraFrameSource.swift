@@ -82,6 +82,7 @@ public final class FakeFrameSource: FrameSource, Sendable {
         var handler: (@Sendable (FinderFrame) -> Void)?
         var timer: DispatchSourceTimer?
         var index = 0
+        var angle: Double = 90
     }
 
     public static let exposureTime = 1.0 / 125
@@ -89,6 +90,8 @@ public final class FakeFrameSource: FrameSource, Sendable {
     private let state = Mutex(State())
     private let queue = DispatchQueue(label: "com.fieldframes.mira.camera.fakefinder", qos: .userInteractive)
     private let picture: CIImage
+    /// One sensor-orientation buffer per rotation angle (0, 90, 180, 270), built lazily.
+    private let buffers = Mutex<[Int: CIImage]>([:])
 
     /// `fixtureURL` nil (or unreadable) falls back to a generated gradient.
     public init(fixtureURL: URL? = nil) {
@@ -98,6 +101,37 @@ public final class FakeFrameSource: FrameSource, Sendable {
 
     public func setHandler(_ handler: @escaping @Sendable (FinderFrame) -> Void) {
         state.withLock { $0.handler = handler }
+    }
+
+    /// The angle the fake back camera reports, as `RotationCoordinator` would: 90 portrait (default), 0, 180, 270.
+    public func setRotationAngle(_ degrees: Double) {
+        var a = Int(degrees.rounded()) % 360
+        if a < 0 { a += 360 }
+        state.withLock { $0.angle = Double((a / 90) * 90) }
+    }
+
+    /// The buffer a real camera would deliver for `angle`: the picture's centred crop for the upright orientation
+    /// (3:4 for 90/270, 4:3 for 0/180) turned by -angle into sensor orientation, origin at zero.
+    func sensorBuffer(angle: Int) -> CIImage {
+        if let cached = buffers.withLock({ $0[angle] }) { return cached }
+        let portrait = angle == 90 || angle == 270
+        let e = picture.extent
+        let want: CGFloat = portrait ? 3.0 / 4 : 4.0 / 3   // width / height
+        var w = e.width, h = e.height
+        if w / h > want { w = (h * want).rounded(.down) } else { h = (w / want).rounded(.down) }
+        let rect = CGRect(x: (e.minX + (e.width - w) / 2).rounded(.down), y: (e.minY + (e.height - h) / 2).rounded(.down), width: w, height: h)
+        var image = picture.cropped(to: rect)
+        // The renderer turns a buffer clockwise by `angle` (`.right` for 90); the inverse puts it in sensor orientation.
+        let inverse: CGImagePropertyOrientation = switch angle {
+        case 90: .left
+        case 180: .down
+        case 270: .right
+        default: .up
+        }
+        if inverse != .up { image = image.oriented(inverse) }
+        image = image.transformed(by: CGAffineTransform(translationX: -image.extent.minX, y: -image.extent.minY))
+        buffers.withLock { $0[angle] = image }
+        return image
     }
 
     public func start() {
@@ -122,17 +156,18 @@ public final class FakeFrameSource: FrameSource, Sendable {
     }
 
     private func tick() {
-        let (handler, index) = state.withLock { s -> ((@Sendable (FinderFrame) -> Void)?, Int) in
+        let (handler, index, angle) = state.withLock { s -> ((@Sendable (FinderFrame) -> Void)?, Int, Double) in
             s.index += 1
-            return (s.handler, s.index)
+            return (s.handler, s.index, s.angle)
         }
         guard let handler else { return }
+        let buffer = sensorBuffer(angle: Int(angle))
         // A brightness wobble far below visibility.
         let wobble = 0.0004 * sin(Double(index) * 0.7)
-        let varied = picture.applyingFilter("CIColorControls", parameters: [kCIInputBrightnessKey: wobble])
-            .cropped(to: picture.extent)
+        let varied = buffer.applyingFilter("CIColorControls", parameters: [kCIInputBrightnessKey: wobble])
+            .cropped(to: buffer.extent)
             .withMiraExposureTime(Self.exposureTime)
-        handler(FinderFrame(image: varied, rotationAngle: 0, exposureTime: Self.exposureTime,
+        handler(FinderFrame(image: varied, rotationAngle: angle, exposureTime: Self.exposureTime,
                             timestamp: ProcessInfo.processInfo.systemUptime, index: index))
     }
 
@@ -174,11 +209,14 @@ public actor FakeCaptureDevice: CameraDevice {
     private nonisolated let thermalOut: AsyncStream<FinderThermalLevel>.Continuation
 
     private let fixtureURL: URL?
+    private nonisolated let onOrientation: (@Sendable (PreviewOrientation) -> Void)?
     private var bias = 0.0
     private var zoom = 1.0
 
-    public init(fixtureURL: URL? = nil) {
+    /// `onOrientation` is called with the finder's interface orientation whenever its layer reports one.
+    public init(fixtureURL: URL? = nil, onOrientation: (@Sendable (PreviewOrientation) -> Void)? = nil) {
         self.fixtureURL = fixtureURL
+        self.onOrientation = onOrientation
         (telemetry, telemetryOut) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
         (events, eventsOut) = AsyncStream.makeStream(bufferingPolicy: .unbounded)
         (readiness, readinessOut) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
@@ -190,13 +228,18 @@ public actor FakeCaptureDevice: CameraDevice {
     public func start() async {
         eventsOut.yield(.sessionStarted)
         readinessOut.yield(.ready)
-        rotationOut.yield(0)
+        rotationOut.yield(90)
         thermalOut.yield(.nominal)
         telemetryOut.yield(ExposureTelemetry(offsetEV: 0.3, duration: FakeFrameSource.exposureTime, iso: 64, aperture: 1.78))
     }
 
     public func stop() async { readinessOut.yield(.sessionNotRunning) }
     public func runDeferredStartWhenNeeded() async {}
+    public func setPreviewLayer(_ box: PreviewLayerBox?) async {
+        guard let orientation = box?.orientation else { return }
+        rotationOut.yield(orientation.previewRotationAngle)
+        onOrientation?(orientation)
+    }
 
     public func configure(settings: CameraSettings) async -> CaptureFormat {
         CaptureFormatPolicy.format(for: await capabilities(), settings: settings)
@@ -240,7 +283,7 @@ public actor FakeCaptureDevice: CameraDevice {
         let properties = [kCGImageDestinationLossyCompressionQuality: 0.9] as CFDictionary
         if let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.heic.identifier as CFString, 1, nil) {
             CGImageDestinationAddImage(destination, cg, properties)
-            if CGImageDestinationFinalize(destination) { return CapturedFrame(heicURL: url, pixelSize: PixelSize(width: cg.width, height: cg.height), exposureTime: FakeFrameSource.exposureTime) }
+            if CGImageDestinationFinalize(destination) { return CapturedFrame(heicURL: url, pixelSize: PixelSize(width: cg.width, height: cg.height), exposureTime: FakeFrameSource.exposureTime, rotationAngle: 0) }
         }
         // No HEIC encoder (some simulators): JPEG data under a .jpg name.
         url = directory.appending(path: "\(name).jpg")
@@ -249,7 +292,7 @@ public actor FakeCaptureDevice: CameraDevice {
         }
         CGImageDestinationAddImage(destination, cg, properties)
         guard CGImageDestinationFinalize(destination) else { throw CaptureError.failed("The picture could not be encoded") }
-        return CapturedFrame(heicURL: url, pixelSize: PixelSize(width: cg.width, height: cg.height), exposureTime: FakeFrameSource.exposureTime)
+        return CapturedFrame(heicURL: url, pixelSize: PixelSize(width: cg.width, height: cg.height), exposureTime: FakeFrameSource.exposureTime, rotationAngle: 0)
     }
 }
 
@@ -261,7 +304,11 @@ public enum CameraBackend {
     /// `fixtureURL` is the picture the fakes show and "capture" (a generated gradient when nil).
     public static func make(fixtureURL: URL? = nil) -> (device: any CameraDevice, frames: any FrameSource) {
         if usesFakes {
-            return (FakeCaptureDevice(fixtureURL: fixtureURL), FakeFrameSource(fixtureURL: fixtureURL))
+            let frames = FakeFrameSource(fixtureURL: fixtureURL)
+            let device = FakeCaptureDevice(fixtureURL: fixtureURL) { [weak frames] orientation in
+                frames?.setRotationAngle(orientation.previewRotationAngle)
+            }
+            return (device, frames)
         }
         let controller = CaptureController()
         let source = CameraFrameSource(controller: controller)

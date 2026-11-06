@@ -1,53 +1,75 @@
 import Foundation
 
-/// White balance chips: the light the film "sees".
+/// Named colour temperatures the Kelvin dial snaps to and names in its readout.
 public enum WhiteBalancePreset: String, Sendable, Codable, CaseIterable, Equatable {
-    case auto, daylight, cloudy, tungsten, fluorescent
+    case tungsten, fluorescent, daylight, cloudy
 
-    /// Color temperature in Kelvin; nil for auto.
-    public var kelvin: Int? {
+    public var kelvin: Int {
         switch self {
-        case .auto: nil
-        case .daylight: 5500
-        case .cloudy: 6500
         case .tungsten: 3200
         case .fluorescent: 4000
+        case .daylight: 5500
+        case .cloudy: 6500
         }
     }
 
-    /// Chip text, mono caps.
-    public var label: String {
+    /// Mono caps name shown beside the value.
+    public var name: String {
         switch self {
-        case .auto: "AUTO"
-        case .daylight: "DAYLIGHT 5500"
-        case .cloudy: "CLOUDY 6500"
-        case .tungsten: "TUNGSTEN 3200"
-        case .fluorescent: "FLUOR. 4000"
-        }
-    }
-
-    public var accessibilityLabel: String {
-        switch self {
-        case .auto: "Auto white balance"
-        case .daylight: "Daylight, 5500 Kelvin"
-        case .cloudy: "Cloudy, 6500 Kelvin"
-        case .tungsten: "Tungsten, 3200 Kelvin"
-        case .fluorescent: "Fluorescent, 4000 Kelvin"
+        case .tungsten: "TUNGSTEN"
+        case .fluorescent: "FLUORESCENT"
+        case .daylight: "DAYLIGHT"
+        case .cloudy: "CLOUDY"
         }
     }
 }
 
-/// A preset plus the lock-to-current-value toggle.
+/// The white balance request: nil is AUTO (continuous auto white balance); a value locks the device at that
+/// temperature (tint 0).
 public struct WhiteBalanceState: Sendable, Equatable {
-    public var preset: WhiteBalancePreset
-    /// Holds the current value (for auto: the value at the moment of locking).
-    public var locked: Bool
-
-    public init(preset: WhiteBalancePreset = .auto, locked: Bool = false) {
-        self.preset = preset
-        self.locked = locked
+    public var kelvin: Int? {
+        didSet { if let k = kelvin, k != WhiteBalanceModel.clamp(k) { kelvin = WhiteBalanceModel.clamp(k) } }
     }
 
-    /// True when the device should be in locked white balance (a fixed preset, or auto with the lock on).
-    public var isFixed: Bool { preset != .auto || locked }
+    public init(kelvin: Int? = nil) {
+        self.kelvin = kelvin.map(WhiteBalanceModel.clamp)
+    }
+
+    public var isAuto: Bool { kelvin == nil }
+}
+
+/// Pure rules for the Kelvin dial.
+public enum WhiteBalanceModel {
+    public static let range = 2500...9000
+    /// One dial step.
+    public static let step = 100
+    /// Where a drag or a tap on AUTO starts from.
+    public static let startKelvin = 5500
+    /// A drag that ends this close to a preset snaps to it.
+    public static let snapRadius = 150
+
+    public static func clamp(_ kelvin: Int) -> Int { min(max(kelvin, range.lowerBound), range.upperBound) }
+
+    /// Rounds to a dial step and clamps.
+    public static func quantised(_ kelvin: Int) -> Int {
+        clamp(Int((Double(kelvin) / Double(step)).rounded()) * step)
+    }
+
+    /// The preset within `snapRadius` of `kelvin` (the nearest), if any.
+    public static func detent(near kelvin: Int) -> WhiteBalancePreset? {
+        WhiteBalancePreset.allCases
+            .filter { abs($0.kelvin - kelvin) <= snapRadius }
+            .min { abs($0.kelvin - kelvin) < abs($1.kelvin - kelvin) }
+    }
+
+    /// The value a drag ends on: the nearby preset's temperature, else the clamped value.
+    public static func snapped(_ kelvin: Int) -> Int { detent(near: kelvin)?.kelvin ?? clamp(kelvin) }
+
+    /// The preset a value is exactly on, for the readout.
+    public static func preset(at kelvin: Int) -> WhiteBalancePreset? { WhiteBalancePreset.allCases.first { $0.kelvin == kelvin } }
+
+    /// "5500 K · DAYLIGHT", or "5600 K" away from a preset.
+    public static func readout(_ kelvin: Int) -> String {
+        preset(at: kelvin).map { "\(kelvin) K \u{00B7} \($0.name)" } ?? "\(kelvin) K"
+    }
 }

@@ -17,6 +17,8 @@ public enum CameraAuthorization: Sendable, Equatable { case authorized, denied, 
 struct FrameReport: Sendable, Equatable {
     var aspect: Double
     var angle: Double
+    /// The aspect crop of the upright frame (normalized, top-left origin); the whole frame without a crop.
+    var crop: CGRect
     var first: Bool
 }
 
@@ -27,6 +29,7 @@ enum DeviceCommand: Sendable {
     case focus(CGPoint, lock: Bool)
     case unlockFocus
     case whiteBalance(WhiteBalanceState)
+    case previewLayer(PreviewLayerBox?)
 }
 
 /// All the camera screen's state. Main actor; every device, Photos, Metal and CoreLocation callback hops here
@@ -62,13 +65,18 @@ public final class CameraModel {
     }
     public var stats: FinderStats?
     public var silentShutterSupported = false
-    /// Upright width / height of the frames on screen (what the finder aspect-fits).
+    /// Width / height of the frames on screen after the aspect crop (what the finder aspect-fits).
     public var frameAspect: Double = 3.0 / 4.0
-    /// Degrees the sensor image is rotated to be upright (90 = portrait phone). Drives the readouts' rotation.
+    /// The part of the upright frame that is on screen (normalized, top-left origin); touches map through it.
+    public var frameCrop = CGRect(x: 0, y: 0, width: 1, height: 1)
+    /// Degrees the sensor image is rotated to be upright (90 = portrait phone). Maps touches back to the device.
     public var rotationAngle: Double = 90
-    public var cardThumbnails: [String: CGImage] = [:]
     public var wb = WhiteBalanceState() {
-        didSet { if wb != oldValue { send(.whiteBalance(wb)) } }
+        didSet {
+            guard wb != oldValue else { return }
+            settings.whiteBalanceKelvin = wb.kelvin
+            send(.whiteBalance(wb))
+        }
     }
     /// The user's recipe. Pushes to the finder and is what a capture saves (no finder-only fields).
     public var recipe: Recipe {
@@ -79,16 +87,13 @@ public final class CameraModel {
             settings.lastFilmID = recipe.filmID
         }
     }
+    private var lastManualKelvin: Int?
     public var settings: CameraSettings {
         didSet { settingsChanged(from: oldValue) }
     }
 
     public let statsEnabled = ProcessInfo.processInfo.environment["MIRA_CAMERA_STATS"] == "1"
     public var statusText: String? { state.statusText }
-    /// Degrees to turn the readouts so they stay upright in the world when the interface stays portrait
-    /// (orientation lock) and the phone is turned: the frame angle's difference from portrait (90).
-    /// The fake source reports 0 as "upright", so it never rotates. [VERIFY on device: sign.]
-    public var readoutRotation: Double { CameraBackend.usesFakes ? 0 : rotationAngle - 90 }
     public var lowestZoom: Double { lenses.first?.zoomFactor ?? 1 }
     public var highestZoom: Double { (lenses.last?.zoomFactor ?? 1) * 2 }
 
@@ -102,7 +107,8 @@ public final class CameraModel {
     private let library: any PhotoLibraryWriting
     private let requestLibraryAccess: @Sendable () async -> LibraryAccess
     private let store: CameraSettingsStore
-    private let onOpenFrame: @MainActor (String) -> Void
+    private let onOpenLibrary: @MainActor () -> Void
+    private let onFrameSaved: @MainActor (String) -> Void
     private let location = CameraLocation()
     private let filmLibrary: FilmLibrary?
 
@@ -132,7 +138,9 @@ public final class CameraModel {
     ///   - backend: the device and frame source; `CameraBackend.make` (real on a phone, fake elsewhere) when nil.
     ///   - fixtureURL: the picture the fake backend shows.
     ///   - printQueue: the app's shared print queue (it drains at launch, even with the camera closed); built here when nil.
-    ///   - onOpenFrame: opens the asset with this local identifier in the editor.
+    ///   - onFrameSaved: called with the local identifier of the asset the user keeps (the developed frame, the baked copy, or the original)
+    ///     as soon as its save completes.
+    ///   - onOpenLibrary: brings up the photo library (the last-frame thumbnail's action).
     public init(
         printWriter: any PrintWriting,
         renderer: Renderer? = nil,
@@ -145,7 +153,8 @@ public final class CameraModel {
         settingsStore: CameraSettingsStore = CameraSettingsStore(),
         pendingDirectory: URL? = nil,
         printQueue: PrintQueue? = nil,
-        onOpenFrame: @escaping @MainActor (String) -> Void = { _ in }
+        onOpenLibrary: @escaping @MainActor () -> Void = {},
+        onFrameSaved: @escaping @MainActor (String) -> Void = { _ in }
     ) {
         let made = backend ?? CameraBackend.make(fixtureURL: fixtureURL)
         device = made.device
@@ -153,7 +162,8 @@ public final class CameraModel {
         self.library = library
         self.requestLibraryAccess = requestLibraryAccess
         store = settingsStore
-        self.onOpenFrame = onOpenFrame
+        self.onOpenLibrary = onOpenLibrary
+        self.onFrameSaved = onFrameSaved
         let loaded = settingsStore.load()
         settings = loaded
         recipe = initialRecipe ?? loaded.lastRecipe ?? Recipe()
@@ -171,9 +181,11 @@ public final class CameraModel {
             state.recipe = recipe
             state.mode = loaded.finderQuality
             state.grainLive = loaded.finderGrainLive
+            state.aspect = loaded.aspect
         }
+        wb = WhiteBalanceState(kelvin: loaded.whiteBalanceKelvin)   // restored without a command: start() sends it
+        lastManualKelvin = wb.kelvin
         finder?.setLatitudeHandler(Self.makeLatitudeHandler(self))
-        finder?.setCardsHandler(Self.makeCardsHandler(self))
         if statsEnabled { finder?.setStatsHandler(Self.makeStatsHandler(self)) }
         startConsumers(commands: commands)
     }
@@ -224,10 +236,6 @@ public final class CameraModel {
         { [weak model] reading in Task { @MainActor in model?.latitude = LatitudeReadout(reading: reading) } }
     }
 
-    private nonisolated static func makeCardsHandler(_ model: CameraModel) -> @Sendable ([String: CGImage]) -> Void {
-        { [weak model] cards in Task { @MainActor in model?.cardThumbnails.merge(cards) { _, new in new } } }
-    }
-
     private nonisolated static func makeStatsHandler(_ model: CameraModel) -> @Sendable (FinderStats) -> Void {
         { [weak model] stats in Task { @MainActor in model?.stats = stats } }
     }
@@ -238,9 +246,11 @@ public final class CameraModel {
         return { [weak model] frame in
             finder?.consume(frame)
             let size = frame.image.extent.size
+            let shape = finder?.aspect ?? .fourThree
             let report = FrameReport(
-                aspect: FinderGeometry.uprightAspect(sensorSize: size, rotationAngle: frame.rotationAngle),
-                angle: frame.rotationAngle, first: false)
+                aspect: FinderGeometry.croppedAspect(sensorSize: size, rotationAngle: frame.rotationAngle, aspect: shape),
+                angle: frame.rotationAngle,
+                crop: FinderGeometry.cropRect(sensorSize: size, rotationAngle: frame.rotationAngle, aspect: shape), first: false)
             let send: FrameReport? = last.withLock { (previous: inout FrameReport?) -> FrameReport? in
                 guard let old = previous else {
                     var first = report
@@ -248,7 +258,7 @@ public final class CameraModel {
                     previous = report
                     return first
                 }
-                guard abs(old.aspect - report.aspect) > 0.001 || old.angle != report.angle else { return nil }
+                guard abs(old.aspect - report.aspect) > 0.001 || old.angle != report.angle || old.crop != report.crop else { return nil }
                 previous = report
                 return report
             }
@@ -258,6 +268,7 @@ public final class CameraModel {
 
     private func apply(_ report: FrameReport) {
         frameAspect = report.aspect
+        frameCrop = report.crop
         rotationAngle = report.angle
         guard report.first, !deferredStartDone else { return }
         deferredStartDone = true
@@ -299,6 +310,7 @@ public final class CameraModel {
             zoom = main?.zoomFactor ?? 1
             if let main { send(.zoom(main.zoomFactor, ramp: false)) }
         }
+        if let kelvin = wb.kelvin { send(.whiteBalance(WhiteBalanceState(kelvin: kelvin))) }   // the stored value reaches the device
         location.setEnabled(settings.addLocation)
         frames.start()
         await device.start()
@@ -366,11 +378,12 @@ public final class CameraModel {
         impact.impactOccurred()
         developingCount += 1
         let recipe = self.recipe
+        let aspect = settings.aspect
         let there = settings.addLocation ? location.latest : nil
-        Task { await capture(recipe: recipe, location: there) }
+        Task { await capture(recipe: recipe, aspect: aspect, location: there) }
     }
 
-    private func capture(recipe: Recipe, location there: CLLocation?) async {
+    private func capture(recipe: Recipe, aspect: CaptureAspect, location there: CLLocation?) async {
         defer { developingCount = max(0, developingCount - 1) }
         if await library.access() == .notDetermined { _ = await requestLibraryAccess() }
         await saver.captureStarted()
@@ -386,7 +399,13 @@ public final class CameraModel {
         }
         state.handle(.captureFinished)
         do {
-            let outcome = try await saver.save(frame, recipe: recipe)
+            // The negative stays full-frame; the aspect goes into this frame's recipe (not the user's recipe or settings).
+            var printed = recipe
+            if let crop = CaptureCrop.recipeCrop(sensorSize: frame.pixelSize, rotationAngle: frame.rotationAngle, aspect: aspect) {
+                printed.crop.rect = crop.rect
+                printed.crop.aspect = crop.aspectID
+            }
+            let outcome = try await saver.save(frame, recipe: printed)
             handle(outcome)
         } catch {
             show(notice: (error as? CaptureSaveError)?.monoCopy ?? "FRAME NOT SAVED")
@@ -396,6 +415,8 @@ public final class CameraModel {
     private func handle(_ outcome: SaveOutcome) {
         lastAssetID = outcome.assetID
         refreshThumbnail(for: outcome.assetID)
+        // The asset exists by now in every case (a pending print only still lacks its recipe), so a later retry needs no hook.
+        onFrameSaved(outcome.savedAssetID)
         switch outcome {
         case .bakedCopy(let text, _, _), .originalOnly(_, let text): show(notice: text)
         case .developed, .printPending: break
@@ -445,11 +466,8 @@ public final class CameraModel {
         }
     }
 
-    /// Opens the last frame in the editor.
-    public func openLastFrame() {
-        guard let id = lastAssetID else { return }
-        onOpenFrame(id)
-    }
+    /// The last-frame thumbnail: brings up the library (also when nothing was shot yet).
+    public func openLastFrame() { onOpenLibrary() }
 
     // MARK: Exposure, lenses, zoom, white balance
 
@@ -460,6 +478,29 @@ public final class CameraModel {
         evBias = target
         latestEV = target
         send(.exposure(target))
+    }
+
+    /// Sets the white balance (nil is AUTO), one selection haptic per 100 K step.
+    public func setWB(_ kelvin: Int?) {
+        let target = WhiteBalanceState(kelvin: kelvin)
+        guard target != wb else { return }
+        if target.kelvin != nil, wb.kelvin != nil { selection.selectionChanged() }
+        wb = target
+        if let k = target.kelvin { lastManualKelvin = k }
+    }
+
+    /// A drag ended: snap to a preset within 150 K.
+    public func commitWB() {
+        guard let k = wb.kelvin else { return }
+        let snapped = WhiteBalanceModel.snapped(k)
+        if snapped != k { impact.impactOccurred() }
+        setWB(snapped)
+    }
+
+    /// AUTO to the last manual value (5500 K the first time), or back to AUTO.
+    public func toggleAutoWB() {
+        selection.selectionChanged()
+        setWB(wb.kelvin == nil ? (lastManualKelvin ?? WhiteBalanceModel.startKelvin) : nil)
     }
 
     public func selectLens(_ lens: Lens) {
@@ -525,7 +566,8 @@ public final class CameraModel {
         focusToken += 1
         let token = focusToken
         // The device wants sensor coordinates: undo the aspect-fit and the rotation.
-        let devicePoint = FinderGeometry.devicePoint(viewPoint: point, viewSize: size, uprightAspect: frameAspect, rotationAngle: rotationAngle)
+        let devicePoint = FinderGeometry.devicePoint(
+            viewPoint: point, viewSize: size, uprightAspect: frameAspect, rotationAngle: rotationAngle, crop: frameCrop)
         send(.focus(devicePoint, lock: lock))
         guard !lock else { return }
         Task {
@@ -534,13 +576,10 @@ public final class CameraModel {
         }
     }
 
-    // MARK: Film door support
+    // MARK: Finder layer
 
-    /// Film IDs the door wants thumbnails of (the finder renders them from the live frame, each published as it is done, refreshed at about 2 Hz); empty when closed.
-    public func setWantedCardIDs(_ ids: [String]) {
-        finder?.update { $0.cardFilmIDs = ids }
-        if ids.isEmpty { cardThumbnails = [:] }
-    }
+    /// The finder's layer is in a window (or left it): the rotation coordinator needs it for the preview angle.
+    public func previewLayerChanged(_ box: PreviewLayerBox?) { send(.previewLayer(box)) }
 
     // MARK: Settings
 
@@ -552,6 +591,7 @@ public final class CameraModel {
                 $0.grainLive = settings.finderGrainLive
             }
         }
+        if settings.aspect != old.aspect { finder?.update { [aspect = settings.aspect] in $0.aspect = aspect } }
         if settings.addLocation != old.addLocation, wantsRunning { location.setEnabled(settings.addLocation) }
         if settings.silentShutter != old.silentShutter {
             Task { format = await device.configure(settings: settings) }
@@ -572,6 +612,7 @@ public final class CameraModel {
         case .focus(let p, let lock): await device.focusAndMeter(at: p, lock: lock)
         case .unlockFocus: await device.unlockFocusAndExposure()
         case .whiteBalance(let s): await device.setWhiteBalance(s)
+        case .previewLayer(let box): await device.setPreviewLayer(box)
         }
     }
 }

@@ -96,6 +96,8 @@ public actor CaptureController: CameraDevice {
     private var readinessCoordinator: AVCapturePhotoOutputReadinessCoordinator?
     private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
     private var observations: [NSKeyValueObservation] = []
+    private var rotationObservation: NSKeyValueObservation?
+    private var previewLayer: PreviewLayerBox?
     private var configured = false
     private var wantsRunning = false
 
@@ -181,11 +183,36 @@ public actor CaptureController: CameraDevice {
         self.device = device
         readinessCoordinator = AVCapturePhotoOutputReadinessCoordinator(photoOutput: photoOutput)
         readinessCoordinator?.delegate = readinessBridge
-        rotationCoordinator = AVCaptureDevice.RotationCoordinator(device: device, previewLayer: nil)
-        observations = Self.makeObservations(
-            device: device, rotation: rotationCoordinator, telemetry: telemetryHub, rotationOut: rotationOut, thermalOut: thermalOut)
+        observations = Self.makeObservations(device: device, telemetry: telemetryHub, thermalOut: thermalOut)
+        rebuildRotationCoordinator()
         installNotificationObservers()
         configured = true
+    }
+
+    /// The finder's layer is in a window (or left it). Rebuilds the rotation coordinator around it.
+    public func setPreviewLayer(_ box: PreviewLayerBox?) async {
+        previewLayer = box
+        if configured { rebuildRotationCoordinator() }
+    }
+
+    /// `previewLayer: nil` makes the coordinator answer 0 degrees for the preview ("if a layer was not specified at
+    /// initialization, the layer is not in a view hierarchy ..."), so the preview angle is only streamed while a layer
+    /// is set; until then the frame source keeps its portrait default. The capture angle does not need the layer.
+    private func rebuildRotationCoordinator() {
+        rotationObservation = nil
+        guard let device else { return }
+        let layer = previewLayer?.layer
+        let coordinator = AVCaptureDevice.RotationCoordinator(device: device, previewLayer: layer)
+        rotationCoordinator = coordinator
+        if layer != nil { rotationObservation = Self.observePreviewAngle(coordinator, rotationOut: rotationOut) }
+    }
+
+    private nonisolated static func observePreviewAngle(
+        _ coordinator: AVCaptureDevice.RotationCoordinator, rotationOut: AsyncStream<Double>.Continuation
+    ) -> NSKeyValueObservation {
+        coordinator.observe(\.videoRotationAngleForHorizonLevelPreview, options: [.initial, .new]) { coordinator, _ in
+            rotationOut.yield(Double(coordinator.videoRotationAngleForHorizonLevelPreview))
+        }
     }
 
     private static func backCamera() -> AVCaptureDevice? {
@@ -292,18 +319,13 @@ public actor CaptureController: CameraDevice {
     public func setWhiteBalance(_ state: WhiteBalanceState) async {
         guard let device, (try? device.lockForConfiguration()) != nil else { return }
         defer { device.unlockForConfiguration() }
-        guard state.isFixed else {
+        guard let kelvin = state.kelvin else {
             if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) { device.whiteBalanceMode = .continuousAutoWhiteBalance }
             return
         }
         guard device.isLockingWhiteBalanceWithCustomDeviceGainsSupported else { return }
-        let gains: AVCaptureDevice.WhiteBalanceGains
-        if let kelvin = state.preset.kelvin {
-            let values = AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(temperature: Float(kelvin), tint: 0)
-            gains = device.deviceWhiteBalanceGains(for: values)
-        } else {
-            gains = device.deviceWhiteBalanceGains   // auto, locked: hold the current value
-        }
+        let values = AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(temperature: Float(kelvin), tint: 0)
+        let gains = device.deviceWhiteBalanceGains(for: values)
         let clamped = WhiteBalanceGains(red: Double(gains.redGain), green: Double(gains.greenGain), blue: Double(gains.blueGain))
             .clamped(maxGain: Double(device.maxWhiteBalanceGain))
         device.setWhiteBalanceModeLocked(
@@ -365,15 +387,21 @@ public actor CaptureController: CameraDevice {
                 horizontalAccuracy: $0.horizontalAccuracy)
         }
         let delegate = PhotoCaptureDelegate(signals: signalsOut, location: snapshot)
-        if let connection = photoOutput.connection(with: .video), let angle = rotationCoordinator?.videoRotationAngleForHorizonLevelCapture,
-           connection.isVideoRotationAngleSupported(angle) {
-            connection.videoRotationAngle = angle
+        var angle = 90.0
+        if let connection = photoOutput.connection(with: .video) {
+            angle = Double(connection.videoRotationAngle)
+            if let wanted = rotationCoordinator?.videoRotationAngleForHorizonLevelCapture, connection.isVideoRotationAngleSupported(wanted) {
+                connection.videoRotationAngle = wanted
+                angle = Double(wanted)
+            }
         }
         readinessCoordinator?.startTrackingCaptureRequest(using: settings)
-        return try await withCheckedThrowingContinuation { continuation in
+        var frame: CapturedFrame = try await withCheckedThrowingContinuation { continuation in
             delegate.begin(continuation)
             photoOutput.capturePhoto(with: settings, delegate: delegate)
         }
+        frame.rotationAngle = angle
+        return frame
     }
 
     private func makePhotoSettings(format: CaptureFormat) -> AVCapturePhotoSettings {
@@ -414,8 +442,7 @@ public actor CaptureController: CameraDevice {
     // MARK: Callback builders (nonisolated: nothing here touches actor state)
 
     private nonisolated static func makeObservations(
-        device: AVCaptureDevice, rotation: AVCaptureDevice.RotationCoordinator?, telemetry hub: TelemetryHub,
-        rotationOut: AsyncStream<Double>.Continuation, thermalOut: AsyncStream<FinderThermalLevel>.Continuation
+        device: AVCaptureDevice, telemetry hub: TelemetryHub, thermalOut: AsyncStream<FinderThermalLevel>.Continuation
     ) -> [NSKeyValueObservation] {
         var tokens: [NSKeyValueObservation] = []
         tokens.append(device.observe(\.exposureTargetOffset, options: [.initial, .new]) { device, _ in
@@ -441,11 +468,6 @@ public actor CaptureController: CameraDevice {
         tokens.append(device.observe(\.systemPressureState, options: [.initial, .new]) { device, _ in
             thermalOut.yield(thermalLevel(device.systemPressureState.level))
         })
-        if let rotation {
-            tokens.append(rotation.observe(\.videoRotationAngleForHorizonLevelPreview, options: [.initial, .new]) { coordinator, _ in
-                rotationOut.yield(Double(coordinator.videoRotationAngleForHorizonLevelPreview))
-            })
-        }
         return tokens
     }
 

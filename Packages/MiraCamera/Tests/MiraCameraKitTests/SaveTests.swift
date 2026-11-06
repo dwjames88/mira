@@ -277,3 +277,10 @@ func makeFrame(raw: Bool) throws -> CapturedFrame {
         #expect(!String(decoding: try saved.encoded(), as: UTF8.self).localizedCaseInsensitiveContains("seed"))
     }
 }
+
+@Test func savedAssetIDIsTheAssetTheUserKeeps() {
+    #expect(SaveOutcome.developed(assetID: "a").savedAssetID == "a")
+    #expect(SaveOutcome.printPending(assetID: "a").savedAssetID == "a")
+    #expect(SaveOutcome.bakedCopy(notice: "n", originalAssetID: "o", bakedAssetID: "b").savedAssetID == "b")
+    #expect(SaveOutcome.originalOnly(assetID: "o", notice: "n").savedAssetID == "o")
+}

@@ -5,9 +5,10 @@ import Photos
 import SwiftUI
 
 /// The camera as the app presents it: `CameraView` with the app's pieces (film renderer, the editor-backed print
-/// writer, opening a frame in the editor the gallery already uses).
+/// writer, bringing up the library the camera sits over).
 struct CameraScreen: View {
     let editor: EditorViewModel
+    /// Brings up the library: the header's LIBRARY link and the last-frame thumbnail.
     let onClose: () -> Void
     // Made once on appear: building it in `init` would make a model (Metal device, queues) per parent redraw.
     @State private var model: CameraModel?
@@ -19,8 +20,6 @@ struct CameraScreen: View {
             if let model, let doors {
                 CameraView(model: model, filmName: filmName(model), onClose: onClose) { context in
                     FilmDoorHost(camera: model, doors: doors, context: context)
-                } wbDoor: { context in
-                    WBDoorHost(camera: model, context: context)
                 }
                 // IMPORT / SAVE PRESET from the door: the camera's presentations, bound to the door model
                 // (RootView turns the editor's off while the camera is open).
@@ -54,18 +53,12 @@ struct CameraScreen: View {
             initialRecipe: initial,
             fixtureURL: Bundle.main.url(forResource: "sample", withExtension: "jpg"),
             printQueue: CameraPrints.queue,
-            onOpenFrame: { [editor, onClose] id in
-                guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil).firstObject else { return }
-                onClose()
-                // Through the gallery's open path (OPENING state, Photos backstop, failure card): a just-captured
-                // asset is exactly the case the backstop covers.
-                editor.pendingLibraryOpen = asset
-            })
+            onOpenLibrary: { [onClose] in onClose() },
+            onFrameSaved: { DevelopStore.shared.add($0) })
     }
 }
 
 /// The film door as the camera presents it: `CameraFilmDoor` over the door model, which is bound to the camera model.
-/// Cards are requested from the finder only while the door is on screen.
 private struct FilmDoorHost: View {
     let camera: CameraModel
     let doors: CameraFilmDoorModel
@@ -77,30 +70,5 @@ private struct FilmDoorHost: View {
             grain: Binding(get: { camera.settings.finderGrainLive }, set: { camera.settings.finderGrainLive = $0 }),
             onClose: context.close,
             maxHeight: context.maxHeight)
-            .onAppear {
-                // Cards may have asked before this ran (children appear first): forward what they asked for now.
-                let model = camera
-                doors.onWantedChange = { [weak model] ids in model?.setWantedCardIDs(ids) }
-                if !doors.wantedThumbnailIDs.isEmpty { camera.setWantedCardIDs(doors.prioritizedWantedIDs) }
-                doors.setThumbnails(camera.cardThumbnails)
-            }
-            .onDisappear {
-                doors.onWantedChange = nil
-                camera.setWantedCardIDs([])
-                doors.resetWantedThumbnails()
-            }
-            // The finder publishes each card as it is rendered and refreshes them about twice a second (CGImages are classes: compare identities).
-            .onChange(of: camera.cardThumbnails.mapValues { ObjectIdentifier($0) }) {
-                doors.setThumbnails(camera.cardThumbnails)
-            }
-    }
-}
-
-private struct WBDoorHost: View {
-    @Bindable var camera: CameraModel
-    let context: CameraDoorContext
-
-    var body: some View {
-        CameraWBDoor(state: $camera.wb, onClose: context.close)
     }
 }

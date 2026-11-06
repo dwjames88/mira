@@ -22,13 +22,42 @@ public enum FinderGeometry {
         return quarter % 2 == 1 ? sensorSize.height / sensorSize.width : sensorSize.width / sensorSize.height
     }
 
+    /// Size of the sensor image once turned upright by `rotationAngle`.
+    public static func uprightSize(sensorSize: CGSize, rotationAngle: Double) -> CGSize {
+        let quarter = Int((normalized(rotationAngle) / 90).rounded()) % 4
+        return quarter % 2 == 1 ? CGSize(width: sensorSize.height, height: sensorSize.width) : sensorSize
+    }
+
+    /// The aspect crop (`CaptureCrop.cropRect`) of the upright frame, normalized, top-left origin; the whole frame
+    /// for `.fourThree` (the sensor's own shape is "no crop").
+    public static func cropRect(sensorSize: CGSize, rotationAngle: Double, aspect: CaptureAspect) -> CGRect {
+        guard aspect != .fourThree else { return CGRect(x: 0, y: 0, width: 1, height: 1) }
+        return CaptureCrop.cropRect(frameSize: uprightSize(sensorSize: sensorSize, rotationAngle: rotationAngle), aspect: aspect)
+    }
+
+    /// Width / height of what the finder shows: the upright frame after the aspect crop.
+    public static func croppedAspect(sensorSize: CGSize, rotationAngle: Double, aspect: CaptureAspect) -> Double {
+        let size = uprightSize(sensorSize: sensorSize, rotationAngle: rotationAngle)
+        let crop = cropRect(sensorSize: sensorSize, rotationAngle: rotationAngle, aspect: aspect)
+        guard size.width > 0, size.height > 0, crop.height > 0 else { return 3.0 / 4.0 }
+        return (size.width * crop.width) / (size.height * crop.height)
+    }
+
     /// A point on the finder view -> the point in AVFoundation's device space (0...1, origin top left of the
     /// landscape sensor image). `rotationAngle` is the angle the sensor image is rotated clockwise to appear upright
     /// (90 for a portrait phone). Points outside the picture are clamped to its edge.
-    public static func devicePoint(viewPoint: CGPoint, viewSize: CGSize, uprightAspect: Double, rotationAngle: Double) -> CGPoint {
+    /// `uprightAspect` is the aspect of what is drawn (after `crop`); `crop` is the part of the upright frame that is
+    /// drawn (normalized, top-left origin), so the view point maps into the cropped frame, then into the whole upright
+    /// frame, then to the sensor.
+    public static func devicePoint(
+        viewPoint: CGPoint, viewSize: CGSize, uprightAspect: Double, rotationAngle: Double,
+        crop: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)
+    ) -> CGPoint {
         let fit = fitRect(aspect: uprightAspect, in: viewSize)
-        let u = min(max((viewPoint.x - fit.minX) / max(fit.width, 1), 0), 1)
-        let v = min(max((viewPoint.y - fit.minY) / max(fit.height, 1), 0), 1)
+        let cu = min(max((viewPoint.x - fit.minX) / max(fit.width, 1), 0), 1)
+        let cv = min(max((viewPoint.y - fit.minY) / max(fit.height, 1), 0), 1)
+        let u = crop.minX + cu * crop.width
+        let v = crop.minY + cv * crop.height
         switch Int((normalized(rotationAngle) / 90).rounded()) % 4 {
         case 1: return CGPoint(x: v, y: 1 - u)         // portrait
         case 2: return CGPoint(x: 1 - u, y: 1 - v)

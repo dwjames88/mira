@@ -9,7 +9,12 @@ struct RootView: View {
     @State private var model = EditorViewModel()
     @State private var tab: EditorTab = .films
     @State private var pickerItem: PhotosPickerItem?
-    @State private var showCamera = false
+    /// The app opens to the camera (the library sits underneath, alive). Snapshot runs and
+    /// `MIRA_LAUNCH_SCREEN=gallery` (the gallery snapshot) start without it.
+    @State private var showCamera = {
+        let env = ProcessInfo.processInfo.environment
+        return env["MIRA_SNAPSHOT"] != "1" && env["MIRA_LAUNCH_SCREEN"] != "gallery"
+    }()
     private let launch = CameraLaunch.shared
     private let snapshotMode = ProcessInfo.processInfo.environment["MIRA_SNAPSHOT"] == "1"
 

@@ -5,6 +5,11 @@ import SwiftUI
 import XCTest
 @testable import Mira
 
+private struct TestOriginKey: PreferenceKey {
+    static let defaultValue: [String: CGRect] = [:]
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) { value.merge(nextValue()) { $1 } }
+}
+
 @MainActor
 final class CameraLayoutTests: XCTestCase {
     func makeModel() -> CameraModel {
@@ -31,10 +36,31 @@ final class CameraLayoutTests: XCTestCase {
         let model = makeModel()
         let view = CameraView(model: model, filmName: "Kodak Portra 400", onClose: {}, onLayout: { box.frames = $0 }) { _ in
             Color.clear
-        } wbDoor: { _ in
-            Color.clear
         }
         await Snapshot.render(view, device: device, name: name, settle: .milliseconds(1500))
+        await model.stop()
+        return box.frames
+    }
+
+    /// Like `render`, but hosted with real safe-area insets (the shutter row sinks into the bottom inset, which padding can't show).
+    func renderInset(_ device: TestDevice) async -> [String: CGRect] {
+        let box = FrameBox()
+        let model = makeModel()
+        let view = CameraView(model: model, filmName: "Kodak Portra 400", onClose: {}, onLayout: { box.frames = $0 }) { _ in
+            Color.clear
+        }
+        let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: CGRect(origin: .zero, size: device.size))
+        window.frame = CGRect(origin: .zero, size: device.size)
+        let host = UIHostingController(rootView: view)
+        host.additionalSafeAreaInsets = UIEdgeInsets(top: device.topInset, left: 0, bottom: device.bottomInset, right: 0)
+        host.view.frame = window.bounds
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        host.view.layoutIfNeeded()
+        try? await Task.sleep(for: .milliseconds(1500))
+        host.view.layoutIfNeeded()
+        window.isHidden = true
         await model.stop()
         return box.frames
     }
@@ -50,7 +76,7 @@ final class CameraLayoutTests: XCTestCase {
 
     func testPortrait() async {
         for d in TestDevice.all {
-            let f = await render(d, name: "camera")
+            let f = await renderInset(d)
             let usable = CGSize(width: d.size.width, height: d.size.height - d.topInset - d.bottomInset)
             XCTAssertEqual(f["header"]?.height ?? 0, 48, accuracy: 0.5, "header is 48 pt on \(d.name)")
             XCTAssertEqual(f["shutter"]?.width ?? 0, 72, accuracy: 0.5)
@@ -62,11 +88,21 @@ final class CameraLayoutTests: XCTestCase {
             let fit = FinderGeometry.fitRect(aspect: 3.0 / 4, in: finder.size)
             XCTAssertLessThanOrEqual(fit.width, finder.width + 0.5)
             XCTAssertLessThanOrEqual(fit.height, finder.height + 0.5)
-            assertNoOverlap(f, ["header", "meter", "finder", "lenses", "ev", "bottom"])
-            XCTAssertLessThanOrEqual(f["bottom"]!.maxY, usable.height + 0.5, "bottom row stays on screen on \(d.name)")
+            if d.size.height >= 874 {
+                XCTAssertEqual(FinderGeometry.fitRect(aspect: 3.0 / 4, in: finder.size).width, finder.width, accuracy: 0.5,
+                               "the 3:4 picture fills the width on \(d.name): finder \(finder)")
+            }
+            assertNoOverlap(f, ["header", "meter", "finder", "ev", "wb", "bottom"])
+            XCTAssertTrue(finder.insetBy(dx: -0.5, dy: -0.5).contains(f["lenses"]!), "lens chips sit inside the finder on \(d.name)")
+            XCTAssertGreaterThanOrEqual(f["lenses"]!.height, 44 - 0.5)
+            XCTAssertGreaterThan(f["lenses"]!.midY, finder.midY, "lens chips at the finder's bottom edge")
+            XCTAssertEqual(f["wb"]!.height, f["ev"]!.height, accuracy: 0.5, "WB row as tall as the EV row on \(d.name)")
+            // The 84-pt row may sink up to 22 pt into the bottom safe area; the shutter stays clear of the home indicator.
+            XCTAssertLessThanOrEqual(f["bottom"]!.maxY, usable.height + min(d.bottomInset, 22) + 0.5, "bottom row stays on screen on \(d.name)")
+            XCTAssertLessThanOrEqual(f["shutter"]!.maxY, usable.height + max(d.bottomInset - 20, 0) + 0.5, "shutter stays 20 pt above the screen edge (home indicator) on \(d.name)")
             XCTAssertLessThanOrEqual(f["thumb"]!.maxX, f["shutter"]!.minX, "thumb left of the shutter")
             XCTAssertEqual(f["shutter"]!.midX, usable.width / 2, accuracy: 1, "shutter centered")
-            for id in ["header", "meter", "finder", "lenses", "ev", "bottom"] {
+            for id in ["header", "meter", "finder", "lenses", "ev", "wb", "bottom"] {
                 XCTAssertGreaterThanOrEqual(f[id]!.minX, -0.5)
                 XCTAssertLessThanOrEqual(f[id]!.maxX, usable.width + 0.5, "\(id) inside the width")
             }
@@ -82,8 +118,52 @@ final class CameraLayoutTests: XCTestCase {
         XCTAssertGreaterThan(finder.width, finder.height, "the finder takes the long side")
         XCTAssertLessThan(meter.maxX, finder.minX + 0.5, "meter on the left edge")
         XCTAssertGreaterThan(shutter.minX, finder.maxX - 0.5, "shutter column on the right")
-        assertNoOverlap(f, ["header", "meter", "lenses", "ev"])
-        XCTAssertLessThanOrEqual(f["ev"]!.maxY, usable.height + 0.5)
+        assertNoOverlap(f, ["header", "meter", "lenses", "ev", "wb"])
+        XCTAssertLessThanOrEqual(f["wb"]!.maxY, usable.height + 0.5)
+        XCTAssertEqual(f["wb"]!.height, f["ev"]!.height, accuracy: 0.5, "WB row as tall as the EV row")
+        XCTAssertGreaterThan(f["wb"]!.minY, f["ev"]!.minY, "WB under EV")
+        XCTAssertLessThanOrEqual(f["wb"]!.maxX, 210.5, "WB in the left column")
         XCTAssertLessThanOrEqual(shutter.maxY, usable.height + 0.5)
+    }
+
+    /// The header (and everything else) sits below the status bar / Dynamic Island: hosted with a real top safe-area
+    /// inset (not padding), the content must respect it while the background may extend under it.
+    func testChromeClearsTheTopSafeArea() async {
+        for d in [TestDevice.iPhone16Pro] {
+            let box = FrameBox()
+            let model = makeModel()
+            let origin = FrameBox()
+            let view = CameraView(model: model, filmName: "Kodak Portra 400", onClose: {}, onLayout: { box.frames = $0 }) { _ in
+                Color.clear
+            }
+            // The camera view's own frame in window coordinates; the part frames are relative to it.
+            .background(GeometryReader { geo in
+                Color.clear.preference(key: TestOriginKey.self, value: ["self": geo.frame(in: .global)])
+            })
+            .onPreferenceChange(TestOriginKey.self) { frames in
+                MainActor.assumeIsolated { if let r = frames["self"] { origin.frames = ["self": r] } }
+            }
+            let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+            let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: CGRect(origin: .zero, size: d.size))
+            window.frame = CGRect(origin: .zero, size: d.size)
+            let host = UIHostingController(rootView: view)
+            host.additionalSafeAreaInsets = UIEdgeInsets(top: d.topInset, left: 0, bottom: d.bottomInset, right: 0)
+            host.view.frame = window.bounds
+            window.rootViewController = host
+            window.makeKeyAndVisible()
+            host.view.layoutIfNeeded()
+            try? await Task.sleep(for: .milliseconds(1200))
+            host.view.layoutIfNeeded()
+            let f = box.frames
+            window.isHidden = true
+            await model.stop()
+            XCTAssertGreaterThan(host.view.safeAreaInsets.top, d.topInset - 0.5, "the host carries the inset")
+            let top = host.view.safeAreaInsets.top
+            guard let base = origin.frames["self"] else { return XCTFail("no camera view frame") }
+            for id in ["header", "meter", "finder"] {
+                guard let r = f[id] else { return XCTFail("missing \(id): \(f.keys.sorted())") }
+                XCTAssertGreaterThanOrEqual(base.minY + r.minY, top - 0.5, "\(id) starts below the top safe area (\(top)) on \(d.name)")
+            }
+        }
     }
 }

@@ -29,6 +29,7 @@ struct CameraHeader: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Back to library")
+            .accessibilityIdentifier("camera.library")
             Spacer(minLength: 0)
             if developing > 0 {
                 Text("DEVELOPING \(developing)").ffLabel(size: 9, color: T.paperDim).lineLimit(1)
@@ -62,23 +63,23 @@ struct CameraHeader: View {
 
 // MARK: Meter
 
-/// Needle on a -3...+3 mono scale with a lichen centre tick, and the readout row under it.
+/// Needle on a -3...+3 mono scale with a lichen centre tick (a 15 pt strip, no numerals), and the readout row under it.
 struct MeterView: View {
+    static let scaleHeight: CGFloat = 15
+
     let needle: Double
     let readout: String
     let latitude: LatitudeReadout
-    /// Degrees to turn the readout row (device turned while the interface stays portrait).
-    var readoutRotation: Double = 0
     /// Two rows (exposure, then latitude) for a narrow column.
     var stacked = false
 
     var body: some View {
-        VStack(spacing: 4) {
-            scale.frame(height: 26)
-            readoutRow.rotationEffect(.degrees(readoutRotation))
+        VStack(spacing: 2) {
+            scale.frame(height: Self.scaleHeight)
+            readoutRow
         }
         .padding(.horizontal, T.cells(2))
-        .padding(.vertical, 6)
+        .padding(.vertical, 3)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Light meter")
         .accessibilityValue("\(readout). \(latitude.text)")
@@ -92,20 +93,16 @@ struct MeterView: View {
                 ForEach(-9...9, id: \.self) { third in
                     let ev = Double(third) / 3
                     let whole = third % 3 == 0
+                    let height: CGFloat = third == 0 ? 9 : (whole ? 6 : 3.5)
                     Rectangle()
                         .fill(third == 0 ? T.lichen : (whole ? T.paperMid : T.paperDim))
-                        .frame(width: third == 0 ? 2 : 1, height: third == 0 ? 10 : (whole ? 7 : 4))
-                        .position(x: x(ev), y: 16)
-                }
-                ForEach([-3, -1, 1, 3], id: \.self) { ev in
-                    Text(ExposureModel.label(Double(ev))).ffLabel(size: 8, color: T.paperDim)
-                        .fixedSize()
-                        .position(x: min(max(x(Double(ev)), 10), w - 10), y: 24)
+                        .frame(width: third == 0 ? 2 : 1, height: height)
+                        .position(x: x(ev), y: Self.scaleHeight - height / 2)
                 }
                 Image(systemName: "arrowtriangle.down.fill")
-                    .font(.system(size: 8))
+                    .font(.system(size: 6))
                     .foregroundStyle(T.paper)
-                    .position(x: x(needle * 3), y: 4)
+                    .position(x: x(needle * 3), y: 3)
                     .animation(.easeOut(duration: 0.15), value: needle)
             }
         }
@@ -232,6 +229,104 @@ struct EVDial: View {
     }
 }
 
+// MARK: White balance dial
+
+/// The white balance row, beside the EV dial's visual language: a hairline-boxed centre readout with a lichen
+/// tick, a Kelvin ruler dragged horizontally (100 K per `pointsPerStep`, a tick every 100 K, a label every
+/// 500 K), AUTO on the left (lichen when auto; tap toggles) and the unit on the right.
+struct WBDial: View {
+    /// nil is AUTO.
+    let kelvin: Int?
+    /// A live value while dragging (nil is AUTO).
+    let onChange: (Int?) -> Void
+    /// The drag ended: snap to a nearby preset.
+    let onCommit: () -> Void
+    let onToggleAuto: () -> Void
+    @State private var dragBase: Int?
+
+    private let pointsPerStep: CGFloat = 8
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Button(action: onToggleAuto) {
+                Text("AUTO").ffLabel(size: 9, color: kelvin == nil ? T.lichen : T.paperDim)
+                    .frame(width: 52, height: 40)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Auto white balance")
+            .accessibilityValue(kelvin == nil ? "On" : "Off")
+            ruler
+            Text("K").ffLabel(size: 9, color: T.paperDim).frame(width: 36)
+        }
+        .frame(height: 40)
+    }
+
+    private var ruler: some View {
+        GeometryReader { geo in
+            let center = Double(kelvin ?? WhiteBalanceModel.startKelvin)
+            let perK = Double(pointsPerStep) / Double(WhiteBalanceModel.step)
+            let halfSpan = Int(geo.size.width / 2 / pointsPerStep) + 1
+            ZStack {
+                // Ticks every 100 K (subtle); labels every 500 K, dim, hidden near the centre box.
+                ForEach(-halfSpan...halfSpan, id: \.self) { i in
+                    let k = (Int(center) / WhiteBalanceModel.step + i) * WhiteBalanceModel.step
+                    if WhiteBalanceModel.range.contains(k) {
+                        let x = (Double(k) - center) * perK
+                        let major = k % 500 == 0
+                        Rectangle().fill(T.hair)
+                            .frame(width: 1, height: major ? 4 : 2)
+                            .offset(x: x, y: 16)
+                        if major, abs(x) > 46 {
+                            Text(String(k)).ffLabel(size: 11, color: T.paperDim).fixedSize()
+                                .offset(x: x)
+                        }
+                    }
+                }
+                .opacity(kelvin == nil ? 0.5 : 1)
+                // The current value, as in the EV dial: a hairline box (opaque, hiding the ruler under it) with a lichen underline.
+                ZStack {
+                    Rectangle().fill(T.ink)
+                    Rectangle().stroke(T.hair, lineWidth: 1)
+                    Text(readout).ffLabel(size: 13, color: kelvin == nil ? T.paperDim : T.paper, weight: .medium).fixedSize()
+                }
+                .frame(width: 64, height: 28)
+                Rectangle().fill(T.lichen).frame(width: 16, height: 2).offset(y: 12)
+            }
+            .frame(width: geo.size.width, height: 40)
+            .clipped()
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 6)
+                    .onChanged { drag in
+                        let base = dragBase ?? (kelvin ?? WhiteBalanceModel.startKelvin)
+                        dragBase = base
+                        let steps = Int((-drag.translation.width / pointsPerStep).rounded())
+                        onChange(WhiteBalanceModel.clamp(base + steps * WhiteBalanceModel.step))
+                    }
+                    .onEnded { _ in
+                        dragBase = nil
+                        onCommit()
+                    })
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("White balance")
+        .accessibilityValue(kelvin.map { k in "\(k) Kelvin" + (WhiteBalanceModel.preset(at: k).map { ", \($0.name.lowercased())" } ?? "") } ?? "Auto")
+        .accessibilityAdjustableAction { direction in
+            let current = kelvin ?? WhiteBalanceModel.startKelvin
+            switch direction {
+            case .increment: onChange(WhiteBalanceModel.clamp(current + WhiteBalanceModel.step))
+            case .decrement: onChange(WhiteBalanceModel.clamp(current - WhiteBalanceModel.step))
+            @unknown default: break
+            }
+        }
+    }
+
+    private var readout: String {
+        kelvin.map { String($0) } ?? "AUTO"
+    }
+}
+
 // MARK: Shutter
 
 /// 72 pt ring, 1.5 pt paper hairline, ink fill; lichen for 120 ms on press; paperDim when it cannot take a press.
@@ -283,8 +378,8 @@ struct LastFrameThumb: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .disabled(image == nil)
-        .accessibilityLabel("Open last frame in the editor")
+        .accessibilityLabel("Open the library")
+        .accessibilityIdentifier("camera.lastFrame")
     }
 }
 
