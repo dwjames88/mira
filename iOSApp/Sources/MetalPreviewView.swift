@@ -24,6 +24,8 @@ struct MetalPreviewView: UIViewRepresentable {
         view.clearColor = MTLClearColor(red: 0.082, green: 0.078, blue: 0.059, alpha: 1)
         view.backgroundColor = UIColor(red: 0.082, green: 0.078, blue: 0.059, alpha: 1)
         view.delegate = context.coordinator
+        // A new source (a RAW develop swapping in) changes the picture without changing any property above.
+        live.onSourceChange = { [weak view] in view?.setNeedsDisplay() }
         return view
     }
 

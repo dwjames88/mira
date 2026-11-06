@@ -32,6 +32,10 @@ final class LivePreview {
 
     let commandQueue: MTLCommandQueue?
 
+    /// Asks the view showing this preview to draw again. The picture depends on the source as well as on the recipe,
+    /// and a RAW develop swaps the source in later without touching the recipe, so nothing else would redraw it.
+    var onSourceChange: (@MainActor () -> Void)?
+
     func setSource(_ image: CIImage, colorSpace: CGColorSpace, size: CGSize) {
         source = image
         self.colorSpace = colorSpace
@@ -40,6 +44,19 @@ final class LivePreview {
         builtLongSide = 0
         epoch += 1
         stageKey = nil
+        onSourceChange?()
+    }
+
+    /// Drops the picture and everything built from it (proxy, staged texture) when the photo is closed, so the
+    /// gallery and camera do not carry a screen-sized half-float proxy and a full-size source.
+    func clear() {
+        source = nil
+        sourceSize = .zero
+        proxy = nil
+        builtLongSide = 0
+        epoch += 1
+        stageKey = nil
+        stage = nil
     }
 
     /// The pixel box the proxy is sized for: the screen's native pixels, the largest the photo can ever be
