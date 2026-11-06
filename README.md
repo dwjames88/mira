@@ -215,12 +215,12 @@ scripts/pack-films.sh           # swift run mira-sheet --pack-films FilmSources 
 ## Tests
 
 ```sh
-swift test --no-parallel --package-path Packages/MiraCore   # 562 tests (MiraCore 518 + MiraUpdates 44); 3 skip without FilmSources/ (see below)
-swift test --no-parallel --package-path Packages/MiraUI     # 184 tests (opt-in perf tests skip without MIRA_PERF=1)
-swift test --package-path Packages/MiraCamera               # 89 tests (camera pure layer, simulator-free)
+swift test --no-parallel --package-path Packages/MiraCore   # 564 tests (MiraCore 520 + MiraUpdates 44); 3 skip without FilmSources/ (see below)
+swift test --no-parallel --package-path Packages/MiraUI     # 194 tests (opt-in perf tests skip without MIRA_PERF=1)
+swift test --package-path Packages/MiraCamera               # 91 tests (camera pure layer, simulator-free)
 ```
 
-`--no-parallel` matters for MiraCore and MiraUI: concurrent Core Image renders can deadlock in the shared `CIContext`. MiraUI also writes headless snapshots to `build/snapshots`. The test list is in [TESTING.md](TESTING.md).
+`--no-parallel` is the reference configuration for MiraCore and MiraUI (the counts and snapshots are taken that way). Parallel runs also complete since Round 3: RAW sources decode on their own `CIContext` (`Renderer.decodeContext`), so a decode no longer holds the interactive context while Swift Testing parks threads on it, and the RAW tests run one at a time. MiraUI also writes headless snapshots to `build/snapshots`. The test list is in [TESTING.md](TESTING.md).
 
 ### Photos self-test
 

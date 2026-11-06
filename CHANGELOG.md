@@ -42,6 +42,57 @@ Roll 1: a camera for iPhone. Not yet verified on an iPhone (see Notes).
 ### Tests
 - New `MiraCamera` package: `swift test --package-path Packages/MiraCamera` runs 89 tests (camera state, exposure and readouts, lenses, capture format, white balance, finder quality ladder, finder touch, pending prints, two-step save with fakes). MiraCore adds finder tests (seed override, texture scale parity, finder vs capture parity) and an opt-in finder budget benchmark. iOS: camera layout snapshots (16 Pro, SE, landscape), camera door snapshots, camera model tests with the fake backend, a RAW+HEIC save round trip against the simulator's Photos library, and an opt-in simulator finder benchmark (MiraiOSTests 63, 5 opt-in skips). Beta 2 adds the finder rotation pixel test, fake-sensor rotation tests, real-safe-area layout tests, aspect/crop geometry, WB dial rules and the DEVELOP queue model; UI tests (8, 4 opt-in skips) start on the camera. Develop regroup: MiraCore `PipelineWhiteBalanceTests` (6), MiraUI `WhiteBalanceControlTests` (4) plus section-order, RAW-by-section, Reset and `editor-develop-panel-raw-*.png` snapshot tests, iOS `DevelopGroupsTests` (9). Totals: MiraCore 505, MiraUI 182, MiraiOSTests 79 (6 skipped), UI tests 8 (4 skipped).
 
+### Round 3: quality pass (no change to features, UI, defaults or file formats)
+Every render is pinned by 136 golden artifacts (`mira-sheet --golden`: previews, exports, proxies, film cards, export files and metadata, encoded recipe, adjustment and preset bytes), bit-identical before and after. Mac, extension and iOS snapshots are identical too, except live finder grain and the shared simulator library's photo count.
+- **Fixed, Mac and iOS core.** Parallel `swift test` no longer deadlocks: a lazy RAW decode held the shared `CIContext` while other threads parked on it. Previews now build their bases on `Renderer.decodeContext`, and the latitude meter does too. Other fixes:
+  - The metadata index could lose lines when two batches or a compaction overlapped.
+  - Garbage EXIF values could crash the info panel.
+  - A failed iCloud RAW download left its partial file behind, and a concurrent fetch could delete a file still in use.
+  - The RAW headroom cache grew without bound.
+  - One failed read of `Presets.json` could empty the preset store, so the next save dropped every preset.
+  - A NaN in a `.cube` crashed the cache writer.
+  - Preset import read files on the main actor.
+  - `mira-sheet --pack-films` could leave `Films/Packed` half written.
+  - A latitude reading on a crop under one pixel crashed.
+- **Fixed, Mac.**
+  - A closed photo stayed in memory, because the recipe observer held its editor.
+  - A file that failed to open dropped the open photo's sandbox access.
+  - Film-strip tiles finished by a cancelled pass were never shown.
+  - Revert fetched an editing input only to discard it.
+  - A save that Photos had committed was reported as failed when only the follow-up refresh failed.
+  - Updater: verification and the manual-install copy no longer block the main thread, Cancel during the copy is honoured, a cancelled check or download can no longer touch a newer one, and CRLF release notes drop the install boilerplate.
+- **Fixed, iPhone.**
+  - Library and queue:
+    - The DEVELOP queue could drop a frame queued during the launch-time prune.
+    - Leaving an album now stops its scans.
+    - Thumbnail preheating used fractional sizes and churned its window.
+    - Shares of a picture and its duplicate overwrote each other, and the temp folder was never removed.
+    - Late badge and cover loads could land on a reused cell.
+  - Editor:
+    - The preview did not redraw when a RAW develop swapped in.
+    - A closed photo's source, proxy and temp copy stayed in memory.
+    - A failed import deleted the open photo's file.
+    - A save that Photos had committed was reported as failed.
+    - Temp JPEGs leaked on failed saves.
+    - A failed film card stayed blank; it is now retried once.
+  - Camera:
+    - Leaving the screen while the camera opened could start it behind the closed screen.
+    - Finder stats leaked when not displayed.
+    - Device streams now end with the device.
+    - Baked or partial files were stranded when a save step failed.
+- **Faster.**
+  - Mac Develop slider: SwiftUI cost per tick is 13.5 → 2.0 ms (FILMS tab 5.8 → 1.5 ms). Only the moved slider re-evaluates, and theme colours and fonts are built once.
+  - LUT prewarm is 11-16 % faster, and packed cube decode is about 10 % faster.
+  - 24 MP export is 142 → 123 ms.
+  - iPhone gallery hands PhotoKit half the preheat work (`startCaching` assets 901 → 454, `stopCaching` calls 419 → 34) with the same requests.
+  - The camera meter redraws only itself.
+  - Numbers and commands: docs/PERFORMANCE.md "Round 3 baseline" and "Round 3 result".
+- **Lighter.** Release binaries are stripped, with dSYMs kept: Mac app 304.0 → 284.8 MB, iOS app 144.9 → 138.9 MB.
+- **Tests and tools.**
+  - New: `mira-sheet --golden record|compare`, settled snapshot tests (`SnapshotSettle`), opt-in perf harnesses (gallery, editor open, UI perf), `ContextStressTests` and `.rawExclusive`.
+  - `scripts/release.sh --dry-run`, `scripts/ios-snapshots.sh` accepts a UDID and refuses iOS 27.0, and `updater-compat.sh` stops on build errors.
+  - Totals: MiraCore 520 + MiraUpdates 44, MiraUI 194, MiraCamera 91, MiraiOSTests 107 (9 opt-in skips), MiraiOSUITests 16 (11 opt-in skips), all passing.
+
 ### Notes
 - Not yet verified on an iPhone. The first device check is the 30 fps finder gate on an iPhone 16 Pro; see [TESTING.md](TESTING.md).
 

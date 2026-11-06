@@ -12,7 +12,7 @@ import XCTest
 ///     build/round3/tools/perf-ios-ui.sh) holds the app's `requested=N` counter to compare across them
 ///   - camera stats: `MIRA_CAMERA_STATS=1` finder readout from Camera settings (the fake source, so a proxy)
 @MainActor final class PerfUITests: XCTestCase {
-    override func setUpWithError() throws {
+    override func setUp() async throws {
         continueAfterFailure = true
         try XCTSkipUnless(ProcessInfo.processInfo.environment["MIRA_PERF"] == "1", "set TEST_RUNNER_MIRA_PERF=1")
         XCUIDevice.shared.orientation = .portrait

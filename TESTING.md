@@ -186,12 +186,12 @@ Check by hand after a change to the editor chrome:
 Dodge & burn adds `DodgeBurnModelTests`, `DodgeBurnMaskTests`, `DodgeBurnRenderTests` (MiraCore, 28) and `DodgeBurnUITests` (MiraUI, 12, writing `dodgeburn-*.png` snapshots), plus the opt-in `DodgeBurnPerf`.
 
 ```sh
-swift test --no-parallel --package-path Packages/MiraCore   # 518 MiraCore tests, then 44 MiraUpdates tests
-swift test --no-parallel --package-path Packages/MiraUI     # 184 tests
-swift test --package-path Packages/MiraCamera               # 89 tests
+swift test --no-parallel --package-path Packages/MiraCore   # 520 MiraCore tests, then 44 MiraUpdates tests
+swift test --no-parallel --package-path Packages/MiraUI     # 194 tests
+swift test --package-path Packages/MiraCamera               # 91 tests
 ```
 
-Use `--no-parallel` for MiraCore and MiraUI: Swift Testing runs render tests concurrently by default, and concurrent Core Image renders can deadlock inside the shared `CIContext`. Run one package at a time.
+Use `--no-parallel` for MiraCore and MiraUI, one package at a time: it is the reference configuration for the counts and snapshots. Before Round 3 a parallel run could deadlock (a lazy RAW decode held the shared `CIContext` while Swift Testing parked every pool thread on it); RAW sources now decode on `Renderer.decodeContext` and the RAW tests run one at a time (`.rawExclusive`), so parallel runs complete too.
 
 iOS: `MiraiOSTests` holds the unit and snapshot tests (`xcodebuild test -scheme MiraiOS -only-testing:MiraiOSTests`).
 `MiraiOSUITests` needs a prepared simulator (Photos granted, media seeded): run `scripts/ios-uitests.sh [UDID]`; on an unprepared simulator a plain `xcodebuild test` reports them as skipped.
@@ -232,7 +232,7 @@ Writes `build/contact-sheet.png` (every film) and `build/contact-sheet-effects.p
 
 ### Camera
 
-`MiraCameraKit` has 89 tests in `Packages/MiraCamera/Tests`: `CameraStateTests`, `CaptureSupportTests`, `ExposureTests`, `LensFormatTests`, `SaveTests`, `SettingsFinderTests` and more (retry queue, pending prints, fallback ladder). Run `swift test --package-path Packages/MiraCamera`. The device checklist is under "Camera (iPhone, device only)". iOS: `FinderUprightTests` (pixel check of the rotation sign), `FakeFrameSourceRotationTests`, `CameraLayoutTests` (real safe-area insets; the 3:4 frame fills the width on 402×874), `DevelopQueueTests`; UI tests start on the camera and tap `camera.library` first. Landscape camera snapshot: `CameraOrientationSnapshotTests` with `TEST_RUNNER_MIRA_SNAPSHOT_OUT` (needs a simulator that rotates; the "iPhone Duo" QA sims do not).
+`MiraCameraKit` has 91 tests in `Packages/MiraCamera/Tests`: `CameraStateTests`, `CaptureSupportTests`, `ExposureTests`, `LensFormatTests`, `SaveTests`, `SettingsFinderTests` and more (retry queue, pending prints, fallback ladder). Run `swift test --package-path Packages/MiraCamera`. The device checklist is under "Camera (iPhone, device only)". iOS: `FinderUprightTests` (pixel check of the rotation sign), `FakeFrameSourceRotationTests`, `CameraLayoutTests` (real safe-area insets; the 3:4 frame fills the width on 402×874), `DevelopQueueTests`; UI tests start on the camera and tap `camera.library` first. Landscape camera snapshot: `CameraOrientationSnapshotTests` with `TEST_RUNNER_MIRA_SNAPSHOT_OUT` (needs a simulator that rotates; the "iPhone Duo" QA sims do not).
 
 ## Manual checklist
 
