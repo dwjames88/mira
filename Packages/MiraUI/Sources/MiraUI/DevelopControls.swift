@@ -61,7 +61,7 @@ public struct RawControlVisibility: Equatable, Sendable {
 ///   resting on 6500 K and tint 0.
 ///
 /// "As shot" clears both, so pipeline warmth / tint left on a RAW recipe by an older edit or a preset goes too.
-public struct WhiteBalanceControl: Equatable, Sendable {
+public struct WhiteBalanceControl: Hashable, Sendable {
     public let isRaw: Bool
     public let kelvinRange: ClosedRange<Double>
     public let kelvinDefault: Double

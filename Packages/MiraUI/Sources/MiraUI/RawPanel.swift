@@ -60,14 +60,17 @@ struct RawSliders: View {
 
     var body: some View {
         let show = model.rawControlVisibility
+        let recipe = model.recipe
         ForEach(specs.filter { $0.isShown(show) }) { spec in
-            let fallback = spec.fallback(model.recipe)
-            let binding = OptionalValue.binding(
-                get: { model.recipe.raw[keyPath: spec.keyPath] },
-                set: { model.recipe.raw[keyPath: spec.keyPath] = $0 }, fallback: fallback)
-            let isAuto = model.recipe.raw[keyPath: spec.keyPath] == nil
-            FFSlider(spec.label, value: binding, in: spec.range, default: fallback,
-                     format: isAuto ? { _ in "Auto" } : nil)
+            let fallback = spec.fallback(recipe)
+            let setting = recipe.raw[keyPath: spec.keyPath]
+            RecipeSlider(label: spec.label, shown: setting ?? fallback, range: spec.range, defaultValue: fallback,
+                         isAuto: setting == nil, context: spec.id.hashValue,
+                         get: { model.recipe.raw[keyPath: spec.keyPath] ?? fallback },
+                         set: { new in
+                             model.recipe.raw[keyPath: spec.keyPath] = abs(new - fallback) <= 0.005 ? nil : new
+                         })
+                .equatable()
                 .help(spec.help ?? "")
         }
     }

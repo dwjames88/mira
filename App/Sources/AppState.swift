@@ -53,8 +53,8 @@ final class AppState {
     /// importing works with no photo open.
     let presetTransfer = PresetTransfer(store: .shared, sharingEnabled: true)
     var mode: Mode = .library
-    private(set) var editor: EditorModel?
-    private(set) var target: Target?
+    private(set) var editor: EditorModel? { didSet { syncSavedRecipe() } }
+    private(set) var target: Target? { didSet { syncSavedRecipe() } }
     var errorMessage: String?
     /// A Photos picture the open could not get from Photos (timed out twice); shown as a card with RETRY and BACK.
     struct OpenFailure: Equatable {
@@ -83,7 +83,7 @@ final class AppState {
     var showLeaveDialog = false
     var showRevertConfirm = false
 
-    private var loadedRecipe = Recipe.neutral
+    private var loadedRecipe = Recipe.neutral { didSet { syncSavedRecipe() } }
     private var canSaveToPhotos = false
     @ObservationIgnored private var pendingLeave: (@MainActor () -> Void)?
     @ObservationIgnored private var scopedURL: URL?
@@ -113,10 +113,22 @@ final class AppState {
     /// The crop tool is open: Save, Export and Revert wait until it is closed with Done or Cancel.
     var isCropping: Bool { editor?.isCropping ?? false }
 
+    /// Tells the editor which saved recipe its edit is measured against: the Photos adjustment that was loaded or
+    /// last saved, or the sidecar on disk (neutral when there is none). The editor keeps `differsFromReference`
+    /// up to date as the recipe changes, so the menus and toolbar read that answer instead of the recipe itself
+    /// and are not re-evaluated by every slider tick.
+    private func syncSavedRecipe() {
+        switch target {
+        case .asset: editor?.reference = loadedRecipe
+        case .file(let file): editor?.reference = file.persisted ?? .neutral
+        case nil: editor?.reference = nil
+        }
+    }
+
     /// Unsaved work in a Photos edit (files autosave to their sidecar).
     var isDirty: Bool {
         guard isAssetTarget, let editor else { return false }
-        return EditDirtyCheck.isDirty(current: editor.recipe, loaded: loadedRecipe)
+        return editor.differsFromReference
     }
 
     /// The short mono label in the toolbar: SAVED / REVERTED right after those actions, UNSAVED while a
@@ -155,7 +167,7 @@ final class AppState {
         guard !isCropping, !isBusy else { return false }
         switch target {
         case .asset: return canSave
-        case .file(let file): return (editor?.recipe ?? .neutral) != (file.persisted ?? .neutral)
+        case .file: return editor?.differsFromReference ?? false
         case nil: return false
         }
     }
@@ -289,9 +301,12 @@ final class AppState {
         let opened = url.startAccessingSecurityScopedResource()
         let model = EditorModel(library: library, transfer: presetTransfer)
         guard model.loadSource(url: url) else {
+            if opened { url.stopAccessingSecurityScopedResource() }
             errorMessage = "\(url.lastPathComponent) could not be opened as an image."
             return
         }
+        scopedURL?.stopAccessingSecurityScopedResource()
+        scopedURL = url
         loadGeneration += 1
         let restored = sidecars.load(for: url)
         let location = sidecars.location(for: url)
@@ -301,12 +316,9 @@ final class AppState {
         loadedRecipe = model.recipe
         canSaveToPhotos = false
         editorNote = nil
-            if opened { url.stopAccessingSecurityScopedResource() }
         resultLine = nil
         statusLine = SidecarStatus.line(location: location, imageURL: url)
         mode = .editor
-        scopedURL?.stopAccessingSecurityScopedResource()
-        scopedURL = url
         track()
     }
 
