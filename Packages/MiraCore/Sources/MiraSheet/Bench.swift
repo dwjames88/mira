@@ -14,6 +14,9 @@ import UniformTypeIdentifiers
 // d. full-resolution 24 MP export
 // h. dodge and burn: mask rasterisation, live-stroke updates, graded frames
 // z. zoomed frames (50%, 100%, 200%): only the visible region of the 24 MP picture is rendered
+//
+// MIRA_BENCH_ONLY=<letters> runs only some parts: l (legacy pipeline), c (current pipeline), h (dodge and burn),
+// e (switching, histogram, launch). Unset runs everything.
 
 enum Bench {
     static let canvasPixels = CGSize(width: 1500, height: 1000)
@@ -104,12 +107,20 @@ enum Bench {
 
         print("mira bench  (\(ProcessInfo.processInfo.processorCount) cores, 6000x4000 JPEG, canvas \(Int(canvasPixels.width))x\(Int(canvasPixels.height)))")
         print("")
-        try Legacy.run(renderer: renderer, library: library, context: context, jpeg: jpeg,
-                       filmsURL: filmsURL, benchDir: dir)
-        try Current.run(renderer: renderer, library: library, context: context, jpeg: jpeg,
-                        filmsURL: filmsURL, benchDir: dir)
-        try DodgeBurnBench.run(renderer: renderer, context: context, jpeg: jpeg)
-        if let full = ImageSource.loadDecoded(url: jpeg) {
+        let only = ProcessInfo.processInfo.environment["MIRA_BENCH_ONLY"] ?? ""
+        let skipping = !only.isEmpty
+        if !skipping || only.contains("l") {
+            try Legacy.run(renderer: renderer, library: library, context: context, jpeg: jpeg,
+                           filmsURL: filmsURL, benchDir: dir)
+        }
+        if !skipping || only.contains("c") {
+            try Current.run(renderer: renderer, library: library, context: context, jpeg: jpeg,
+                            filmsURL: filmsURL, benchDir: dir)
+        }
+        if !skipping || only.contains("h") {
+            try DodgeBurnBench.run(renderer: renderer, context: context, jpeg: jpeg)
+        }
+        if !skipping || only.contains("e"), let full = ImageSource.loadDecoded(url: jpeg) {
             try Extra.run(library: library, full: full, filmsURL: filmsURL, benchDir: dir)
         }
     }

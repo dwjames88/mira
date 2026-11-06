@@ -60,7 +60,11 @@ enum DodgeBurnBench {
                   String(format: "median %7.2f ms   p95 %7.2f ms", st.median, st.p95))
 
         // Graded frames at preview size, through the whole graph.
-        guard let full = ImageSource.load(url: jpeg) else { return }
+        // The decoded source the Mac editor holds (`EditorModel.loadSource`), not the lazy file-backed one: a lazy
+        // `CIImage(contentsOf:)` JPEG is decoded again for every frame in about half of the process launches (Core
+        // Image's CMPhoto decode is not kept between renders there; a 24 MP software decode is about 450 ms), which
+        // made this row measure the JPEG decoder, 16 ms in one launch and 450 ms in the next.
+        guard let full = ImageSource.loadDecoded(url: jpeg) else { return }
         let preview = renderer.previewImage(from: full, maxPixelSize: 1500)
         let film = Bench.effectsRecipe
         for (label, count) in [("no strokes", 0), ("10 strokes", 10), ("50 strokes", 50)] {
