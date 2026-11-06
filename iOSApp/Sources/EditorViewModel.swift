@@ -109,6 +109,46 @@ final class EditorViewModel {
 
     init() { recipe = Recipe() }
 
+    // MARK: Develop queue on save
+
+    /// Where a save lands, as far as the DEVELOP queue cares.
+    enum SaveTarget: Equatable {
+        /// An in-place edit of this library asset.
+        case inPlace(String)
+        /// A new asset; `original` is the library asset the edit came from, when known.
+        case newAsset(original: String?)
+    }
+
+    /// The queue a confirmed save removes photos from.
+    var developStore: DevelopStore = .shared
+    /// Test seam: replaces the PhotoKit write. Returns the created asset's identifier (new-asset saves).
+    /// Throwing leaves the queue alone, like a real failure. Always nil in production.
+    @ObservationIgnored var saveWriter: (@MainActor (SaveTarget, Recipe) async throws -> String?)?
+    /// Test seam: makes `save()` treat the open photo as an in-place edit of this asset. Always nil in production.
+    @ObservationIgnored var inPlaceAssetIDForTesting: String?
+    /// The library asset an imported picture was picked from (PhotosPicker's `itemIdentifier`), when known.
+    @ObservationIgnored private var importedOriginalID: String?
+
+    private var saveTarget: SaveTarget {
+        if let id = inPlaceAssetIDForTesting { return .inPlace(id) }
+        switch editTarget {
+        case .asset(let session): return .inPlace(session.asset.localIdentifier)
+        case .imported: return .newAsset(original: importedOriginalID)
+        }
+    }
+
+    /// Takes a saved photo (and, for a copy, the original it came from) out of the DEVELOP queue.
+    private func dequeueAfterSave(target: SaveTarget, created: String?) {
+        var ids: Set<String> = []
+        switch target {
+        case .inPlace(let id): ids.insert(id)
+        case .newAsset(let original): if let original { ids.insert(original) }
+        }
+        if let created { ids.insert(created) }
+        guard !ids.isEmpty else { return }
+        developStore.remove(ids: ids)
+    }
+
     /// Applies a film (or Original). A film choice moves the recipe to the current rendering pipeline,
     /// as on the Mac; push, scan and toning stay as the user set them.
     func select(_ id: String?) {
@@ -288,7 +328,7 @@ final class EditorViewModel {
             guard let data = try await item.loadTransferable(type: Data.self) else {
                 status = "THAT PHOTO COULD NOT BE LOADED"; return
             }
-            try await ingest(data)
+            try await ingest(data, originalID: item.itemIdentifier)
         } catch {
             status = "ERROR · \(error.localizedDescription.uppercased())"
         }
@@ -341,6 +381,7 @@ final class EditorViewModel {
             recipe = loaded.recipe
             isRestoring = false
             editTarget = .asset(session)
+            importedOriginalID = nil
             isLibraryAsset = true
             saveState = .saved
             thumbnails = [:]
@@ -463,17 +504,17 @@ final class EditorViewModel {
         }
     }
 
-    private func ingest(_ data: Data) async throws {
+    private func ingest(_ data: Data, originalID: String? = nil) async throws {
         openGeneration += 1
         let generation = openGeneration
         engineEpoch += 1
         let loaded = try await engine.load(data: data, epoch: engineEpoch)
         guard generation == openGeneration else { return }
-        present(loaded)
+        present(loaded, originalID: originalID)
     }
 
     /// Shows a decoded source as a freshly opened import (default recipe, nothing to save).
-    func present(_ loaded: LoadedSource) {
+    func present(_ loaded: LoadedSource, originalID: String? = nil) {
         thumbnailsFilmApplied = false
         live.setSource(loaded.image, colorSpace: loaded.colorSpace, size: loaded.size)
         sourceExposureTime = loaded.image.miraExposureTime
@@ -485,6 +526,7 @@ final class EditorViewModel {
         recipe = Recipe()
         isRestoring = false
         editTarget = .imported
+        importedOriginalID = originalID
         isLibraryAsset = false
         clearRawInfo()
         saveState = .saved
@@ -544,16 +586,23 @@ final class EditorViewModel {
         status = "SAVING"
         defer { isSaving = false }
         do {
-            switch editTarget {
-            case .asset(let session):
-                guard let renderer = live.renderer else { throw AssetEditError.noRenderer }
-                try await session.save(recipe: recipe, renderer: renderer)
-                status = "SAVED TO PHOTOS"
-            case .imported:
-                let url = try await engine.exportFull(recipe)
-                try await PhotoEngine.saveToLibrary(url)
-                status = "SAVED TO PHOTOS"
+            let target = saveTarget
+            var created: String?
+            if let saveWriter {
+                created = try await saveWriter(target, recipe)
+            } else {
+                switch editTarget {
+                case .asset(let session):
+                    guard let renderer = live.renderer else { throw AssetEditError.noRenderer }
+                    try await session.save(recipe: recipe, renderer: renderer)
+                case .imported:
+                    let url = try await engine.exportFull(recipe)
+                    created = try await PhotoEngine.saveToLibrary(url)
+                }
             }
+            status = "SAVED TO PHOTOS"
+            // Only now, with the change committed to Photos, does the photo leave the queue.
+            dequeueAfterSave(target: target, created: created)
             // Edits made while the save ran are not in the file: the photo is still unsaved.
             saveState = recipe == saving ? .saved : .unsaved
         } catch {

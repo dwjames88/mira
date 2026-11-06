@@ -157,13 +157,26 @@ actor PhotoEngine {
     }
 
     /// Adds the JPEG at `url` to the library as a new photo; the file is removed whether or not that succeeds.
-    static func saveToLibrary(_ url: URL) async throws {
+    /// Returns the created asset's local identifier (nil if Photos did not report one).
+    @discardableResult
+    static func saveToLibrary(_ url: URL) async throws -> String? {
         defer { try? FileManager.default.removeItem(at: url) }
         let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
         guard status == .authorized || status == .limited else { throw PhotoEngineError.notAuthorized }
-        try await PHPhotoLibrary.shared().performChanges {
+        let box = CreatedIDBox()
+        try await PHPhotoLibrary.shared().performChanges { @Sendable in
             let req = PHAssetCreationRequest.forAsset()
             req.addResource(with: .photo, fileURL: url, options: PHAssetResourceCreationOptions())
+            box.set(req.placeholderForCreatedAsset?.localIdentifier)
         }
+        return box.value
     }
+}
+
+/// Carries the created asset's identifier out of the `performChanges` block (which runs on Photos' queue).
+private final class CreatedIDBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var id: String?
+    func set(_ new: String?) { lock.lock(); id = new; lock.unlock() }
+    var value: String? { lock.lock(); defer { lock.unlock() }; return id }
 }
