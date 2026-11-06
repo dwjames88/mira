@@ -1,4 +1,5 @@
 import CoreText
+import os
 import SwiftUI
 
 // MARK: Tokens
@@ -99,30 +100,31 @@ public enum FieldFramesTheme {
 
     public static func token(named name: String) -> FFToken? { tokens.first { $0.name == name } }
 
-    // Colours (dynamic: they follow the system appearance).
-    public static var ink: Color { inkToken.color }
+    // Colours (dynamic: they follow the system appearance). Built once: a view body reads several of these, and
+    // each used to allocate a new dynamic NSColor (two hex parses and a provider closure) on every read.
+    public static let ink: Color = inkToken.color
     /// The dark ink in both appearances: the ground behind a photograph shown alone (full screen).
-    public static var inkAlways: Color {
+    public static let inkAlways: Color = {
         #if canImport(AppKit)
         Color(nsColor: inkToken.dark.platformColor)
         #else
         Color(uiColor: inkToken.dark.platformColor)
         #endif
-    }
-    public static var inkSoft: Color { inkSoftToken.color }
-    public static var paper: Color { paperToken.color }
-    public static var paperSoft: Color { paperSoftToken.color }
-    public static var paperMid: Color { paperMidToken.color }
-    public static var paperDim: Color { paperDimToken.color }
-    public static var lichen: Color { lichenToken.color }
-    public static var hair: Color { hairToken.color }
-    public static var backdrop: Color { backdropToken.color }
-    public static var onPhoto: Color { onPhotoToken.color }
-    public static var onPhotoSoft: Color { onPhotoSoftToken.color }
-    public static var onPhotoMid: Color { onPhotoMidToken.color }
-    public static var onPhotoDim: Color { onPhotoDimToken.color }
-    public static var onPhotoAccent: Color { onPhotoAccentToken.color }
-    public static var onPhotoVeil: Color { onPhotoVeilToken.color }
+    }()
+    public static let inkSoft: Color = inkSoftToken.color
+    public static let paper: Color = paperToken.color
+    public static let paperSoft: Color = paperSoftToken.color
+    public static let paperMid: Color = paperMidToken.color
+    public static let paperDim: Color = paperDimToken.color
+    public static let lichen: Color = lichenToken.color
+    public static let hair: Color = hairToken.color
+    public static let backdrop: Color = backdropToken.color
+    public static let onPhoto: Color = onPhotoToken.color
+    public static let onPhotoSoft: Color = onPhotoSoftToken.color
+    public static let onPhotoMid: Color = onPhotoMidToken.color
+    public static let onPhotoDim: Color = onPhotoDimToken.color
+    public static let onPhotoAccent: Color = onPhotoAccentToken.color
+    public static let onPhotoVeil: Color = onPhotoVeilToken.color
 
     // MARK: Grid
 
@@ -201,19 +203,37 @@ public enum FieldFramesTheme {
         return PlatformFont(name: name, size: size) ?? .monospacedSystemFont(ofSize: size, weight: .regular)
     }
 
+    /// SwiftUI fonts by face, size and weight axis value. A label or slider body asks for the same two or three
+    /// fonts on every evaluation, and building one meant a font-descriptor lookup each time.
+    private struct FontKey: Hashable {
+        let face: UInt8
+        let size: CGFloat
+        let weight: Double
+    }
+
+    private static let fontCache = OSAllocatedUnfairLock(initialState: [FontKey: Font]())
+
+    private static func cachedFont(face: UInt8, size: CGFloat, weight: Font.Weight, make: () -> Font) -> Font {
+        let key = FontKey(face: face, size: size, weight: variationWeight(weight))
+        if let hit = fontCache.withLock({ $0[key] }) { return hit }
+        let font = make()
+        fontCache.withLock { $0[key] = font }
+        return font
+    }
+
     /// Cormorant Garamond display type.
     public static func display(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        platformFont(displayNSFont(size, weight: weight))
+        cachedFont(face: 0, size: size, weight: weight) { platformFont(displayNSFont(size, weight: weight)) }
     }
 
     /// Cormorant Garamond italic.
     public static func displayItalic(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        platformFont(displayNSFont(size, weight: weight, italic: true))
+        cachedFont(face: 1, size: size, weight: weight) { platformFont(displayNSFont(size, weight: weight, italic: true)) }
     }
 
     /// IBM Plex Mono.
     public static func mono(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        platformFont(monoNSFont(size, weight: weight))
+        cachedFont(face: 2, size: size, weight: weight) { platformFont(monoNSFont(size, weight: weight)) }
     }
 
     /// Letter spacing of the house label, in em (`styles.css`: 0.08em to 0.14em).
