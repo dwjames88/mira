@@ -220,6 +220,7 @@ struct DevelopPanel: View {
 
     private func chip(_ item: Adjustment) -> some View {
         let selected = item.id == focus
+        let modified = isModified(item)
         return Button {
             focus = item.id
         } label: {
@@ -232,7 +233,7 @@ struct DevelopPanel: View {
                     Rectangle().fill(selected ? T.lichen : .clear).frame(height: 2).padding(.horizontal, T.cells(1))
                 }
                 .overlay(alignment: .topTrailing) {
-                    if isModified(item) {
+                    if modified {
                         Rectangle().fill(T.lichen).frame(width: 5, height: 5).padding(.top, 10).padding(.trailing, 6)
                     }
                 }
@@ -240,11 +241,14 @@ struct DevelopPanel: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(item.title)
-        .accessibilityValue(isModified(item) ? "adjusted" : "default")
+        .accessibilityValue(modified ? "adjusted" : "default")
     }
 
+    /// What an untouched recipe holds, for the chips that compare a whole group (curves, mixer, border).
+    private static let untouched = Recipe()
+
     private func isModified(_ item: Adjustment) -> Bool {
-        let base = Recipe()
+        let base = Self.untouched
         switch item.kind {
         case let .scalar(kp, _, def): return model.recipe[keyPath: kp] != def
         case .curves: return model.recipe.curves != base.curves

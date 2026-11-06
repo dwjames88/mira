@@ -80,7 +80,9 @@ struct CropTab: View {
         let c = canvas
         guard c.width > 0 else { return "\u{2014}" }
         let r = model.workingCrop.rect
-        return "\(Int((r.w * c.width).rounded())) \u{00D7} \(Int((r.h * c.height).rounded())) px"
+        let w = (r.w * c.width).rounded(), h = (r.h * c.height).rounded()
+        guard w.isFinite, h.isFinite else { return "\u{2014}" }   // Int(NaN) would trap
+        return "\(Int(w)) \u{00D7} \(Int(h)) px"
     }
 }
 

@@ -33,8 +33,10 @@ actor PhotoEngine {
     private var sourceURL: URL?
     private var source: CIImage?
     private var colorSpace: CGColorSpace?
-    private var histogramSource: CIImage?
-    private var thumb: CIImage?
+    /// The histogram's and the film cards' small copies of `source`, made on first use (see `smallCopies()`).
+    private var small: (histogram: CIImage, thumb: CIImage)?
+    /// The caller's number of the source held now (see `discard(upTo:)`).
+    private var epoch = 0
 
     init() {
         let lib = Self.library
@@ -46,31 +48,58 @@ actor PhotoEngine {
     nonisolated static let filmList: [Film] = library?.films ?? []
 
     /// Loads an upright image from `data`; returns the source for the live view.
-    func load(data: Data) throws -> LoadedSource {
-        guard let renderer else { throw PhotoEngineError.noLibrary }
+    func load(data: Data, epoch: Int = 0) throws -> LoadedSource {
+        guard renderer != nil else { throw PhotoEngineError.noLibrary }
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("mira-source-\(UUID().uuidString)")
         try data.write(to: url)
+        // A photo that cannot be read leaves the one already held (and its file) alone.
+        guard let loaded = ImageSource.loadWithColorSpace(url: url) else {
+            try? FileManager.default.removeItem(at: url)
+            throw PhotoEngineError.cannotLoad
+        }
         if let old = sourceURL { try? FileManager.default.removeItem(at: old) }
-        guard let loaded = ImageSource.loadWithColorSpace(url: url) else { throw PhotoEngineError.cannotLoad }
+        self.epoch = epoch
         sourceURL = url
         source = loaded.image
         colorSpace = loaded.colorSpace
-        histogramSource = Self.tagged(renderer.previewImage(from: loaded.image, maxPixelSize: 480), like: loaded.image)
-        thumb = Self.tagged(renderer.previewImage(from: loaded.image, maxPixelSize: 220), like: loaded.image)
+        small = nil
         let space = loaded.colorSpace
         return LoadedSource(image: loaded.image, colorSpace: space, size: loaded.image.extent.size)
     }
 
     /// Adopts an already-decoded original (library asset) for histogram and film thumbnails.
     /// Export of library assets goes through `AssetEditSession`, not this engine.
-    func adopt(_ loaded: LoadedSource) throws {
-        guard let renderer else { throw PhotoEngineError.noLibrary }
+    func adopt(_ loaded: LoadedSource, epoch: Int = 0) throws {
+        guard renderer != nil else { throw PhotoEngineError.noLibrary }
         if let old = sourceURL { try? FileManager.default.removeItem(at: old) }
+        self.epoch = epoch
         sourceURL = nil
         source = loaded.image
         colorSpace = loaded.colorSpace
-        histogramSource = Self.tagged(renderer.previewImage(from: loaded.image, maxPixelSize: 480), like: loaded.image)
-        thumb = Self.tagged(renderer.previewImage(from: loaded.image, maxPixelSize: 220), like: loaded.image)
+        small = nil
+    }
+
+    /// Lets go of the held source, its temp copy and the derived small images, unless a newer one (`epoch` above
+    /// `upTo`) was handed over after the caller decided to discard.
+    func discard(upTo: Int) {
+        guard epoch <= upTo else { return }
+        if let old = sourceURL { try? FileManager.default.removeItem(at: old) }
+        sourceURL = nil
+        source = nil
+        colorSpace = nil
+        small = nil
+    }
+
+    /// Small copies of the source for the histogram (480 px) and the film cards (220 px), made on first use and kept.
+    /// They stay lazy scale-down graphs: rendering them to a bitmap once would be faster per tick (measured 2x) but
+    /// shifts the histogram and card pixels by a few levels, so it is left as a proposal.
+    private func smallCopies() -> (histogram: CIImage, thumb: CIImage)? {
+        if let small { return small }
+        guard let renderer, let source else { return nil }
+        let made = (histogram: Self.tagged(renderer.previewImage(from: source, maxPixelSize: 480), like: source),
+                    thumb: Self.tagged(renderer.previewImage(from: source, maxPixelSize: 220), like: source))
+        small = made
+        return made
     }
 
     /// A derived image keeps the source's EXIF exposure time and headroom (the reciprocity and exposure stages read them).
@@ -80,8 +109,8 @@ actor PhotoEngine {
 
     /// Histogram of the graded small preview. Called throttled, never per frame.
     func histogram(for recipe: Recipe) throws -> HistogramData {
-        guard let renderer, let histogramSource else { throw PhotoEngineError.cannotLoad }
-        return Self.histogram(of: renderer.apply(recipe, to: histogramSource))
+        guard let renderer, let copies = smallCopies() else { throw PhotoEngineError.cannotLoad }
+        return Self.histogram(of: renderer.apply(recipe, to: copies.histogram))
     }
 
     private static func histogram(of image: CIImage) -> HistogramData {
@@ -101,10 +130,12 @@ actor PhotoEngine {
     }
 
     func renderThumbnail(filmID: String?) throws -> Data {
-        guard let renderer, let thumb else { throw PhotoEngineError.cannotLoad }
+        // Cards queue here one by one; one whose request was cancelled while it waited (scrolled away) is skipped.
+        try Task.checkCancellation()
+        guard let renderer, let copies = smallCopies() else { throw PhotoEngineError.cannotLoad }
         // Same card recipe as the Mac strip: the film at its native grain, halation and bloom (what applying it gives).
         let recipe = Recipe(filmID: filmID, reciprocity: .off).applyingNativeTexture(filmID: filmID)
-        return try Self.encode(renderer.apply(recipe, to: thumb), colorSpace: colorSpace)
+        return try Self.encode(renderer.apply(recipe, to: copies.thumb), colorSpace: colorSpace)
     }
 
     /// Full-size export to a temp JPEG; returns its URL.
@@ -125,13 +156,14 @@ actor PhotoEngine {
         return data
     }
 
+    /// Adds the JPEG at `url` to the library as a new photo; the file is removed whether or not that succeeds.
     static func saveToLibrary(_ url: URL) async throws {
+        defer { try? FileManager.default.removeItem(at: url) }
         let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
         guard status == .authorized || status == .limited else { throw PhotoEngineError.notAuthorized }
         try await PHPhotoLibrary.shared().performChanges {
             let req = PHAssetCreationRequest.forAsset()
             req.addResource(with: .photo, fileURL: url, options: PHAssetResourceCreationOptions())
         }
-        try? FileManager.default.removeItem(at: url)
     }
 }
