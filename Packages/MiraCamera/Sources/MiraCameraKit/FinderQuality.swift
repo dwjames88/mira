@@ -106,9 +106,6 @@ public struct FallbackLadder: Sendable {
     /// Records a finder frame time (milliseconds) at `timestamp` (seconds, monotonic).
     public mutating func record(frameMilliseconds ms: Double, at timestamp: Double) {
         guard ms.isFinite, mode == .auto else { return }
-        // A gap longer than the window (the camera paused, or the level was pinned for a while): the pending slow /
-        // fast timers no longer describe one continuous run of frames, so they start over.
-        if let last = samples.last, timestamp - last.t > Self.window { resetWindow() }
         samples.append((ms, timestamp))
         samples.removeAll { timestamp - $0.t > Self.window }
         let median = Self.median(samples.map(\.ms))

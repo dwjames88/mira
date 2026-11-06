@@ -101,28 +101,6 @@ import MiraCore
         #expect(l.level == .full)
     }
 
-    @Test func aStallRestartsThePendingTimers() {
-        // 0.9 s of slow frames is not yet a step down ...
-        var l = FallbackLadder()
-        feed(&l, ms: 40, from: 0, seconds: 0.9)
-        #expect(l.level == .full)
-        // ... and after a pause the first slow frame must not finish that old second.
-        l.record(frameMilliseconds: 40, at: 60)
-        #expect(l.level == .full)
-        feed(&l, ms: 40, from: 60.03, seconds: 0.9)
-        #expect(l.level == .full)
-        feed(&l, ms: 40, from: 60.93, seconds: 0.5)
-        #expect(l.level == .grainOff)
-
-        // Same for the step up: 4 s of fast frames, a pause, then one fast frame is not 5 s.
-        var u = FallbackLadder()
-        var t = feed(&u, ms: 40, from: 0, seconds: 1.5)
-        #expect(u.level == .grainOff)
-        t = feed(&u, ms: 12, from: t, seconds: 4)
-        u.record(frameMilliseconds: 12, at: t + 60)
-        #expect(u.level == .grainOff)
-    }
-
     @Test func thermalFloors() {
         var l = FallbackLadder()
         l.thermal = .fair
