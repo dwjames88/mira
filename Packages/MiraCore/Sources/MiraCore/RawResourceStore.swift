@@ -54,13 +54,25 @@ public enum RawResourceStore {
         options.isNetworkAccessAllowed = true
         if let progress { options.progressHandler = { @Sendable value in progress(value) } }
         let box = ResourceBox(resource: resource, options: options)
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            PHAssetResourceManager.default().writeData(for: box.resource, toFile: partial, options: box.options) { @Sendable error in
-                if let error { continuation.resume(throwing: error) } else { continuation.resume() }
+        do {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                PHAssetResourceManager.default().writeData(for: box.resource, toFile: partial, options: box.options) { @Sendable error in
+                    if let error { continuation.resume(throwing: error) } else { continuation.resume() }
+                }
             }
+        } catch {
+            // A failed or interrupted download leaves a (possibly large) partial file; nothing else removes it.
+            try? fm.removeItem(at: partial)
+            throw error
         }
         do {
-            if fm.fileExists(atPath: final.path) { try fm.removeItem(at: final) }
+            if fm.fileExists(atPath: final.path) {
+                // A concurrent fetch of the same asset finished first and its caller may already have the file
+                // open; the bytes are the same, so keep that file and drop this download.
+                try? fm.removeItem(at: partial)
+                prune(keeping: folder)
+                return final
+            }
             try fm.moveItem(at: partial, to: final)
         } catch {
             try? fm.removeItem(at: partial)
@@ -70,6 +82,7 @@ public enum RawResourceStore {
         return final
     }
 
+    // @unchecked Sendable: carries the PHAssetResource and its options into the Photos callback; Photos objects are not mutated after creation.
     private struct ResourceBox: @unchecked Sendable {
         let resource: PHAssetResource
         let options: PHAssetResourceRequestOptions
