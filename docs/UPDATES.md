@@ -10,10 +10,11 @@ Audited 2026-11-04 against tags v0.2.0, v0.3.0, v0.3.1, v0.4.0 and main (0.5.0 w
 | v0.3.0 | yes, first shipped here | `Packages/MiraCore/Sources/MiraUpdates/*` and `App/Sources/Updates/*` added. |
 | v0.3.1 | yes | `git diff v0.3.0 v0.3.1 -- Packages/MiraCore/Sources/MiraUpdates App/Sources/Updates` is empty. |
 | v0.4.0 | yes | Same diff against v0.3.0 is empty. |
-| main / 0.5.0 | yes | Also identical to v0.3.0. |
+| main / 0.5.0 | yes | Same logic as v0.3.0. Differences: `#if os(macOS)` guards around each MiraUpdates file, and in `UpdateController` an install token so a cancelled attempt cannot reset a newer one. Nothing about what is accepted changed. |
 
 So there is exactly one updater implementation in the field. All file:line citations below are valid for v0.3.0,
-v0.3.1, v0.4.0 and main (`Packages/MiraCore/Sources/MiraUpdates/` unless noted).
+v0.3.1 and v0.4.0 (`Packages/MiraCore/Sources/MiraUpdates/` unless noted). On main the MiraUpdates files sit one line lower
+(the `#if os(macOS)` guard) and `UpdateController.swift` has moved on.
 
 ## Audit (identical for v0.3.0, v0.3.1, v0.4.0)
 
@@ -61,7 +62,7 @@ All of these must hold for v0.3.0, v0.3.1 and v0.4.0 builds (and 0.5.0+) to upda
 
 No incompatibility found. `scripts/release.sh 1.0.0` produces what the contract needs (tag `v<version>`,
 `Mira-<version>.zip` with a single `Mira.app`, DMG, Info.plist version check, the same signing requirement verified on
-the unpacked zip at release.sh:55-64).
+the unpacked zip, `scripts/release.sh`, "Updater contract" block).
 
 The critical point, the download host: GitHub now redirects asset downloads to `release-assets.githubusercontent.com`.
 Every shipped build allows `*.githubusercontent.com` (Release.swift:93-94), and the allow-list is only applied to the
@@ -88,6 +89,5 @@ Residual risks (none can be fixed in shipped code, all are release hygiene):
   (size and SHA-256 checked by that tag's downloader), unzips and runs that tag's `BundleVerifier`. Use
   `MIRA_COMPAT_CURRENT=<version>` to pretend to be another build. After publishing 1.0.0 run, for each of v0.3.0, v0.3.1
   and v0.4.0: `scripts/updater-compat.sh <tag> live`.
-- Current code, live: `MIRA_LIVE_UPDATE=1 swift test --filter LiveUpdateTests` (opt-in; temp dirs only). It is pinned to
-  0.2.0 (`LiveUpdateTests.swift:26, 35, 57`), so it fails as soon as a newer release is latest; update those literals when
-  1.0.0 is published.
+- Current code, live: `MIRA_LIVE_UPDATE=1 swift test --filter LiveUpdateTests` (opt-in; temp dirs only). It pretends to run 0.1.0 and
+  follows whatever release is latest (`LiveUpdateTests.swift` pins no version except that 0.1.0), so it needs no edit when a new release is published.

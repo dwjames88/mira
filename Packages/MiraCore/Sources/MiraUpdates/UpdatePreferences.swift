@@ -2,6 +2,7 @@
 import Foundation
 
 /// The updater's persisted state: the automatic-check switch, when it last ran, and the skipped version.
+// UserDefaults is documented thread-safe; the struct holds nothing else, so sharing it across tasks is safe.
 public struct UpdatePreferences: @unchecked Sendable {
     /// Also used by `@AppStorage` in Settings (MiraUI keeps a copy of this string in `MiraSettings`).
     public static let autoCheckKey = "mira.updates.autoCheck"

@@ -50,6 +50,8 @@ final class UpdateController {
             try? await Task.sleep(for: .seconds(5))
             guard let self, !Task.isCancelled else { return }
             let report = await self.checker.check(current: self.currentVersion, trigger: .launch, preferences: self.preferences)
+            // Cancelled (a manual check started, or the window was closed): the task slot now belongs to someone else.
+            guard !Task.isCancelled else { return }
             switch report {
             case .available(let release):
                 self.offer(release)
@@ -193,36 +195,41 @@ final class UpdateController {
         let archive = work.appendingPathComponent(asset.name)
         try await UpdateDownloader.download(asset, to: archive) { received, total in
             Task { @MainActor in
-                if case .downloading = UpdateController.shared.phase {
-                    UpdateController.shared.phase = .downloading(info, received: received, total: total)
+                // Progress queued by a cancelled attempt must not land on a newer attempt's window.
+                let controller = UpdateController.shared
+                if controller.installToken == token, case .downloading = controller.phase {
+                    controller.phase = .downloading(info, received: received, total: total)
                 }
             }
         }
 
         // A disk image cannot be installed in place: hand it over.
         guard asset.isZip else {
-            try handOff(archive: archive, asset: asset, info: info, reason: "This release only comes as a disk image, which Mira cannot install by itself.")
+            try await handOff(archive: archive, asset: asset, info: info, reason: "This release only comes as a disk image, which Mira cannot install by itself.")
             return
         }
 
         // 2. Unpack and verify: bundle id, version, and a valid FieldFrames signature.
         phase = .working(info, status: "Verifying", detail: nil)
         let app = try await UpdateInstaller.extractApp(from: archive, into: work.appendingPathComponent("extracted"))
-        try BundleVerifier.verify(bundleAt: app, version: release.version)
+        let version = release.version
+        // Strict, nested validation hashes the whole bundle: keep it off the main thread.
+        try await Task.detached(priority: .userInitiated) {
+            try BundleVerifier.verify(bundleAt: app, version: version)
+        }.value
         try Task.checkCancellation()
 
         // 3. Permission to write the folder Mira lives in.
         let target = Bundle.main.bundleURL
         guard let grant = InstallAccess.acquire(forBundleAt: target) else {
-            try handOff(archive: archive, asset: asset, info: info,
-                        reason: "Mira was not given access to its folder, so it could not replace itself. The download was verified.")
+            try await handOff(archive: archive, asset: asset, info: info,
+                              reason: "Mira was not given access to its folder, so it could not replace itself. The download was verified.")
             return
         }
         defer { grant.end() }
 
         // 4. Swap atomically, off the main thread; the old copy goes to the Trash.
         phase = .working(info, status: "Installing", detail: nil)
-        let version = release.version
         let installed = try await Task.detached(priority: .userInitiated) {
             UpdateInstaller.removeLeftovers(in: grant.folder)
             return try UpdateInstaller.swap(newBundle: app, over: target) { staged in
@@ -232,7 +239,7 @@ final class UpdateController {
         installedBundle = installed
 
         // The sandbox cannot clear com.apple.quarantine, so a sandboxed install leaves the new app quarantined.
-        let quarantined = UpdateInstaller.stripQuarantine(at: installed) > 0
+        let quarantined = await Task.detached(priority: .userInitiated) { UpdateInstaller.stripQuarantine(at: installed) }.value > 0
         let note = quarantined
             ? "This build is not notarized, so macOS asks you to approve the new version once when it opens: right-click Mira in Applications, choose Open, then Open (or System Settings \u{25B8} Privacy & Security \u{25B8} Open Anyway)."
             : nil
@@ -240,10 +247,19 @@ final class UpdateController {
         if note == nil { relaunch() }
     }
 
-    private func handOff(archive: URL, asset: ReleaseAsset, info: UpdateNoticeInfo, reason: String) throws {
+    private func handOff(archive: URL, asset: ReleaseAsset, info: UpdateNoticeInfo, reason: String) async throws {
         let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
-        let saved = try UpdateInstaller.saveForManualInstall(archive, in: downloads, name: asset.name)
+        let name = asset.name
+        // Copying the archive can take a moment: not on the main thread.
+        let saved = try await Task.detached(priority: .userInitiated) {
+            try UpdateInstaller.saveForManualInstall(archive, in: downloads, name: name)
+        }.value
+        // Cancel pressed while the copy ran (it used to block the main thread, so it could not be): honour it.
+        if Task.isCancelled {
+            try? FileManager.default.removeItem(at: saved)
+            throw UpdateError.cancelled
+        }
         savedFile = saved
         phase = .savedForManualInstall(info, fileName: saved.lastPathComponent, reason: reason)
         NSWorkspace.shared.activateFileViewerSelecting([saved])
