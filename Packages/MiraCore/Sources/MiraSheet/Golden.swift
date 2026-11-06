@@ -20,7 +20,11 @@ import UniformTypeIdentifiers
 // non-zero when any artifact is beyond tolerance, differs in size, metadata or encoded bytes, or is missing.
 //
 // TOLERANCES (8-bit levels per channel). See `Golden.defaultTolerance` and `Golden.tolerances`:
-//   default           mean <= 0.05, max <= 2          (set from the measured noise floor, see the report)
+//   default           mean <= 0.01, max <= 1
+// Measured noise floor (Apple M1 Pro, macOS 27.0 beta, 85 image artifacts): two release runs in separate processes and one debug
+// build all reproduced the reference bit for bit (mean 0, max 0), grain, halation, blurs and RAW decode included. The tolerance is
+// therefore not noise headroom: it only lets a driver or OS update move an isolated pixel by one level. A refactor that changes
+// pixels in a way that shows up in the mean (> 0.01 level) or anywhere by more than one level is a rendering change.
 // Text artifacts (export metadata, encoded recipe / adjustment data / preset bytes) have NO tolerance: any change fails.
 //
 // Stages (what each artifact exercises):
@@ -41,7 +45,7 @@ enum Golden {
     }
 
     /// Applies to every artifact without an entry in `tolerances`.
-    static let defaultTolerance = Tolerance(mean: 0.05, max: 2, note: nil)
+    static let defaultTolerance = Tolerance(mean: 0.01, max: 1, note: nil)
 
     /// Per-artifact overrides, keyed by artifact id (`name/stage`). Each needs a documented reason.
     static let tolerances: [String: Tolerance] = [:]

@@ -21,11 +21,11 @@ import UniformTypeIdentifiers
 // .withGrainSeed(FinderRecipe.grainSeed).withTextureScale(quality.textureScale).apply(FinderRecipe.recipe(...))`. What is not
 // covered: the camera frame rotation / aspect crop (`FinderRenderer.upright`), the upscale to the drawable, the Metal drawable.
 //
-// Tolerance, in 8-bit levels per channel (16-bit units / 257): mean <= 0.05, max <= 2 (same as `mira-sheet --golden`).
+// Tolerance, in 8-bit levels per channel (16-bit units / 257): mean <= 0.01, max <= 1 (same as `mira-sheet --golden`; measured noise floor is 0).
 
 @Suite struct FinderGoldenTests {
-    static let meanTolerance = 0.05
-    static let maxTolerance = 2.0
+    static let meanTolerance = 0.01
+    static let maxTolerance = 1.0
     /// One finder frame index, so the grain field is the same every run.
     static let frameIndex = 7
     /// A phone-sized drawable and the capture long side of a 12 MP photo.
