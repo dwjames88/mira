@@ -44,7 +44,6 @@ struct EditorLibraryMenu: View {
     @State private var watcher = EditorFavoriteWatcher()
     @State private var albumRequest: AlbumSheetRequest?
     @State private var infoRequest: InfoSheetRequest?
-    @State private var failure: String?
 
     var body: some View {
         let id = model.libraryAssetID
@@ -83,9 +82,7 @@ struct EditorLibraryMenu: View {
                     do {
                         if let target { try await LibraryActions.add(ids, toAlbum: target) }
                         else if let newTitle { _ = try await LibraryActions.addToNewAlbum(ids, title: newTitle) }
-                    } catch {
-                        if !LibraryActions.isUserCancel(error) { failure = error.localizedDescription }
-                    }
+                    } catch {}
                 }
             }
         }
