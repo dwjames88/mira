@@ -17,6 +17,7 @@ public enum PresetSheetMode: Identifiable, Equatable, Sendable {
 }
 
 /// Stops a batch of preset thumbnail renders early (set on the main actor, read on workers).
+// @unchecked Sendable: the only state is `flag`, guarded by `lock`.
 final class PresetCancelFlag: @unchecked Sendable {
     private let lock = NSLock()
     private var flag = false
@@ -30,6 +31,7 @@ struct PresetThumbnailKey: Hashable {
     let crop: CropSettings
 }
 
+// @unchecked Sendable: carries one finished CGImage, which is immutable, from a worker to the main actor.
 private struct PresetThumbnailResult: @unchecked Sendable {
     let id: String
     let image: CGImage

@@ -4,12 +4,14 @@ import Observation
 import Photos
 
 /// Bridges `PHPhotoLibraryChangeObserver` (arbitrary queue) to the main actor.
+// @unchecked Sendable: immutable (`onChange` is a @Sendable let); PhotoKit calls it from its own queue.
 private final class ChangeRelay: NSObject, PHPhotoLibraryChangeObserver, @unchecked Sendable {
     let onChange: @Sendable (Unchecked<PHChange>) -> Void
     nonisolated init(onChange: @escaping @Sendable (Unchecked<PHChange>) -> Void) { self.onChange = onChange }
     nonisolated func photoLibraryDidChange(_ changeInstance: PHChange) { onChange(Unchecked(value: changeInstance)) }
 }
 
+// @unchecked Sendable: the only state is `flag`, guarded by `lock`.
 private final class LookupFlag: @unchecked Sendable {
     private let lock = NSLock()
     private var flag = false
@@ -17,6 +19,7 @@ private final class LookupFlag: @unchecked Sendable {
     var isCancelled: Bool { lock.lock(); defer { lock.unlock() }; return flag }
 }
 
+// @unchecked Sendable: only ever dereferenced inside a main-actor hop; the weak reference itself is never mutated.
 private final class WeakStore: @unchecked Sendable {
     weak var store: LibraryStore?
     init(_ store: LibraryStore) { self.store = store }

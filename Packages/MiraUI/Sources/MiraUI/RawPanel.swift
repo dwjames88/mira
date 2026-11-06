@@ -12,6 +12,7 @@ extension EditorModel {
 
 /// One camera-raw-decode slider, shown inside the Develop section its function belongs to. A nil setting reads
 /// "Auto" and the slider rests on `fallback`.
+// @unchecked Sendable: immutable values; the key path is the only non-Sendable member and is never mutated.
 struct RawSliderSpec: Identifiable, @unchecked Sendable {
     let id: String
     let label: String
