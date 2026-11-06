@@ -85,7 +85,8 @@ public final class ExtensionRootFitter {
         let sup = view.superview
         let supClass = sup.map { String(describing: type(of: $0)) } ?? "none"
         let win = view.window
-        Self.log.notice("""
+        // Debug: this runs on every layout pass and resize step of the host's window; a persisted line each time is noise.
+        Self.log.debug("""
         [\(reason, privacy: .public)] view=\(NSStringFromRect(view.frame), privacy: .public) \
         superview=\(sup.map { NSStringFromRect($0.frame) } ?? "none", privacy: .public) (\(supClass, privacy: .public)) \
         window=\(win.map { NSStringFromRect($0.frame) } ?? "none", privacy: .public) \
