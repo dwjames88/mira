@@ -44,10 +44,12 @@ struct DevelopQueue: Equatable, Codable, Sendable {
     mutating func removeAll(where shouldRemove: (Entry) -> Bool) { entries.removeAll(where: shouldRemove) }
 
     /// Drops identifiers whose assets no longer exist. Returns how many were dropped.
+    /// `checked` limits the pruning to the identifiers that were actually looked up: an entry added after
+    /// the lookup started is not in `existing` only because nobody asked about it, and must stay.
     @discardableResult
-    mutating func prune(existing: Set<String>) -> Int {
+    mutating func prune(existing: Set<String>, checked: Set<String>? = nil) -> Int {
         let before = entries.count
-        entries.removeAll { !existing.contains($0.id) }
+        entries.removeAll { !existing.contains($0.id) && (checked?.contains($0.id) ?? true) }
         return before - entries.count
     }
 
@@ -107,8 +109,10 @@ final class DevelopStore {
     func pruneMissing(fullAccess: Bool) async {
         guard fullAccess, !queue.isEmpty else { return }
         let ids = queue.ids
-        let existing = await Task.detached(priority: .utility) { Self.existingIdentifiers(among: ids) }.value
-        mutate { $0.prune(existing: existing) }
+        let existing = await GalleryKit.detached(priority: .utility) { Self.existingIdentifiers(among: ids) }
+        // Frames the camera queued while the lookup ran were never asked about: keep them.
+        let asked = Set(ids)
+        mutate { $0.prune(existing: existing, checked: asked) }
     }
 
     private func mutate(_ change: (inout DevelopQueue) -> Void) {
