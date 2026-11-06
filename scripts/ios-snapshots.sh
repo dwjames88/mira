@@ -1,6 +1,7 @@
 #!/bin/bash
 # Headless iOS screenshots: build, boot, install, launch with MIRA_SNAPSHOT=1, capture the framebuffer.
 # No taps, no keyboard, no pointer input -- launch + screenshot only.
+# Usage: scripts/ios-snapshots.sh [UDID]   (or env UDID; DEVICE_NAME picks by name when no UDID is given).
 # SNAP_DISPLAY=1 picks display 1 (multi-display devices such as the "iPhone Duo" type).
 # Landscape (simctl cannot rotate a headless simulator): run the UI test CameraOrientationSnapshotTests, e.g.
 #   TEST_RUNNER_MIRA_SNAPSHOT_OUT=$PWD/build/snapshots/ios xcodebuild test -scheme MiraiOS -destination "id=<udid>" \
@@ -16,11 +17,40 @@ SETTLE="${SETTLE:-4}"
 
 mkdir -p "$OUT"
 
-# Pick the first available simulator with this name; create one if none exists.
-UDID="$(xcrun simctl list devices available | grep -E "^ +$DEVICE_NAME \(" | head -1 | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/' || true)"
-if [ -z "$UDID" ]; then
-  RUNTIME="$(xcrun simctl list runtimes available | grep -E 'iOS' | tail -1 | sed -E 's/.* - //')"
-  UDID="$(xcrun simctl create "$DEVICE_NAME" "$DEVICE_NAME" "$RUNTIME")"
+# Simulator: pass a UDID (first argument or env UDID) to use that exact device, else the first available device named
+# $DEVICE_NAME, else create one on the newest iOS runtime. The iOS 27.0 runtime is never used (PosterBoard crash-loops
+# there): a UDID on it is refused, and it is skipped when picking by name or creating.
+#
+# One line per available iOS device: "<udid><TAB><runtime>"<TAB>"<name>", e.g. "53F8...<TAB>iOS 27.2<TAB>iPhone 17".
+list_devices() {
+  xcrun simctl list devices available | awk '
+    /^-- .* --$/ { runtime = $0; sub(/^-- /, "", runtime); sub(/ --$/, "", runtime); next }
+    runtime ~ /^iOS / && match($0, /\([0-9A-Fa-f]+(-[0-9A-Fa-f]+)+\)/) {
+      udid = substr($0, RSTART + 1, RLENGTH - 2)
+      name = substr($0, 1, RSTART - 2); sub(/^ +/, "", name)
+      print udid "\t" runtime "\t" name
+    }'
+}
+is_banned_runtime() { [[ "$1" =~ ^iOS\ 27\.0($|[^0-9]) ]]; }
+
+UDID="${1:-${UDID:-}}"
+if [ -n "$UDID" ]; then
+  case "$UDID" in F7DAA9B9*) echo "Refusing to use the iOS 27.0 runtime device $UDID" >&2; exit 1;; esac
+  LINE="$(list_devices | grep -i -F "$UDID" | head -1 || true)"
+  [ -n "$LINE" ] || { echo "No available iOS simulator with UDID $UDID" >&2; exit 1; }
+  RUNTIME_OF="$(cut -f2 <<<"$LINE")"
+  if is_banned_runtime "$RUNTIME_OF"; then echo "Refusing to use $UDID: it is on $RUNTIME_OF" >&2; exit 1; fi
+  DEVICE_NAME="$(cut -f3 <<<"$LINE")"
+else
+  UDID=""
+  while IFS=$'\t' read -r candidate runtime name; do
+    if [ "$name" = "$DEVICE_NAME" ] && ! is_banned_runtime "$runtime"; then UDID="$candidate"; break; fi
+  done < <(list_devices)
+  if [ -z "$UDID" ]; then
+    RUNTIME="$(xcrun simctl list runtimes available | grep -E '^iOS ' | grep -v -E '^iOS 27\.0( |$)' | tail -1 | sed -E 's/.* - //' || true)"
+    [ -n "$RUNTIME" ] || { echo "No usable iOS runtime (27.0 is excluded)" >&2; exit 1; }
+    UDID="$(xcrun simctl create "$DEVICE_NAME" "$DEVICE_NAME" "$RUNTIME")"
+  fi
 fi
 echo "Simulator: $DEVICE_NAME ($UDID)"
 
