@@ -5,7 +5,7 @@ import MiraCameraKit
 import QuartzCore
 
 /// A layer handed across actors without retaining it. Only the main actor creates it; the session queue only passes
-/// it to `AVCaptureDevice.RotationCoordinator`.
+/// it to `AVCaptureDevice.RotationCoordinator`. `@unchecked Sendable`: the layer is held weakly and only passed on.
 public struct PreviewLayerBox: @unchecked Sendable {
     public weak var layer: CALayer?
     /// The interface orientation of the layer's window scene, when known (the fakes derive their angle from it).
