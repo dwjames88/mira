@@ -65,6 +65,11 @@ final class AssetEditSession {
     /// True when the RAW is a separately fetched resource: saved edits are marked as RAW-based.
     private var rawIsFetched = false
 
+    /// What the Develop panel needs of the RAW being developed: its as-shot white balance and the controls its decoder supports.
+    var rawInfo: (asShot: (temperature: Double, tint: Double), supported: RawSupportedControls)? {
+        rawDevelop.map { ($0.asShot, $0.supported) }
+    }
+
     private let policy: EditingInputPolicy
     private let makeRequester: @Sendable (PHAsset) -> any EditingInputRequesting<PHContentEditingInput>
 
