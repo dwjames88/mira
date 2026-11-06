@@ -112,13 +112,14 @@ public struct CameraView<FilmDoor: View>: View {
             FFGroundBackground(grain: 0.07).ignoresSafeArea()
             GeometryReader { geo in
                 if model.authorization == .denied {
-                    denied
+                    denied.padding(.bottom, geo.safeAreaInsets.bottom)
                 } else if geo.size.width > geo.size.height {
-                    landscape
+                    landscape.padding(.bottom, geo.safeAreaInsets.bottom)
                 } else {
-                    portrait
+                    portrait(bottomInset: geo.safeAreaInsets.bottom)
                 }
             }
+            .ignoresSafeArea(.container, edges: .bottom)
             doorPanel
         }
         .coordinateSpace(name: CameraSpace.name)
@@ -187,17 +188,26 @@ public struct CameraView<FilmDoor: View>: View {
 
     // MARK: Portrait
 
-    private var portrait: some View {
+    /// Lens chips float over the bottom edge of the finder (above its gesture layer) on an ink scrim, like Apple Camera.
+    /// The shutter row is 84 pt and sinks up to 22 pt into the bottom safe area so the finder can fill the width (3:4).
+    private func portrait(bottomInset: CGFloat) -> some View {
         VStack(spacing: 0) {
             CameraHeader(filmName: filmName, developing: model.developingCount, onBack: onClose) { settingsShown = true }
                 .reportFrame("header")
             FFHairline()
             MeterView(needle: model.needle, readout: model.readoutText, latitude: model.latitude)
                 .reportFrame("meter")
-            finder.reportFrame("finder")
-            LensChips(lenses: model.lenses, selected: model.selectedLens) { model.selectLens($0) }
-                .frame(height: 34)
-                .reportFrame("lenses")
+            finder
+                .overlay(alignment: .bottom) {
+                    LensChips(lenses: model.lenses, selected: model.selectedLens) { model.selectLens($0) }
+                        .frame(height: 44)
+                        .reportFrame("lenses")
+                        .padding(.top, 12)
+                        .background(
+                            LinearGradient(colors: [.clear, T.inkAlways.opacity(0.6)], startPoint: .top, endPoint: .bottom)
+                                .allowsHitTesting(false))
+                }
+                .reportFrame("finder")
             FFHairline()
             EVDial(value: model.evBias) { model.setEV($0) }.reportFrame("ev")
             FFHairline()
@@ -213,8 +223,9 @@ public struct CameraView<FilmDoor: View>: View {
                 ShutterButton(readiness: model.readiness) { model.shutter() }.reportFrame("shutter")
             }
             .padding(.horizontal, T.cells(2))
-            .frame(height: 92)
+            .frame(height: 84)
             .reportFrame("bottom")
+            .padding(.bottom, max(bottomInset - 22, 0))
         }
     }
 
