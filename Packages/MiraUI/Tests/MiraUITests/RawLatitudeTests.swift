@@ -31,7 +31,7 @@ struct RawLatitudeTests {
         #expect(value == nil)
     }
 
-    @Test func rawGroupOnlyForRawSourcesAndSupportedControls() throws {
+    @Test func rawControlsOnlyForRawSourcesAndSupportedControls() throws {
         let model = EditorModel(library: try FilmVariantTests.makeLibrary())
         #expect(!model.rawControlVisibility.isRaw)
         #expect(!model.rawControlVisibility.sharpness)

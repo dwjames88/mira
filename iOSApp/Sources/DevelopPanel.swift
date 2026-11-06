@@ -5,45 +5,84 @@ import SwiftUI
 private typealias T = FieldFramesTheme
 
 /// One focusable adjustment in the DEVELOP chip strip.
-private struct Adjustment: Identifiable {
+struct Adjustment: Identifiable {
     enum Kind {
         case scalar(WritableKeyPath<Recipe, Double>, ClosedRange<Double>, Double)
-        case curves, mixer, border
+        /// A camera-decode setting; nil is "Auto" and the slider rests on `fallback` (which may depend on the film).
+        case decode(WritableKeyPath<RawSettings, Double?>, ClosedRange<Double>, autoFallback: Double, filmFallback: Double)
+        case temperature, tint
+        case curves, mixer, border, lensCorrection
     }
     let id: String
     let title: String
     let group: String
     let kind: Kind
 
-    /// Built on demand so key paths are never held in shared mutable/global state.
-    static var all: [Adjustment] {
-        func s(_ id: String, _ title: String, _ group: String, _ kp: WritableKeyPath<Recipe, Double>,
+    var isWhiteBalance: Bool {
+        switch kind { case .temperature, .tint: true; default: false }
+    }
+
+    /// Built on demand so key paths are never held in shared mutable/global state. Camera-decode chips only
+    /// appear for a RAW source whose decoder supports them.
+    static func all(raw: RawControlVisibility = .none) -> [Adjustment] {
+        func s(_ id: String, _ title: String, _ section: DevelopSection, _ kp: WritableKeyPath<Recipe, Double>,
                _ r: ClosedRange<Double>, _ d: Double = 0) -> Adjustment {
-            Adjustment(id: id, title: title, group: group, kind: .scalar(kp, r, d))
+            Adjustment(id: id, title: title, group: section.title, kind: .scalar(kp, r, d))
         }
-        return [
-            s("exposure", "Exposure", "Light", \.exposure, -2...2),
-            s("contrast", "Contrast", "Light", \.contrast, -1...1),
-            s("highlights", "Highlights", "Light", \.highlights, -1...1),
-            s("shadows", "Shadows", "Light", \.shadows, -1...1),
-            s("whites", "Whites", "Light", \.whites, -1...1),
-            s("blacks", "Blacks", "Light", \.blacks, -1...1),
-            s("texture", "Texture", "Presence", \.texture, -1...1),
-            s("clarity", "Clarity", "Presence", \.clarity, -1...1),
-            s("vibrance", "Vibrance", "Presence", \.vibrance, -1...1),
-            s("saturation", "Saturation", "Presence", \.saturation, -1...1),
-            s("temperature", "Temperature", "Color", \.warmth, -1...1),
-            s("tint", "Tint", "Color", \.tint, -1...1),
-            Adjustment(id: "curves", title: "Curves", group: "Color", kind: .curves),
-            Adjustment(id: "mixer", title: "Color mix", group: "Color", kind: .mixer),
-            s("grain", "Grain", "Effects", \.grainAmount, 0...1),
-            s("grainSize", "Grain size", "Effects", \.grainSize, 0...1, 0.5),
-            s("halation", "Halation", "Effects", \.halationAmount, 0...1),
-            s("halationRadius", "Halation radius", "Effects", \.halationRadius, 0...1, 0.5),
-            s("bloom", "Bloom", "Effects", \.bloomAmount, 0...1),
-            s("vignette", "Vignette", "Frame", \.vignetteAmount, 0...1),
-            Adjustment(id: "border", title: "Border", group: "Frame", kind: .border),
+        func d(_ id: String, _ title: String, _ section: DevelopSection, _ kp: WritableKeyPath<RawSettings, Double?>,
+               _ r: ClosedRange<Double>, auto: Double = 0, film: Double = 0) -> Adjustment {
+            Adjustment(id: id, title: title, group: section.title, kind: .decode(kp, r, autoFallback: auto, filmFallback: film))
+        }
+        var list: [Adjustment] = [
+            s("exposure", "Exposure", .light, \.exposure, -2...2),
+            s("contrast", "Contrast", .light, \.contrast, -1...1),
+            s("highlights", "Highlights", .light, \.highlights, -1...1),
+            s("shadows", "Shadows", .light, \.shadows, -1...1),
+            s("whites", "Whites", .light, \.whites, -1...1),
+            s("blacks", "Blacks", .light, \.blacks, -1...1),
         ]
+        if raw.boost {
+            list.append(d("boost", "Boost", .light, \.boostAmount, RawSupportedControls.boostRange, auto: 0.5, film: 0))
+        }
+        if raw.highlightRecovery {
+            list.append(d("highlightRecovery", "Highlight recovery", .light, \.extendedDynamicRangeAmount,
+                          RawSupportedControls.extendedDynamicRange))
+        }
+        if raw.localToneMap {
+            list.append(d("localToneMap", "Local tone map", .light, \.localToneMapAmount, RawSupportedControls.unitRange))
+        }
+        list += [
+            Adjustment(id: "temperature", title: "Temperature", group: DevelopSection.whiteBalance.title, kind: .temperature),
+            Adjustment(id: "tint", title: "Tint", group: DevelopSection.whiteBalance.title, kind: .tint),
+            s("vibrance", "Vibrance", .color, \.vibrance, -1...1),
+            s("saturation", "Saturation", .color, \.saturation, -1...1),
+            Adjustment(id: "curves", title: "Curves", group: DevelopSection.color.title, kind: .curves),
+            Adjustment(id: "mixer", title: "Color mix", group: DevelopSection.color.title, kind: .mixer),
+            s("texture", "Texture", .detail, \.texture, -1...1),
+            s("clarity", "Clarity", .detail, \.clarity, -1...1),
+        ]
+        if raw.sharpness {
+            list.append(d("sharpness", "Sharpness", .detail, \.sharpnessAmount, RawSupportedControls.unitRange))
+        }
+        if raw.luminanceNoiseReduction {
+            list.append(d("lumNoise", "Lum. noise", .detail, \.luminanceNoiseReductionAmount, RawSupportedControls.unitRange))
+        }
+        if raw.colorNoiseReduction {
+            list.append(d("colorNoise", "Color noise", .detail, \.colorNoiseReductionAmount, RawSupportedControls.unitRange))
+        }
+        if raw.lensCorrection {
+            list.append(Adjustment(id: "lensCorrection", title: "Lens correction", group: DevelopSection.lens.title, kind: .lensCorrection))
+        }
+        list += [
+            s("vignette", "Vignette", .lens, \.vignetteAmount, 0...1),
+            s("grain", "Grain", .film, \.grainAmount, 0...1),
+            s("grainSize", "Grain size", .film, \.grainSize, 0...1, 0.5),
+            s("halation", "Halation", .film, \.halationAmount, 0...1),
+            s("halationRadius", "Halation radius", .film, \.halationRadius, 0...1, 0.5),
+            s("bloom", "Bloom", .film, \.bloomAmount, 0...1),
+            Adjustment(id: "border", title: "Border", group: DevelopSection.frame.title, kind: .border),
+        ]
+        return list
     }
 }
 
@@ -62,7 +101,7 @@ struct DevelopPanel: View {
     /// Chip strip height; the rest of the panel cap is the controls'.
     private static let stripHeight: CGFloat = 48
 
-    private var items: [Adjustment] { Adjustment.all }
+    private var items: [Adjustment] { Adjustment.all(raw: model.rawControls) }
     private var current: Adjustment { items.first { $0.id == focus } ?? items[0] }
 
     var body: some View {
@@ -102,6 +141,24 @@ struct DevelopPanel: View {
                 switch current.kind {
                 case let .scalar(kp, range, def):
                     FocusedSlider(label: current.title, value: model.bind(kp), range: range, def: def)
+                case .temperature:
+                    let wb = model.whiteBalance
+                    FocusedSlider(label: current.title, value: model.bindTemperature(), range: wb.kelvinRange,
+                                  def: wb.kelvinDefault, decimals: 0, snap: WhiteBalanceControl.kelvinSnap,
+                                  format: { "\(Int($0.rounded())) K" })
+                case .tint:
+                    let wb = model.whiteBalance
+                    FocusedSlider(label: current.title, value: model.bindTint(), range: wb.tintRange,
+                                  def: wb.tintDefault, decimals: 0, snap: WhiteBalanceControl.tintSnap)
+                case let .decode(kp, range, auto, film):
+                    let fallback = model.recipe.filmID == nil ? auto : film
+                    FocusedSlider(label: current.title, value: model.bindRaw(kp, fallback: fallback), range: range,
+                                  def: fallback, format: model.recipe.raw[keyPath: kp] == nil ? { _ in "AUTO" } : nil)
+                case .lensCorrection:
+                    FFToggle("Lens correction", isOn: Binding(
+                        get: { model.recipe.raw.lensCorrection ?? false },
+                        set: { model.recipe.raw.lensCorrection = $0 ? true : nil }))
+                        .frame(minHeight: 44)
                 case .curves:
                     EmptyView()
                 case .mixer:
@@ -116,6 +173,9 @@ struct DevelopPanel: View {
                         }
                     }
                 }
+            }
+            if current.isWhiteBalance {
+                toolButton("AS SHOT", enabled: !model.whiteBalance.isAsShot(model.recipe)) { model.resetWhiteBalance() }
             }
             if case .mixer = current.kind {} else {
                 toolButton(showHistogram ? "HIST \u{2212}" : "HIST +", enabled: true) { showHistogram.toggle() }
@@ -190,6 +250,10 @@ struct DevelopPanel: View {
         case .curves: return model.recipe.curves != base.curves
         case .mixer: return model.recipe.colorMixer != base.colorMixer
         case .border: return model.recipe.borderEnabled != base.borderEnabled
+        case .temperature: return !model.whiteBalance.temperatureIsAsShot(model.recipe)
+        case .tint: return !model.whiteBalance.tintIsAsShot(model.recipe)
+        case let .decode(kp, _, _, _): return model.recipe.raw[keyPath: kp] != nil
+        case .lensCorrection: return model.recipe.raw.lensCorrection != nil
         }
     }
 }
@@ -201,10 +265,13 @@ private struct FocusedSlider: View {
     @Binding var value: Double
     let range: ClosedRange<Double>
     let def: Double
+    var decimals: Int = 2
+    var snap: Double?
+    var format: ((Double) -> String)?
 
     var body: some View {
         HStack(spacing: T.cells(1)) {
-            FFSlider(label, value: $value, in: range, default: def)
+            FFSlider(label, value: $value, in: range, default: def, decimals: decimals, snap: snap, format: format)
                 .frame(minHeight: 56)
                 .contentShape(Rectangle())
                 .simultaneousGesture(TapGesture(count: 2).onEnded { value = def })

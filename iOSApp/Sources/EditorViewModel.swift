@@ -96,6 +96,10 @@ final class EditorViewModel {
     private let engine = PhotoEngine()
     /// True while the open library asset is developed from its RAW original.
     @ObservationIgnored private var rawAsset = false
+    /// Which camera-raw controls the Develop panel shows for the open photo (none unless it is a RAW).
+    private(set) var rawControls: RawControlVisibility = .none
+    /// The open RAW's as-shot white balance (kelvin, tint); nil for anything else.
+    private(set) var rawAsShot: (temperature: Double, tint: Double)?
     @ObservationIgnored private var rawTask: Task<Void, Never>?
     /// Bumped by every open; a load that finishes after a newer one started is dropped.
     @ObservationIgnored private var openGeneration = 0
@@ -215,6 +219,42 @@ final class EditorViewModel {
         Binding(get: { self.recipe[keyPath: keyPath] }, set: { self.recipe[keyPath: keyPath] = $0 })
     }
 
+    private func clearRawInfo() {
+        rawControls = .none
+        rawAsShot = nil
+    }
+
+    /// Test seam: shows the RAW-only Develop controls without a PhotoKit asset. Does not enable re-developing.
+    func setRawInfoForTesting(asShot: (temperature: Double, tint: Double)?, supported: RawSupportedControls) {
+        rawControls = RawControlVisibility(isRaw: asShot != nil, supported: supported)
+        rawAsShot = asShot
+    }
+
+    /// The one temperature / tint pair: camera white balance for a RAW, pipeline balance otherwise.
+    var whiteBalance: WhiteBalanceControl { WhiteBalanceControl(isRaw: rawControls.isRaw, asShot: rawAsShot) }
+
+    func bindTemperature() -> Binding<Double> {
+        Binding(get: { self.whiteBalance.temperature(of: self.recipe) },
+                set: { k in var r = self.recipe; self.whiteBalance.setTemperature(k, in: &r); self.recipe = r })
+    }
+
+    func bindTint() -> Binding<Double> {
+        Binding(get: { self.whiteBalance.tint(of: self.recipe) },
+                set: { t in var r = self.recipe; self.whiteBalance.setTint(t, in: &r); self.recipe = r })
+    }
+
+    func resetWhiteBalance() {
+        var r = recipe
+        WhiteBalanceControl.resetToAsShot(&r)
+        recipe = r
+    }
+
+    /// A RAW setting shown as a slider: while nil ("Auto") it rests at `fallback`; moving it back onto the fallback clears it.
+    func bindRaw(_ kp: WritableKeyPath<RawSettings, Double?>, fallback: Double) -> Binding<Double> {
+        Binding(get: { self.recipe.raw[keyPath: kp] ?? fallback },
+                set: { v in self.recipe.raw[keyPath: kp] = abs(v - fallback) <= 0.005 ? nil : v })
+    }
+
     /// Resets every develop control; keeps film and crop.
     func resetDevelop() {
         recipe = Recipe(filmID: recipe.filmID, crop: recipe.crop)
@@ -309,6 +349,12 @@ final class EditorViewModel {
                 status = loaded.rawNote ?? ""
             }
             rawAsset = loaded.isRaw
+            if loaded.isRaw, let info = session.rawInfo {
+                rawControls = RawControlVisibility(isRaw: true, supported: info.supported)
+                rawAsShot = info.asShot
+            } else {
+                clearRawInfo()
+            }
             thumbnailsFilmApplied = loaded.recipe.filmID != nil
             scheduleHistogram()
             startThumbnails()
@@ -389,6 +435,7 @@ final class EditorViewModel {
         commitCrop()
         rawTask?.cancel()
         rawAsset = false
+        clearRawInfo()
         hasPhoto = false
         isCropping = false
         panelHidden = [:]
@@ -427,6 +474,7 @@ final class EditorViewModel {
         isRestoring = false
         editTarget = .imported
         isLibraryAsset = false
+        clearRawInfo()
         saveState = .saved
         thumbnails = [:]
         status = ""
