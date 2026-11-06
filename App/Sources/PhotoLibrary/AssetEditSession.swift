@@ -55,6 +55,9 @@ final class AssetEditSession {
 
     private(set) var asset: PHAsset
     private var input: PHContentEditingInput?
+    /// True when the last save went through but fetching the asset's next editing input failed: `input` is the one
+    /// from before that edit, so the next save fetches a fresh one first.
+    private var inputIsStale = false
     private var isFullSize = false
     /// The RAW original downloaded as a separate resource (RAW+JPEG pairs, or a RAW whose editing input is
     /// the rendered file). The editing input stays the base of the saved output; this file is what is developed.
@@ -85,6 +88,7 @@ final class AssetEditSession {
               onEvent: (@MainActor (EditingInputEvent) -> Void)? = nil) async throws -> Loaded {
         let input = try await requestInput(progress: progress, onEvent: onEvent)
         self.input = input
+        inputIsStale = false
 
         var recipe = Recipe.neutral
         var ours = false
@@ -208,6 +212,10 @@ final class AssetEditSession {
 
     /// Renders `recipe` over `source` at full size and saves it to Photos as an edit of the asset.
     func save(recipe: Recipe, source: CIImage, renderer: Renderer) async throws {
+        if inputIsStale {
+            input = try await requestInput(progress: nil, onEvent: nil)
+            inputIsStale = false
+        }
         guard let input else { throw AssetEditError.inputUnavailable }
         guard isFullSize, let inputURL = input.fullSizeImageURL else { throw AssetEditError.noFullSizeImage }
 
@@ -229,7 +237,7 @@ final class AssetEditSession {
         let assetBox = Unchecked(value: asset)
         let outputBox = Unchecked(value: output)
         try await PhotoKitBridge.saveEdit(asset: assetBox, output: outputBox)
-        try await refreshAsset()
+        await refreshAsset()
     }
 
     // MARK: Revert
@@ -241,15 +249,22 @@ final class AssetEditSession {
         // asks Photos for a fresh one). Dropping it first keeps `refreshAsset` from requesting an input
         // only to discard it, which could also fail a revert that Photos had already completed.
         input = nil
-        try await refreshAsset()
+        await refreshAsset()
     }
 
-    /// Re-fetches the asset (its version changed) and, after a save, a fresh editing input.
-    private func refreshAsset() async throws {
+    /// Re-fetches the asset (its version changed) and, after a save, a fresh editing input. The edit is already in
+    /// Photos by now, so a failure here must not report the save as failed: the next save fetches again.
+    private func refreshAsset() async {
         if let fresh = PHAsset.fetchAssets(withLocalIdentifiers: [asset.localIdentifier], options: nil).firstObject {
             asset = fresh
         }
-        if input != nil { input = try await requestInput(progress: nil, onEvent: nil) }
+        if input != nil {
+            do {
+                input = try await requestInput(progress: nil, onEvent: nil)
+            } catch {
+                inputIsStale = true
+            }
+        }
     }
 
     static func fetchAsset(localIdentifier: String) -> PHAsset? {
