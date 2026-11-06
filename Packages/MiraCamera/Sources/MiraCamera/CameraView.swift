@@ -195,7 +195,7 @@ public struct CameraView<FilmDoor: View>: View {
             CameraHeader(filmName: filmName, developing: model.developingCount, onLibrary: onClose) { settingsShown = true }
                 .reportFrame("header")
             FFHairline()
-            MeterView(needle: model.needle, readout: model.readoutText, latitude: model.latitude)
+            LiveMeter(model: model)
                 .reportFrame("meter")
             finder
                 .overlay(alignment: .bottom) {
@@ -241,7 +241,7 @@ public struct CameraView<FilmDoor: View>: View {
                     Text(filmName).font(T.display(17)).lineLimit(1).minimumScaleFactor(0.6)
                         .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, T.cells(2)).padding(.top, 4)
                 }
-                MeterView(needle: model.needle, readout: model.readoutText, latitude: model.latitude, stacked: true).reportFrame("meter")
+                LiveMeter(model: model, stacked: true).reportFrame("meter")
                 Spacer(minLength: 0)
                 LensChips(lenses: model.lenses, selected: model.selectedLens) { model.selectLens($0) }
                     .frame(height: 34).reportFrame("lenses")
@@ -343,6 +343,17 @@ public struct CameraView<FilmDoor: View>: View {
             }
             .buttonStyle(.plain)
         }
+    }
+}
+
+/// The meter reading the live values itself: a new exposure or latitude reading (up to every frame) redraws the meter,
+/// not the whole camera screen. Looks exactly like `MeterView` placed in the screen.
+private struct LiveMeter: View {
+    let model: CameraModel
+    var stacked = false
+
+    var body: some View {
+        MeterView(needle: model.needle, readout: model.readoutText, latitude: model.latitude, stacked: stacked)
     }
 }
 

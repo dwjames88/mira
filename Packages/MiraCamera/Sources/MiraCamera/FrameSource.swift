@@ -2,6 +2,7 @@
 import CoreImage
 import Foundation
 
+// `@unchecked Sendable`: `CIImage` is immutable; a frame is handed from the capture queue to the renderer and not changed.
 public struct FinderFrame: @unchecked Sendable {
     public let image: CIImage          // pixel buffer as delivered (sensor orientation)
     public let rotationAngle: Double   // degrees, from the rotation coordinator (preview)
