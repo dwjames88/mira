@@ -703,3 +703,107 @@ The link-map symbol totals are unchanged (the linked code is the same size to wi
 | thumbnail requests after editor opened/closed | 0.0  | 0.0  | +0 % |  |
 
 iOS simulator rows use the Debug app, Mac rows Release, as in the baseline. Not measured again (as in the baseline): Mac app cold launch, a real device.
+
+## iPhone library: open, scroll, changes (fix/library-three, 2026-11-06)
+
+What was measured: the iPhone gallery root (the album list) against a large library, before and after.
+The question was whether a big library blocks the main thread or leaves the first screen blank.
+
+**Machine and simulator.** Apple M1 Pro, macOS 27.0, Xcode beta, Debug app. "Mira QA Library" (iOS 27.2), a dedicated
+perf simulator. Other workers shared the machine, but every run went through the machine-wide lock, so no other
+build or simulator run overlapped.
+
+**Seeded library (exact).** 10,024 pictures: 5,000 generated 320 px JPEGs (`tools/make-seed-jpegs.swift`, varied
+gradients and shapes, EXIF dates spread over about 6 years) added twice by two `simctl addmedia` runs (the first run
+was not noticed when the second started), plus the simulator's 24 original pictures. 154 albums (150 seeded by
+`iOSTests/LibrarySeedTool.swift` plus 4 that were already there) in 87 top-level collections: 7 folders (Trips with a
+nested Trips 2019, Projects, Family, Archive with Archive 2018 and Archive 2018 Q4), 3 albums of 1,000 to 2,000
+pictures (2,000 / 1,500 / 1,000), 12 of 150 to 500, 6 empty ones, the rest 3 to 60 pictures.
+**Not measurable here:** an iCloud Shared Library and shared albums cannot be created on a simulator, so the shared
+albums fetch (and the SHARED / PERSONAL scopes against real shared content) was not measured; the SHARED ALBUMS section
+was empty in every run. Its cost on a device is one `fetchAssetCollections(.albumCloudShared)` plus one count per shared
+album, fetched lazily like the user albums now.
+
+**Method.** `iOSTests/GalleryRootPerfProbe.swift` hosts the real `GalleryView` (the model is injectable) in a window and
+prints one `GALLERYROOT` line; `iOSTests/GalleryPerfProbe.swift` (existing, album grid of node "all") prints
+`GALLERYPROBE`. Both are opt-in and read the same env var. Commands, through the machine lock, one process per run:
+
+```
+TEST_RUNNER_MIRA_GALLERY_PROBE=1 xcodebuild test-without-building -scheme MiraiOS \
+  -destination id=7D29270C-F9F9-4F96-AD54-91732EC0F108 -derivedDataPath build/dd \
+  -only-testing:MiraiOSTests/GalleryRootPerfProbe        # and /GalleryPerfProbe
+```
+
+Seeding: `build/seed/gen build/seed/jpgs 5000` (from `tools/make-seed-jpegs.swift`), `xcrun simctl addmedia` in
+batches of 500, Photos granted to the app and the test bundle, then
+`TEST_RUNNER_MIRA_SEED_LIBRARY=1 ... -only-testing:MiraiOSTests/LibrarySeedTool` (refuses any device not named
+"Mira QA Library"). Each number below is the median of 3 runs (a fresh process each).
+The probe's change step toggles the favorite flag of the newest picture and restores it (allowed on this simulator only).
+Definitions: first sections = window shown to the sections published (the first screen can draw); all ready = every
+count the first screen needs is known and cover requests were quiet for 0.7 s (before the fix the counts came with the
+sections, so the definition gives the same answer for the base code); open frames = display-link intervals from
+window shown to all ready; scroll = scripted 12,000 pt at 2,400 pt/s through the album list; change = ms from the
+`performChanges` call until the Favorites count shows it, and the main-thread frames while it is processed.
+
+| Measure | Before | After | Change |
+|---|---|---|---|
+| first sections published (blank screen until then) | 2722 ms | 248 ms | -91 % |
+| all first-screen counts + covers ready | 2787 ms | 336 ms | -88 % |
+| open: main-thread max frame | 73.6 ms | 141.6 ms | worse (see below) |
+| open: main-thread p95 frame | 16.7 ms | 37.3 ms | worse, few frames (about 20) |
+| open: frames > 50 ms | 2 | 1 | |
+| album-list scroll: p50 / p95 frame | 16.7 / 16.7 ms | 16.7 / 16.7 ms | same |
+| album-list scroll: max frame | 16.7 ms | 16.7 ms | same (one run each: 34.9 before, 54.3 after) |
+| album-list scroll: frames > 33 ms | 0 | 0 | same |
+| one library change (favorite on), ms until Favorites shows it | 2606 ms | 45 ms | -98 % |
+| same, favorite off | 2586 ms | 29 ms | -99 % |
+| main-thread max frame while a change is processed | 16.7 ms | 16.7 ms | same |
+| cover lookups caused by two changes (every visible tile re-ran before) | 16 | 8 | -50 % |
+| album grid (node "all") first request | 89 ms | 85 ms | same |
+| album grid scroll p95 / max frame | 16.7 / 16.7 ms | 16.7 / 16.7 ms | same |
+| album grid scroll, thumbnail requests | 216 | 216 | same |
+
+`SidebarLoader` timed on a background thread (median of 3, ms):
+
+| Part | Before | After |
+|---|---|---|
+| `loadAll()` including album capabilities | 1350 | not used by the iPhone any more (still the Mac's) |
+| `loadAll(withAlbumEntries: false)` | 1159 | not used by the iPhone any more |
+| of which: user album counts (154 albums, one fetch each) | 1178 | 0 up front; one fetch per tile, when it appears |
+| of which: library + favorites counts | 11 + 3 | same, in the first-screen pass |
+| `albumCapabilities` (one fetch per album) | 234 | 0; asked when a context menu opens |
+| first-screen structure (`SidebarLoader.structure`) | | 65 |
+| media types + utilities counts (background pass) | | 61 |
+
+**Where the time went.** The main thread was never the problem at base: the loader already ran in a detached task, the
+list scrolled at the display rate, and a library change did not stall frames. The problems were latency and waste.
+The first screen was blank until `loadAll` had counted everything (2.7 s on 154 albums; it grows with the number
+of albums), and every library change re-ran the whole of `loadAll` (2.6 s to show a changed favorite count) and made
+every visible cover tile look its cover up again.
+
+**Open frame.** The max frame while the screen opens went from 74 to about 140 ms. Before, the screen was blank for the
+whole 2.7 s, so the first frame that draws content (the album list with its tiles' first tasks) happened late and the
+stall was the same kind of event. Now it happens 250 ms in, and the same event is the 140 ms frame. It did not get
+cheaper; it got earlier. Reducing it (cheaper first layout of the list) was left for later.
+
+**What each fix was.**
+- First screen from a cheap pass: `SidebarLoader.structure` builds LIBRARY (three counts, about 12 ms), ALBUMS and
+  SHARED ALBUMS from collection lists only (folders walked, no per-album fetch; an estimated count of zero is trusted, as
+  before) and lists the media-type / utility smart albums that exist, without counts.
+- Counts and covers on demand: a tile's `.task` asks `GalleryModel.ensureCount`, which fetches on a detached task
+  (skipped if the tile already scrolled away) and caches the count in `counts`; media types and utilities are
+  counted in one background pass right after the first paint so empty rows leave the list before they are reached.
+  Nodes known to be empty are kept in `emptyIDs`; the list reads only that, so a count arriving re-evaluates the small
+  count label, not the list.
+- Incremental changes: `LibraryTracker` holds each counted node's fetch result; `photoLibraryDidChange` applies the
+  `PHChange` to those results on Photos' own queue (`changeDetails(for:)`, in delivery order), publishes the new
+  counts, and bumps the cover version of only the albums that changed. The sections are rebuilt only when the
+  top-level collections, a folder's children or the shared albums list changed (also watched with `changeDetails`),
+  and those rebuilds are still coalesced.
+- Cover token: no longer includes the global change count (`scopeEpoch` + the node's own version). A library-wide
+  membership change no longer clears every cover.
+- Cover lookup uses `fetchLimit = 1`.
+- Album capabilities: asked in the context menu's own view, so the PhotoKit lookup runs when the menu opens, not for
+  every album up front and not with every body pass (`ContextMenuLazinessTests` still pass).
+- Not done: moving `AlbumModel.apply`'s `changeDetails(for:)` off the main actor. It only runs for an open album grid;
+  the probe's grid steps showed no stall, and the change step does not open one. Left as is.
