@@ -1067,7 +1067,8 @@ public final class EditorModel {
             guard let self, let frame = self.histogramPending else { self?.histogramInFlight = false; return }
             self.histogramPending = nil
             let data = await Task.detached(priority: .utility) { HistogramData.compute(frame: frame) }.value
-            self.histogram = data
+            // Equal data is not republished: the histogram and the curves behind it would redraw for nothing.
+            if data != self.histogram { self.histogram = data }
             self.histogramLast = .now
             self.histogramInFlight = false
             if self.histogramPending != nil { self.pumpHistogram() }
