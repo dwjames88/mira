@@ -12,6 +12,7 @@ private struct Unchecked<Value>: @unchecked Sendable {
 }
 
 /// Set from the main actor, read from worker threads, to stop a batch of renders early.
+// @unchecked Sendable: the only state is `flag`, guarded by `lock`.
 private final class CancelFlag: @unchecked Sendable {
     private let lock = NSLock()
     private var flag = false
@@ -935,6 +936,7 @@ public final class EditorModel {
 
     // MARK: Thumbnails
 
+    // @unchecked Sendable: carries one finished CGImage, which is immutable, from a worker to the main actor.
     private struct ThumbnailResult: @unchecked Sendable {
         let id: String?
         let image: CGImage

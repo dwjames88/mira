@@ -202,6 +202,7 @@ struct EditorKeyHost: NSViewRepresentable {
             stop()
             self.window = window
             monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp]) { [weak self] event in
+                // The monitor callback runs on the main thread; NSEvent is not Sendable but is only read there.
                 nonisolated(unsafe) let e = event
                 let consumed = MainActor.assumeIsolated { self?.handle(e) ?? false }
                 return consumed ? nil : event

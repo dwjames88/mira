@@ -3,6 +3,7 @@ import MiraCore
 import Photos
 
 /// Cancellation flag shared between the store (main actor) and an index run (background).
+// @unchecked Sendable: the only state is `flag`, guarded by `lock`.
 final class IndexCancelFlag: @unchecked Sendable {
     private let lock = NSLock()
     private var flag = false
@@ -13,6 +14,7 @@ final class IndexCancelFlag: @unchecked Sendable {
 /// One EXIF read in flight. PhotoKit calls `receive` for each chunk of the resource and `complete` at
 /// the end, on its own queue; the first of "camera found", "byte limit reached" or "stream ended"
 /// resumes the continuation, and a found/limit result also cancels the rest of the transfer.
+// @unchecked Sendable: all mutable state (`continuation`, `requestID`, the accumulator) is guarded by `lock`.
 private final class ResourceRead: @unchecked Sendable {
     struct Result: Sendable {
         var exif: ParsedEXIF?
