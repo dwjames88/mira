@@ -225,6 +225,16 @@ public actor FakeCaptureDevice: CameraDevice {
         (thermalLevels, thermalOut) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
     }
 
+    /// Ends every stream, so the model's consumer tasks finish with the device.
+    deinit {
+        telemetryOut.finish()
+        eventsOut.finish()
+        readinessOut.finish()
+        signalsOut.finish()
+        rotationOut.finish()
+        thermalOut.finish()
+    }
+
     public func start() async {
         eventsOut.yield(.sessionStarted)
         readinessOut.yield(.ready)

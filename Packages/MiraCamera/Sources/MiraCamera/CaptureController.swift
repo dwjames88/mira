@@ -24,7 +24,7 @@ final class TelemetryHub: Sendable {
     }
 }
 
-/// Removes its notification observers when the controller goes away.
+/// Removes its notification observers when the controller goes away. `@unchecked Sendable`: the token list is behind the lock.
 final class ObserverTokens: @unchecked Sendable {
     private let lock = NSLock()
     private var tokens: [any NSObjectProtocol] = []
@@ -120,6 +120,16 @@ public actor CaptureController: CameraDevice {
         self.signalsOut = signalsOut
         self.rotationOut = rotationOut
         self.thermalOut = thermalOut
+    }
+
+    /// Ends every stream, so the model's consumer tasks finish with the controller instead of waiting forever.
+    deinit {
+        telemetryHub.continuation.finish()
+        eventsOut.finish()
+        readinessBridge.continuation.finish()
+        signalsOut.finish()
+        rotationOut.finish()
+        thermalOut.finish()
     }
 
     // MARK: Lifecycle

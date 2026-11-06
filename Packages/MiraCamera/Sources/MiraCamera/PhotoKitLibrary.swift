@@ -127,7 +127,12 @@ public struct PhotoKitBaker: PrintBaking {
         let directory = FileManager.default.temporaryDirectory.appending(path: "MiraCamera", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let output = directory.appending(path: "\(UUID().uuidString)-baked.jpg")
-        try renderer.export(recipe, source: source, metadataFrom: photo, outputURL: output, type: .jpeg, quality: 0.95, colorSpace: space)
+        do {
+            try renderer.export(recipe, source: source, metadataFrom: photo, outputURL: output, type: .jpeg, quality: 0.95, colorSpace: space)
+        } catch {
+            try? FileManager.default.removeItem(at: output)   // a failed export can leave a partial file
+            throw error
+        }
         return output
     }
 }

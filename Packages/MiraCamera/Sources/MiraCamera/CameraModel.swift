@@ -209,7 +209,7 @@ public final class CameraModel {
         tasks = [
             Task { @MainActor [weak self] in for await t in telemetry { self?.apply(t) } },
             Task { @MainActor [weak self] in for await e in events { self?.state.handle(e) } },
-            Task { @MainActor [weak self] in for await r in readiness { self?.readiness = r } },
+            Task { @MainActor [weak self] in for await r in readiness { if let self, self.readiness != r { self.readiness = r } } },
             Task { @MainActor [weak self] in for await s in signals { if s == .shutterClosed { await self?.blinkOnce() } } },
             Task { @MainActor [weak self] in for await l in thermal { self?.finder?.setThermal(l) } },
             Task { @MainActor [weak self] in for await id in developed { self?.frameDeveloped(id) } },
@@ -218,8 +218,12 @@ public final class CameraModel {
     }
 
     private func apply(_ t: ExposureTelemetry) {
-        readoutText = t.duration > 0 ? ExposureReadout.text(duration: t.duration, iso: t.iso, aperture: t.aperture) : "\u{2014}"
-        needle = ExposureModel.needle(offsetEV: t.offsetEV)
+        // Telemetry arrives per KVO change, often with the readout unchanged; only a changed value is written, because
+        // every write to an observed property redraws the views that read it.
+        let text = t.duration > 0 ? ExposureReadout.text(duration: t.duration, iso: t.iso, aperture: t.aperture) : "\u{2014}"
+        if text != readoutText { readoutText = text }
+        let position = ExposureModel.needle(offsetEV: t.offsetEV)
+        if position != needle { needle = position }
     }
 
     private func blinkOnce() async {
@@ -233,7 +237,13 @@ public final class CameraModel {
     // Metal, AVFoundation or Photos queue.
 
     private nonisolated static func makeLatitudeHandler(_ model: CameraModel) -> @Sendable (LatitudeReading?) -> Void {
-        { [weak model] reading in Task { @MainActor in model?.latitude = LatitudeReadout(reading: reading) } }
+        { [weak model] reading in
+            Task { @MainActor in
+                guard let model else { return }
+                let readout = LatitudeReadout(reading: reading)
+                if model.latitude != readout { model.latitude = readout }
+            }
+        }
     }
 
     private nonisolated static func makeStatsHandler(_ model: CameraModel) -> @Sendable (FinderStats) -> Void {
@@ -287,6 +297,8 @@ public final class CameraModel {
 
         authorization = await resolveAuthorization()
         guard authorization == .authorized else { wantsRunning = false; return }
+        // The screen was left while the permission was being resolved: do not open the camera behind it.
+        guard wantsRunning else { return }
 
         state.handle(.start)
         impact.prepare()
@@ -311,6 +323,9 @@ public final class CameraModel {
             if let main { send(.zoom(main.zoomFactor, ramp: false)) }
         }
         if let kelvin = wb.kelvin { send(.whiteBalance(WhiteBalanceState(kelvin: kelvin))) }   // the stored value reaches the device
+        // `stop()` can arrive during the awaits above (the screen was left while the camera was opening). It has
+        // already halted the device, so starting it now would leave the camera running behind a closed screen.
+        guard wantsRunning else { return }
         location.setEnabled(settings.addLocation)
         frames.start()
         await device.start()

@@ -52,6 +52,7 @@ public struct FinderStats: Sendable, Equatable {
 public final class FinderRenderer: @unchecked Sendable {
     public static let subsystem = "com.fieldframes.mira"
 
+    // `nextDrawable()` is documented thread safe and an `MTLTexture` is a handle; the boxes only carry them across the lock.
     private struct LayerBox: @unchecked Sendable { let layer: CAMetalLayer }
     private struct TextureBox: @unchecked Sendable { let texture: MTLTexture }
 
@@ -82,7 +83,7 @@ public final class FinderRenderer: @unchecked Sendable {
     private let ciContext: CIContext
     private let renderer: Renderer?
     private let signposter = OSSignposter(subsystem: FinderRenderer.subsystem, category: "camera")
-    private let work = DispatchQueue(label: "com.fieldframes.mira.finder.work", qos: .utility)
+    private let srgb = CGColorSpace(name: CGColorSpace.sRGB)!
     private let ink = CIImage(color: CIColor(red: 0.082, green: 0.078, blue: 0.059, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)!)
 
     /// The latitude meter reads the frame at most this often (seconds): 4 Hz, from a copy of at most `meterLongSide` pixels.
@@ -187,8 +188,7 @@ public final class FinderRenderer: @unchecked Sendable {
     /// next frame replaces it, `releaseSnapshotSource()` lets go earlier.
     public func snapshot() -> CGImage? {
         guard let image = core.withLock({ $0.lastImage }) else { return nil }
-        return ciContext.createCGImage(image, from: image.extent, format: .RGBA8,
-                                       colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
+        return ciContext.createCGImage(image, from: image.extent, format: .RGBA8, colorSpace: srgb)
     }
 
     public func releaseSnapshotSource() { core.withLock { $0.lastImage = nil } }
@@ -294,7 +294,7 @@ public final class FinderRenderer: @unchecked Sendable {
             return false
         }
         let destination = CIRenderDestination(mtlTexture: texture, commandBuffer: cb)
-        destination.colorSpace = CGColorSpace(name: CGColorSpace.sRGB)
+        destination.colorSpace = srgb
         destination.isFlipped = true
 
         let timestamp = frame.timestamp
@@ -369,7 +369,15 @@ public final class FinderRenderer: @unchecked Sendable {
             c.ladder.record(frameMilliseconds: ms, at: timestamp)
             let start = c.windowStart ?? timestamp
             c.windowStart = start
-            guard timestamp - start >= 1, let handler = c.onStats else { return nil }
+            guard timestamp - start >= 1 else { return nil }
+            guard let handler = c.onStats else {
+                // Nobody reads the stats (the default): still close the window, so the samples do not pile up
+                // for as long as the camera runs.
+                c.gpuSamples.removeAll(keepingCapacity: true)
+                c.presentedInWindow = 0
+                c.windowStart = timestamp
+                return nil
+            }
             let sorted = c.gpuSamples.sorted()
             let stats = FinderStats(
                 medianMS: sorted[sorted.count / 2],
