@@ -42,6 +42,14 @@ final class DevelopQueueTests: XCTestCase {
         XCTAssertEqual(q.ids, ["c", "a"])
     }
 
+    func testPruneOnlyDropsIdentifiersThatWereLookedUp() {
+        var q = DevelopQueue()
+        for id in ["a", "b", "c"] { q.add(id) }
+        // "c" was queued after the lookup of ["a", "b"] began: it is absent from `existing` but was never asked about.
+        XCTAssertEqual(q.prune(existing: ["a"], checked: ["a", "b"]), 1)
+        XCTAssertEqual(q.ids, ["c", "a"])
+    }
+
     func testPersistenceRoundTrip() {
         let suite = "DevelopQueueTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!

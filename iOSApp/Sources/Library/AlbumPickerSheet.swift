@@ -214,6 +214,7 @@ struct AlbumSheetCover: View {
     let albumID: String
     @Environment(\.displayScale) private var displayScale
     @State private var image: UIImage?
+    @State private var requestID: PHImageRequestID?
 
     var body: some View {
         Color(white: 0.09)
@@ -221,15 +222,19 @@ struct AlbumSheetCover: View {
                 if let image { Image(uiImage: image).resizable().scaledToFill() }
                 else { Image(systemName: "photo").font(.system(size: 12, weight: .light)).foregroundStyle(T.paperDim.opacity(0.5)) }
             }
+            .onDisappear {
+                if let id = requestID { PHImageManager.default().cancelImageRequest(id) }
+                requestID = nil
+            }
             .task(id: albumID) {
                 let side = 48 * displayScale
                 let found = await Task.detached(priority: .userInitiated) { GalleryKit.coverAsset(nodeID: albumID) }.value
-                guard let found else { return }
+                guard let found, !Task.isCancelled else { return }
                 let options = PHImageRequestOptions()
                 options.deliveryMode = .opportunistic
                 options.resizeMode = .fast
                 options.isNetworkAccessAllowed = true
-                _ = GalleryKit.requestThumbnail(
+                requestID = GalleryKit.requestThumbnail(
                     manager: PHImageManager.default(), asset: found, size: CGSize(width: side, height: side),
                     options: Unchecked(value: options)
                 ) { box, _ in
