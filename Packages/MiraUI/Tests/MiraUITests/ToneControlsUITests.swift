@@ -95,7 +95,8 @@ struct ToneControlsUITests {
         model.recipe.vibrance = 0.25
         model.recipe.warmth = 0.2
         model.recipe.borderEnabled = true
-        func write(_ tag: String) throws {
+        func write(_ tag: String) async throws {
+            try await SnapshotSettle.settle(model)
             for scheme in [ColorScheme.dark, .light] {
                 try SnapshotTests.writePNG(
                     DevelopPanel(model: model).frame(width: 320, height: 2300).foregroundStyle(FieldFramesTheme.paper),
@@ -103,13 +104,13 @@ struct ToneControlsUITests {
                     name: "editor-develop-panel-\(tag)\(scheme == .dark ? "dark" : "light")")
             }
         }
-        try write("")
+        try await write("")
         model.rawSession.isRaw = true
         model.rawSession.asShot = (5200, 8)
         model.rawSession.supported = Self.allSupported
         model.recipe.warmth = 0
         model.recipe.raw.temperature = 6100
-        try write("raw-")
+        try await write("raw-")
         model.cancelWork()
     }
 }
