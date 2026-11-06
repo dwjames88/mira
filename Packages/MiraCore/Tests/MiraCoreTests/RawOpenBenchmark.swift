@@ -6,7 +6,7 @@ import Testing
 
 /// Open-time measurements for RAW files. Skipped unless `MIRA_BENCH_RAW=1` (it prints, it does not assert
 /// speed). `MIRA_RAW_DIR` points at the folder holding sony-ilce7m3.arw. Medians of 3 runs, milliseconds.
-@Suite("RAW open benchmark", .serialized)
+@Suite("RAW open benchmark", .serialized, .rawExclusive)
 struct RawOpenBenchmark {
     static var enabled: Bool { ProcessInfo.processInfo.environment["MIRA_BENCH_RAW"] == "1" }
 

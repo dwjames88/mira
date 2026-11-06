@@ -70,7 +70,7 @@ private func lumas(_ p: LinearPixels) -> [Double] {
     }
 }
 
-@Suite(.serialized) struct RawIntegrationTests {
+@Suite(.serialized, .rawExclusive) struct RawIntegrationTests {
     // MARK: Decode
 
     @Test(arguments: [RawSamples.sony, RawSamples.iphoneXS, RawSamples.iphone12Pro].compactMap { $0 })

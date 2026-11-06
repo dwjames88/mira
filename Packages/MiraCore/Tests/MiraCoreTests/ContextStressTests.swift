@@ -10,7 +10,7 @@ import UniformTypeIdentifiers
 /// bitmap proxy, histograms, the latitude meter, and export. `swift test` (parallel) of this package used to hang
 /// with threads blocked in `-[CIContext lock]`; this test reproduces that shape and reports a hang as a failure
 /// (after `timeout` seconds) instead of hanging the run.
-@Suite("CIContext stress", .serialized) struct ContextStressTests {
+@Suite("CIContext stress", .serialized, .rawExclusive) struct ContextStressTests {
     static let timeout: TimeInterval = 90
     /// For the RAW renders in this file; never the shared context (see `exhaustedCooperativePoolDoesNotStallARawRender`).
     static let rawContext = Renderer.makeContext()
@@ -123,7 +123,7 @@ import UniformTypeIdentifiers
                     // A preview engine whose source is a lazy RAW decode: its pyramid is materialised on the shared context.
                     if let rawURL, let develop = RawDevelop(url: rawURL),
                        let developed = develop.develop(.identity, filmApplied: true, draft: true, scale: 0.25) {
-                        let raw = PreviewEngine(renderer: renderer, context: context)
+                        let raw = PreviewEngine(renderer: renderer, context: context, decodeContext: Self.rawContext)
                         raw.setSource(developed.image)
                         _ = raw.render(recipe, canvas: CGSize(width: 400, height: 400))
                     }
@@ -164,7 +164,9 @@ import UniformTypeIdentifiers
                                 guard let develop = RawDevelop(url: rawURL),
                                       let image = develop.apply(.identity, filmApplied: false, draft: true, scale: 0.25) else { continue }
                                 if mode == "engine" {
-                                    let engine = PreviewEngine(renderer: renderer, context: context)
+                                    // A decode context of its own here: in the suite the default one is shared with the other
+                                    // preview-engine tests, which would park on it behind the decode.
+                                    let engine = PreviewEngine(renderer: renderer, context: context, decodeContext: rawContext)
                                     engine.setSource(image)
                                     _ = engine.render(Recipe(filmID: "neg"), canvas: CGSize(width: 500, height: 400))
                                 } else {

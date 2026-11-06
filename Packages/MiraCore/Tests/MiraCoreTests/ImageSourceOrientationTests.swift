@@ -130,13 +130,9 @@ enum OrientationFixture {
         return url
     }
 
-    /// A context of this file's own: a RAW decode under the shared context's lock, with the other suites parked on
-    /// that lock, never finishes under `swift test` (parallel); see `ContextStressTests`.
-    static let context = Renderer.makeContext()
-
     /// RGBA8 sRGB bitmap of the image; row 0 is the TOP (Core Image's extent is bottom-left origin,
     /// but `render(toBitmap:)` writes the top row first).
-    static func bitmap(_ image: CIImage) -> (width: Int, height: Int, rgba: [UInt8]) {
+    static func bitmap(_ image: CIImage, context: CIContext = Renderer.sharedContext) -> (width: Int, height: Int, rgba: [UInt8]) {
         let r = image.extent.integral
         let w = Int(r.width), h = Int(r.height)
         var buf = [UInt8](repeating: 0, count: w * h * 4)
@@ -312,7 +308,7 @@ private let loaders: [Loader] = [
 
     /// ImageIO's own embedded-preview thumbnail with the EXIF transform applied is the reference for
     /// "upright"; the RAW paths must agree with it, not with a flipped or rotated copy.
-    @Test(arguments: [RawSamples.iphoneXS, RawSamples.iphone12Pro].compactMap { $0 })
+    @Test(.rawExclusive, arguments: [RawSamples.iphoneXS, RawSamples.iphone12Pro].compactMap { $0 })
     func dngLoadsUprightLikeImageIOPreview(url: URL) throws {
         let src = try #require(CGImageSourceCreateWithURL(url as CFURL, nil))
         let options: [CFString: Any] = [
@@ -353,7 +349,9 @@ private let loaders: [Loader] = [
         let scaled = image.transformed(by: CGAffineTransform(translationX: -e.minX, y: -e.minY))
             .transformed(by: CGAffineTransform(scaleX: CGFloat(grid.w) / e.width, y: CGFloat(grid.h) / e.height))
             .cropped(to: CGRect(x: 0, y: 0, width: grid.w, height: grid.h))
-        let bm = Fx.bitmap(scaled)
+        // RAW pictures render on the RAW tests' own context: a RAW decode under a context other suites wait on stalls
+        // the whole parallel run (see `ContextStressTests`).
+        let bm = Fx.bitmap(scaled, context: RawSamples.context)
         return (0..<(bm.width * bm.height)).map {
             0.2126 * Double(bm.rgba[$0 * 4]) + 0.7152 * Double(bm.rgba[$0 * 4 + 1]) + 0.0722 * Double(bm.rgba[$0 * 4 + 2])
         }
