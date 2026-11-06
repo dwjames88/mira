@@ -1,4 +1,5 @@
 import AppKit
+import MiraCore
 import MiraUI
 import SwiftUI
 
@@ -83,6 +84,40 @@ struct MiraApp: App {
                 Button("Import Presets\u{2026}") { state.presetTransfer.presentImportPanel() }
                     .keyboardShortcut("i", modifiers: [.command, .shift])
                 Button("Export All Presets\u{2026}") { state.presetTransfer.exportAll() }
+            }
+            CommandMenu("Photo") {
+                Button(state.photoIsFavorite ? "Unfavorite" : "Favorite") { state.runPhotoCommand(state.photoIsFavorite ? .unfavorite : .favorite) }
+                    .keyboardShortcut(".", modifiers: .command)
+                    .disabled(!state.photoEnabled(.favorite, .unfavorite))
+                Menu("Add to Album") {
+                    Button("New Album\u{2026}") { state.store.beginNewAlbum(adding: state.photoCommandIDs) }
+                        .disabled(!state.canManagePhotoAlbums)
+                    if !AlbumList.targets(for: state.store.albums).isEmpty { Divider() }
+                    ForEach(AlbumList.targets(for: state.store.albums, excluding: state.store.currentAlbum?.id)) { album in
+                        Button(album.displayPath) { state.store.add(state.photoCommandIDs, toAlbum: album.id) }
+                    }
+                }
+                .disabled(!state.photoEnabled(.addToAlbum))
+                Button("New Album\u{2026}") { state.store.beginNewAlbum() }
+                    .keyboardShortcut("n", modifiers: [.command, .shift])
+                    .disabled(!state.canManagePhotoAlbums)
+                Divider()
+                Button(state.photoIsHidden ? "Unhide" : "Hide") { state.runPhotoCommand(state.photoIsHidden ? .unhide : .hide) }
+                    .keyboardShortcut("l", modifiers: .command)
+                    .disabled(!state.photoEnabled(.hide, .unhide))
+                Button("Duplicate") { state.runPhotoCommand(.duplicate) }
+                    .keyboardShortcut("d", modifiers: .command)
+                    .disabled(!state.photoEnabled(.duplicate))
+                Divider()
+                Button("Select All") { state.store.selectAll() }
+                    .disabled(state.mode != .library || state.store.count == 0)
+                Button(state.store.inspectorOpen ? "Hide Info" : "Get Info") { state.runPhotoCommand(.info) }
+                    .keyboardShortcut("i", modifiers: .command)
+                    .disabled(state.mode != .library || !state.store.isAuthorized)
+                Divider()
+                Button("Delete\u{2026}") { state.runPhotoCommand(.delete) }
+                    .keyboardShortcut(.delete, modifiers: .command)
+                    .disabled(!state.photoEnabled(.delete))
             }
             CommandGroup(after: .undoRedo) {
                 Divider()

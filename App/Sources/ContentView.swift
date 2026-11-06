@@ -87,6 +87,20 @@ struct ContentView: View {
         .sheet(isPresented: $state.showExportSheet) {
             ExportSheet(state: state)
         }
+        .sheet(item: Binding(get: { state.store.albumSheet }, set: { state.store.albumSheet = $0 })) { request in
+            AlbumNameSheet(store: state.store, request: request)
+        }
+        .confirmationDialog(
+            "Delete album?",
+            isPresented: Binding(get: { state.store.albumPendingDeletion != nil },
+                                 set: { if !$0 { state.store.albumPendingDeletion = nil } }),
+            titleVisibility: .visible, presenting: state.store.albumPendingDeletion
+        ) { album in
+            Button("Delete Album", role: .destructive) { state.store.deleteAlbum(album) }
+            Button("Cancel", role: .cancel) {}
+        } message: { album in
+            Text("\u{201C}\(album.title)\u{201D} will be deleted. The photos stay in your library.")
+        }
         .confirmationDialog("You have unsaved changes", isPresented: $state.showLeaveDialog, titleVisibility: .visible) {
             Button("Save to Photos") { state.confirmLeaveSaving() }
             Button("Discard Changes", role: .destructive) { state.confirmLeaveDiscarding() }
@@ -128,7 +142,8 @@ private struct EditorScreen: View {
             status: status,
             statusHelp: state.toolbarStatusHelp,
             save: .init(isEnabled: state.canSaveNow, isSaved: status == "SAVED",
-                        action: { Task { await state.saveNow() } }))
+                        action: { Task { await state.saveNow() } }),
+            library: state.editorLibraryControls)
     }
 
     var body: some View {

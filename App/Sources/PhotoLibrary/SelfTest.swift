@@ -48,7 +48,7 @@ enum SelfTest {
     // MARK: Photos
 
     @MainActor
-    static func runPhotos(library: FilmLibrary) async {
+    static func runPhotos(library: FilmLibrary, allowDelete: Bool = false) async {
         var status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
         if status == .notDetermined { status = await PHPhotoLibrary.requestAuthorization(for: .readWrite) }
         guard status == .authorized else {
@@ -114,9 +114,99 @@ enum SelfTest {
             note("step5 reopened recipe \(isNeutral ? "neutral" : "not neutral")")
             guard isNeutral else { note("FAIL step5 reopen"); return }
 
+            guard await libraryRoundTrip(identifier: identifier, allowDelete: allowDelete) else { return }
+
             note("PASS")
         } catch {
             note("FAIL exception \(error)")
+        }
+    }
+
+    // MARK: Library round trip
+
+    // Plain fetches by title and id: `userAlbums()` counts the pictures of every album, slow on a big library.
+    private static func albumID(titled title: String) -> String? {
+        let options = PHFetchOptions()
+        options.predicate = NSPredicate(format: "title = %@", title)
+        return PHAssetCollection.fetchAssetCollections(with: .album, subtype: .albumRegular, options: options).firstObject?.localIdentifier
+    }
+
+    private static func albumTitle(id: String) -> String? {
+        PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [id], options: nil).firstObject?.localizedTitle
+    }
+
+    /// Finds the album by title or creates it.
+    private static func ensureAlbum(_ title: String) async throws -> String {
+        if let id = albumID(titled: title) { return id }
+        return try await LibraryActions.createAlbum(title: title)
+    }
+
+    /// Steps 6 to 9 on the asset the self test imported: favorite, albums (add, move, remove, rename),
+    /// hide, duplicate. Hiding, deleting the duplicate and deleting the scratch albums raise Photos' confirmation
+    /// alert (a person must click it), so those parts run only with `--selftest-photos-delete`.
+    private static func libraryRoundTrip(identifier: String, allowDelete: Bool) async -> Bool {
+        func verdict(_ step: String, _ ok: Bool, _ detail: String = "") -> Bool {
+            note(ok ? "\(step) PASS \(detail)" : "FAIL \(step) \(detail)")
+            return ok
+        }
+        do {
+            // 6. Favorite on, verify, off.
+            try await LibraryActions.setFavorite([identifier], true)
+            guard verdict("step6 favorite on", LibraryActions.isFavorite(id: identifier) == true) else { return false }
+            try await LibraryActions.setFavorite([identifier], false)
+            guard verdict("step6 favorite off", LibraryActions.isFavorite(id: identifier) == false) else { return false }
+
+            // 7. Albums: add, move, remove, rename and back.
+            let scratch = try await ensureAlbum("Emulsion Test Scratch")
+            let scratch2 = try await ensureAlbum("Emulsion Test Scratch 2")
+            note("step7 albums scratch=\(scratch) scratch2=\(scratch2)")
+            try await LibraryActions.add([identifier], toAlbum: scratch)
+            guard verdict("step7 add", LibraryActions.albumIDs(containing: identifier).contains(scratch)) else { return false }
+            try await LibraryActions.move([identifier], from: scratch, to: scratch2)
+            let afterMove = LibraryActions.albumIDs(containing: identifier)
+            guard verdict("step7 move", afterMove.contains(scratch2) && !afterMove.contains(scratch)) else { return false }
+            try await LibraryActions.remove([identifier], fromAlbum: scratch2)
+            let afterRemove = LibraryActions.albumIDs(containing: identifier)
+            guard verdict("step7 remove", !afterRemove.contains(scratch2) && !afterRemove.contains(scratch)) else { return false }
+            try await LibraryActions.renameAlbum(id: scratch2, title: "Emulsion Test Scratch B")
+            guard verdict("step7 rename", albumTitle(id: scratch2) == "Emulsion Test Scratch B") else { return false }
+            try await LibraryActions.renameAlbum(id: scratch2, title: "Emulsion Test Scratch 2")
+            guard verdict("step7 rename back", albumTitle(id: scratch2) == "Emulsion Test Scratch 2") else { return false }
+
+            // 8. Hide, verify, unhide. Photos asks the user to confirm hiding (a system alert), so like
+            // deletion it runs only with `--selftest-photos-delete`.
+            if allowDelete {
+                try await LibraryActions.setHidden([identifier], true)
+                guard verdict("step8 hide", LibraryStore.flags(for: [identifier]).allHidden) else { return false }
+                try await LibraryActions.setHidden([identifier], false)
+                guard verdict("step8 unhide", !LibraryStore.flags(for: [identifier]).allHidden) else { return false }
+            } else {
+                note("step8 hide SKIPPED (Photos shows a confirmation alert; pass --selftest-photos-delete to run it)")
+            }
+
+            // 9. Duplicate: a new asset in no album; then put it in "Emulsion Test" so it is cleaned with the album.
+            let copies = try await LibraryActions.duplicate([identifier])
+            guard let copy = copies.first, copy != identifier else { return verdict("step9 duplicate", false, "no new id") }
+            let exists = PHAsset.fetchAssets(withLocalIdentifiers: [copy], options: nil).count == 1
+            let noAlbums = LibraryActions.albumIDs(containing: copy).isEmpty
+            guard verdict("step9 duplicate", exists && noAlbums, "copy=\(copy) exists=\(exists) inNoAlbum=\(noAlbums)") else { return false }
+            guard let testAlbum = albumID(titled: "Emulsion Test") else { return verdict("step9 test album", false, "Emulsion Test album missing") }
+            try await LibraryActions.add([copy], toAlbum: testAlbum)
+            guard verdict("step9 copy added to Emulsion Test", LibraryActions.albumIDs(containing: copy).contains(testAlbum)) else { return false }
+
+            guard allowDelete else {
+                note("step9 delete SKIPPED (pass --selftest-photos-delete; Photos asks for a click). Scratch albums and the duplicate remain; both live in or beside Emulsion Test.")
+                return true
+            }
+            try await LibraryActions.delete([copy])
+            guard verdict("step9 delete duplicate", true, "request completed") else { return false }
+            try await LibraryActions.deleteAlbum(id: scratch)
+            try await LibraryActions.deleteAlbum(id: scratch2)
+            return verdict("step9 delete scratch albums", albumID(titled: "Emulsion Test Scratch") == nil && albumID(titled: "Emulsion Test Scratch 2") == nil)
+        } catch {
+            if LibraryActions.isUserCancel(error) { note("step9 delete cancelled by the user") ; return true }
+            note("FAIL library round trip: \(error)")
+            return false
         }
     }
 

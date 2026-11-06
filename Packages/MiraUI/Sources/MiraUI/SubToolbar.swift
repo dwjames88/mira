@@ -103,22 +103,24 @@ struct EditorSubToolbar: View {
                 .accessibilityLabel(library.isFavorite ? "Unfavorite" : "Favorite")
                 .accessibilityAddTraits(.isToggle)
                 .accessibilityIdentifier("favorite-button")
-                Menu {
-                    Button("New Album\u{2026}", action: library.newAlbum)
-                    let albums = library.albums()
-                    if !albums.isEmpty { Divider() }
-                    ForEach(albums) { album in
-                        Button(album.title) { library.addToAlbum(album.id) }
+                if library.showsAlbums {
+                    Menu {
+                        Button("New Album\u{2026}", action: library.newAlbum)
+                        let albums = library.albums()
+                        if !albums.isEmpty { Divider() }
+                        ForEach(albums) { album in
+                            Button(album.title) { library.addToAlbum(album.id) }
+                        }
+                    } label: {
+                        Text("Album \u{25BE}").ffLabel(color: T.paperMid)
                     }
-                } label: {
-                    Text("Album \u{25BE}").ffLabel(color: T.paperMid)
+                    .menuStyle(.borderlessButton)
+                    .menuIndicator(.hidden)
+                    .fixedSize()
+                    .help("Add to an album")
+                    .accessibilityLabel("Add to album")
+                    .accessibilityIdentifier("album-menu")
                 }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .fixedSize()
-                .help("Add to an album")
-                .accessibilityLabel("Add to album")
-                .accessibilityIdentifier("album-menu")
             }
         }
     }

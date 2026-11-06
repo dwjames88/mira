@@ -96,6 +96,7 @@ final class AppState {
     init() {
         library = FilmLibrary.bundled()
         Task.detached(priority: .utility) { Self.cleanShareStaging() }
+        Task.detached(priority: .utility) { LibrarySharing.removeStale() }
         if let library {
             Task(priority: .utility) {
                 await library.prewarm()
@@ -597,11 +598,13 @@ final class AppState {
         guard !selfTestStarted else { return }
         let args = CommandLine.arguments
         guard args.contains("--selftest-photos") || args.contains("--selftest-sidecar") else { return }
+        // Deleting a photo or an album raises a Photos confirmation that needs a person: only on request.
+        let allowDelete = args.contains("--selftest-photos-delete")
         selfTestStarted = true
         guard let library else { return }
         if args.contains("--selftest-sidecar") { SelfTest.runSidecar() }
         if args.contains("--selftest-photos") {
-            Task { await SelfTest.runPhotos(library: library) }
+            Task { await SelfTest.runPhotos(library: library, allowDelete: allowDelete) }
         }
     }
 }

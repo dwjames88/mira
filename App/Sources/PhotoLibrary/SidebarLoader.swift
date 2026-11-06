@@ -89,7 +89,26 @@ enum SidebarLoader {
                            count: imageCount(in: collection, includeHidden: includeHidden))
     }
 
-    nonisolated static func load() -> [SidebarSection] {
+    nonisolated static func load() -> [SidebarSection] { loadAll().sections }
+
+    /// The user's albums flattened out of the snapshot tree (counts already fetched for the sidebar, so
+    /// this adds no second counting pass), with each album's capabilities.
+    nonisolated static func albumEntries(from snapshots: [CollectionSnapshot], path: [String] = []) -> [AlbumEntry] {
+        var entries: [AlbumEntry] = []
+        for snapshot in snapshots {
+            if snapshot.isFolder {
+                let inner = snapshot.children.compactMap { $0 as? CollectionSnapshot }
+                entries += albumEntries(from: inner, path: path + [snapshot.title])
+            } else {
+                entries.append(AlbumEntry(
+                    id: snapshot.identifier, title: snapshot.title, path: path, count: snapshot.assetCount,
+                    capabilities: LibraryActions.albumCapabilities(id: snapshot.identifier) ?? .none))
+            }
+        }
+        return entries
+    }
+
+    nonisolated static func loadAll() -> (sections: [SidebarSection], albums: [AlbumEntry]) {
         // LIBRARY
         var library = [
             SidebarNode(id: "all", title: "Library", kind: .library,
@@ -104,7 +123,8 @@ enum SidebarLoader {
 
         // ALBUMS and SHARED ALBUMS
         // Photos' own manual order: no sorting here or in the builder.
-        let albums = SidebarModel.albumNodes(from: userCollections(in: nil))
+        let tree = userCollections(in: nil)
+        let albums = SidebarModel.albumNodes(from: tree)
         var shared: [SidebarNode] = []
         let sharedResult = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .albumCloudShared, options: nil)
         for index in 0..<sharedResult.count {
@@ -143,8 +163,9 @@ enum SidebarLoader {
         if let hidden = smartNode(hiddenRaw, title: "Hidden", includeHidden: true) { utilities.append(hidden) }
         if let deleted = smartNode(recentlyDeletedRaw, title: "Recently Deleted", includeHidden: true) { utilities.append(deleted) }
 
-        return SidebarModel.sections(library: library, albums: albums, shared: shared,
-                                     mediaTypes: media, utilities: utilities)
+        let sections = SidebarModel.sections(library: library, albums: albums, shared: shared,
+                                             mediaTypes: media, utilities: utilities)
+        return (sections, albumEntries(from: tree))
     }
 
     /// The pictures of a sidebar node ("all", "fav", "recent", "smart:<raw>" or an album id), with the filter's fetch criteria.

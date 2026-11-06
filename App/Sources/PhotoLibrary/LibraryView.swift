@@ -80,7 +80,9 @@ private struct LibrarySidebar: View {
                             .padding(.top, T.rows(1))
                     }
                     let collapsed = store.isSectionCollapsed(section.id)
-                    SectionHeader(title: section.title, collapsed: collapsed) {
+                    SectionHeader(title: section.title, collapsed: collapsed,
+                                  onAdd: section.id == "albums" && store.canManageAlbums && store.authorization == .authorized
+                                      ? { store.beginNewAlbum() } : nil) {
                         focused = true
                         withAnimation(.easeOut(duration: 0.12)) { store.toggleSection(section.id) }
                     }
@@ -94,6 +96,7 @@ private struct LibrarySidebar: View {
                                 if row.node.isFolder { store.toggleExpanded(row.node.id) } else { store.select(row.node) }
                             }
                             .id(row.node.id)
+                            .sidebarLibraryActions(store: store, node: row.node)
                         }
                     }
                 }
@@ -113,28 +116,56 @@ private struct LibrarySidebar: View {
 private struct SectionHeader: View {
     let title: String
     let collapsed: Bool
+    /// A small `+` at the trailing edge (the ALBUMS section: new album); nil for none.
+    var onAdd: (() -> Void)?
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: T.cells(1)) {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 8, weight: .semibold))
-                    .foregroundStyle(T.paperDim)
-                    .rotationEffect(.degrees(collapsed ? 0 : 90))
-                    .frame(width: T.cells(1.5))
-                Text(title).ffLabel()
-                Spacer(minLength: 0)
+        HStack(spacing: 0) {
+            Button(action: action) {
+                HStack(spacing: T.cells(1)) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(T.paperDim)
+                        .rotationEffect(.degrees(collapsed ? 0 : 90))
+                        .frame(width: T.cells(1.5))
+                    Text(title).ffLabel()
+                    Spacer(minLength: 0)
+                }
+                .padding(.leading, T.cells(2))
+                .padding(.trailing, onAdd == nil ? T.cells(2) : 0)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, T.cells(2))
-            .padding(.top, T.rows(1))
-            .padding(.bottom, T.rows(0.5))
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityLabel("\(title), \(collapsed ? "collapsed" : "expanded")")
+            if let onAdd {
+                AddButton(action: onAdd)
+            }
         }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(.isHeader)
-        .accessibilityLabel("\(title), \(collapsed ? "collapsed" : "expanded")")
+        .padding(.top, T.rows(1))
+        .padding(.bottom, T.rows(0.5))
+    }
+
+    private struct AddButton: View {
+        let action: () -> Void
+        @State private var hovering = false
+
+        var body: some View {
+            Button(action: action) {
+                Text("+")
+                    .font(T.mono(13, weight: .medium))
+                    .foregroundStyle(hovering ? T.paper : T.paperDim)
+                    .frame(width: T.cells(3), height: T.rows(1.25))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .onHover { hovering = $0 }
+            .padding(.trailing, T.cells(1))
+            .help("New album \u{21E7}\u{2318}N")
+            .accessibilityLabel("New album")
+        }
     }
 }
 
@@ -210,6 +241,16 @@ private struct LibraryGridPane: View {
     private let gap = FieldFramesTheme.cellW
 
     var body: some View {
+        HStack(spacing: 0) {
+            gridColumn
+            if store.inspectorOpen {
+                LibraryInspector(store: store)
+                    .transition(.identity)
+            }
+        }
+    }
+
+    private var gridColumn: some View {
         VStack(spacing: 0) {
             header
             FFHairline()
@@ -237,7 +278,7 @@ private struct LibraryGridPane: View {
                         .onChange(of: side) { _, new in store.setCellSize(points: new, scale: displayScale) }
                 }
             }
-            if let note = state.libraryNote ?? state.presetTransfer.notice {
+            if let note = store.actionNote ?? state.libraryNote ?? state.presetTransfer.notice {
                 FFHairline()
                 Text(note).ffLabel(size: 10)
                     .padding(.horizontal, T.cells(2))
@@ -264,7 +305,11 @@ private struct LibraryGridPane: View {
             if store.authorization == .limited {
                 Text("LIMITED ACCESS").ffLabel(size: 10, color: T.lichen)
             }
+            if store.selection.count > 1 {
+                Text("\(store.selection.count) SELECTED").ffLabel(size: 10, color: T.lichen)
+            }
             Spacer()
+            if !store.selection.isEmpty { LibraryHeaderActions(store: store) }
             RawQuickToggle(store: store)
             FilterButton(store: store)
         }
@@ -278,14 +323,14 @@ private struct LibraryGridPane: View {
             ScrollView {
                 LazyVGrid(columns: items, spacing: gap) {
                     ForEach(0..<store.count, id: \.self) { index in
-                        AssetCell(store: store, index: index, selected: store.selectedIndex == index)
+                        AssetCell(state: state, index: index)
                             .id(index)
                             .onTapGesture(count: 2) {
-                                store.selectedIndex = index
+                                store.handleClick(index: index, modifiers: [])
                                 open(index)
                             }
                             .onTapGesture {
-                                store.selectedIndex = index
+                                store.handleClick(index: index, modifiers: Self.currentModifiers())
                                 focused = true
                             }
                     }
@@ -304,6 +349,16 @@ private struct LibraryGridPane: View {
             .onKeyPress(.rightArrow) { move(1, proxy) }
             .onKeyPress(.upArrow) { move(-columns, proxy) }
             .onKeyPress(.downArrow) { move(columns, proxy) }
+            .onKeyPress(.escape) {
+                guard !store.selection.isEmpty else { return .ignored }
+                store.clearSelection()
+                return .handled
+            }
+            .onKeyPress(characters: CharacterSet(charactersIn: "aA"), phases: .down) { press in
+                guard press.modifiers == .command else { return .ignored }
+                store.selectAll()
+                return .handled
+            }
             .onAppear { focused = isActive }
             .onChange(of: isActive) { _, active in focused = active }
         }
@@ -312,9 +367,18 @@ private struct LibraryGridPane: View {
     private func move(_ delta: Int, _ proxy: ScrollViewProxy) -> KeyPress.Result {
         guard store.count > 0 else { return .ignored }
         let next = min(max(0, (store.selectedIndex ?? (delta > 0 ? -1 : store.count)) + delta), store.count - 1)
-        store.selectedIndex = next
+        store.moveCursor(to: next, extend: NSEvent.modifierFlags.contains(.shift))
         proxy.scrollTo(next)
         return .handled
+    }
+
+    /// The command and shift keys held right now (a click handler runs while the click's modifiers are still down).
+    private static func currentModifiers() -> LibraryClickModifiers {
+        let flags = NSEvent.modifierFlags
+        var result: LibraryClickModifiers = []
+        if flags.contains(.command) { result.insert(.command) }
+        if flags.contains(.shift) { result.insert(.shift) }
+        return result
     }
 
     private func open(_ index: Int) {
@@ -326,9 +390,9 @@ private struct LibraryGridPane: View {
 /// A square thumbnail. Reads the memory cache first and asks PhotoKit only on a miss; it refreshes
 /// when its asset changes or PhotoKit reports that asset edited, never because something else did.
 private struct AssetCell: View {
-    let store: LibraryStore
+    let state: AppState
     let index: Int
-    let selected: Bool
+    var store: LibraryStore { state.store }
     @State private var loader = ThumbnailCellLoader<NSImage, PHAsset>()
     @State private var isRAW = false
 
@@ -343,6 +407,8 @@ private struct AssetCell: View {
     var body: some View {
         let asset = store.asset(at: index)
         let key = asset.map { store.thumbnailKey(for: $0) }
+        let id = asset?.localIdentifier
+        let selected = id.map { store.selection.contains($0) } ?? false
         Color.clear
             .aspectRatio(1, contentMode: .fit)
             .overlay {
@@ -361,10 +427,36 @@ private struct AssetCell: View {
                 }
                 .padding(4)
             }
+            .overlay(alignment: .bottomTrailing) {
+                if asset?.isFavorite == true {
+                    Image(systemName: "heart.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(T.onPhoto)
+                        .padding(3)
+                        .background(T.onPhotoVeil)
+                        .padding(4)
+                        .accessibilityLabel("Favorite")
+                }
+            }
+            .overlay(alignment: .topTrailing) {
+                if selected, store.selection.count > 1 {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(T.ink)
+                        .frame(width: 14, height: 14)
+                        .background(T.lichen)
+                        .padding(4)
+                }
+            }
             .overlay {
                 if selected { Rectangle().strokeBorder(T.lichen, lineWidth: 1) }
             }
             .contentShape(Rectangle())
+            .libraryDraggable(store: store, id: id)
+            .contextMenu {
+                if let id { LibraryContextMenu(state: state, index: index, id: id) }
+            }
+            .accessibilityAddTraits(selected ? .isSelected : [])
             .accessibilityLabel(asset?.creationDate.map { "Photo, \(Self.dateFormatter.string(from: $0))" } ?? "Photo")
             .onAppear {
                 store.prefetch(around: index)

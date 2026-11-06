@@ -86,11 +86,14 @@ public struct EditorHostBar {
         public var addToAlbum: @MainActor (String) -> Void
         /// "New Album…": the host asks for a name and adds the picture to it.
         public var newAlbum: @MainActor () -> Void
+        /// False hides the ALBUM menu (limited Photos access cannot see albums); the heart stays.
+        public var showsAlbums: Bool
 
         public init(isFavorite: Bool, toggleFavorite: @escaping @MainActor () -> Void,
                     albums: @escaping @MainActor () -> [Album],
                     addToAlbum: @escaping @MainActor (String) -> Void,
-                    newAlbum: @escaping @MainActor () -> Void) {
+                    newAlbum: @escaping @MainActor () -> Void, showsAlbums: Bool = true) {
+            self.showsAlbums = showsAlbums
             self.isFavorite = isFavorite
             self.toggleFavorite = toggleFavorite
             self.albums = albums

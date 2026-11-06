@@ -58,7 +58,31 @@ final class LibraryStore {
     /// Per-asset change counters: PhotoKit reported the asset changed (edit, revert, favorite), so
     /// only that cell fetches a new thumbnail.
     private(set) var versions = AssetVersions()
+    /// The focused cell (keyboard cursor, Return opens it). Always part of `selection` when set by a click.
     var selectedIndex: Int?
+    /// The selected photos by local identifier (multi-selection; see `LibraryActions+Store.swift`).
+    var selection = LibrarySelection()
+    /// Grid position of the selection's range anchor, so a shift-click gathers ids between two cells
+    /// without listing the whole grid.
+    @ObservationIgnored var anchorIndex: Int?
+    /// The user's albums with capabilities and counts, rebuilt with the sidebar.
+    var albums: [AlbumEntry] = []
+    /// Bumped on every library change; the inspector and the editor strip re-read flags from it.
+    private(set) var changeTick = 0
+    /// Favorite / hidden state of the selection, refreshed when the selection or the library changes.
+    var selectionFlags = SelectionFlags()
+    /// The INFO panel beside the grid.
+    var inspectorOpen = UserDefaults.standard.bool(forKey: "mira.library.inspectorOpen") {
+        didSet { UserDefaults.standard.set(inspectorOpen, forKey: "mira.library.inspectorOpen") }
+    }
+    /// The New Album / Rename sheet, when open.
+    var albumSheet: AlbumSheetRequest?
+    /// The album the user asked to delete (confirmation dialog).
+    var albumPendingDeletion: AlbumEntry?
+    /// A one-line mono notice under the grid (an action failed); clears itself.
+    var actionNote: String?
+    @ObservationIgnored var actionNoteTask: Task<Void, Never>?
+    @ObservationIgnored var flagsTask: Task<Void, Never>?
 
     @ObservationIgnored let imageManager = PHCachingImageManager()
     @ObservationIgnored private var relay: ChangeRelay?
@@ -228,21 +252,41 @@ final class LibraryStore {
     private func libraryDidChange(_ change: PHChange) {
         var membershipChanged = false
         if let current = fetchResult, let details = change.changeDetails(for: current) {
-            membershipChanged = applyGridChange(details)
+            membershipChanged = applyGridChange(details, change: change)
         }
+        changeTick += 1
+        refreshSelectionFlags()
+        // Always: album renames, creations and deletions change the sidebar without touching this grid.
         scheduleSidebarRefresh(reindex: membershipChanged)
     }
 
     /// Returns true when the set or order of photos changed.
-    private func applyGridChange(_ details: PHFetchResultChangeDetails<PHAsset>) -> Bool {
+    private func applyGridChange(_ details: PHFetchResultChangeDetails<PHAsset>, change: PHChange) -> Bool {
         let summary = LibraryChangeSummary(
             isIncremental: details.hasIncrementalChanges,
             removedCount: details.removedIndexes?.count ?? 0,
             insertedCount: details.insertedIndexes?.count ?? 0,
             hasMoves: details.hasMoves,
-            changedIDs: details.changedObjects.map(\.localIdentifier))
+            changedIDs: details.changedObjects.map(\.localIdentifier),
+            contentChangedIDs: LibraryActions.contentChangedIDs(in: change, details: details))
         let after = details.fetchResultAfterChanges
-        versions.bump(summary.changedIDs)
+        // Edits get a new version (their thumbnail is fetched again); favorite, hidden and album
+        // membership changes keep the key they had, so no thumbnail is requested for them.
+        var before: [String: Date?] = [:]
+        for asset in details.changedObjects {
+            before[asset.localIdentifier] = change.changeDetails(for: asset)?.objectBeforeChanges.modificationDate
+        }
+        versions.apply(summary, previousModification: { before[$0] ?? nil })
+        let focusedID = selectedIndex.flatMap { asset(at: $0)?.localIdentifier }
+        defer {
+            // Photos that left the grid (deleted, removed from the album, unfavorited in Favorites) leave the selection.
+            let gone = Set(details.removedObjects.map(\.localIdentifier))
+            if !gone.isEmpty {
+                selection.prune(keeping: Set(selection.ids).subtracting(gone))
+                if let focusedID, gone.contains(focusedID) { selectedIndex = nil }
+                if selection.isEmpty { anchorIndex = nil }
+            }
+        }
         guard summary.membershipChanged else {
             // Edits only: the same photos in the same places. Swap the fetch so cells read the fresh assets.
             fetchResult = after
@@ -295,9 +339,10 @@ final class LibraryStore {
         if reindex { restartIndexing(delay: .milliseconds(500)) }
         treeTask?.cancel()
         treeTask = Task { [weak self] in
-            let built = await Task.detached(priority: .userInitiated) { SidebarLoader.load() }.value
+            let built = await Task.detached(priority: .userInitiated) { SidebarLoader.loadAll() }.value
             guard !Task.isCancelled, let self else { return }
-            self.apply(built)
+            self.albums = built.albums
+            self.apply(built.sections)
         }
     }
 
@@ -314,7 +359,7 @@ final class LibraryStore {
         if SidebarModel.node(withID: selectedNodeID, in: built) == nil, selectedNodeID != "all" {
             selectedNodeID = "all"
             UserDefaults.standard.set("all", forKey: Self.selectionKey)
-            selectedIndex = nil
+            resetSelection()
             refetchGrid()
             restartIndexing(delay: .zero)
         }
@@ -351,7 +396,7 @@ final class LibraryStore {
         guard !node.isFolder else { return }
         selectedNodeID = node.id
         UserDefaults.standard.set(node.id, forKey: Self.selectionKey)
-        selectedIndex = nil
+        resetSelection()
         refetchGrid()
         restartIndexing(delay: .milliseconds(400))
     }
@@ -374,7 +419,7 @@ final class LibraryStore {
         change(&new)
         guard new != old else { return }
         filter = new
-        selectedIndex = nil
+        resetSelection()
         if old.fetchCriteria != new.fetchCriteria {
             refetchGrid()
         } else if new.needsAssetPass {
@@ -510,7 +555,7 @@ final class LibraryStore {
     /// The memory-cache key of an asset's grid thumbnail at the current size.
     func thumbnailKey(for asset: PHAsset) -> GridThumbnailKey {
         GridThumbnailKey(id: asset.localIdentifier, pixels: Int(thumbnailPixels),
-                         modificationDate: asset.modificationDate, version: versions[asset.localIdentifier])
+                         modificationDate: asset.modificationDate, versions: versions)
     }
 
     /// A larger image for the editor to show while the editing input loads.
