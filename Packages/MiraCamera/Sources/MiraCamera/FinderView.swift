@@ -40,6 +40,7 @@ public struct FinderView: UIViewRepresentable {
     public final class MetalLayerView: UIView {
         var renderer: FinderRenderer?
         var onPreviewLayer: (@MainActor (PreviewLayerBox?) -> Void)?
+        private var sentOrientation: PreviewOrientation?
 
         override public class var layerClass: AnyClass { CAMetalLayer.self }
         var metalLayer: CAMetalLayer { layer as! CAMetalLayer }
@@ -60,12 +61,29 @@ public struct FinderView: UIViewRepresentable {
             metalLayer.contentsScale = scale
             if metalLayer.drawableSize != size { metalLayer.drawableSize = size }
             renderer?.setDrawableSize(size)
+            // Tell the device when the interface orientation changes (the fake camera follows it).
+            if window != nil, let now = currentOrientation, now != sentOrientation { sendLayer() }
+        }
+
+        private var currentOrientation: PreviewOrientation? {
+            switch window?.windowScene?.effectiveGeometry.interfaceOrientation {
+            case .portrait: .portrait
+            case .portraitUpsideDown: .portraitUpsideDown
+            case .landscapeLeft: .landscapeLeft
+            case .landscapeRight: .landscapeRight
+            default: nil
+            }
+        }
+
+        private func sendLayer() {
+            sentOrientation = currentOrientation
+            onPreviewLayer?(window == nil ? nil : PreviewLayerBox(metalLayer, orientation: currentOrientation))
         }
 
         override public func didMoveToWindow() {
             super.didMoveToWindow()
             setNeedsLayout()
-            onPreviewLayer?(window == nil ? nil : PreviewLayerBox(metalLayer))
+            sendLayer()
         }
     }
 }

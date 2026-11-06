@@ -1,6 +1,10 @@
 #!/bin/bash
 # Headless iOS screenshots: build, boot, install, launch with MIRA_SNAPSHOT=1, capture the framebuffer.
 # No taps, no keyboard, no pointer input -- launch + screenshot only.
+# SNAP_DISPLAY=1 picks display 1 (multi-display devices such as the "iPhone Duo" type).
+# Landscape (simctl cannot rotate a headless simulator): run the UI test CameraOrientationSnapshotTests, e.g.
+#   TEST_RUNNER_MIRA_SNAPSHOT_OUT=$PWD/build/snapshots/ios xcodebuild test -scheme MiraiOS -destination "id=<udid>" \
+#     -only-testing:MiraiOSUITests/CameraOrientationSnapshotTests CODE_SIGNING_ALLOWED=NO   # writes camera-portrait/-landscape.png
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -37,7 +41,7 @@ shoot() { # name [tab] [sheet] [detail] [focus] [hidden]
     SIMCTL_CHILD_MIRA_SNAPSHOT_DETAIL="${4:-}" SIMCTL_CHILD_MIRA_SNAPSHOT_FOCUS="${5:-}" SIMCTL_CHILD_MIRA_SNAPSHOT_HIDDEN="${6:-}" \
     xcrun simctl launch "$UDID" "$BUNDLE_ID" >/dev/null
   sleep "$SETTLE"
-  xcrun simctl io "$UDID" screenshot "$OUT/$1.png" >/dev/null 2>&1
+  xcrun simctl io "$UDID" screenshot ${SNAP_DISPLAY:+--display=$SNAP_DISPLAY} "$OUT/$1.png" >/dev/null 2>&1
   echo "$OUT/$1.png ($(stat -f%z "$OUT/$1.png") bytes)"
 }
 
@@ -66,7 +70,7 @@ xcrun simctl privacy "$UDID" grant photos "$BUNDLE_ID" 2>/dev/null || true
 xcrun simctl terminate "$UDID" "$BUNDLE_ID" 2>/dev/null || true
 SIMCTL_CHILD_MIRA_LAUNCH_SCREEN=gallery xcrun simctl launch "$UDID" "$BUNDLE_ID" >/dev/null
 sleep "${GALLERY_SETTLE:-6}"
-xcrun simctl io "$UDID" screenshot "$OUT/gallery.png" >/dev/null 2>&1
+xcrun simctl io "$UDID" screenshot ${SNAP_DISPLAY:+--display=$SNAP_DISPLAY} "$OUT/gallery.png" >/dev/null 2>&1
 echo "$OUT/gallery.png ($(stat -f%z "$OUT/gallery.png") bytes)"
 # The root screen is the album list (a pushed grid needs a tap, which this script never does).
 # If the sim honors the grant it shows the album list; otherwise the system permission prompt over the chrome.

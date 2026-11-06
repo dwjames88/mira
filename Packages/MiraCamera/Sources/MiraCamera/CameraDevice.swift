@@ -8,7 +8,12 @@ import QuartzCore
 /// it to `AVCaptureDevice.RotationCoordinator`.
 public struct PreviewLayerBox: @unchecked Sendable {
     public weak var layer: CALayer?
-    public init(_ layer: CALayer?) { self.layer = layer }
+    /// The interface orientation of the layer's window scene, when known (the fakes derive their angle from it).
+    public var orientation: PreviewOrientation?
+    public init(_ layer: CALayer?, orientation: PreviewOrientation? = nil) {
+        self.layer = layer
+        self.orientation = orientation
+    }
 }
 
 /// The camera as the model drives it: `CaptureDeviceControlling` plus lifecycle, capture and the event streams.

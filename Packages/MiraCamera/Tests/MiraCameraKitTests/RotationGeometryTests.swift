@@ -32,3 +32,12 @@ import Testing
         #expect(abs(topRight.x) < 1e-9 && abs(topRight.y) < 1e-9)
     }
 }
+
+@Suite struct PreviewOrientationTests {
+    @Test func interfaceOrientationMapsToTheBackCameraAngle() {
+        #expect(PreviewOrientation.portrait.previewRotationAngle == 90)
+        #expect(PreviewOrientation.landscapeRight.previewRotationAngle == 0)
+        #expect(PreviewOrientation.landscapeLeft.previewRotationAngle == 180)
+        #expect(PreviewOrientation.portraitUpsideDown.previewRotationAngle == 270)
+    }
+}
