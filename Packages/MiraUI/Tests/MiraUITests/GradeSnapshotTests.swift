@@ -28,6 +28,7 @@ struct GradeSnapshotTests {
         model.recipe.curves.rgb = [CurvePoint(x: 0, y: 0.04), CurvePoint(x: 0.28, y: 0.2), CurvePoint(x: 0.62, y: 0.74), CurvePoint(x: 1, y: 1)]
         model.recipe.curves.red = [CurvePoint(x: 0, y: 0), CurvePoint(x: 0.5, y: 0.58), CurvePoint(x: 1, y: 1)]
         try await settle(model)
+        try await SnapshotSettle.settle(model)
         try SnapshotTests.writePNG(Self.panels(model, channel: .rgb, selected: 2), size: CGSize(width: 288, height: 760),
                                    scheme: .dark, name: "editor-curves-panel-dark")
         try SnapshotTests.writePNG(EditorView(model: model), size: CGSize(width: 1280, height: 1100),
@@ -42,6 +43,7 @@ struct GradeSnapshotTests {
         model.recipe.colorMixer.orange = ColorAdjust(hue: 0.35, saturation: 0.4, luminance: -0.15)
         model.recipe.colorMixer.blue = ColorAdjust(hue: -0.2, saturation: 0, luminance: 0.1)
         try await settle(model)
+        try await SnapshotSettle.settle(model)
         try SnapshotTests.writePNG(Self.panels(model, channel: .rgb, selected: nil), size: CGSize(width: 288, height: 760),
                                    scheme: .light, name: "editor-mixer-panel-light")
         try SnapshotTests.writePNG(EditorView(model: model), size: CGSize(width: 1280, height: 1100),

@@ -20,6 +20,7 @@ final class BaselineSnapshotTests: XCTestCase {
         m.select(PhotoEngine.filmList.first?.id)
         for film in m.visibleStocks.prefix(8) { await m.requestThumbnail(film.id) }
         await m.requestThumbnail(nil)
+        await m.settleHistogram()
         return m
     }
 

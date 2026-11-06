@@ -35,7 +35,7 @@ struct BaselineSnapshotTests {
                 model.selectTab(tab)
                 if tab == .develop { await model.refreshHistogramNow() }
                 try await HoverTests.waitFor { model.isPreviewIdle }
-                try await Task.sleep(for: .milliseconds(400))
+                try await SnapshotSettle.settle(model)
                 container.layoutSubtreeIfNeeded()
                 host.layoutSubtreeIfNeeded()
                 let rep = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))

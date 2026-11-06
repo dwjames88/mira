@@ -22,6 +22,7 @@ final class LayoutSnapshotTests: XCTestCase {
         }
         for film in m.visibleStocks.prefix(8) { await m.requestThumbnail(film.id) }
         await m.requestThumbnail(nil)
+        await m.settleHistogram()
         return m
     }
 

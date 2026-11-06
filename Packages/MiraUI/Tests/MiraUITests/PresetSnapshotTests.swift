@@ -28,7 +28,7 @@ struct PresetSnapshotTests {
         model.refreshPresets()
         try await HoverTests.waitFor(90) { model.presets.count == 3 && model.presetThumbnails.count == 3 }
         #expect(model.presetThumbnails.count == 3)
-        try await HoverTests.waitFor { model.isPreviewIdle }
+        try await SnapshotSettle.settle(model)
 
         for (scheme, tag) in [(ColorScheme.dark, "dark"), (.light, "light")] {
             try SnapshotTests.writePNG(EditorView(model: model), size: CGSize(width: 1280, height: 800),
@@ -58,6 +58,7 @@ struct PresetSnapshotTests {
         // No presets yet: the single SAVE A PRESET slot ahead of the films.
         let empty = try await PresetModelTests.makeModel(store: PresetModelTests.tempStore())
         try await HoverTests.waitFor { empty.isPreviewIdle && empty.thumbnails.count > 4 }
+        try await SnapshotSettle.settle(empty)
         try SnapshotTests.writePNG(EditorView(model: empty), size: CGSize(width: 1280, height: 800),
                                    scheme: .dark, name: "films-tab-no-presets-dark")
         empty.cancelWork()
