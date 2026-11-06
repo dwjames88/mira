@@ -35,6 +35,8 @@ actor PhotoEngine {
     private var colorSpace: CGColorSpace?
     private var histogramSource: CIImage?
     private var thumb: CIImage?
+    /// The caller's number of the source held now (see `discard(upTo:)`).
+    private var epoch = 0
 
     init() {
         let lib = Self.library
@@ -46,12 +48,17 @@ actor PhotoEngine {
     nonisolated static let filmList: [Film] = library?.films ?? []
 
     /// Loads an upright image from `data`; returns the source for the live view.
-    func load(data: Data) throws -> LoadedSource {
+    func load(data: Data, epoch: Int = 0) throws -> LoadedSource {
         guard let renderer else { throw PhotoEngineError.noLibrary }
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("mira-source-\(UUID().uuidString)")
         try data.write(to: url)
+        // A photo that cannot be read leaves the one already held (and its file) alone.
+        guard let loaded = ImageSource.loadWithColorSpace(url: url) else {
+            try? FileManager.default.removeItem(at: url)
+            throw PhotoEngineError.cannotLoad
+        }
         if let old = sourceURL { try? FileManager.default.removeItem(at: old) }
-        guard let loaded = ImageSource.loadWithColorSpace(url: url) else { throw PhotoEngineError.cannotLoad }
+        self.epoch = epoch
         sourceURL = url
         source = loaded.image
         colorSpace = loaded.colorSpace
@@ -63,14 +70,27 @@ actor PhotoEngine {
 
     /// Adopts an already-decoded original (library asset) for histogram and film thumbnails.
     /// Export of library assets goes through `AssetEditSession`, not this engine.
-    func adopt(_ loaded: LoadedSource) throws {
+    func adopt(_ loaded: LoadedSource, epoch: Int = 0) throws {
         guard let renderer else { throw PhotoEngineError.noLibrary }
         if let old = sourceURL { try? FileManager.default.removeItem(at: old) }
+        self.epoch = epoch
         sourceURL = nil
         source = loaded.image
         colorSpace = loaded.colorSpace
         histogramSource = Self.tagged(renderer.previewImage(from: loaded.image, maxPixelSize: 480), like: loaded.image)
         thumb = Self.tagged(renderer.previewImage(from: loaded.image, maxPixelSize: 220), like: loaded.image)
+    }
+
+    /// Lets go of the held source, its temp copy and the derived small images, unless a newer one (`epoch` above
+    /// `upTo`) was handed over after the caller decided to discard.
+    func discard(upTo: Int) {
+        guard epoch <= upTo else { return }
+        if let old = sourceURL { try? FileManager.default.removeItem(at: old) }
+        sourceURL = nil
+        source = nil
+        colorSpace = nil
+        histogramSource = nil
+        thumb = nil
     }
 
     /// A derived image keeps the source's EXIF exposure time and headroom (the reciprocity and exposure stages read them).
@@ -101,6 +121,8 @@ actor PhotoEngine {
     }
 
     func renderThumbnail(filmID: String?) throws -> Data {
+        // Cards queue here one by one; one whose request was cancelled while it waited (scrolled away) is skipped.
+        try Task.checkCancellation()
         guard let renderer, let thumb else { throw PhotoEngineError.cannotLoad }
         // Same card recipe as the Mac strip: the film at its native grain, halation and bloom (what applying it gives).
         let recipe = Recipe(filmID: filmID, reciprocity: .off).applyingNativeTexture(filmID: filmID)
@@ -125,13 +147,14 @@ actor PhotoEngine {
         return data
     }
 
+    /// Adds the JPEG at `url` to the library as a new photo; the file is removed whether or not that succeeds.
     static func saveToLibrary(_ url: URL) async throws {
+        defer { try? FileManager.default.removeItem(at: url) }
         let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
         guard status == .authorized || status == .limited else { throw PhotoEngineError.notAuthorized }
         try await PHPhotoLibrary.shared().performChanges {
             let req = PHAssetCreationRequest.forAsset()
             req.addResource(with: .photo, fileURL: url, options: PHAssetResourceCreationOptions())
         }
-        try? FileManager.default.removeItem(at: url)
     }
 }

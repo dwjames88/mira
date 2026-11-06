@@ -94,6 +94,8 @@ final class EditorViewModel {
     }
 
     private let engine = PhotoEngine()
+    /// Numbers every hand-over of a source to `engine` (load or adopt), so a deferred `discard` never removes a newer one.
+    @ObservationIgnored private var engineEpoch = 0
     /// True while the open library asset is developed from its RAW original.
     @ObservationIgnored private var rawAsset = false
     /// Which camera-raw controls the Develop panel shows for the open photo (none unless it is a RAW).
@@ -325,7 +327,8 @@ final class EditorViewModel {
             let loaded = try await session.load(onEvent: onEvent)
             guard generation == openGeneration else { return .superseded }
             let adopted = LoadedSource(image: loaded.source, colorSpace: loaded.colorSpace, size: loaded.size)
-            try await engine.adopt(adopted)
+            engineEpoch += 1
+            try await engine.adopt(adopted, epoch: engineEpoch)
             // A newer open (another asset or a picked photo) started while this one loaded: it wins.
             guard generation == openGeneration else { return .superseded }
             live.setSource(loaded.source, colorSpace: loaded.colorSpace, size: loaded.size)
@@ -420,7 +423,8 @@ final class EditorViewModel {
 
     private func adoptRaw(_ loaded: LoadedSource, _ session: AssetEditSession, filmApplied: Bool) async {
         guard !Task.isCancelled, hasPhoto, case .asset(let current) = editTarget, current === session else { return }
-        try? await engine.adopt(loaded)
+        engineEpoch += 1
+        try? await engine.adopt(loaded, epoch: engineEpoch)
         guard !Task.isCancelled else { return }
         noteThumbnailSource(filmApplied: filmApplied)
         live.setSource(loaded.image, colorSpace: loaded.colorSpace, size: loaded.size)
@@ -432,7 +436,7 @@ final class EditorViewModel {
 
     /// Returns to the gallery, discarding the open photo's edit state.
     func closePhoto() {
-        commitCrop()
+        // The recipe is reset below, so a crop being edited has nothing to commit (and must not schedule a histogram).
         rawTask?.cancel()
         rawAsset = false
         clearRawInfo()
@@ -450,12 +454,20 @@ final class EditorViewModel {
         thumbnails = [:]
         startThumbnails()
         status = ""
+        // Free the closed photo's pixels (proxy, staged texture, the engine's source and its temp copy). An import
+        // that is still being saved reads the engine's source, so that one is left for the next open to replace.
+        live.clear()
+        if !isSaving {
+            let epoch = engineEpoch
+            Task { [engine] in await engine.discard(upTo: epoch) }
+        }
     }
 
     private func ingest(_ data: Data) async throws {
         openGeneration += 1
         let generation = openGeneration
-        let loaded = try await engine.load(data: data)
+        engineEpoch += 1
+        let loaded = try await engine.load(data: data, epoch: engineEpoch)
         guard generation == openGeneration else { return }
         present(loaded)
     }

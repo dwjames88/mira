@@ -57,6 +57,9 @@ final class AssetEditSession {
 
     private(set) var asset: PHAsset
     private var input: PHContentEditingInput?
+    /// True when the last save went through but fetching the asset's next editing input failed: `input` is the one
+    /// from before that edit, so the next save fetches a fresh one first.
+    private var inputIsStale = false
     private var source: CIImage?
     private var isFullSize = false
     /// The RAW being developed (the editing input's own file, or the asset's RAW resource).
@@ -83,6 +86,7 @@ final class AssetEditSession {
     func load(onEvent: @escaping @Sendable (EditingInputEvent) -> Void = { _ in }) async throws -> Loaded {
         let input = try await requestInput(onEvent: onEvent)
         self.input = input
+        inputIsStale = false
 
         var recipe = Recipe.neutral
         var ours = false
@@ -196,6 +200,10 @@ final class AssetEditSession {
 
     /// Renders `recipe` over the pristine original at full size and commits it as an edit of the asset.
     func save(recipe: Recipe, renderer: Renderer) async throws {
+        if inputIsStale {
+            input = try await requestInput()
+            inputIsStale = false
+        }
         guard let input, var source else { throw AssetEditError.inputUnavailable }
         guard isFullSize, let inputURL = input.fullSizeImageURL else { throw AssetEditError.noFullSizeImage }
 
@@ -218,14 +226,19 @@ final class AssetEditSession {
         }.value
 
         try await EditKit.saveEdit(asset: Unchecked(value: asset), output: Unchecked(value: output))
-        try await refreshAsset()
+        await refreshAsset()
     }
 
-    /// Re-fetches the asset (its version changed) and a fresh editing input so a later save works.
-    private func refreshAsset() async throws {
+    /// Re-fetches the asset (its version changed) and a fresh editing input so a later save works. The edit is
+    /// already in Photos by now, so a failure here must not report the save as failed: the next save fetches again.
+    private func refreshAsset() async {
         if let fresh = PHAsset.fetchAssets(withLocalIdentifiers: [asset.localIdentifier], options: nil).firstObject {
             asset = fresh
         }
-        input = try await requestInput()
+        do {
+            input = try await requestInput()
+        } catch {
+            inputIsStale = true
+        }
     }
 }
