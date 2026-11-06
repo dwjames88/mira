@@ -99,8 +99,15 @@ public final class PresetStore {
     private func load(_ current: Stamp?) {
         loadedOnce = true
         stamp = current
-        guard current != nil, let data = try? Data(contentsOf: fileURL) else {
+        guard current != nil else {
             items = []
+            return
+        }
+        guard let data = try? Data(contentsOf: fileURL) else {
+            // The file is there but could not be read this time (replaced while reading, a permission or iCloud
+            // blip). Keep the presets already loaded and look again on the next call instead of treating the file
+            // as empty until it next changes (the next save would then have dropped every saved preset).
+            stamp = nil
             return
         }
         do {

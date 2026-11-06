@@ -11,8 +11,6 @@ enum PackFilms {
         let dst = URL(fileURLWithPath: films, isDirectory: true)
         let library = try FilmLibrary(directory: dst)
         let packedDir = dst.appendingPathComponent("Packed", isDirectory: true)
-        try? FileManager.default.removeItem(at: packedDir)
-        try FileManager.default.createDirectory(at: packedDir, withIntermediateDirectories: true)
         // Optional what-if limits (in 1/255 units) for reports; the shipped files use the defaults.
         let env = ProcessInfo.processInfo.environment
         let maxLimit = env["MIRA_PACK_MAX"].flatMap(Float.init).map { $0 / 255 } ?? PackedLUT.acceptedMaxError
@@ -23,12 +21,15 @@ enum PackFilms {
         var perDim: [Int: (count: Int, bytes: Int)] = [:]
         var worstProbe: [Int: (Float, Float)] = [:], worstLattice: [Int: (Float, Float)] = [:]
         let todo = library.films.filter { $0.proceduralID == nil }
+        // Everything is packed in memory first (about 130 MB) and written at the end, so a failure part-way (a missing
+        // PNG) leaves the existing Packed folder alone instead of half emptied.
+        var outputs: [(url: URL, data: Data)] = []
         for film in todo {
             guard let png = film.png else { throw PackError.noSource(film.id) }
             let (n, rgb) = try LUT.haldSamples(url: src.appendingPathComponent(png))
             let pick = PackedLUT.choose(rgb, dimension: n, probe: probe, maxError: maxLimit, p999Error: p999Limit)
             let data = try PackedLUT.pack(dimension: pick.dimension, rgb: pick.rgb)
-            try data.write(to: dst.appendingPathComponent(film.file), options: .atomic)
+            outputs.append((dst.appendingPathComponent(film.file), data))
             total += data.count
             perDim[pick.dimension, default: (0, 0)].count += 1
             perDim[pick.dimension, default: (0, 0)].bytes += data.count
@@ -36,6 +37,9 @@ enum PackFilms {
             worstProbe[pick.dimension] = (max(w.0, pick.probe.max), max(w.1, pick.probe.p999))
             worstLattice[pick.dimension] = (max(l.0, pick.lattice.max), max(l.1, pick.lattice.p999))
         }
+        try? FileManager.default.removeItem(at: packedDir)
+        try FileManager.default.createDirectory(at: packedDir, withIntermediateDirectories: true)
+        for output in outputs { try output.data.write(to: output.url, options: .atomic) }
         print("dimension  films       MB   probe max / p99.9 (1/255)   lattice max / p99.9 (1/255, information)")
         for d in perDim.keys.sorted() {
             let v = perDim[d]!, p = worstProbe[d]!, l = worstLattice[d]!

@@ -29,6 +29,25 @@ import Testing
         }
     }
 
+    /// `unpack` builds the Float cube directly (with a fast path for the shipped transform); it must equal the
+    /// cube made from the decoded samples, byte for byte, for every transform and codec.
+    @Test func unpackEqualsCubeOfUnpackedSamples() throws {
+        for n in [2, 3, 16] {
+            let rgb = Self.sampleCube(n: n)
+            for codec in PackedLUT.Codec.allCases {
+                for p in PackedLUT.Transform.Predictor.allCases {
+                    for z in [false, true] { for s in [false, true] {
+                        let t = PackedLUT.Transform(predictor: p, zigzag: z, split: s)
+                        let data = try PackedLUT.pack(dimension: n, rgb: rgb, transform: t, codec: codec)
+                        let (dim, samples) = try PackedLUT.unpackSamples(data)
+                        #expect(try PackedLUT.unpack(data).data == LUT(dimension: dim, rgb16: samples).data,
+                                "n=\(n) \(codec) \(p) zig=\(z) split=\(s)")
+                    } }
+                }
+            }
+        }
+    }
+
     @Test func packingIsDeterministicAndMatchesFloatScale() throws {
         let rgb = Self.sampleCube()
         let a = try PackedLUT.pack(dimension: 16, rgb: rgb)

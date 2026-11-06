@@ -43,7 +43,8 @@ public struct LUT: Sendable {
         var values: [Float] = []
 
         func triple(_ parts: [Substring], _ keyword: String) throws -> [Float] {
-            guard parts.count == 4, let a = Float(parts[1]), let b = Float(parts[2]), let c = Float(parts[3]) else {
+            guard parts.count == 4, let a = Float(parts[1]), let b = Float(parts[2]), let c = Float(parts[3]),
+                  a.isFinite, b.isFinite, c.isFinite else {
                 throw LUTError.invalidCube("malformed \(keyword) line")
             }
             return [a, b, c]
@@ -73,10 +74,12 @@ public struct LUT: Sendable {
             case "LUT_1D_INPUT_RANGE", "LUT_3D_INPUT_RANGE":
                 continue
             default:
-                guard parts.count == 3, let r = Float(parts[0]), let g = Float(parts[1]), let b = Float(parts[2]) else {
+                // "nan" parses as a Float and would stay NaN through the clamp below, then trap in the 16-bit cache.
+                guard parts.count == 3, let r = Float(parts[0]), let g = Float(parts[1]), let b = Float(parts[2]),
+                      !r.isNaN, !g.isNaN, !b.isNaN else {
                     throw LUTError.invalidCube("unrecognised line: \(line.prefix(40))")
                 }
-                values.append(contentsOf: [r, g, b])
+                values.append(r); values.append(g); values.append(b)
             }
         }
 
