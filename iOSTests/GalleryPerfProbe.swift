@@ -45,7 +45,7 @@ final class GalleryPerfProbe: XCTestCase {
         try XCTSkipUnless(s == .authorized || s == .limited, "Photos not authorized (\(s.rawValue))")
     }
 
-    private func findScrollView(in view: UIView) -> UIScrollView? {
+    @MainActor private func findScrollView(in view: UIView) -> UIScrollView? {
         if let s = view as? UIScrollView, s.contentSize.height > s.bounds.height { return s }
         for sub in view.subviews { if let s = findScrollView(in: sub) { return s } }
         return nil
