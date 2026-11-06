@@ -19,12 +19,15 @@ struct EditorSubToolbar: View {
         var status: Bool
         var save: Bool
         var share: Bool
+        /// The heart and ALBUM menu (`EditorHostBar.library`).
+        var photoActions: Bool
 
         init(host: EditorHostBar?) {
             library = host?.onLibrary != nil
             status = host?.status != nil
             save = host?.save != nil
             share = host?.share != nil
+            photoActions = host?.library != nil
         }
     }
 
@@ -52,6 +55,10 @@ struct EditorSubToolbar: View {
                 }
                 Spacer(minLength: T.cells(2))
                 if let host {
+                    if let library = host.library {
+                        LibraryControls(library: library)
+                            .padding(.trailing, T.cells(2))
+                    }
                     if let status = host.status {
                         Text(status)
                             .ffLabel(size: 10, color: status == "UNSAVED" ? T.paperMid : T.lichen)
@@ -76,6 +83,44 @@ struct EditorSubToolbar: View {
             .background(alignment: .bottom) { FFHairline() }
         }
         .ffPanel()
+    }
+
+    /// The heart and the ALBUM menu for the open picture (app only): quiet mono controls before the status.
+    private struct LibraryControls: View {
+        let library: EditorHostBar.Library
+
+        var body: some View {
+            HStack(spacing: T.cells(2)) {
+                Button(action: library.toggleFavorite) {
+                    Image(systemName: library.isFavorite ? "heart.fill" : "heart")
+                        .font(.system(size: 13))
+                        .foregroundStyle(library.isFavorite ? T.lichen : T.paperMid)
+                        .frame(width: T.cells(2.5), height: T.rows(1.25))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(library.isFavorite ? "Unfavorite ." : "Favorite .")
+                .accessibilityLabel(library.isFavorite ? "Unfavorite" : "Favorite")
+                .accessibilityAddTraits(.isToggle)
+                .accessibilityIdentifier("favorite-button")
+                Menu {
+                    Button("New Album\u{2026}", action: library.newAlbum)
+                    let albums = library.albums()
+                    if !albums.isEmpty { Divider() }
+                    ForEach(albums) { album in
+                        Button(album.title) { library.addToAlbum(album.id) }
+                    }
+                } label: {
+                    Text("Album \u{25BE}").ffLabel(color: T.paperMid)
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .help("Add to an album")
+                .accessibilityLabel("Add to album")
+                .accessibilityIdentifier("album-menu")
+            }
+        }
     }
 
     /// Share sits left of SAVE, a quiet strip button with the system "share" glyph. While the picture

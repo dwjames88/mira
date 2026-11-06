@@ -157,6 +157,16 @@ struct EditorTabTests {
         #expect(app.library && app.save && app.status)
     }
 
+    @Test func photoActionsExistOnlyWhenTheHostPassesLibrary() {
+        #expect(!EditorSubToolbar.Items(host: nil).photoActions)
+        #expect(!EditorSubToolbar.Items(host: EditorHostBar(onLibrary: {})).photoActions)
+        let library = EditorHostBar.Library(
+            isFavorite: true, toggleFavorite: {}, albums: { [.init(id: "a", title: "A")] },
+            addToAlbum: { _ in }, newAlbum: {})
+        let app = EditorSubToolbar.Items(host: EditorHostBar(onLibrary: {}, library: library))
+        #expect(app.photoActions && app.library)
+    }
+
     // MARK: Share button
 
     @Test func shareControlExistsInTheAppAndNotInTheExtension() {

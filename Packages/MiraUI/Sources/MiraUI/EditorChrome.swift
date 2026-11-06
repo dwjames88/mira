@@ -70,6 +70,35 @@ public struct EditorHostBar {
         }
     }
 
+    /// Photos-library actions for the open picture: a heart toggle and an ALBUM menu. Only the app passes
+    /// one (the Photos extension has no library of its own to manage).
+    public struct Library {
+        public struct Album: Identifiable, Hashable, Sendable {
+            public var id: String
+            public var title: String
+            public init(id: String, title: String) { self.id = id; self.title = title }
+        }
+
+        public var isFavorite: Bool
+        public var toggleFavorite: @MainActor () -> Void
+        /// Albums the picture can be added to, asked for when the menu opens.
+        public var albums: @MainActor () -> [Album]
+        public var addToAlbum: @MainActor (String) -> Void
+        /// "New Album…": the host asks for a name and adds the picture to it.
+        public var newAlbum: @MainActor () -> Void
+
+        public init(isFavorite: Bool, toggleFavorite: @escaping @MainActor () -> Void,
+                    albums: @escaping @MainActor () -> [Album],
+                    addToAlbum: @escaping @MainActor (String) -> Void,
+                    newAlbum: @escaping @MainActor () -> Void) {
+            self.isFavorite = isFavorite
+            self.toggleFavorite = toggleFavorite
+            self.albums = albums
+            self.addToAlbum = addToAlbum
+            self.newAlbum = newAlbum
+        }
+    }
+
     /// `← LIBRARY`: nil hides it.
     public var onLibrary: (@MainActor () -> Void)?
     /// Small mono status (UNSAVED, SAVED, REVERTED, READ ONLY, ...), nil for none.
@@ -79,9 +108,12 @@ public struct EditorHostBar {
     public var save: Save?
     /// nil hides the Share button (the Photos extension has no file access).
     public var share: Share?
+    /// nil hides the heart and ALBUM menu (the Photos extension).
+    public var library: Library?
 
     public init(onLibrary: (@MainActor () -> Void)? = nil, status: String? = nil, statusHelp: String? = nil,
-                save: Save? = nil, share: Share? = nil) {
+                save: Save? = nil, share: Share? = nil, library: Library? = nil) {
+        self.library = library
         self.share = share
         self.onLibrary = onLibrary
         self.status = status
