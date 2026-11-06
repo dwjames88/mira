@@ -1,5 +1,5 @@
 // Generates N small varied JPEGs (gradients + shapes, distinct per index) for the library perf sim.
-// usage: swiftc -O tools/make-seed-jpegs.swift -o build/seed/gen && build/seed/gen <outdir> <count>
+// usage: swiftc -O scripts/make-seed-jpegs.swift -o build/seed/gen && build/seed/gen <outdir> <count>
 import CoreGraphics
 import Foundation
 import ImageIO

@@ -4,7 +4,7 @@ import XCTest
 /// Opt-in seeding of the dedicated "Mira QA Library" simulator with a large album tree for the gallery perf probe
 /// (TEST_RUNNER_MIRA_SEED_LIBRARY=1). It only ever creates albums and folders (never edits or deletes pictures),
 /// and refuses to run on any other device. The pictures themselves come from `xcrun simctl addmedia`
-/// (see tools/make-seed-jpegs.swift and docs/PERFORMANCE.md).
+/// (see scripts/make-seed-jpegs.swift and docs/PERFORMANCE.md).
 ///
 /// Layout (deterministic): 4 top-level folders (Trips with a nested year folder, Projects, Family, Archive with two
 /// nesting levels), top-level albums, 3 albums of 1,000-2,000 pictures, ~12 of a few hundred, many of 3-60,

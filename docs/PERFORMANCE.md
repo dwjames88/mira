@@ -713,7 +713,7 @@ The question was whether a big library blocks the main thread or leaves the firs
 perf simulator. Other workers shared the machine, but every run went through the machine-wide lock, so no other
 build or simulator run overlapped.
 
-**Seeded library (exact).** 10,024 pictures: 5,000 generated 320 px JPEGs (`tools/make-seed-jpegs.swift`, varied
+**Seeded library (exact).** 10,024 pictures: 5,000 generated 320 px JPEGs (`scripts/make-seed-jpegs.swift`, varied
 gradients and shapes, EXIF dates spread over about 6 years) added twice by two `simctl addmedia` runs (the first run
 was not noticed when the second started), plus the simulator's 24 original pictures. 154 albums (150 seeded by
 `iOSTests/LibrarySeedTool.swift` plus 4 that were already there) in 87 top-level collections: 7 folders (Trips with a
@@ -734,7 +734,7 @@ TEST_RUNNER_MIRA_GALLERY_PROBE=1 xcodebuild test-without-building -scheme MiraiO
   -only-testing:MiraiOSTests/GalleryRootPerfProbe        # and /GalleryPerfProbe
 ```
 
-Seeding: `build/seed/gen build/seed/jpgs 5000` (from `tools/make-seed-jpegs.swift`), `xcrun simctl addmedia` in
+Seeding: `build/seed/gen build/seed/jpgs 5000` (from `scripts/make-seed-jpegs.swift`), `xcrun simctl addmedia` in
 batches of 500, Photos granted to the app and the test bundle, then
 `TEST_RUNNER_MIRA_SEED_LIBRARY=1 ... -only-testing:MiraiOSTests/LibrarySeedTool` (refuses any device not named
 "Mira QA Library"). Each number below is the median of 3 runs (a fresh process each).

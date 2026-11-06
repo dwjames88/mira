@@ -186,7 +186,7 @@ Check by hand after a change to the editor chrome:
 Dodge & burn adds `DodgeBurnModelTests`, `DodgeBurnMaskTests`, `DodgeBurnRenderTests` (MiraCore, 28) and `DodgeBurnUITests` (MiraUI, 12, writing `dodgeburn-*.png` snapshots), plus the opt-in `DodgeBurnPerf`.
 
 ```sh
-swift test --no-parallel --package-path Packages/MiraCore   # 520 MiraCore tests, then 44 MiraUpdates tests
+swift test --no-parallel --package-path Packages/MiraCore   # 526 MiraCore tests, then 44 MiraUpdates tests
 swift test --no-parallel --package-path Packages/MiraUI     # 194 tests
 swift test --package-path Packages/MiraCamera               # 91 tests
 ```
@@ -295,6 +295,16 @@ Automated: the iOS PhotoKit probe (`TEST_RUNNER_MIRA_LIBRARY_PROBE=1 xcodebuild 
 - [ ] Recently Deleted and smart albums: no destructive or album actions.
 - [ ] Limited access: album actions hidden; favorite, hide and delete on selected pictures work; ADD MORE still opens the picker.
 - [ ] Change something in Photos while Mira is open (favorite, rename an album): Mira updates without reloading the grid.
+
+**iPhone: library scope and DEVELOP queue on save (fix/library-three)**
+- [ ] LIBRARY header: PERSONAL / SHARED / ALL on the right. PERSONAL hides SHARED ALBUMS and shows "WITHOUT SHARED ALBUMS"; the photo count in the header and the Library tile change with the scope. (iCloud Shared Library pictures still appear under PERSONAL: PhotoKit cannot tell them apart.)
+- [ ] SHARED on a library with shared albums: Library shows the shared-album pictures only, ALBUMS / MEDIA TYPES / UTILITIES are hidden, "SHARED ALBUMS ONLY". On a library without shared albums: "No photos" with the scope control still above it. (Device only: the simulator has no shared albums; `includeAssetSourceTypes = .typeCloudShared` is unverified on a device.)
+- [ ] The scope survives a relaunch; album grids opened after a change show only in-scope pictures.
+- [ ] DEVELOP card and queue view count only in-scope frames; switching back to ALL shows every queued frame again (nothing was pruned).
+- [ ] Open a frame from the DEVELOP queue, edit, SAVE: after SAVED TO PHOTOS the frame is gone from the queue (the grid underneath updates). Turn on airplane mode / deny access to force a failed save: the frame stays queued.
+- [ ] Import a library picture that is in the queue (IMPORT icon), edit, SAVE: the new photo is saved and the original leaves the queue.
+- [ ] Gallery header: "Mira" and the count left, import and camera icons right; both open their flows; ADD MORE (limited access) still opens the picker.
+- [ ] Large library: the album list appears at once, counts and covers fill in as you scroll; favoriting a picture in Photos updates only that album's count and cover.
 
 **Mac**
 - [ ] Click, ⌘-click, ⇧-click, ⇧-arrow, ⌘A, Esc in the grid; Return still opens the focused picture; double-click opens.
