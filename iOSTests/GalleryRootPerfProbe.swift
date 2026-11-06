@@ -82,6 +82,13 @@ final class GalleryRootPerfProbe: XCTestCase {
         return ids
     }
 
+    /// PhotoKit runs the change block on its own queue: it must not be main-actor isolated.
+    nonisolated private static func setFavorite(_ asset: Unchecked<PHAsset>, _ value: Bool) async throws {
+        try await PHPhotoLibrary.shared().performChanges { @Sendable in
+            PHAssetChangeRequest(for: asset.value).isFavorite = value
+        }
+    }
+
     private static func ms(_ from: CFTimeInterval) -> Double { (CACurrentMediaTime() - from) * 1000 }
 
     @MainActor
@@ -160,9 +167,7 @@ final class GalleryRootPerfProbe: XCTestCase {
             rec.start()
             let lookups0 = GalleryKit.coverLookups
             func toggle(to value: Bool) async throws {
-                try await PHPhotoLibrary.shared().performChanges {
-                    PHAssetChangeRequest(for: target).isFavorite = value
-                }
+                try await Self.setFavorite(Unchecked(value: target), value)
             }
             func waitFav(_ expected: Int, since: CFTimeInterval) async throws -> Double {
                 while Self.ms(since) < 30_000 {
