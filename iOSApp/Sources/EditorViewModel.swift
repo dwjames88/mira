@@ -72,6 +72,8 @@ final class EditorViewModel {
     var saveTitle: String { saveState.title }
     var hasUnsavedEdits: Bool { saveState == .unsaved }
     private(set) var isLibraryAsset = false
+    /// Local identifier of the open library photo (nil for imports and the sample).
+    var libraryAssetID: String? { if case .asset(let session) = editTarget { session.asset.localIdentifier } else { nil } }
     /// Suppresses the unsaved flag while the recipe is set from stored adjustments / reset on open.
     @ObservationIgnored private var isRestoring = false
 

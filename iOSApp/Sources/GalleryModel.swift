@@ -279,6 +279,8 @@ final class AlbumModel {
     @ObservationIgnored let metrics = ThumbnailMetrics.shared
     /// PhotoKit reported these assets changed (edit, revert, favorite): their cells fetch a new thumbnail.
     private(set) var versions = AssetVersions()
+    /// Told after each change with the ids that left this album (nil = not incremental, re-check). Set by the library UI.
+    @ObservationIgnored var onMembershipChange: (([String]?) -> Void)?
     /// Memory cache + the one request path for this album's grid thumbnails.
     @ObservationIgnored private(set) lazy var thumbnails = ThumbnailPipeline<UIImage, PHAsset>(
         metrics: metrics,
@@ -299,7 +301,7 @@ final class AlbumModel {
 
     func thumbnailKey(for asset: PHAsset) -> GridThumbnailKey {
         GridThumbnailKey(id: asset.localIdentifier, pixels: thumbPixels,
-                         modificationDate: asset.modificationDate, version: versions[asset.localIdentifier])
+                         modificationDate: asset.modificationDate, versions: versions)
     }
 
     init(nodeID: String) { self.nodeID = nodeID }
@@ -407,10 +409,17 @@ final class AlbumModel {
         let inserted = Array(details.insertedIndexes ?? [])
         let summary = LibraryChangeSummary(
             isIncremental: details.hasIncrementalChanges, removedCount: removed.count, insertedCount: inserted.count,
-            hasMoves: details.hasMoves, changedIDs: details.changedObjects.map(\.localIdentifier))
+            hasMoves: details.hasMoves, changedIDs: details.changedObjects.map(\.localIdentifier),
+            contentChangedIDs: LibraryActions.contentChangedIDs(in: change, details: details))
         let after = details.fetchResultAfterChanges
+        let previous = Dictionary(details.changedObjects.map { object -> (String, Date?) in
+            let at = current.index(of: object)
+            return (object.localIdentifier, at == NSNotFound ? object.modificationDate : current.object(at: at).modificationDate)
+        }, uniquingKeysWith: { first, _ in first })
+        // Metadata-only changes (favorite, hidden, album membership) keep the old key; edits bump it.
+        versions.apply(summary, previousModification: { previous[$0] ?? nil })
         result = after
-        versions.bump(summary.changedIDs)
+        onMembershipChange?(summary.isIncremental ? removed.isEmpty ? [] : details.removedObjects.map(\.localIdentifier) : nil)
         guard summary.membershipChanged else { return }
         gallery.invalidateCover(nodeID: nodeID)
         if !removed.isEmpty {

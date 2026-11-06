@@ -26,6 +26,7 @@ struct EditorHeader: View {
             .buttonStyle(.plain)
             .accessibilityLabel("Back to library")
             Spacer(minLength: 0)
+            EditorLibraryMenu(model: model)
             Text(model.status).ffLabel(size: 9, color: T.paperDim).lineLimit(1)
             saveButton
         }

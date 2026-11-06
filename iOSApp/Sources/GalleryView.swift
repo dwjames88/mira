@@ -136,6 +136,7 @@ struct GalleryView: View {
 private struct AlbumListView: View {
     let gallery: GalleryModel
     let sections: [SidebarSection]
+    @State private var albumTools = AlbumToolsModel()
     private let margin = FieldFramesTheme.cells(2)
     private let gap: CGFloat = 14
 
@@ -146,7 +147,7 @@ private struct AlbumListView: View {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     DevelopCard(gallery: gallery)
                     ForEach(sections) { section in
-                        sectionHeader(section.title)
+                        sectionHeader(section.title, id: section.id)
                         let nodes = SidebarModel.visible(section.nodes)
                         switch section.id {
                         case "library": library(nodes, side: side, width: geo.size.width - margin * 2)
@@ -158,11 +159,18 @@ private struct AlbumListView: View {
                 .padding(.bottom, FieldFramesTheme.rows(3))
             }
         }
+        .albumTools(albumTools)
     }
 
-    private func sectionHeader(_ title: String) -> some View {
+    private func sectionHeader(_ title: String, id: String = "") -> some View {
         VStack(alignment: .leading, spacing: FieldFramesTheme.cells(1)) {
-            Text(title.uppercased()).ffLabel(size: 10, color: FieldFramesTheme.paperMid)
+            HStack {
+                Text(title.uppercased()).ffLabel(size: 10, color: FieldFramesTheme.paperMid)
+                Spacer(minLength: 0)
+                if id == "albums", LibraryActionAvailability.canManageAlbums(limitedAccess: gallery.status == .limited) {
+                    NewAlbumButton { albumTools.newAlbum(existingTitles: LibraryActions.userAlbums().map(\.title)) }
+                }
+            }
             FFHairline()
         }
         .padding(.horizontal, margin)
@@ -192,6 +200,7 @@ private struct AlbumListView: View {
                     CoverTile(gallery: gallery, node: node, size: CGSize(width: side, height: side), titleSize: 17)
                 }
                 .buttonStyle(.plain)
+                .albumContextMenu(node: node, tools: albumTools, limited: gallery.status == .limited)
             }
         }
         .padding(.horizontal, padded ? margin : 0)
@@ -378,10 +387,10 @@ struct AlbumGridView: View {
     @Bindable var editor: EditorViewModel
     let title: String
     @State private var album: AlbumModel
+    @State private var library: GallerySelectionModel
     /// Persisted ALL / RAW choice, shared by every album.
     @AppStorage("gallery.rawOnly") private var rawOnly = false
     @Environment(\.displayScale) private var displayScale
-    private let develop = DevelopStore.shared
 
     private let columns = 3
     private let gutter: CGFloat = 1
@@ -391,6 +400,7 @@ struct AlbumGridView: View {
         self.editor = editor
         self.title = title
         _album = State(initialValue: AlbumModel(nodeID: nodeID))
+        _library = State(initialValue: GallerySelectionModel(nodeID: nodeID))
     }
 
     var body: some View {
@@ -398,22 +408,28 @@ struct AlbumGridView: View {
             FFGroundBackground(grain: 0.07).ignoresSafeArea()
             VStack(spacing: 0) {
                 HStack {
+                    LibrarySelectionHeader(library: library, album: album, rawOnly: rawOnly)
+                    if !library.isSelecting {
                     Text("\(album.count) \(rawOnly ? "RAW" : (album.count == 1 ? "PHOTO" : "PHOTOS"))").ffLabel(size: 9, color: FieldFramesTheme.paperDim)
+                    }
                     if let progress = album.scanProgress {
                         Text("SCANNING \(progress.done.formatted()) / \(progress.total.formatted())")
                             .ffLabel(size: 9, color: FieldFramesTheme.lichen).lineLimit(1)
                     }
                     Spacer(minLength: 0)
+                    if !library.isSelecting {
                     FFTabBar([(value: false, title: "ALL"),
                               (value: true, title: album.rawCount.map { "RAW \($0.formatted())" } ?? "RAW")],
                              selection: $rawOnly,
                              spacing: FieldFramesTheme.cells(2))
                         .accessibilityLabel("Show all photos or RAW only")
+                    }
                     if gallery.status == .limited {
                         Button { gallery.presentLimitedPicker() } label: {
                             Text("ADD MORE").ffLabel(size: 11, color: FieldFramesTheme.lichen).frame(minHeight: 44)
                         }.buttonStyle(.plain)
                     }
+                    LibrarySelectControl(library: library)
                 }
                 .padding(.horizontal, FieldFramesTheme.cells(2))
                 .frame(height: 32)
@@ -432,6 +448,7 @@ struct AlbumGridView: View {
             }
         }
         .ffNavigationTitle(title)
+        .libraryChrome(library, album: album, gallery: gallery)
         // Loads once. Later library changes arrive through `album.apply`, not by refetching the album.
         .task { if !album.loaded { await album.reload(rawOnly: rawOnly, gallery: gallery) } }
         .onChange(of: rawOnly) { _, on in album.setRawOnly(on) }
@@ -448,14 +465,8 @@ struct AlbumGridView: View {
                         if let asset = album.asset(at: index) {
                             GalleryCell(album: album, asset: asset, index: index)
                                 .aspectRatio(1, contentMode: .fit)
-                                .onTapGesture { Task { await gallery.open(asset, in: editor) } }
-                                .contextMenu {
-                                    let queued = develop.contains(asset.localIdentifier)
-                                    Button { develop.toggle(asset.localIdentifier) } label: {
-                                        Label(queued ? "Remove from Develop" : "Add to Develop",
-                                              systemImage: queued ? "minus.circle" : "plus.circle")
-                                    }
-                                }
+                                .libraryCell(library, asset: asset, gallery: gallery)
+                                .onTapGesture { if !library.handleTap(asset) { Task { await gallery.open(asset, in: editor) } } }
                         }
                     }
                 }
