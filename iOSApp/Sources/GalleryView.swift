@@ -14,7 +14,7 @@ enum AlbumRoute: Hashable {
 
 struct GalleryView: View {
     @Bindable var editor: EditorViewModel
-    /// Opens the camera (the CAMERA control next to IMPORT).
+    /// Opens the camera (the CAMERA control, top-left before the title).
     var onCamera: () -> Void = {}
     @State private var gallery = GalleryModel()
     @State private var path: [AlbumRoute] = []
@@ -81,6 +81,11 @@ struct GalleryView: View {
 
     private var header: some View {
         HStack(spacing: FieldFramesTheme.cells(1)) {
+            Button(action: onCamera) {
+                CameraLabel().frame(minWidth: 44, minHeight: 44, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Open the camera")
             Text("Mira").font(FieldFramesTheme.display(22, weight: .regular))
             Text(gallery.hasAccess ? (gallery.libraryCount.map { "\($0) \($0 == 1 ? "PHOTO" : "PHOTOS")" } ?? "") : editor.status)
                 .ffLabel(size: 9, color: FieldFramesTheme.paperDim).lineLimit(1)
@@ -90,11 +95,6 @@ struct GalleryView: View {
                     Text("ADD MORE").ffLabel(size: 11, color: FieldFramesTheme.lichen).frame(minHeight: 44)
                 }.buttonStyle(.plain)
             }
-            Button(action: onCamera) {
-                CameraLabel().frame(minWidth: 44, minHeight: 44)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Open the camera")
             PhotosPicker(selection: $pickerItem, matching: .images) {
                 ImportLabel().frame(minWidth: 44, minHeight: 44)
             }

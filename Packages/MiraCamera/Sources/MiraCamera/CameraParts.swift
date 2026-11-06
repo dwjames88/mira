@@ -7,28 +7,25 @@ private typealias T = FieldFramesTheme
 
 // MARK: Header
 
-/// The editor header's pattern: chevron + LIBRARY (11 pt mono, 44 pt hit), the film name centered in Cormorant,
+/// A plain LIBRARY label (11 pt mono, 44 pt hit, no back chevron) that opens the library, the film name centered in Cormorant,
 /// the counter slot ("DEVELOPING n") and a small settings gear, 48 pt tall.
 struct CameraHeader: View {
     let filmName: String?
     let developing: Int
-    let onBack: () -> Void
+    let onLibrary: () -> Void
     let onSettings: () -> Void
     var showsFilmName = true
 
     var body: some View {
         HStack(spacing: T.cells(1)) {
-            Button(action: onBack) {
-                HStack(spacing: 4) {
-                    Image(systemName: "chevron.left").font(.system(size: 13, weight: .semibold))
-                    Text("LIBRARY").ffLabel(size: 11)
-                }
-                .foregroundStyle(T.paper)
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
+            Button(action: onLibrary) {
+                Text("LIBRARY").ffLabel(size: 11)
+                    .foregroundStyle(T.paper)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Back to library")
+            .accessibilityLabel("Open library")
             .accessibilityIdentifier("camera.library")
             Spacer(minLength: 0)
             if developing > 0 {
