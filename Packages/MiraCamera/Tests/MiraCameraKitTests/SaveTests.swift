@@ -230,6 +230,38 @@ func makeFrame(raw: Bool) throws -> CapturedFrame {
         #expect(await log.entries.contains { $0.hasPrefix("createAsset") })
     }
 
+    @Test func aFailedBakedCopyDoesNotStrandTheBakedFile() async throws {
+        struct Failing: PhotoLibraryWriting {
+            let step: String
+            func access() async -> LibraryAccess { .limited }
+            func createAsset(photo: URL, alternateRaw: URL?) async throws -> String {
+                if step == "asset" { throw PrintError.failed("asset") }
+                return "asset-1"
+            }
+            func createBakedCopy(jpeg: URL) async throws -> String { throw PrintError.failed("copy") }
+        }
+        actor Baked { var urls: [URL] = []; func add(_ u: URL) { urls.append(u) } }
+        struct RecordingBaker: PrintBaking {
+            let baked: Baked
+            func bake(recipe: Recipe, photo: URL, raw: URL?) async throws -> URL {
+                let url = FileManager.default.temporaryDirectory.appendingPathComponent("baked-\(UUID().uuidString).jpg")
+                try Data("jpeg".utf8).write(to: url)
+                await baked.add(url)
+                return url
+            }
+        }
+        for step in ["asset", "copy"] {
+            let baked = Baked()
+            let queue = PrintQueue(store: PendingPrintStore(directory: tempDir()), writer: FakePrintWriter())
+            let saver = CaptureSaver(library: Failing(step: step), baker: RecordingBaker(baked: baked), queue: queue)
+            await #expect(throws: PrintError.failed(step)) { try await saver.save(try makeFrame(raw: false), recipe: recipe) }
+            let urls = await baked.urls
+            #expect(urls.count == 1)
+            #expect(urls.allSatisfy { !FileManager.default.fileExists(atPath: $0.path) })
+            #expect(await saver.developingCount == 0)
+        }
+    }
+
     @Test func deniedAndNotDeterminedThrowWithMonoCopyAndKeepTheFiles() async throws {
         for access in [LibraryAccess.denied, .notDetermined] {
             let (saver, log, _, _) = make(access)

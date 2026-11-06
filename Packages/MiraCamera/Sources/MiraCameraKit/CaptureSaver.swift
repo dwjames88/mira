@@ -114,8 +114,16 @@ public actor CaptureSaver {
                 queue.announceDeveloped(id)
                 return .originalOnly(assetID: id, notice: Self.limitedAccessNotice)
             }
-            let original = try await library.createAsset(photo: capture.heicURL, alternateRaw: capture.dngURL)
-            let copy = try await library.createBakedCopy(jpeg: baked)
+            let original: String
+            let copy: String
+            do {
+                original = try await library.createAsset(photo: capture.heicURL, alternateRaw: capture.dngURL)
+                copy = try await library.createBakedCopy(jpeg: baked)
+            } catch {
+                // The library takes the baked file only when its asset is created; a failed step must not strand it.
+                Self.deleteTemp(baked)
+                throw error
+            }
             Self.deleteTemp(capture.heicURL, capture.dngURL, baked)
             queue.announceDeveloped(copy)
             return .bakedCopy(notice: Self.limitedAccessNotice, originalAssetID: original, bakedAssetID: copy)
