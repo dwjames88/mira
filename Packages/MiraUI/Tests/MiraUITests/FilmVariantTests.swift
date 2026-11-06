@@ -175,7 +175,7 @@ struct FilmControlTests {
         #expect(PushFormat.label(1.0 / 3) == "+\u{2153}")
     }
 
-    @Test func resetClearsFilmSettingsButKeepsRawFilmAndPipeline() throws {
+    @Test func resetClearsFilmAndRawSettingsButKeepsFilmAndPipeline() throws {
         let model = EditorModel(library: try library(remJet: true))
         model.selectFilm("bw")
         model.recipe.push = 1; model.recipe.remJetRemoved = true
@@ -185,7 +185,7 @@ struct FilmControlTests {
         model.reset()
         let r = model.recipe
         #expect(r.push == 0 && !r.remJetRemoved && r.scanProfile == .neutral && r.toning == .none && r.toningStrength == 0.5)
-        #expect(r.raw.boostAmount == 0.3)
+        #expect(r.raw.isIdentity)
         #expect(r.filmID == "bw" && r.pipeline == Recipe.currentPipeline)
         #expect(!model.canReset)
         model.resetAll()

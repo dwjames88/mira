@@ -368,44 +368,83 @@ enum CropSummary {
 
 // MARK: Develop
 
-/// DEVELOP: histogram, light, presence and colour sliders, curves, colour mixer, then effects and frame, with
-/// RESET at the foot.
+/// One Develop section's data-driven sliders: the recipe sliders, then the camera-raw-decode ones for a RAW photo.
+struct DevelopSectionSpec: Identifiable {
+    let section: DevelopSection
+    let specs: [SliderSpec]
+    let rawSpecs: [RawSliderSpec]
+    var id: String { section.rawValue }
+
+    init(_ section: DevelopSection, specs: [SliderSpec] = [], rawSpecs: [RawSliderSpec] = []) {
+        self.section = section
+        self.specs = specs
+        self.rawSpecs = rawSpecs
+    }
+
+    /// Every slider id the section can show, in order.
+    var sliderIDs: [String] { specs.map(\.id) + rawSpecs.map(\.id) }
+}
+
+/// DEVELOP: histogram, then Light, White balance, Color (with curves and the mixer), Detail, Lens, Film and
+/// Frame, with RESET at the foot. Camera-raw-decode controls sit inside the section of their function.
 struct DevelopPanel: View {
     @Bindable var model: EditorModel
 
-    static let toneColor: [SliderGroup] = [
-        SliderGroup(title: "Light", specs: [
+    /// The panel's sections in order. White balance, the lens-correction toggle, the rem-jet toggle and the
+    /// border controls are laid out by hand around these.
+    static let sections: [DevelopSectionSpec] = [
+        DevelopSectionSpec(.light, specs: [
             SliderSpec("exposure", "Exposure", \.exposure, -2...2, default: 0),
             SliderSpec("contrast", "Contrast", \.contrast, -1...1, default: 0),
             SliderSpec("highlights", "Highlights", \.highlights, -1...1, default: 0),
             SliderSpec("shadows", "Shadows", \.shadows, -1...1, default: 0),
             SliderSpec("whites", "Whites", \.whites, -1...1, default: 0),
             SliderSpec("blacks", "Blacks", \.blacks, -1...1, default: 0),
-        ]),
-        SliderGroup(title: "Presence", specs: [
-            SliderSpec("texture", "Texture", \.texture, -1...1, default: 0),
-            SliderSpec("clarity", "Clarity", \.clarity, -1...1, default: 0),
+        ], rawSpecs: [.boost, .highlightRecovery, .localToneMap]),
+        DevelopSectionSpec(.whiteBalance),
+        DevelopSectionSpec(.color, specs: [
             SliderSpec("vibrance", "Vibrance", \.vibrance, -1...1, default: 0),
             SliderSpec("saturation", "Saturation", \.saturation, -1...1, default: 0),
         ]),
-        SliderGroup(title: "Color", specs: [
-            SliderSpec("warmth", "Temperature", \.warmth, -1...1, default: 0),
-            SliderSpec("tint", "Tint", \.tint, -1...1, default: 0),
+        DevelopSectionSpec(.detail, specs: [
+            SliderSpec("texture", "Texture", \.texture, -1...1, default: 0),
+            SliderSpec("clarity", "Clarity", \.clarity, -1...1, default: 0),
+        ], rawSpecs: [.sharpness, .luminanceNoise, .colorNoise]),
+        DevelopSectionSpec(.lens, specs: [
+            SliderSpec("vignette", "Vignette", \.vignetteAmount, 0...1, default: 0),
+        ]),
+        DevelopSectionSpec(.film, specs: [
+            SliderSpec("grain", "Grain", \.grainAmount, 0...1, default: 0,
+                       help: "50% is the film's own grain"),
+            SliderSpec("grainSize", "Grain size", \.grainSize, 0...1, default: 0.5,
+                       help: "50% is the film's own grain size"),
+            SliderSpec("halation", "Halation", \.halationAmount, 0...1, default: 0,
+                       help: "50% is the film's own halation"),
+            SliderSpec("halationRadius", "Halation radius", \.halationRadius, 0...1, default: 0.5,
+                       help: "50% is the film's own spread"),
+            SliderSpec("bloom", "Bloom", \.bloomAmount, 0...1, default: 0,
+                       help: "50% is the film's own bloom"),
+        ]),
+        DevelopSectionSpec(.frame, specs: [
+            SliderSpec("borderWidth", "Border width", \.borderWidth, 0...0.3, default: 0.04),
         ]),
     ]
 
-    static let texture = [
-        SliderSpec("grain", "Grain", \.grainAmount, 0...1, default: 0,
-                   help: "50% is the film's own grain"),
-        SliderSpec("grainSize", "Grain size", \.grainSize, 0...1, default: 0.5,
-                   help: "50% is the film's own grain size"),
-        SliderSpec("halation", "Halation", \.halationAmount, 0...1, default: 0,
-                   help: "50% is the film's own halation"),
-        SliderSpec("halationRadius", "Halation radius", \.halationRadius, 0...1, default: 0.5,
-                   help: "50% is the film's own spread"),
-        SliderSpec("bloom", "Bloom", \.bloomAmount, 0...1, default: 0,
-                   help: "50% is the film's own bloom"),
-    ]
+    private static func spec(_ section: DevelopSection) -> DevelopSectionSpec {
+        sections.first { $0.section == section }!
+    }
+
+    private func label(_ section: DevelopSection) -> some View {
+        FFSectionLabel(section.title).padding(.top, T.rows(1)).padding(.bottom, 4)
+    }
+
+    private func sliders(_ section: DevelopSection) -> some View {
+        let spec = Self.spec(section)
+        return Group {
+            SpecSliders(model: model, specs: spec.specs)
+            RawSliders(model: model, specs: spec.rawSpecs)
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -413,26 +452,37 @@ struct DevelopPanel: View {
                 VStack(alignment: .leading, spacing: 0) {
                     HistogramView(model: model)
                     LatitudeReadout(model: model)
-                    RawGroup(model: model)
-                    ForEach(Self.toneColor) { group in
-                        FFSectionLabel(group.title).padding(.top, T.rows(1)).padding(.bottom, 4)
-                        SpecSliders(model: model, specs: group.specs)
-                    }
+                    label(.light)
+                    sliders(.light)
+                    label(.whiteBalance)
+                    WhiteBalanceSliders(model: model)
+                    label(.color)
+                    sliders(.color)
                     CurvesPanel(model: model)
                     ColorMixerPanel(model: model)
-                    FFSectionLabel("Effects").padding(.top, T.rows(1)).padding(.bottom, 4)
-                    SpecSliders(model: model, specs: Self.texture)
+                    label(.detail)
+                    sliders(.detail)
+                    label(.lens)
+                    if model.rawControlVisibility.lensCorrection {
+                        FFToggle("Lens correction", isOn: Binding(
+                            get: { model.recipe.raw.lensCorrection ?? false },
+                            set: { model.recipe.raw.lensCorrection = $0 }))
+                            .padding(.bottom, 8)
+                            .help("Corrects the lens distortion in the camera raw decode")
+                    }
+                    sliders(.lens)
+                    label(.film)
+                    sliders(.film)
                     if model.showsRemJetToggle {
                         FFToggle("Remove rem-jet", isOn: $model.recipe.remJetRemoved)
                             .padding(.bottom, 8)
                             .help("Removing the anti-halation backing lets highlights bleed red")
                     }
-                    FFSectionLabel("Frame").padding(.top, T.rows(1)).padding(.bottom, 4)
-                    SpecSliders(model: model, specs: [SliderSpec("vignette", "Vignette", \.vignetteAmount, 0...1, default: 0)])
+                    label(.frame)
                     FFToggle("Border", isOn: $model.recipe.borderEnabled)
                         .padding(.bottom, 8)
                     if model.recipe.borderEnabled {
-                        SpecSliders(model: model, specs: [SliderSpec("borderWidth", "Border width", \.borderWidth, 0...0.3, default: 0.04)])
+                        sliders(.frame)
                     }
                 }
                 .padding(.horizontal, T.cells(2))
@@ -444,12 +494,39 @@ struct DevelopPanel: View {
                 Button("Reset") { model.reset() }
                     .buttonStyle(FFButtonStyle())
                     .disabled(!model.canReset)
-                    .help("Reset all sliders, curves and the mixer; keeps the selected film and crop")
+                    .help("Reset all sliders, curves, the mixer and white balance; keeps the selected film, crop and dodge and burn")
             }
             .padding(.horizontal, T.cells(2))
             .padding(.vertical, T.rows(1))
         }
         .ffPanel()
+    }
+}
+
+/// WHITE BALANCE: one temperature (kelvin) and tint pair for every photo, and "As shot" to clear both.
+private struct WhiteBalanceSliders: View {
+    @Bindable var model: EditorModel
+
+    var body: some View {
+        let wb = WhiteBalanceControl(isRaw: model.isRawSource, asShot: model.rawAsShot)
+        FFSlider("Temperature (K)",
+                 value: Binding(get: { wb.temperature(of: model.recipe) },
+                                set: { wb.setTemperature($0, in: &model.recipe) }),
+                 in: wb.kelvinRange, default: wb.kelvinDefault, decimals: 0, snap: WhiteBalanceControl.kelvinSnap)
+            .help(wb.isRaw ? "White balance in kelvin; the camera's value until you change it"
+                           : "Warmer or cooler, in kelvin from a 6500 K neutral")
+        FFSlider("Tint",
+                 value: Binding(get: { wb.tint(of: model.recipe) },
+                                set: { wb.setTint($0, in: &model.recipe) }),
+                 in: wb.tintRange, default: wb.tintDefault, decimals: 0, snap: WhiteBalanceControl.tintSnap)
+        HStack {
+            Spacer()
+            Button("As shot") { WhiteBalanceControl.resetToAsShot(&model.recipe) }
+                .buttonStyle(.ff)
+                .disabled(wb.isAsShot(model.recipe))
+                .help("Back to the camera's white balance")
+        }
+        .padding(.bottom, 8)
     }
 }
 

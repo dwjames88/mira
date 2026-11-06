@@ -458,9 +458,10 @@ public final class EditorModel {
     public var isLegacyPipeline: Bool { recipe.isLegacyPipeline && recipe.filmID != nil }
 
     /// Resets every slider to its default (including push, rem-jet, scan and toning) and keeps the selected
-    /// film. The dodge and burn strokes, the crop and the RAW settings stay: they belong to the photo.
+    /// film. White balance and the camera-raw-decode settings go too (they live in the same panel); the dodge
+    /// and burn strokes and the crop stay: they belong to the photo.
     public func reset() {
-        recipe = Recipe(filmID: recipe.filmID, pipeline: recipe.pipeline, raw: recipe.raw, crop: recipe.crop,
+        recipe = Recipe(filmID: recipe.filmID, pipeline: recipe.pipeline, crop: recipe.crop,
                         dodgeBurn: recipe.dodgeBurn)
     }
 
@@ -472,7 +473,7 @@ public final class EditorModel {
 
     /// True when `reset()` would change something (any adjustment differs from neutral).
     public var canReset: Bool {
-        recipe != Recipe(filmID: recipe.filmID, pipeline: recipe.pipeline, raw: recipe.raw, crop: recipe.crop,
+        recipe != Recipe(filmID: recipe.filmID, pipeline: recipe.pipeline, crop: recipe.crop,
                          dodgeBurn: recipe.dodgeBurn)
     }
 
