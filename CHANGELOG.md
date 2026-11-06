@@ -29,6 +29,10 @@ Roll 1: a camera for iPhone. Not yet verified on an iPhone (see Notes).
 - **Portrait layout.** The meter is about half as tall (15 pt scale, one-line readout), the lens chips float over the bottom of the finder, and the shutter row is 84 pt and sits partly in the bottom safe area, so on an iPhone 16 Pro the 3:4 frame fills the width.
 
 ### Changed
+- **DEVELOP sections are named for what they do (Mac, Photos extension, iPhone).** LIGHT, WHITE BALANCE, COLOR, DETAIL, LENS, FILM, FRAME replace Light / Presence / Color / Effects / Frame and the separate RAW group. The camera-raw decoder's controls join the section they belong to when the photo is a RAW and the decoder supports them: boost, highlight recovery and local tone map in LIGHT; sharpness, luminance and colour noise in DETAIL; lens correction in LENS (beside Vignette).
+- **One white balance.** The second Temperature / Tint pair is gone. WHITE BALANCE has Temperature in kelvin, Tint and As shot for every photo: for a RAW it is the camera's white balance (as before); for a JPEG or HEIC it drives the pipeline balance, shown as 5000-8000 K around a 6500 K neutral and tint -40 to 40 (mapping in Design/FILM-SCIENCE.md, constants in MiraCore `PipelineWhiteBalance`). Recipes and presets keep their `warmth` / `tint` and render exactly as before; As shot also clears pipeline warmth / tint left on a RAW recipe.
+- **iPhone gets the RAW controls** (boost, highlight recovery, tone map, sharpness, noise reduction, lens correction) as chips in those sections, each only when the open photo is developed from its RAW and the decoder supports it.
+- Mac Develop RESET also returns the RAW decoder settings to as shot / Auto, since they now sit in the same sections.
 - `FilmsPanel` is now shared between the editor and the camera.
 - The latitude meter computes its percentiles with a selection instead of a full sort (same values, about 5x faster); the camera reads it from a 256 px frame at 4 Hz.
 - MiraCore `Renderer` gains `withGrainSeed` and `withTextureScale` for the finder. Capture and export use the defaults and render as before.
