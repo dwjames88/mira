@@ -1,10 +1,14 @@
 import Foundation
+import os
 
 /// Reads `films.json` from a directory and lazily loads (and caches) each film's LUT.
 ///
 /// Bundled films are `.mlut` files (`PackedLUT`), decoded in a few milliseconds and never disk-cached.
 /// With a `cacheDirectory`, cubes loaded from Hald PNGs (user or test libraries) are persisted as compact
 /// 16-bit files so a large PNG is decoded only once per install.
+///
+/// Thread safety: `films`, `index` and the stock tables are immutable after `init`; the cube cache and `filmLocks` are
+/// guarded by `lock`, and `filmLocks` serialises loads of one film, which is why `@unchecked Sendable` is sound.
 public final class FilmLibrary: @unchecked Sendable {
     public let directory: URL
     public let films: [Film]
@@ -26,6 +30,8 @@ public final class FilmLibrary: @unchecked Sendable {
     /// Every stock in card order, and each film id's position in it.
     public let filmStocks: [FilmStock]
     private let stockIndex: [String: FilmStock]
+    /// The base film of every stock: the films shown as cards, in card order.
+    public let stocks: [Film]
 
     public init(directory: URL, cacheDirectory: URL? = nil) throws {
         self.directory = directory
@@ -39,15 +45,14 @@ public final class FilmLibrary: @unchecked Sendable {
         }
         self.films = films
         self.index = Dictionary(films.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        let stocks = FilmStock.group(films)
-        self.filmStocks = stocks
-        self.stockIndex = Dictionary(stocks.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let grouped = FilmStock.group(films)
+        self.filmStocks = grouped
+        self.stockIndex = Dictionary(grouped.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let index = self.index
+        self.stocks = grouped.compactMap { index[$0.baseFilmID] }
     }
 
     public func film(id: String) -> Film? { index[id] }
-
-    /// The base film of every stock: the films shown as cards, in card order.
-    public var stocks: [Film] { filmStocks.compactMap { index[$0.baseFilmID] } }
 
     /// The stock `filmID` belongs to; nil when the film is unknown.
     public func stock(for filmID: String) -> FilmStock? {
@@ -192,18 +197,21 @@ public final class FilmLibrary: @unchecked Sendable {
     }
 
     /// Loads the LUT of every stock (not the variants) with up to `concurrency` loads in flight. Failures are ignored here; they
-    /// surface again from `lut(for:)`.
+    /// surface again from `lut(for:)`. The memory cache keeps `memoryCacheLimit` cubes, the last ones loaded in card
+    /// order, so the first stocks beyond that bound are not decoded just to be evicted again (they load on demand).
     public func prewarmSync(concurrency: Int = FilmLibrary.defaultPrewarmConcurrency) {
-        let films = self.stocks
+        let cards = stocks
+        var skip = max(0, cards.filter { $0.proceduralID == nil }.count - Self.memoryCacheLimit)
+        let films = cards.filter { film in
+            if film.proceduralID == nil, skip > 0 { skip -= 1; return false }
+            return true
+        }
         guard !films.isEmpty else { return }
         let workers = max(1, min(concurrency, films.count))
-        let next = NSLock()
-        nonisolated(unsafe) var cursor = 0
+        let cursor = OSAllocatedUnfairLock(initialState: 0)
         DispatchQueue.concurrentPerform(iterations: workers) { _ in
             while true {
-                next.lock()
-                let i = cursor; cursor += 1
-                next.unlock()
+                let i = cursor.withLock { value -> Int in defer { value += 1 }; return value }
                 if i >= films.count { return }
                 _ = try? self.lut(for: films[i])
             }
@@ -268,29 +276,32 @@ public final class FilmLibrary: @unchecked Sendable {
 
     static func unpack(_ data: Data) -> LUT? {
         guard data.count >= headerSize else { return nil }
-        let bytes = [UInt8](data)
-        guard Array(bytes[0..<4]) == cacheMagic else { return nil }
-        func u32(_ o: Int) -> UInt32 {
-            UInt32(bytes[o]) | UInt32(bytes[o + 1]) << 8 | UInt32(bytes[o + 2]) << 16 | UInt32(bytes[o + 3]) << 24
-        }
-        guard u32(4) == cacheFormatVersion else { return nil }
-        let n = Int(u32(8))
-        guard n >= 2, n <= 256 else { return nil }
-        let texels = n * n * n
-        guard bytes.count == headerSize + texels * 6 else { return nil }
-        var out = [Float](repeating: 1, count: texels * 4)
-        let scale: Float = 1.0 / 65535.0
-        bytes.withUnsafeBufferPointer { b in
-            var o = headerSize
-            for i in 0..<texels {
-                for c in 0..<3 {
-                    let v = UInt16(b[o]) | UInt16(b[o + 1]) << 8
-                    out[i * 4 + c] = Float(v) * scale
-                    o += 2
+        return data.withUnsafeBytes { raw -> LUT? in
+            let b = raw.bindMemory(to: UInt8.self)
+            guard b[0] == cacheMagic[0], b[1] == cacheMagic[1], b[2] == cacheMagic[2], b[3] == cacheMagic[3] else { return nil }
+            func u32(_ o: Int) -> UInt32 {
+                UInt32(b[o]) | UInt32(b[o + 1]) << 8 | UInt32(b[o + 2]) << 16 | UInt32(b[o + 3]) << 24
+            }
+            guard u32(4) == cacheFormatVersion else { return nil }
+            let n = Int(u32(8))
+            guard n >= 2, n <= 256 else { return nil }
+            let texels = n * n * n
+            guard b.count == headerSize + texels * 6 else { return nil }
+            var out = Data(count: texels * 16)
+            let scale: Float = 1.0 / 65535.0
+            out.withUnsafeMutableBytes { dstRaw in
+                let dst = dstRaw.bindMemory(to: Float.self).baseAddress!
+                var o = headerSize
+                for i in 0..<texels {
+                    for c in 0..<3 {
+                        dst[i * 4 + c] = Float(UInt16(b[o]) | UInt16(b[o + 1]) << 8) * scale
+                        o += 2
+                    }
+                    dst[i * 4 + 3] = 1
                 }
             }
+            return LUT(dimension: n, data: out)
         }
-        return LUT(dimension: n, data: out.withUnsafeBufferPointer { Data(buffer: $0) })
     }
 
     private static func readCache(_ url: URL) -> LUT? {

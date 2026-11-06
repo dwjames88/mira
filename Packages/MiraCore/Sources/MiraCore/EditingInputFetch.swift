@@ -74,6 +74,7 @@ public enum EditingInputFetch {
 
     // MARK: Internals
 
+    // @unchecked Sendable: moves the delivered PHContentEditingInput out of the Photos callback; it is read once, by the awaiting task.
     private struct Box<T>: @unchecked Sendable { let value: T }
 
     private enum Outcome<T>: Sendable {
@@ -81,6 +82,7 @@ public enum EditingInputFetch {
     }
 
     /// Lock-protected state of one attempt. `resume` wins exactly once.
+    // @unchecked Sendable: all mutable state is under `lock`.
     private final class Attempt<T>: @unchecked Sendable {
         private let lock = NSLock()
         private var resumed = false
@@ -199,8 +201,10 @@ public enum EditingInputFetch {
 
 /// `PHAsset.requestContentEditingInput` as an `EditingInputRequesting`. Every closure handed to Photos
 /// is built here, nonisolated and `@Sendable` (Photos calls back on its own queues).
+// @unchecked Sendable: holds only the PHAsset box below; PHAsset requests may be made from any thread.
 public struct PhotoKitEditingInputRequester: EditingInputRequesting, @unchecked Sendable {
     public typealias Input = PHContentEditingInput
+    // @unchecked Sendable: PHAsset is an immutable handle used only to start and cancel requests.
     private struct AssetBox: @unchecked Sendable { let asset: PHAsset }
     private let box: AssetBox
 

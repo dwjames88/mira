@@ -24,8 +24,10 @@ public enum ImageSource {
     /// file's pixels; without it the file's own metadata orientation is used.
     /// The image carries the file's EXIF exposure time (`CIImage.miraExposureTime`).
     public static func load(url: URL, orientation: CGImagePropertyOrientation? = nil) -> CIImage? {
-        Perf.interval("source load") { loadUntraced(url: url, orientation: orientation) }?
-            .withMiraExposureTime(exposureTime(url: url))
+        guard let loaded = Perf.interval("source load", { loadUntraced(url: url, orientation: orientation) }) else { return nil }
+        // A RAW develop is already tagged with the file's exposure time (`RawDevelop.init` read it with the
+        // same function), so the file is not opened a second time to tag it again.
+        return loaded.tagged ? loaded.image : loaded.image.withMiraExposureTime(exposureTime(url: url))
     }
 
     /// The EXIF exposure time of the file in seconds (RAW files included); nil when it has none.
@@ -43,12 +45,15 @@ public enum ImageSource {
         return t
     }
 
-    private static func loadUntraced(url: URL, orientation: CGImagePropertyOrientation?) -> CIImage? {
+    /// `tagged` is true when the image already carries the exposure-time tag (a RAW develop).
+    private static func loadUntraced(
+        url: URL, orientation: CGImagePropertyOrientation?
+    ) -> (image: CIImage, tagged: Bool)? {
         if isRAW(url: url), let develop = RawDevelop(url: url, orientation: orientation),
            let out = develop.apply(.identity, filmApplied: false, draft: false) {
-            return out
+            return (out, true)
         }
-        return loadNonRAW(url: url, orientation: orientation)
+        return loadNonRAW(url: url, orientation: orientation).map { ($0, false) }
     }
 
     /// Decodes a non-RAW file into memory now (full resolution, upright), so later renders never
@@ -59,14 +64,19 @@ public enum ImageSource {
             let options = [kCGImageSourceShouldCacheImmediately: true] as CFDictionary
             guard let src = CGImageSourceCreateWithURL(url as CFURL, nil),
                   let cg = CGImageSourceCreateImageAtIndex(src, 0, options)
-            else { return loadUntraced(url: url, orientation: orientation) }
-            return CIImage(cgImage: cg).oriented(effectiveOrientation(src, override: orientation))
-                .withMiraExposureTime(exposureTime(from: src))
+            else { return loadUntraced(url: url, orientation: orientation)?.image }
+            return upright(cg, from: src, override: orientation)
         }
     }
 
-    private static func exposureTime(from src: CGImageSource) -> Double? {
-        (CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any]).flatMap(exposureTime(properties:))
+    /// `cg` oriented upright and tagged with the exposure time; the source's properties are copied once
+    /// for both (`orientation` overrides the file's own).
+    private static func upright(
+        _ cg: CGImage, from src: CGImageSource, override orientation: CGImagePropertyOrientation?
+    ) -> CIImage {
+        let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any]
+        return CIImage(cgImage: cg).oriented(effectiveOrientation(props, override: orientation))
+            .withMiraExposureTime(props.flatMap(exposureTime(properties:)))
     }
 
     /// A fast, small, upright decode for the first on-screen frame: ImageIO decodes JPEG and HEIC
@@ -84,8 +94,7 @@ public enum ImageSource {
                 kCGImageSourceShouldCacheImmediately: true,
             ]
             guard let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, options as CFDictionary) else { return nil }
-            return CIImage(cgImage: cg).oriented(effectiveOrientation(src, override: orientation))
-                .withMiraExposureTime(exposureTime(from: src))
+            return upright(cg, from: src, override: orientation)
         }
     }
 
@@ -104,8 +113,7 @@ public enum ImageSource {
             kCGImageSourceShouldCacheImmediately: true,
         ]
         guard let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, options as CFDictionary) else { return nil }
-        return CIImage(cgImage: cg).oriented(effectiveOrientation(src, override: orientation))
-            .withMiraExposureTime(exposureTime(from: src))
+        return upright(cg, from: src, override: orientation)
     }
 
     /// Pixel size of the first image after orientation, read from the header only.
@@ -114,13 +122,14 @@ public enum ImageSource {
               let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any],
               let w = props[kCGImagePropertyPixelWidth] as? Double,
               let h = props[kCGImagePropertyPixelHeight] as? Double else { return nil }
-        let o = effectiveOrientation(src, override: orientation)
+        let o = effectiveOrientation(props, override: orientation)
         return o.rawValue >= 5 ? CGSize(width: h, height: w) : CGSize(width: w, height: h)
     }
 
-    private static func effectiveOrientation(_ src: CGImageSource, override: CGImagePropertyOrientation?) -> CGImagePropertyOrientation {
+    private static func effectiveOrientation(
+        _ props: [CFString: Any]?, override: CGImagePropertyOrientation?
+    ) -> CGImagePropertyOrientation {
         if let override { return override }
-        let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any]
         let raw = (props?[kCGImagePropertyOrientation] as? UInt32) ?? 1
         return CGImagePropertyOrientation(rawValue: raw) ?? .up
     }

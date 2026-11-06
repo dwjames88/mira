@@ -67,6 +67,8 @@ public enum ThumbnailHash {
 /// Small JPEG files of rendered film-strip thumbnails in `Library/Caches/<bundle id or "Mira">/Thumbnails/`.
 /// Bounded by total size: the least recently used files (by modification date, touched on every hit) go
 /// first. Safe to call from any thread; keep calls off the main actor, they do file IO.
+/// `@unchecked Sendable`: the only mutable state (`storesSinceTrim`, `trimmedOnce`) is guarded by `lock`; the files are
+/// written atomically, so concurrent callers (or a second instance on the same folder) see whole files or none.
 public final class ThumbnailDiskCache: @unchecked Sendable {
     public static let defaultByteLimit = 200 * 1024 * 1024
 

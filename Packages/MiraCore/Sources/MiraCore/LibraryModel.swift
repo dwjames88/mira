@@ -377,8 +377,9 @@ public enum AssetInfoFormatter {
     public static func shutter(_ seconds: Double) -> String {
         guard seconds > 0, seconds.isFinite else { return "" }
         if seconds < 1 {
-            let denominator = Int((1 / seconds).rounded())
-            if denominator >= 2 { return "1/\(denominator) s" }
+            // A garbage EXIF time (1e-30 s) would overflow `Int`; it falls through to the plain seconds form.
+            let denominator = (1 / seconds).rounded()
+            if denominator >= 2, denominator < Double(Int.max) { return "1/\(Int(denominator)) s" }
         }
         return "\(trimmed(seconds, places: 1)) s"
     }
@@ -424,7 +425,7 @@ public enum AssetInfoFormatter {
     private static func trimmed(_ value: Double, places: Int) -> String {
         let scale = pow(10, Double(places))
         let rounded = (value * scale).rounded() / scale
-        if rounded == rounded.rounded() { return String(Int(rounded)) }
+        if rounded == rounded.rounded(), abs(rounded) < Double(Int.max) { return String(Int(rounded)) }
         return String(format: "%.\(places)f", rounded)
     }
 }

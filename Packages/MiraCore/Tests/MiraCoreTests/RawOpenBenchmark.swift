@@ -38,6 +38,18 @@ struct RawOpenBenchmark {
         return e.size
     }
 
+    /// Round 3: `ImageSource.load` / `developedSource` no longer re-read the exposure time of a RAW that
+    /// `RawDevelop` already tagged. This times the removed read (one `exposureTime(url:)`) next to the load.
+    @Test(arguments: ["iphone-xs.dng", "sony-ilce7m3.arw"])
+    func exposureReadVersusLoad(_ name: String) throws {
+        guard Self.enabled else { return }
+        let url = try #require(RawSamples.url(name))
+        let read = Self.timed { _ = ImageSource.exposureTime(url: url) }
+        let load = Self.timed { _ = ImageSource.load(url: url) }
+        let developed = Self.timed { _ = ImageSource.developedSource(url: url, recipe: Recipe.neutral, draft: true) }
+        print("RAWBENCH exposure \(name): removed read \(read) | ImageSource.load (lazy) \(load) | developedSource draft \(developed)")
+    }
+
     @Test(arguments: ["iphone-xs.dng", "sony-ilce7m3.arw"])
     func openTimes(_ name: String) throws {
         guard Self.enabled else { return }

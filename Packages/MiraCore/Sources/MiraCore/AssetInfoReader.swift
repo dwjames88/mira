@@ -118,6 +118,7 @@ public enum AssetInfoReader {
 }
 
 /// Collects a resource's first bytes and resumes its continuation exactly once.
+// @unchecked Sendable: all mutable state is under `lock`.
 private final class ResourceRead: @unchecked Sendable {
     private let lock = NSLock()
     private let accumulator: EXIFAccumulator
@@ -166,6 +167,7 @@ private final class ResourceRead: @unchecked Sendable {
 }
 
 /// Gathers a small resource's bytes and resumes once.
+// @unchecked Sendable: all mutable state is under `lock`.
 private final class Collector: @unchecked Sendable {
     private let lock = NSLock()
     private var data = Data()
