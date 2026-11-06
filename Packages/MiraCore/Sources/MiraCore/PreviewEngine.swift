@@ -66,6 +66,13 @@ public struct ZoomPlacement: Equatable, Sendable {
 public final class PreviewEngine: @unchecked Sendable {
     public let renderer: Renderer
     public let context: CIContext
+    /// The context that builds the slider-independent bases and pyramid levels (`materialise`). A source can be a
+    /// lazy camera RAW decode (`CIRAWFilter`), and RawCamera decodes inside the render, on libdispatch workers, while
+    /// the rendering context stays locked. On the interactive `context` that would hold up every frame, thumbnail and
+    /// meter behind a decode that lasts seconds, and with many threads parked on its lock the decode's own workers
+    /// cannot get scheduled, so the render never finishes (see `ContextStressTests`). A context of its own keeps
+    /// waiters off it. Same options as `context`, so the pixels are identical.
+    let decodeContext: CIContext
 
     private let lock = NSLock()
     private var source: CIImage?
@@ -121,9 +128,11 @@ public final class PreviewEngine: @unchecked Sendable {
     public static let linearSpace = CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!
     public static let srgbSpace = CGColorSpace(name: CGColorSpace.sRGB)!
 
-    public init(renderer: Renderer, context: CIContext) {
+    /// `decodeContext` defaults to `Renderer.decodeContext`, shared by every engine.
+    public init(renderer: Renderer, context: CIContext, decodeContext: CIContext = Renderer.decodeContext) {
         self.renderer = renderer
         self.context = context
+        self.decodeContext = decodeContext
     }
 
     // MARK: Source
@@ -314,7 +323,7 @@ public final class PreviewEngine: @unchecked Sendable {
         let destination = CIRenderDestination(pixelBuffer: buffer)
         destination.colorSpace = Self.linearSpace
         do {
-            let task = try context.startTask(toRender: image, from: e, to: destination, at: .zero)
+            let task = try decodeContext.startTask(toRender: image, from: e, to: destination, at: .zero)
             _ = try task.waitUntilCompleted()
         } catch {
             return nil

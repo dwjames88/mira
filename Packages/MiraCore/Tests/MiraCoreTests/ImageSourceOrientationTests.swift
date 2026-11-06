@@ -130,13 +130,17 @@ enum OrientationFixture {
         return url
     }
 
+    /// A context of this file's own: a RAW decode under the shared context's lock, with the other suites parked on
+    /// that lock, never finishes under `swift test` (parallel); see `ContextStressTests`.
+    static let context = Renderer.makeContext()
+
     /// RGBA8 sRGB bitmap of the image; row 0 is the TOP (Core Image's extent is bottom-left origin,
     /// but `render(toBitmap:)` writes the top row first).
     static func bitmap(_ image: CIImage) -> (width: Int, height: Int, rgba: [UInt8]) {
         let r = image.extent.integral
         let w = Int(r.width), h = Int(r.height)
         var buf = [UInt8](repeating: 0, count: w * h * 4)
-        Renderer.sharedContext.render(image, toBitmap: &buf, rowBytes: w * 4, bounds: r, format: .RGBA8,
+        context.render(image, toBitmap: &buf, rowBytes: w * 4, bounds: r, format: .RGBA8,
                                       colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
         return (w, h, buf)
     }
