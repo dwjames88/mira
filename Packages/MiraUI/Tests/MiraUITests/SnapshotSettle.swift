@@ -13,7 +13,23 @@ import Testing
 /// Test code only; it reads the model's observable state and awaits its tasks, it changes nothing.
 @MainActor
 enum SnapshotSettle {
-    static func settle(_ model: EditorModel, quiet: Duration = .milliseconds(400), timeout: TimeInterval = 120) async throws {
+    /// - Parameter warm: renders the very view that is about to be photographed and throws the picture away. The film
+    ///   strip's cards report that they came on screen only when the view is actually laid out, and that changes which
+    ///   tiles are wanted (`cardAppeared`, 40 ms later `startThumbnails`); photographing first would catch those tiles
+    ///   mid-fetch. With `warm` the model is settled, the view is rendered, and it is settled again.
+    static func settle(_ model: EditorModel, warm: (@MainActor () -> Void)? = nil,
+                       quiet: Duration = .milliseconds(400), timeout: TimeInterval = 120) async throws {
+        try await settleOnce(model, quiet: quiet, timeout: timeout)
+        if let warm {
+            for _ in 0..<2 {
+                warm()
+                try await Task.sleep(for: .milliseconds(150))
+                try await settleOnce(model, quiet: quiet, timeout: timeout)
+            }
+        }
+    }
+
+    private static func settleOnce(_ model: EditorModel, quiet: Duration, timeout: TimeInterval) async throws {
         let deadline = Date().addingTimeInterval(timeout)
         // Preset tiles are rendered only while FILMS shows; give them up to 10 s, then accept whatever is there.
         let presetDeadline = Date().addingTimeInterval(10)
