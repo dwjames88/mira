@@ -61,6 +61,9 @@ extension Renderer {
         if !recipe.curves.isIdentity { image = GradeKernels.applyCurves(recipe.curves, to: image) }
 
         let w = Int(extent.width), h = Int(extent.height)
+        // An extent under one pixel (a degenerate crop) rounds to nothing to measure; the percentile
+        // indices below would otherwise be -1.
+        guard w > 0, h > 0 else { return nil }
         var buffer = [Float](repeating: 0, count: w * h * 4)
         context.render(image, toBitmap: &buffer, rowBytes: w * 16, bounds: extent, format: .RGBAf,
                        colorSpace: CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!)

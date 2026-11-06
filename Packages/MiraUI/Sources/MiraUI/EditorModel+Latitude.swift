@@ -40,7 +40,8 @@ extension EditorModel {
             if delay > .zero { try? await Task.sleep(for: delay) }
             guard !Task.isCancelled else { return }
             let reading = await Task.detached(priority: .utility) {
-                renderer.latitudeReading(recipe, input: box.image, context: Renderer.sharedContext)
+                // decodeContext, not the interactive one: `box.image` may be a lazy RAW decode (see Renderer.decodeContext).
+                renderer.latitudeReading(recipe, input: box.image, context: Renderer.decodeContext)
             }.value
             guard !Task.isCancelled, let self, self.latitudeSession.generation == generation else { return }
             if self.latitudeSession.reading != reading { self.latitudeSession.reading = reading }

@@ -300,7 +300,7 @@ import UniformTypeIdentifiers
         return url.appendingPathComponent(path)
     }
 
-    @Test func exposureTimeFromFixtures() throws {
+    @Test(.rawExclusive) func exposureTimeFromFixtures() throws {
         let jpg = Self.fixture("Fixtures/sample.jpg")
         let dng = Self.fixture("Fixtures/raw/iphone-xs.dng")
         let tJPG = ImageSource.exposureTime(url: jpg)
