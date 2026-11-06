@@ -54,14 +54,14 @@ public struct CurvesPanel: View {
     }
 
     private var points: Binding<[CurvePoint]> {
-        Binding(get: { model.recipe.curves[channel] }, set: { model.recipe.curves[channel] = $0 })
+        Binding(get: { model.curves[channel] }, set: { model.recipe.curves[channel] = $0 })
     }
 
     public var body: some View {
         InspectorGroup("curves", title: "Curves") {
             VStack(alignment: .leading, spacing: 0) {
                 tabs
-                CurveEditorView(points: points, channel: channel, curves: model.recipe.curves,
+                CurveEditorView(points: points, channel: channel, curves: model.curves,
                                 histogram: model.histogram, selected: $selected)
                     .aspectRatio(1, contentMode: .fit)
                     .padding(.top, 4)
@@ -73,8 +73,8 @@ public struct CurvesPanel: View {
                         selected = nil
                     }
                     .buttonStyle(.plain)
-                    .ffLabel(color: model.recipe.curves.isIdentity(channel) ? T.paperDim.opacity(0.5) : T.lichen)
-                    .disabled(model.recipe.curves.isIdentity(channel))
+                    .ffLabel(color: model.curves.isIdentity(channel) ? T.paperDim.opacity(0.5) : T.lichen)
+                    .disabled(model.curves.isIdentity(channel))
                     .help("Reset this curve")
                 }
                 .frame(height: T.rows(2))

@@ -29,7 +29,9 @@ struct DodgeBurnPaintLayer: NSViewRepresentable {
 final class DodgeBurnPaintView: NSView {
     weak var model: EditorModel?
     var backingScale: CGFloat = 2
-    private var pointer: CGPoint?
+    var pointer: CGPoint?
+    /// Where the last `draw` put the ring, so a move redraws only the old and the new spot, not the whole canvas.
+    private var inkedRect: NSRect?
     private var panning = false
     private var lastPan = CGPoint.zero
 
@@ -60,14 +62,31 @@ final class DodgeBurnPaintView: NSView {
     private func track(_ event: NSEvent) {
         pointer = convert(event.locationInWindow, from: nil)
         model?.setPaintFlipping(event.modifierFlags.contains(.option))
-        needsDisplay = true
+        invalidateRing()
     }
 
     override func mouseEntered(with event: NSEvent) { track(event) }
     override func mouseMoved(with event: NSEvent) { track(event) }
     override func mouseExited(with event: NSEvent) {
         pointer = nil
-        needsDisplay = true
+        invalidateRing()
+    }
+
+    /// Everything `draw` paints for a ring centred on `c`: the halo (1 pt beyond the radius, 1 pt wide), the dashed
+    /// inner ring, and the centre mark (4 pt arms, 1.5 pt wide, shifted 0.5 pt), plus 2 pt for anti-aliasing.
+    func ringRect(at c: CGPoint) -> NSRect? {
+        guard let model, let ring = BrushRing(model: model, scale: backingScale) else { return nil }
+        let reach = max(ring.radius + 1.5, 5.5) + 2
+        return NSRect(x: c.x - reach, y: c.y - reach, width: 2 * reach, height: 2 * reach)
+    }
+
+    /// Marks the old and the new ring spot for redrawing. The canvas covers the whole photo; invalidating all of
+    /// it on every pointer move made each move clear and upload a picture-sized layer.
+    private func invalidateRing() {
+        var dirty = inkedRect ?? .null
+        if let pointer, let now = ringRect(at: pointer) { dirty = dirty.union(now) }
+        guard !dirty.isNull else { return }
+        setNeedsDisplay(dirty.intersection(bounds))
     }
 
     override func mouseDown(with event: NSEvent) {
@@ -107,8 +126,12 @@ final class DodgeBurnPaintView: NSView {
     // MARK: Brush ring
 
     override func draw(_ dirtyRect: NSRect) {
-        guard let model, let pointer, let ring = BrushRing(model: model, scale: backingScale) else { return }
+        guard let model, let pointer, let ring = BrushRing(model: model, scale: backingScale) else {
+            inkedRect = nil
+            return
+        }
         let c = pointer
+        inkedRect = ringRect(at: c)
         func circle(_ r: CGFloat) -> NSBezierPath {
             NSBezierPath(ovalIn: NSRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r))
         }

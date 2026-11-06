@@ -27,10 +27,9 @@ struct EditorLoadOrientationTests {
     }
 
     private static let scratch: URL = {
-        let dir = URL(fileURLWithPath: "/private/tmp/claude-501/-Users-designbyjdw-Developer/9314ad8a-9550-4b27-95dd-92363573da5e/scratchpad/orient", isDirectory: true)
-        let fallback = FileManager.default.temporaryDirectory.appendingPathComponent("mira-orient-ui", isDirectory: true)
-        for d in [dir, fallback] where (try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)) != nil { return d }
-        return fallback
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("mira-orient-ui", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
     }()
 
     /// Stored picture: red top-left, green top-right, blue bottom-left, white bottom-right, grey between.

@@ -49,9 +49,13 @@ public final class EditorModel {
             // A pipeline-2-only control changed on a legacy recipe: move it to the current pipeline in the same
             // edit (push, scan, paper, toning, rem-jet, exposure time, reciprocity would otherwise do nothing).
             recipe.upgradePipelineIfFilmScienceChanged(from: oldValue)
+            recipeMirror = recipe
             // Views that only care which film is applied (the film strip) read this instead of
             // `recipe`, so a slider tick does not re-evaluate them.
             if recipe.filmID != selectedFilmID { selectedFilmID = recipe.filmID }
+            if recipe.curves != curves { curves = recipe.curves }
+            if recipe.colorMixer != colorMixer { colorMixer = recipe.colorMixer }
+            refreshEditFlags()
             updateAppliedPreset()
             rawRecipeChanged(from: oldValue)
             scheduleLatitude()
@@ -63,6 +67,24 @@ public final class EditorModel {
     }
     /// `recipe.filmID`, but only changes when the film does.
     public private(set) var selectedFilmID: String?
+    /// `recipe.curves` and `recipe.colorMixer`, but they change only when the curves / the mixer do: the CURVES and
+    /// COLOR MIXER groups read these, so moving an unrelated slider does not redraw them.
+    public private(set) var curves: CurvesSettings
+    public private(set) var colorMixer: ColorMixerSettings
+    /// Always equal to `recipe`, but not observed: `canZoom` reads this so the menu items and gestures that ask
+    /// whether zooming is possible are not re-evaluated by every slider tick.
+    @ObservationIgnored private var recipeMirror: Recipe
+    // `hasEdits`, `canReset` and `differsFromReference` are stored answers, refreshed with each recipe change and
+    // published only when they change. The app's menus and toolbar read them; reading `recipe` there would
+    // re-evaluate them on every slider tick.
+    /// Whether leaving now would discard work.
+    public private(set) var hasEdits: Bool
+    /// True when `reset()` would change something (any adjustment differs from neutral).
+    public private(set) var canReset: Bool
+    /// The saved recipe the host compares the edit against (the Photos adjustment or the sidecar). nil: none.
+    @ObservationIgnored public var reference: Recipe? { didSet { refreshReferenceFlag() } }
+    /// True when `reference` is set and `recipe` is not equal to it.
+    public private(set) var differsFromReference = false
     public var showOriginal = false {
         didSet {
             // A zoomed original is rendered on demand, so ask for it as soon as compare starts.
@@ -265,7 +287,12 @@ public final class EditorModel {
         self.renderer = Renderer(library: library)
         self.engine = PreviewEngine(renderer: renderer, context: Renderer.sharedContext)
         self.recipe = recipe
+        self.recipeMirror = recipe
         self.selectedFilmID = recipe.filmID
+        self.curves = recipe.curves
+        self.colorMixer = recipe.colorMixer
+        self.hasEdits = Self.computeHasEdits(recipe)
+        self.canReset = Self.computeCanReset(recipe)
         self.transfer.onChange = { [weak self] in self?.refreshPresets() }
     }
 
@@ -331,21 +358,36 @@ public final class EditorModel {
     /// Applies a card: its stock's base film. The recipe stores that concrete film id.
     public func selectStock(_ stock: FilmStock) { selectFilm(stock.baseFilmID) }
 
+    /// Reads `selectedFilmID`, not `recipe`, so the views that only need the film (header, latitude, toning and
+    /// rem-jet toggles) are not re-evaluated by every slider tick.
     public var selectedFilm: Film? {
-        recipe.filmID.flatMap { library.film(id: $0) }
+        selectedFilmID.flatMap { library.film(id: $0) }
     }
 
-    /// Whether leaving now would discard work.
-    public var hasEdits: Bool {
-        recipe != neutralKeepingPipeline
+    /// The recipe differs from a neutral one on the same pipeline (`pipeline` alone is not an edit, so a legacy
+    /// recipe with nothing else set does not count as changed).
+    private static func computeHasEdits(_ recipe: Recipe) -> Bool {
+        var neutral = Recipe.neutral
+        neutral.pipeline = recipe.pipeline
+        return recipe != neutral
     }
 
-    /// A neutral recipe on the same pipeline as the current one: `pipeline` alone is not an edit, so a
-    /// legacy recipe with nothing else set does not count as changed.
-    private var neutralKeepingPipeline: Recipe {
-        var r = Recipe.neutral
-        r.pipeline = recipe.pipeline
-        return r
+    /// True when `reset()` would change something.
+    private static func computeCanReset(_ recipe: Recipe) -> Bool {
+        recipe != Recipe(filmID: recipe.filmID, pipeline: recipe.pipeline, crop: recipe.crop,
+                         dodgeBurn: recipe.dodgeBurn)
+    }
+
+    private func refreshEditFlags() {
+        let edits = Self.computeHasEdits(recipe), reset = Self.computeCanReset(recipe)
+        if edits != hasEdits { hasEdits = edits }
+        if reset != canReset { canReset = reset }
+        refreshReferenceFlag()
+    }
+
+    private func refreshReferenceFlag() {
+        let differs = reference.map { recipe != $0 } ?? false
+        if differs != differsFromReference { differsFromReference = differs }
     }
 
     // MARK: Source
@@ -469,12 +511,6 @@ public final class EditorModel {
     public func resetAll() {
         if isCropping { cancelCrop() }
         recipe = .neutral
-    }
-
-    /// True when `reset()` would change something (any adjustment differs from neutral).
-    public var canReset: Bool {
-        recipe != Recipe(filmID: recipe.filmID, pipeline: recipe.pipeline, crop: recipe.crop,
-                         dodgeBurn: recipe.dodgeBurn)
     }
 
     /// True when `resetAll()` would change something.
@@ -617,15 +653,19 @@ public final class EditorModel {
     }
 
     /// The geometry the zoom maths works in, nil until there is a photo and a pane.
-    public var zoomViewport: ZoomViewport? {
+    public var zoomViewport: ZoomViewport? { zoomViewport(for: recipe) }
+
+    private func zoomViewport(for recipe: Recipe) -> ZoomViewport? {
         guard let source, paneSize.width >= 1 else { return nil }
         let vp = ZoomViewport(content: PreviewEngine.zoomContentSize(for: recipe, imageSize: source.extent.size),
                               pane: paneSize, fitArea: fitAreaSize)
         return vp.isValid ? vp : nil
     }
 
-    /// Zoom works on the full-resolution photo, outside the crop tool.
-    public var canZoom: Bool { isSourceFull && !isCropping && zoomViewport != nil }
+    /// Zoom works on the full-resolution photo, outside the crop tool. Reads the unobserved copy of the recipe:
+    /// the answer does not change with a slider, and the menu items and gestures that ask should not be
+    /// re-evaluated by every tick.
+    public var canZoom: Bool { isSourceFull && !isCropping && zoomViewport(for: recipeMirror) != nil }
 
     /// The region the zoomed render covers, nil while fitted or when zooming is unavailable.
     private var zoomRegion: ZoomRegion? {
@@ -970,7 +1010,13 @@ public final class EditorModel {
         let wanted = wantedThumbnailIDs()
         let cached = thumbnailCache[crop] ?? [:]
         let ids = wanted.filter { cached[$0 ?? Self.originalTileID] == nil }
-        if !keepShown { thumbnails = cached }
+        if !keepShown {
+            thumbnails = cached
+        } else if cached.contains(where: { thumbnails[$0.key] !== $0.value }) {
+            // A run cancelled by this one (the strip scrolled) may have cached tiles it had not yet published
+            // (they are published in batches); they are no longer "wanted", so nothing else would show them.
+            thumbnails.merge(cached) { $1 }
+        }
         if ids.isEmpty { return }
         let cancel = CancelFlag()
         thumbnailCancel = cancel
@@ -1061,7 +1107,8 @@ public final class EditorModel {
             guard let self, let frame = self.histogramPending else { self?.histogramInFlight = false; return }
             self.histogramPending = nil
             let data = await Task.detached(priority: .utility) { HistogramData.compute(frame: frame) }.value
-            self.histogram = data
+            // Equal data is not republished: the histogram and the curves behind it would redraw for nothing.
+            if data != self.histogram { self.histogram = data }
             self.histogramLast = .now
             self.histogramInFlight = false
             if self.histogramPending != nil { self.pumpHistogram() }

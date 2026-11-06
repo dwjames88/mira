@@ -120,16 +120,18 @@ struct UIPerfTests {
             #expect(await Self.waitUntil { model.isPreviewIdle })
             for _ in 0..<3 { host.layoutSubtreeIfNeeded() }
             var ui: [Double] = []
-            var cards = 0, strips = 0
+            var cards = 0, strips = 0, sliders = 0, panels = 0, recipeSliders = 0
             let n = 60
             for i in 0..<n {
                 let c0 = PerfCounters.filmCard, s0 = PerfCounters.filmStrip
+                let sl0 = PerfCounters.slider, p0 = PerfCounters.developPanel, rs0 = PerfCounters.recipeSlider
                 let t = ContinuousClock.now
                 model.recipe.contrast = Double(i % 20) / 40
                 host.layoutSubtreeIfNeeded()
                 host.displayIfNeeded()
                 let dt = Self.ms(t)
                 cards += PerfCounters.filmCard - c0; strips += PerfCounters.filmStrip - s0
+                sliders += PerfCounters.slider - sl0; panels += PerfCounters.developPanel - p0; recipeSliders += PerfCounters.recipeSlider - rs0
                 ui.append(dt)
                 // Let the render finish between ticks so renders do not pollute the next measurement.
                 _ = await Self.waitUntil { model.isPreviewIdle }
@@ -138,6 +140,7 @@ struct UIPerfTests {
             let name = tab == .develop ? "DEVELOP tab" : "FILMS tab"
             Self.line("SwiftUI per slider tick, \(name) (mutate + layout + display)", String(format: "median %6.2f ms  p95 %6.2f ms", Self.median(ui), Self.p95(ui)))
             Self.line("film strip body evaluations per tick, \(name)", String(format: "%.2f strip, %.1f cards", Double(strips) / Double(n), Double(cards) / Double(n)))
+            Self.line("slider / Develop panel body evaluations per tick, \(name)", String(format: "%.1f FFSlider, %.1f RecipeSlider, %.2f panel", Double(sliders) / Double(n), Double(recipeSliders) / Double(n), Double(panels) / Double(n)))
         }
 
         // Thumbnails arriving one by one: SwiftUI cost of the whole batch.

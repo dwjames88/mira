@@ -21,13 +21,18 @@ public struct ColorMixerPanel: View {
         self.model = model
     }
 
-    private func binding(_ key: WritableKeyPath<ColorAdjust, Double>) -> Binding<Double> {
-        Binding(
-            get: { model.recipe.colorMixer[model.mixerRange][keyPath: key] * 100 },
-            set: { model.recipe.colorMixer[model.mixerRange][keyPath: key] = $0 / 100 })
+    /// A hue / saturation / luminance slider for the selected range. The panel reads the mixer once (`mixer`);
+    /// the gestures read it live through the binding.
+    private func slider(_ label: String, _ key: WritableKeyPath<ColorAdjust, Double>, in mixer: ColorMixerSettings) -> some View {
+        RecipeSlider(label: label, shown: mixer[model.mixerRange][keyPath: key] * 100,
+                     range: -100...100, defaultValue: 0, decimals: 0, context: key.hashValue,
+                     get: { model.colorMixer[model.mixerRange][keyPath: key] * 100 },
+                     set: { model.recipe.colorMixer[model.mixerRange][keyPath: key] = $0 / 100 })
+            .equatable()
     }
 
     public var body: some View {
+        let mixer = model.colorMixer
         InspectorGroup("colorMixer", title: "Color mixer") {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 6) {
@@ -40,9 +45,9 @@ public struct ColorMixerPanel: View {
                     .ffLabel(color: T.lichen)
                     .frame(height: T.rows(1), alignment: .leading)
                     .padding(.bottom, 2)
-                FFSlider("Hue", value: binding(\.hue), in: -100...100, default: 0, decimals: 0)
-                FFSlider("Saturation", value: binding(\.saturation), in: -100...100, default: 0, decimals: 0)
-                FFSlider("Luminance", value: binding(\.luminance), in: -100...100, default: 0, decimals: 0)
+                slider("Hue", \.hue, in: mixer)
+                slider("Saturation", \.saturation, in: mixer)
+                slider("Luminance", \.luminance, in: mixer)
                 Text(summary)
                     .ffLabel(size: 9, color: T.paperDim)
                     .lineLimit(2)
@@ -50,10 +55,10 @@ public struct ColorMixerPanel: View {
                     .frame(maxWidth: .infinity, minHeight: T.rows(1), alignment: .leading)
                     .accessibilityLabel("Changed ranges")
                 HStack(spacing: T.cells(2)) {
-                    resetButton("Reset range", disabled: model.recipe.colorMixer[model.mixerRange].isZero) {
+                    resetButton("Reset range", disabled: model.colorMixer[model.mixerRange].isZero) {
                         model.recipe.colorMixer[model.mixerRange] = .zero
                     }
-                    resetButton("Reset all", disabled: model.recipe.colorMixer.isIdentity) {
+                    resetButton("Reset all", disabled: model.colorMixer.isIdentity) {
                         model.recipe.colorMixer = .identity
                     }
                     Spacer()
@@ -65,7 +70,7 @@ public struct ColorMixerPanel: View {
 
     private func swatch(_ range: ColorRange) -> some View {
         let isSelected = range == model.mixerRange
-        let changed = !model.recipe.colorMixer[range].isZero
+        let changed = !model.colorMixer[range].isZero
         return Button { model.mixerRange = range } label: {
             Rectangle().fill(range.color)
                 .frame(width: 18, height: 18)
@@ -107,8 +112,8 @@ public struct ColorMixerPanel: View {
 
     /// `RED H+20 S-10 · ORANGE L+5`, or a note when nothing has moved.
     private var summary: String {
-        let parts = model.recipe.colorMixer.changedRanges.map { range -> String in
-            let a = model.recipe.colorMixer[range]
+        let parts = model.colorMixer.changedRanges.map { range -> String in
+            let a = model.colorMixer[range]
             var s = range.displayName
             for (letter, v) in [("H", a.hue), ("S", a.saturation), ("L", a.luminance)] where v != 0 {
                 let n = Int((v * 100).rounded())
