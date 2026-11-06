@@ -14,7 +14,7 @@ enum AlbumRoute: Hashable {
 
 struct GalleryView: View {
     @Bindable var editor: EditorViewModel
-    /// Opens the camera (the CAMERA control, top-left before the title).
+    /// Opens the camera (the camera icon, top-right).
     var onCamera: () -> Void = {}
     @State private var gallery = GalleryModel()
     @State private var path: [AlbumRoute] = []
@@ -81,23 +81,28 @@ struct GalleryView: View {
 
     private var header: some View {
         HStack(spacing: FieldFramesTheme.cells(1)) {
-            Button(action: onCamera) {
-                CameraLabel().frame(minWidth: 44, minHeight: 44, alignment: .leading)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Open the camera")
-            Text("Mira").font(FieldFramesTheme.display(22, weight: .regular))
+            Text("Mira").font(FieldFramesTheme.display(22, weight: .regular)).fixedSize()
             Text(gallery.hasAccess ? (gallery.libraryCount.map { "\($0) \($0 == 1 ? "PHOTO" : "PHOTOS")" } ?? "") : editor.status)
                 .ffLabel(size: 9, color: FieldFramesTheme.paperDim).lineLimit(1)
             Spacer(minLength: 0)
             if gallery.status == .limited {
                 Button { gallery.presentLimitedPicker() } label: {
                     Text("ADD MORE").ffLabel(size: 11, color: FieldFramesTheme.lichen).frame(minHeight: 44)
-                }.buttonStyle(.plain)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("library.addMore")
             }
             PhotosPicker(selection: $pickerItem, matching: .images) {
-                ImportLabel().frame(minWidth: 44, minHeight: 44)
+                HeaderIcon(systemName: "square.and.arrow.down")
             }
+            .accessibilityLabel("Import a photo")
+            .accessibilityIdentifier("library.import")
+            Button(action: onCamera) {
+                HeaderIcon(systemName: "camera")
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Open the camera")
+            .accessibilityIdentifier("library.camera")
         }
         .padding(.horizontal, FieldFramesTheme.cells(2))
         .frame(height: 44)
@@ -557,10 +562,14 @@ private struct GalleryCell: View {
     }
 }
 
-struct CameraLabel: View {
-    var body: some View { Text("CAMERA").ffLabel(size: 11, color: FieldFramesTheme.paperDim) }
-}
-
-struct ImportLabel: View {
-    var body: some View { Text("IMPORT").ffLabel(size: 11, color: FieldFramesTheme.paperDim) }
+/// A 44x44 header icon (the camera / import controls), drawn like the app's other light line icons.
+struct HeaderIcon: View {
+    let systemName: String
+    var body: some View {
+        Image(systemName: systemName)
+            .font(.system(size: 15, weight: .light))
+            .foregroundStyle(FieldFramesTheme.paperDim)
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
+    }
 }
