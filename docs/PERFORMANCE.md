@@ -454,3 +454,251 @@ What the sizes say, for later rounds (observations, nothing was changed): the Fi
 - Camera finder, simulator vs Mac: full grade 19.2 ms median in the simulator against 8.8 ms on the Mac GPU (1920x1440); the plan's 30 fps gate (33 ms) is still an outstanding device measurement.
 - `OpenTimingPerf` first-frame rows: the DNG "returned" cold value (152 ms) is the embedded-preview stand-in decode; warm it is 13.5 ms because the proxy and develop caches are in memory. The iPhone 12 Pro and Sony files come from `MIRA_RAW_DIR` (they are git-ignored, so other worktrees skip them unless the variable is set). The iPhone XS DNG is the committed fixture; none of the available files is an Apple ProRAW, so the iPhone 12 Pro DNG (8-bit linear) is the closest stand-in.
 - Not measured: Mac app cold launch (a window would appear on screen; `MIRA_BENCH_COLD` above is the headless proxy for the first frame), a real device, thermal behaviour.
+
+## Round 3 result (round3/quality 809a5a4 against the baseline above)
+
+Every measurement of "Round 3 baseline" was repeated with the same commands and scripts (`build/round3/tools/perf-mac2.sh`, `perf-ios.sh`, `perf-ios-ui.sh`, `perf-size.sh`; only the output folder differs, `RAW_DIR`) on a fresh worktree of `round3/quality` at 809a5a4, on the same Apple M1 Pro, one locked command at a time, 3 runs each, 2026-11-06 05:03 to 05:32. Raw outputs: `build/round3/perf/raw-result/` (baseline: `perf/raw/`); machine-readable: `build/round3/perf/result.json`; comparison script `build/round3/tools/perf-compare.py`. Load average at the start of each block (first number of `uptime`), baseline then result: sheet 3 to 6 / 4 to 13, cold process warm-up off 7 to 10 / 4.7, warm-up on 16 to 21 / 4.4, UIPerf 3 to 8 / 3 to 4, Mac editor open 10 to 15 / 4, thumbnails 7 to 10 / 4, Mac finder 4.5 to 6.6 / 3.2 to 4.4, simulator finder 4.6 to 5.4 / 4.8 to 9.9, simulator open 4 to 7 / 10 to 12.6. The baseline rows taken at a high load (warm-up on, Mac editor open) were therefore pessimistic; some of their improvement below is load, not code. The residual load of about 4 on a quiet Mac is the booted simulators.
+
+**Noise and the flagging rule.** The run-to-run range (max minus min over the 3 runs, as a share of the median) has a median of 6 % over all rows and a 90th percentile of 31 %; single-digit-millisecond rows, first-run (cold) rows and anything touching Photos decoders or the GPU scheduler are the noisy ones. A row is flagged REGRESSED only when the result median is more than 10 % above the baseline median AND the result's fastest run is slower than the baseline's slowest run (the run ranges do not overlap); "faster" is the mirror image. Everything else with a change above 10 % is noise by this rule.
+
+### Summary
+
+- **Faster:** the Mac Develop slider's SwiftUI cost per tick 13.5 to 2.0 ms (-85 %) and the FILMS-tab tick 5.8 to 1.5 ms (-73 %); thumbnail refill after a crop 64 to 39 ms (-39 %, noisy); LUT prewarm 11 to 16 % faster in all four configurations; 24 MP export from a decoded source 142 to 123 ms (-13 %); film switch, film only 20.6 to 17.9 ms (-13 %); iOS simulator RAW open (first editable frame, cold) -13 to -20 % and the cold full-size develop of the Sony ARW -32 %; the cold-process bench process uses 8 % less memory (240 to 222 MB).
+- **Release binaries are much smaller** (area h strips them): Mac `Mira` 19.6 to 8.35 MB (-57 %), `MiraPhotos` 13.9 to 5.99 MB (-57 %), Mac bundle 304.0 to 284.8 MB (-6.3 %); iOS `Mira` 10.0 to 4.05 MB (-60 %), iOS bundle 144.9 to 138.9 MB (-4.1 %). The Films packs (129,372 KB each, still shipped twice in the Mac app) are unchanged, so they are now 95 % of the iOS bundle (91 % before; the baseline section's 89 % divided kilobytes by megabytes).
+- **Unchanged within noise:** every Mac finder row, preview frame times, slider and RAW slider latency, JPEG, DNG and ARW opens on the Mac, iOS cold launch (3.3 s), gallery first paint (1.82 s to the grid header, 2.92 s to the first image) and scroll, memory (156 to 164 MB during the scroll, about 475 MB with the editor open), and the thumbnail request counter (57 while the grid settles, +0 after the editor opens and closes).
+- **Second Core Image context for RAW (area a):** the cold-process first frame, which is where a second context would show, is 33.7 ms with the launch warm-up off against 37.4 ms before (-10 %, inside the run range 33.2 to 41.3), and 20.3 ms with it on against 20.1 ms (+1 %). RAW opens on the Mac (DNG 154.6 ms first frame cold against 161.1) and the RAW slider latency (6.5 against 6.4 ms exposure, 481 against 484 ms white balance) show no regression either.
+
+### Regressions and rows to watch
+
+- **`g. launch: FilmLibrary init (films.json)`, 3.1 to 3.6 ms (+16 %)** is the only row that meets the rule (ranges 3.0 to 3.2 against 3.3 to 4.2). It is half a millisecond, once per launch, and `films.json` is byte for byte the same size (157,207 B) in both bundles, so the cost is in the loading code (area b changed the LUT code), not the data. In a second A/B run of the two binaries alternated back to back the values were 3.1, 4.2 and 17.3 ms (one cold outlier) against 3.3, 3.3, 3.2 ms for the baseline commit, which is consistent with a small real increase of 0.3 to 1 ms. Not isolated further.
+- **`h.` dodge & burn graded and painting frame, 16 to 450 ms:** in this block the result shows about 450 ms per frame (p95 about 480 ms) for the effects-recipe graded frame (even with no strokes) in 2 of 3 runs. This is **not a code regression**: an alternating A/B of the baseline binary and the result binary (3 runs each, same session) gave the slow mode in 2 of 3 runs of the baseline commit (448, 23, 455 ms) and 2 of 3 runs of the result (17, 451, 449 ms). The bench process lands in a fast (16 to 23 ms) or a slow (about 450 ms) mode per launch, independent of the commit; the baseline numbers above happened to be 3 of 3 fast. It looks like a Core Image / Metal state that persists for the life of the process after an earlier bench section (the earlier sections, including the plain preview frames, are unaffected). Worth its own investigation: if it can also happen in the app, a painting frame would take 28 times its budget. A/B raw files: `build/round3/perf/raw-result/ab/`.
+- **Mac HEIC open** (returned, first frame, full source: +4 to +13 % medians, run ranges overlap) and **simulator finder** (grain off +9 %, reduced +8 %, overlapping ranges) are inside the noise by the rule; watch them in the next run.
+
+### Binary and resource sizes (Release, no signing; `size-mac.txt`, `size-ios.txt`, `linkmaps/`, `top20-*.txt` in `raw-result/`)
+
+| Item | Baseline | Result | Change |
+|---|---|---|---|
+| Mac bundle, sum of file sizes | 304,027,779 B | 284,785,011 B | -6.3 % |
+| Mac `Mira` (x86_64 + arm64) | 19,648,936 B | 8,350,760 B | -57.5 % |
+| Mac `MiraPhotos` (x86_64 + arm64) | 13,932,296 B | 5,987,704 B | -57.0 % |
+| iOS bundle, sum of file sizes | 144,856,827 B | 138,879,331 B | -4.1 % |
+| iOS `Mira` (arm64) | 10,023,600 B | 4,046,104 B | -59.6 % |
+| Films packs, each copy (Mac app, Mac extension, iOS) | 129,372 KB | 129,372 KB | 0 % |
+| Duplicated content inside the Mac bundle (app + extension) | 135,480,587 B in 271 groups | 135,480,587 B in 271 groups | 0 % |
+| Mac `Assets.car` (app / extension), iOS `Assets.car` | 133,208 / 134,760 / 62,328 B | 133,208 / 134,760 / 62,328 B | 0 % |
+| Link-map symbol total, Mac `Mira` arm64 / `MiraPhotos` / iOS `Mira` | 3,640,501 / 2,636,880 / 3,612,507 B | 3,670,321 / 2,659,262 / 3,668,268 B | +0.8 % / +0.8 % / +1.5 % |
+| Release build wall time, Mac / iOS | 59.9 s / 43.2 s | 59.5 s / 41.9 s | -0.7 % / -3.0 % |
+
+The link-map symbol totals are unchanged (the linked code is the same size to within 1.5 %); the executables shrank because stripping removed their symbol and debug tables. Contribution per target in the iOS and Mac maps is the same as in the baseline table (MiraUI, MiraCore, app sources, MiraUpdates, MiraCamera).
+
+### Row by row (baseline against result; medians of 3 runs; change = (result - baseline) / baseline; units as in the baseline tables)
+
+#### mira-sheet --bench (release)
+
+| Measure | Baseline | Result | Change | Note |
+|---|---|---|---|---|
+| b. open: ImageSource.load (lazy) | 42.7 ms | 50.2 ms | +18 % |  |
+| b. open: first displayable preview (load+first render) | 68.4 ms | 76.9 ms | +12 % |  |
+| b. open: full-res source ready (load + first 1:1 read) | 46.3 ms | 52.4 ms | +13 % |  |
+| a. preview frame, effects | 14.2 ms | 14.3 ms | +1 % |  |
+| a. preview frame, crop+6deg | 7.2 ms | 7.2 ms | +0 % |  |
+| c. 32 thumbnails, cold LUT cache | 912.0 ms | 961.0 ms | +5 % |  |
+| c. 32 thumbnails, warm disk LUT cache | 855.0 ms | 815.0 ms | -5 % |  |
+| c. 32 thumbnails, hot (LUTs in memory) | 800.0 ms | 801.0 ms | +0 % |  |
+| d. export 24 MP JPEG (effects recipe) | 164.0 ms | 173.0 ms | +5 % |  |
+| b. open: ImageIO thumbnail decode | 44.6 ms | 49.6 ms | +11 % |  |
+| b. open: first displayable preview (thumb+first render) | 52.3 ms | 57.7 ms | +10 % |  |
+| b. open: full-res source decoded | 93.8 ms | 90.7 ms | -3 % |  |
+| b. open: first frame from full-res (base build + render) | 21.1 ms | 18.2 ms | -14 % |  |
+| a. preview frame 1500x1000, effects | 8.4 ms | 8.2 ms | -2 % |  |
+| a. preview frame 1500x1000, effects+mixer+curves | 6.9 ms | 7.6 ms | +10 % |  |
+| a. preview frame 1500x1000, crop+6deg | 5.7 ms | 4.5 ms | -21 % |  |
+| a. preview frame 2400x1600, effects | 10.2 ms | 10.3 ms | +1 % |  |
+| a. preview frame 2400x1600, effects+mixer+curves | 11.8 ms | 11.8 ms | +0 % |  |
+| a. preview frame 2400x1600, crop+6deg | 9.1 ms | 9.1 ms | +0 % |  |
+| z. zoom 100% effects+mixer+curves, slider drag | 8.2 ms | 8.0 ms | -2 % |  |
+| z. zoom 100% effects+mixer+curves, pan drag | 7.8 ms | 7.6 ms | -3 % |  |
+| z. zoom 100% crop+6deg, slider drag | 5.7 ms | 5.8 ms | +2 % |  |
+| z. zoom 100% crop+6deg, pan drag | 5.8 ms | 5.8 ms | +0 % |  |
+| z. zoom 50% effects+mixer+curves, slider drag | 7.2 ms | 7.6 ms | +6 % |  |
+| z. zoom 50% effects+mixer+curves, pan drag | 7.4 ms | 7.1 ms | -4 % |  |
+| z. zoom 50% crop+6deg, slider drag | 6.1 ms | 5.6 ms | -8 % |  |
+| z. zoom 50% crop+6deg, pan drag | 6.3 ms | 6.0 ms | -5 % |  |
+| z. zoom 200% effects+mixer+curves, slider drag | 8.8 ms | 7.9 ms | -10 % |  |
+| z. zoom 200% effects+mixer+curves, pan drag | 9.6 ms | 8.0 ms | -17 % |  |
+| z. zoom 200% crop+6deg, slider drag | 6.3 ms | 7.4 ms | +17 % |  |
+| z. zoom 200% crop+6deg, pan drag | 6.5 ms | 7.8 ms | +20 % |  |
+| a. crop tool: straighten drag frame | 7.8 ms | 9.1 ms | +17 % |  |
+| a. same frame read back as 8-bit CGImage | 7.6 ms | 9.0 ms | +18 % |  |
+| d. export 24 MP JPEG, decoded CGImage source | 142.0 ms | 123.0 ms | -13 % | faster |
+| d. export 24 MP JPEG, lazy file-backed source | 125.0 ms | 151.0 ms | +21 % |  |
+| h. mask rasterisation, 1 stroke (cold) | 0.8 ms | 0.8 ms | -3 % |  |
+| h. mask rasterisation, 10 strokes (cold) | 7.8 ms | 7.7 ms | -2 % |  |
+| h. mask rasterisation, 50 strokes (cold) | 37.5 ms | 38.3 ms | +2 % |  |
+| h. live stroke update, +1 point on 10 cached (mask only) | 0.9 ms | 0.8 ms | -6 % |  |
+| h. graded frame, effects recipe + no strokes | 16.6 ms | 449.1 ms | +2605 % | bimodal, see text (not a code regression) |
+| h. graded frame, effects recipe + 10 strokes | 16.9 ms | 449.9 ms | +2562 % | bimodal, see text (not a code regression) |
+| h. graded frame, effects recipe + 50 strokes | 17.6 ms | 449.2 ms | +2452 % | bimodal, see text (not a code regression) |
+| h. painting frame (10 cached + live stroke, full graph) | 22.4 ms | 451.5 ms | +1916 % | bimodal, see text (not a code regression) |
+| e. slider tick, same film (film only + exposure) | 1.8 ms | 2.0 ms | +11 % |  |
+| e. film switch, effects recipe, every frame new film | 27.6 ms | 25.6 ms | -7 % |  |
+| e. film switch, film only, every frame new film | 20.6 ms | 17.9 ms | -13 % | faster |
+| f. histogram of a 1536x1024 frame | 0.3 ms | 0.3 ms | -3 % |  |
+| g. launch: FilmLibrary init (films.json) | 3.1 ms | 3.6 ms | +16 % | REGRESSED |
+| g. launch: prewarm all LUTs, cold disk cache, 4 workers | 194.0 ms | 169.0 ms | -13 % | faster |
+| g. launch: prewarm all LUTs, cold disk cache, 10 workers | 93.0 ms | 83.0 ms | -11 % |  |
+| g. launch: prewarm all LUTs, warm disk cache, 4 workers | 193.0 ms | 169.0 ms | -12 % | faster |
+| g. launch: prewarm all LUTs, warm disk cache, 10 workers | 96.0 ms | 81.0 ms | -16 % |  |
+| g. launch: first frame on a brand-new CIContext | 127.8 ms | 147.9 ms | +16 % |  |
+
+#### cold process, launch warm-up off (MIRA_BENCH_COLD=1 MIRA_BENCH_WARMUP=0)
+
+| Measure | Baseline | Result | Change | Note |
+|---|---|---|---|---|
+| first frame | 37.4 ms | 33.7 ms | -10 % |  |
+| second frame | 8.7 ms | 8.9 ms | +2 % |  |
+| max RSS (value in MB, not ms) | 239.0 ms | 221.6 ms | -7 % |  |
+
+#### cold process, launch warm-up on (MIRA_BENCH_COLD=1 MIRA_BENCH_WARMUP=1)
+
+| Measure | Baseline | Result | Change | Note |
+|---|---|---|---|---|
+| first frame | 20.1 ms | 20.3 ms | +1 % |  |
+| second frame | 8.8 ms | 8.8 ms | +0 % |  |
+| max RSS (value in MB, not ms) | 245.0 ms | 224.4 ms | -8 % |  |
+
+#### Finder frame time, Mac (FinderBudgetBenchmark, release)
+
+| Measure | Baseline | Result | Change | Note |
+|---|---|---|---|---|
+| full 1920x1440 | 8.8 ms | 8.9 ms | +1 % |  |
+| full 1206x1809 | 9.1 ms | 8.9 ms | -2 % |  |
+| grain off 1920x1440 | 5.9 ms | 5.9 ms | +0 % |  |
+| grain off 1206x1809 | 4.8 ms | 4.6 ms | -4 % |  |
+| textureScale 0.5 1920x1440 | 11.0 ms | 11.0 ms | +0 % |  |
+| textureScale 0.5 1206x1809 | 9.0 ms | 8.9 ms | -1 % |  |
+| textureScale 0.5 + grain off 1920x1440 | 4.3 ms | 4.2 ms | -2 % |  |
+| textureScale 0.5 + grain off 1206x1809 | 3.6 ms | 3.6 ms | +0 % |  |
+| renderScale 0.75 1920x1440 | 8.0 ms | 7.4 ms | -7 % |  |
+| renderScale 0.75 1206x1809 | 6.2 ms | 6.5 ms | +5 % |  |
+
+#### Finder frame time, iOS simulator (FinderBudgetSimTests, Debug app)
+
+| Measure | Baseline | Result | Change | Note |
+|---|---|---|---|---|
+| full 1920x1440 | 19.2 ms | 19.8 ms | +3 % |  |
+| half texture 1920x1440 | 19.8 ms | 20.0 ms | +1 % |  |
+| grain off 1920x1440 | 15.0 ms | 16.3 ms | +9 % |  |
+| reduced 1920x1440 | 12.6 ms | 13.6 ms | +8 % |  |
+
+#### UIPerf (Mac model + SwiftUI, release)
+
+| Measure | Baseline | Result | Change | Note |
+|---|---|---|---|---|
+| slider change -> published preview frame | 12.1 ms | 12.0 ms | -1 % |  |
+| frame -> histogram ready (incl. 20 Hz pacing) | 41.4 ms | 41.4 ms | +0 % |  |
+| film switch -> published preview frame | 29.1 ms | 27.2 ms | -7 % |  |
+| burst of 120 slider changes -> settled | 17.1 ms | 17.8 ms | +4 % |  |
+| SwiftUI per slider tick, DEVELOP tab (mutate + layout + displa | 13.5 ms | 2.0 ms | -85 % | faster |
+| SwiftUI per slider tick, FILMS tab (mutate + layout + display) | 5.8 ms | 1.5 ms | -73 % | faster |
+| thumbnail batch after a crop (to last card) | 64.0 ms | 39.0 ms | -39 % |  |
+| RAW: exposure slider -> published frame | 6.4 ms | 6.5 ms | +2 % |  |
+| RAW: white balance slider -> settled frame | 484.4 ms | 481.1 ms | -1 % |  |
+
+#### Editor open, Mac model level (OpenTimingPerf, release)
+
+| Measure | Baseline | Result | Change | Note |
+|---|---|---|---|---|
+| JPEG 6000x4000 / returned (cold) | 58.7 ms | 59.9 ms | +2 % |  |
+| JPEG 6000x4000 / returned (warm median) | 50.0 ms | 49.3 ms | -1 % |  |
+| JPEG 6000x4000 / first frame (cold) | 104.8 ms | 103.5 ms | -1 % |  |
+| JPEG 6000x4000 / first frame (warm median) | 62.1 ms | 60.9 ms | -2 % |  |
+| JPEG 6000x4000 / full source (cold) | 119.5 ms | 120.1 ms | +1 % |  |
+| JPEG 6000x4000 / full source (warm median) | 109.5 ms | 108.5 ms | -1 % |  |
+| HEIC 6000x4000 / returned (cold) | 187.0 ms | 211.8 ms | +13 % |  |
+| HEIC 6000x4000 / returned (warm median) | 115.5 ms | 122.9 ms | +6 % |  |
+| HEIC 6000x4000 / first frame (cold) | 199.1 ms | 222.2 ms | +12 % |  |
+| HEIC 6000x4000 / first frame (warm median) | 127.0 ms | 134.2 ms | +6 % |  |
+| HEIC 6000x4000 / full source (cold) | 339.1 ms | 360.8 ms | +6 % |  |
+| HEIC 6000x4000 / full source (warm median) | 267.7 ms | 278.0 ms | +4 % |  |
+| DNG iphone-xs 4032x3024 / returned (cold) | 152.0 ms | 145.5 ms | -4 % |  |
+| DNG iphone-xs 4032x3024 / returned (warm median) | 13.5 ms | 13.7 ms | +1 % |  |
+| DNG iphone-xs 4032x3024 / first frame (cold) | 161.1 ms | 154.6 ms | -4 % |  |
+| DNG iphone-xs 4032x3024 / first frame (warm median) | 20.5 ms | 19.3 ms | -6 % |  |
+| DNG iphone-xs 4032x3024 / full source (cold) | 376.8 ms | 355.7 ms | -6 % |  |
+| DNG iphone-xs 4032x3024 / full source (warm median) | 146.7 ms | 148.6 ms | +1 % |  |
+| DNG iphone-xs 4032x3024 / refined (cold) | 629.1 ms | 608.2 ms | -3 % |  |
+| DNG iphone-xs 4032x3024 / refined (warm median) | 399.4 ms | 402.1 ms | +1 % |  |
+| DNG iphone-12-pro / returned (cold) | 53.9 ms | 53.0 ms | -2 % |  |
+| DNG iphone-12-pro / returned (warm median) | 53.7 ms | 53.4 ms | -1 % |  |
+| DNG iphone-12-pro / first frame (cold) | 65.8 ms | 63.2 ms | -4 % |  |
+| DNG iphone-12-pro / first frame (warm median) | 64.3 ms | 63.0 ms | -2 % |  |
+| DNG iphone-12-pro / full source (cold) | 241.4 ms | 236.8 ms | -2 % |  |
+| DNG iphone-12-pro / full source (warm median) | 209.4 ms | 205.1 ms | -2 % |  |
+| DNG iphone-12-pro / refined (cold) | 492.4 ms | 487.9 ms | -1 % |  |
+| DNG iphone-12-pro / refined (warm median) | 463.0 ms | 458.6 ms | -1 % |  |
+| ARW sony-a7iii 6000x4000 / returned (cold) | 37.6 ms | 36.9 ms | -2 % |  |
+| ARW sony-a7iii 6000x4000 / returned (warm median) | 31.5 ms | 31.1 ms | -1 % |  |
+| ARW sony-a7iii 6000x4000 / first frame (cold) | 49.3 ms | 47.3 ms | -4 % |  |
+| ARW sony-a7iii 6000x4000 / first frame (warm median) | 41.1 ms | 40.4 ms | -2 % |  |
+| ARW sony-a7iii 6000x4000 / full source (cold) | 324.0 ms | 319.2 ms | -1 % |  |
+| ARW sony-a7iii 6000x4000 / full source (warm median) | 314.0 ms | 304.7 ms | -3 % |  |
+| ARW sony-a7iii 6000x4000 / refined (cold) | 577.9 ms | 570.6 ms | -1 % |  |
+| ARW sony-a7iii 6000x4000 / refined (warm median) | 567.1 ms | 557.6 ms | -2 % |  |
+
+#### Editor open, iOS simulator (OpenTimingSimTests, Debug)
+
+| Measure | Baseline | Result | Change | Note |
+|---|---|---|---|---|
+| JPEG 6000x4000 / PhotoEngine.load(data:) (cold) | 57.7 ms | 51.4 ms | -11 % | faster |
+| JPEG 6000x4000 / PhotoEngine.load(data:) (warm median) | 51.2 ms | 48.7 ms | -5 % |  |
+| HEIC 6000x4000 / PhotoEngine.load(data:) (cold) | 186.0 ms | 148.1 ms | -20 % | faster |
+| HEIC 6000x4000 / PhotoEngine.load(data:) (warm median) | 34.6 ms | 33.5 ms | -3 % |  |
+| DNG iphone-xs 4032x3024 / openDraft (first editable frame) (cold) | 636.4 ms | 506.1 ms | -20 % |  |
+| DNG iphone-xs 4032x3024 / openDraft (first editable frame) (warm median) | 245.6 ms | 227.1 ms | -8 % |  |
+| DNG iphone-xs 4032x3024 / refine at preview size, realised (cold) | 135.1 ms | 141.5 ms | +5 % |  |
+| DNG iphone-xs 4032x3024 / refine at preview size, realised (warm median) | 125.5 ms | 127.5 ms | +2 % |  |
+| DNG iphone-xs 4032x3024 / full-size develop, realised (Save / zoom) (cold) | 225.4 ms | 195.0 ms | -13 % |  |
+| DNG iphone-xs 4032x3024 / full-size develop, realised (Save / zoom) (warm median) | 201.3 ms | 191.2 ms | -5 % |  |
+| DNG iphone-12-pro / openDraft (first editable frame) (cold) | 328.4 ms | 267.5 ms | -19 % |  |
+| DNG iphone-12-pro / openDraft (first editable frame) (warm median) | 241.1 ms | 238.5 ms | -1 % |  |
+| DNG iphone-12-pro / refine at preview size, realised (cold) | 99.0 ms | 98.0 ms | -1 % |  |
+| DNG iphone-12-pro / refine at preview size, realised (warm median) | 97.2 ms | 97.6 ms | +0 % |  |
+| DNG iphone-12-pro / full-size develop, realised (Save / zoom) (cold) | 133.2 ms | 131.1 ms | -2 % |  |
+| DNG iphone-12-pro / full-size develop, realised (Save / zoom) (warm median) | 137.2 ms | 130.2 ms | -5 % |  |
+| ARW sony-a7iii / openDraft (first editable frame) (cold) | 493.9 ms | 431.8 ms | -13 % |  |
+| ARW sony-a7iii / openDraft (first editable frame) (warm median) | 422.9 ms | 426.4 ms | +1 % |  |
+| ARW sony-a7iii / refine at preview size, realised (cold) | 168.4 ms | 147.7 ms | -12 % |  |
+| ARW sony-a7iii / refine at preview size, realised (warm median) | 147.9 ms | 148.7 ms | +1 % |  |
+| ARW sony-a7iii / full-size develop, realised (Save / zoom) (cold) | 781.4 ms | 531.8 ms | -32 % | faster |
+| ARW sony-a7iii / full-size develop, realised (Save / zoom) (warm median) | 423.2 ms | 427.0 ms | +1 % |  |
+
+#### Film strip thumbnails (ThumbnailTimingTests, release; 'before' = every card, no disk cache)
+
+| Measure | Baseline | Result | Change | Note |
+|---|---|---|---|---|
+| before: every card, no disk cache / first 8 tiles | 75.0 ms | 76.0 ms | +1 % |  |
+| before: every card, no disk cache / window settled | 96.0 ms | 89.0 ms | -7 % |  |
+| before: every card, no disk cache / all tiles | 96.0 ms | 89.0 ms | -7 % |  |
+| after: lazy window + disk cache, cold / first 8 tiles | 49.0 ms | 45.0 ms | -8 % |  |
+| after: lazy window + disk cache, cold / window settled | 49.0 ms | 45.0 ms | -8 % |  |
+| after: lazy window + disk cache, cold / all tiles | 108.0 ms | 104.0 ms | -4 % |  |
+| after: lazy window + disk cache, warm / first 8 tiles | 31.0 ms | 30.0 ms | -3 % |  |
+| after: lazy window + disk cache, warm / window settled | 31.0 ms | 30.0 ms | -3 % |  |
+| after: lazy window + disk cache, warm / all tiles | 46.0 ms | 46.0 ms | +0 % |  |
+
+#### iOS simulator UI perf (PerfUITests)
+
+| Measure | Baseline | Result | Change | Note |
+|---|---|---|---|---|
+| cold launch (s, per-iteration median of runs) | 3.3 s | 3.3 s | -0 % |  |
+| gallery: tap -> grid header (ms) | 1808.0 ms | 1824.0 ms | +1 % |  |
+| gallery: tap -> first image (ms) | 2903.0 ms | 2917.0 ms | +0 % |  |
+| gallery scroll (s per iteration) | 1.3 s | 1.3 s | -0 % |  |
+| gallery scroll CPU time (s) | 0.9 s | 0.9 s | +2 % |  |
+| app memory, grid scroll (MB) | 153.0 MB | 162.3 MB | +6 % |  |
+| app footprint, editor open (MB) | 481.0 MB | 474.0 MB | -1 % |  |
+| thumbnail requests while grid settles | 57.0  | 57.0  | +0 % |  |
+| thumbnail requests after editor opened/closed | 0.0  | 0.0  | +0 % |  |
+
+iOS simulator rows use the Debug app, Mac rows Release, as in the baseline. Not measured again (as in the baseline): Mac app cold launch, a real device.
