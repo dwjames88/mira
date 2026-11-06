@@ -970,7 +970,13 @@ public final class EditorModel {
         let wanted = wantedThumbnailIDs()
         let cached = thumbnailCache[crop] ?? [:]
         let ids = wanted.filter { cached[$0 ?? Self.originalTileID] == nil }
-        if !keepShown { thumbnails = cached }
+        if !keepShown {
+            thumbnails = cached
+        } else if cached.contains(where: { thumbnails[$0.key] !== $0.value }) {
+            // A run cancelled by this one (the strip scrolled) may have cached tiles it had not yet published
+            // (they are published in batches); they are no longer "wanted", so nothing else would show them.
+            thumbnails.merge(cached) { $1 }
+        }
         if ids.isEmpty { return }
         let cancel = CancelFlag()
         thumbnailCancel = cancel
