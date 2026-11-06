@@ -237,8 +237,11 @@ final class AssetEditSession {
     func revert() async throws {
         let assetBox = Unchecked(value: asset)
         try await PhotoKitBridge.revert(asset: assetBox)
-        try await refreshAsset()
+        // The old editing input describes the edit that is gone, and the caller reopens the asset (`load`
+        // asks Photos for a fresh one). Dropping it first keeps `refreshAsset` from requesting an input
+        // only to discard it, which could also fail a revert that Photos had already completed.
         input = nil
+        try await refreshAsset()
     }
 
     /// Re-fetches the asset (its version changed) and, after a save, a fresh editing input.
