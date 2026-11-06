@@ -51,8 +51,14 @@ public struct SidecarStore: Sendable {
     }
 
     func legacyFallbackURL(for imageURL: URL) -> URL {
-        let name = fallbackURL(for: imageURL).lastPathComponent
-        return fallbackDirectory.appendingPathComponent(name.replacingOccurrences(of: ".mira.json", with: ".emulsion.json"))
+        legacyFallbackURL(fromFallback: fallbackURL(for: imageURL))
+    }
+
+    /// The legacy name of an already computed fallback URL (the path hash costs a symlink resolution and a
+    /// SHA-256, so callers that need both compute it once).
+    private func legacyFallbackURL(fromFallback fallback: URL) -> URL {
+        fallbackDirectory.appendingPathComponent(
+            fallback.lastPathComponent.replacingOccurrences(of: ".mira.json", with: ".emulsion.json"))
     }
 
     func fallbackURL(for imageURL: URL) -> URL {
@@ -83,16 +89,19 @@ public struct SidecarStore: Sendable {
     // MARK: API
 
     public func location(for imageURL: URL) -> SidecarLocation? {
+        location(for: imageURL, fallback: fallbackURL(for: imageURL))
+    }
+
+    private func location(for imageURL: URL, fallback: URL) -> SidecarLocation? {
         let fm = FileManager.default
         let adjacent = Self.sidecarURL(for: imageURL)
-        let fallback = fallbackURL(for: imageURL)
         let hasAdjacent = fm.fileExists(atPath: adjacent.path)
         let hasFallback = fm.fileExists(atPath: fallback.path)
         switch (hasAdjacent, hasFallback) {
         case (false, false):
             // Pre-rename (Emulsion) sidecars still count as the recipe's home until re-saved.
             let legacyAdjacent = Self.legacySidecarURL(for: imageURL)
-            let legacyFallback = legacyFallbackURL(for: imageURL)
+            let legacyFallback = legacyFallbackURL(fromFallback: fallback)
             if fm.fileExists(atPath: legacyAdjacent.path) { return .adjacent(legacyAdjacent) }
             if fm.fileExists(atPath: legacyFallback.path) { return .fallback(legacyFallback) }
             return nil
@@ -112,9 +121,9 @@ public struct SidecarStore: Sendable {
     /// one yields a recipe. Unreadable or foreign files are skipped.
     public func load(for imageURL: URL) -> Recipe? {
         let adjacent = Self.sidecarURL(for: imageURL), fallback = fallbackURL(for: imageURL)
-        let ordered = location(for: imageURL)?.url == fallback ? [fallback, adjacent] : [adjacent, fallback]
+        let ordered = location(for: imageURL, fallback: fallback)?.url == fallback ? [fallback, adjacent] : [adjacent, fallback]
         for url in ordered { if let r = Self.read(url) { return r } }
-        for url in [Self.legacySidecarURL(for: imageURL), legacyFallbackURL(for: imageURL)] {
+        for url in [Self.legacySidecarURL(for: imageURL), legacyFallbackURL(fromFallback: fallback)] {
             if let r = Self.read(url) { return r }
         }
         return nil
@@ -136,19 +145,20 @@ public struct SidecarStore: Sendable {
         let data = try encoder.encode(payload)
 
         let adjacent = Self.sidecarURL(for: imageURL)
+        let fallback = fallbackURL(for: imageURL)
+        let legacyFallback = legacyFallbackURL(fromFallback: fallback)
         do {
             try data.write(to: adjacent, options: .atomic)
             // A stale fallback copy would otherwise shadow nothing, but remove it to avoid confusion.
-            try? FileManager.default.removeItem(at: fallbackURL(for: imageURL))
+            try? FileManager.default.removeItem(at: fallback)
             // Migrated: the legacy copies are now superseded.
             try? FileManager.default.removeItem(at: Self.legacySidecarURL(for: imageURL))
-            try? FileManager.default.removeItem(at: legacyFallbackURL(for: imageURL))
+            try? FileManager.default.removeItem(at: legacyFallback)
             return .adjacent(adjacent)
         } catch {
             try FileManager.default.createDirectory(at: fallbackDirectory, withIntermediateDirectories: true)
-            let fallback = fallbackURL(for: imageURL)
             try data.write(to: fallback, options: .atomic)
-            try? FileManager.default.removeItem(at: legacyFallbackURL(for: imageURL))
+            try? FileManager.default.removeItem(at: legacyFallback)
             return .fallback(fallback)
         }
     }
@@ -157,8 +167,9 @@ public struct SidecarStore: Sendable {
     public func remove(for imageURL: URL) throws {
         let fm = FileManager.default
         var firstError: Error?
-        let all = [Self.sidecarURL(for: imageURL), fallbackURL(for: imageURL),
-                   Self.legacySidecarURL(for: imageURL), legacyFallbackURL(for: imageURL)]
+        let fallback = fallbackURL(for: imageURL)
+        let all = [Self.sidecarURL(for: imageURL), fallback,
+                   Self.legacySidecarURL(for: imageURL), legacyFallbackURL(fromFallback: fallback)]
         for url in all where fm.fileExists(atPath: url.path) {
             do { try fm.removeItem(at: url) } catch { firstError = firstError ?? error }
         }
