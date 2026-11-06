@@ -18,7 +18,7 @@ import XCTest
     private var libraryDir: URL!
     private var missing: [String] = []
 
-    override func setUpWithError() throws {
+    override func setUp() async throws {
         continueAfterFailure = true
         guard let out = ProcessInfo.processInfo.environment["MIRA_SNAPSHOT_OUT"], !out.isEmpty else {
             throw XCTSkip("Set TEST_RUNNER_MIRA_SNAPSHOT_OUT to a directory to write the UI snapshots")
@@ -66,7 +66,7 @@ import XCTest
         guard app.buttons["camera.library"].waitForExistence(timeout: 20) else { return XCTFail("camera never appeared") }
         shot("ui-camera", settle: 4)
         // The film button is labelled "Film: <name>".
-        let film = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Film'")).firstMatch
+        let film = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Film:'")).firstMatch
         if tap(film, "camera film button", timeout: 5) {
             shot("ui-camera-film-door", settle: 3)
             film.tap()
