@@ -168,7 +168,7 @@ private struct AlbumListView: View {
                 Text(title.uppercased()).ffLabel(size: 10, color: FieldFramesTheme.paperMid)
                 Spacer(minLength: 0)
                 if id == "albums", LibraryActionAvailability.canManageAlbums(limitedAccess: gallery.status == .limited) {
-                    NewAlbumButton { albumTools.newAlbum(existingTitles: LibraryActions.userAlbums().map(\.title)) }
+                    NewAlbumButton { albumTools.newAlbum(existingTitles: AlbumToolsModel.albumTitles(in: sections)) }
                 }
             }
             FFHairline()

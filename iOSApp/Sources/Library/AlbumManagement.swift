@@ -26,6 +26,14 @@ final class AlbumToolsModel {
     private(set) var notice: String?
     @ObservationIgnored private var noticeTask: Task<Void, Never>?
 
+    /// Album titles already loaded in the sidebar sections (no PhotoKit fetch on the main actor).
+    static func albumTitles(in sections: [SidebarSection]) -> [String] {
+        func walk(_ nodes: [SidebarNode]) -> [String] {
+            nodes.flatMap { $0.isFolder ? walk($0.children) : ($0.kind == .album ? [$0.title] : []) }
+        }
+        return walk(sections.first { $0.id == "albums" }?.nodes ?? [])
+    }
+
     func newAlbum(existingTitles: [String]) {
         nameRequest = AlbumNameRequest(kind: .create, initialName: AlbumList.uniqueTitle(existing: existingTitles))
     }
