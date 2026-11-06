@@ -41,7 +41,9 @@ public enum ReleaseNotes {
     /// (`## Install ...`) that `scripts/release.sh` appends for first-time downloads.
     public static func updateNotes(from markdown: String) -> String {
         var kept: [Substring] = []
-        for line in markdown.split(separator: "\n", omittingEmptySubsequences: false) {
+        // "\r\n" is a single Character in Swift, so a body edited on github.com (CRLF) would never split on "\n".
+        let normalized = markdown.replacingOccurrences(of: "\r\n", with: "\n")
+        for line in normalized.split(separator: "\n", omittingEmptySubsequences: false) {
             let lower = line.trimmingCharacters(in: .whitespaces).lowercased()
             if lower.hasPrefix("## install") { break }
             kept.append(line)

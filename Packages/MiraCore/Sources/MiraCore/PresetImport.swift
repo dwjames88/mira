@@ -51,7 +51,9 @@ extension PresetStore {
         var parsed: [(url: URL, preset: Preset)] = []
         for url in urls {
             do {
-                parsed.append((url, try PresetFile.read(url)))
+                // File IO (a dropped file may be dataless in iCloud Drive or on a network volume) stays off the main actor.
+                let preset = try await Task.detached(priority: .userInitiated) { try PresetFile.read(url) }.value
+                parsed.append((url, preset))
             } catch let error as PresetFileError {
                 outcome.failures.append(.init(fileName: url.lastPathComponent, reason: error.description))
             } catch {

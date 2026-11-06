@@ -12,6 +12,16 @@ struct Unchecked<Value>: @unchecked Sendable {
 /// Every closure handed to PhotoKit is built in a `nonisolated` context and marked `@Sendable`
 /// (Photos calls back on its own queues; a main-actor-inherited closure would trap in Swift 6).
 enum GalleryKit {
+    /// Runs `work` on its own detached task, but unlike a bare `Task.detached(...).value` the child is
+    /// cancelled when the awaiting task is: a detached task does not inherit cancellation, so a RAW scan
+    /// batch or a fetch walk would otherwise run to the end after its album was left.
+    nonisolated static func detached<T: Sendable>(
+        priority: TaskPriority, _ work: @escaping @Sendable () async -> T
+    ) async -> T {
+        let task = Task.detached(priority: priority, operation: work)
+        return await withTaskCancellationHandler { await task.value } onCancel: { task.cancel() }
+    }
+
     nonisolated static func requestThumbnail(
         manager: PHImageManager, asset: Unchecked<PHAsset>, size: CGSize, options: Unchecked<PHImageRequestOptions>,
         deliver: @escaping @Sendable (Unchecked<UIImage?>, _ isDegraded: Bool) -> Void
@@ -21,20 +31,6 @@ enum GalleryKit {
             let degraded = (info?[PHImageResultIsDegradedKey] as? Bool) ?? false
             let box = Unchecked(value: image)
             DispatchQueue.main.async { deliver(box, degraded) }
-        }
-    }
-
-    nonisolated static func requestFullData(asset: Unchecked<PHAsset>) async -> Data? {
-        let options = PHImageRequestOptions()
-        options.isNetworkAccessAllowed = true
-        options.deliveryMode = .highQualityFormat
-        options.version = .current
-        let boxed = Unchecked(value: options)
-        return await withCheckedContinuation { (continuation: CheckedContinuation<Data?, Never>) in
-            PHImageManager.default().requestImageDataAndOrientation(for: asset.value, options: boxed.value) {
-                @Sendable data, _, _, _ in
-                continuation.resume(returning: data)
-            }
         }
     }
 
@@ -86,9 +82,14 @@ enum GalleryKit {
     nonisolated static func badges(of asset: Unchecked<PHAsset>) -> (raw: Bool, edited: Bool) {
         let resources = PHAssetResource.assetResources(for: asset.value)
         // Same rule as the RAW filter (any camera-RAW type, not just DNG), so badge and filter agree.
-        let raw = RAWScan.isRAW(asset.value)
+        let raw = RAWScan.isRAW(resources: resources)
         let edited = resources.contains { $0.type == .adjustmentData }
         return (raw, edited)
+    }
+
+    /// Whether the asset carries adjustment data (the EDITED badge / the Develop queue's tick); runs off the main actor.
+    nonisolated static func isEdited(_ asset: Unchecked<PHAsset>) -> Bool {
+        PHAssetResource.assetResources(for: asset.value).contains { $0.type == .adjustmentData }
     }
 }
 
@@ -99,6 +100,8 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
     private(set) var status: PHAuthorizationStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
     private(set) var sections: [SidebarSection] = []
     private(set) var loadedSections = false
+    /// What each user album allows (rename, delete), loaded with the sections off the main actor.
+    private(set) var albumCapabilities: [String: AlbumCapabilities] = [:]
     /// Bumps when pictures were added, removed or reordered library-wide (covers are stale then).
     /// Pure content edits do not bump it; they reach the open album as per-asset versions.
     private(set) var revision = 0
@@ -118,6 +121,8 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
     }
 
     @ObservationIgnored private var observing = false
+    @ObservationIgnored private var sectionsTask: Task<Void, Never>?
+    @ObservationIgnored private var sectionsPending = false
     /// Shared by every cover tile: one caching manager and an in-memory cover cache.
     @ObservationIgnored let covers = CoverStore()
     /// RAW answers shared by every album grid; cleared when the library changes.
@@ -146,10 +151,29 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
     deinit { PHPhotoLibrary.shared().unregisterChangeObserver(self) }
 
     /// `SidebarLoader` is `nonisolated`; run it off the main actor and hop back with Sendable values.
+    /// Requests that arrive while a load is running (a burst of library changes) share it: one more pass
+    /// runs after it, so the sections always reflect the last change and loads never finish out of order.
     func reloadSections() async {
-        let loaded = await Task.detached(priority: .userInitiated) { SidebarLoader.load() }.value
-        sections = loaded
-        loadedSections = true
+        if let running = sectionsTask {
+            sectionsPending = true
+            await running.value
+            return
+        }
+        let task = Task { [weak self] in
+            repeat {
+                guard let self else { return }
+                self.sectionsPending = false
+                let loaded = await Task.detached(priority: .userInitiated) { SidebarLoader.loadAll() }.value
+                // An unchanged tree is not re-published (the album list would re-evaluate for nothing).
+                if loaded.sections != self.sections { self.sections = loaded.sections }
+                let capabilities = Dictionary(loaded.albums.map { ($0.id, $0.capabilities) }, uniquingKeysWith: { first, _ in first })
+                if capabilities != self.albumCapabilities { self.albumCapabilities = capabilities }
+                self.loadedSections = true
+            } while self?.sectionsPending == true
+            self?.sectionsTask = nil
+        }
+        sectionsTask = task
+        await task.value
     }
 
     nonisolated func photoLibraryDidChange(_ changeInstance: PHChange) {
@@ -228,15 +252,8 @@ final class GalleryModel: NSObject, PHPhotoLibraryChangeObserver {
     }
 
     func presentLimitedPicker() {
-        guard let top = Self.topViewController() else { return }
+        guard let top = LibraryShare.topViewController() else { return }
         PHPhotoLibrary.shared().presentLimitedLibraryPicker(from: top)
-    }
-
-    private static func topViewController() -> UIViewController? {
-        let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        var top = scene?.keyWindow?.rootViewController ?? scene?.windows.first?.rootViewController
-        while let next = top?.presentedViewController { top = next }
-        return top
     }
 
     static func openSettings() {
@@ -275,6 +292,8 @@ final class AlbumModel {
         return o
     }()
     @ObservationIgnored private var cachedRange: Range<Int> = 0..<0
+    @ObservationIgnored private var cachedCenter = 0
+    private static let cachingSlack = 12
     @ObservationIgnored private(set) var thumbSize: CGSize = .zero
     @ObservationIgnored let metrics = ThumbnailMetrics.shared
     /// PhotoKit reported these assets changed (edit, revert, favorite): their cells fetch a new thumbnail.
@@ -285,7 +304,9 @@ final class AlbumModel {
     @ObservationIgnored private(set) lazy var thumbnails = ThumbnailPipeline<UIImage, PHAsset>(
         metrics: metrics,
         cost: { image in max(1, Int(image.size.width * image.size.height * image.scale * image.scale) * 4) },
-        fetch: { [unowned self] asset, key, deliver in
+        fetch: { [weak self] asset, key, deliver in
+            // The album is gone with its view; nothing is left to show a thumbnail (0 = no request).
+            guard let self else { return 0 }
             let side = CGFloat(key.pixels)
             return Int(GalleryKit.requestThumbnail(
                 manager: self.caching, asset: Unchecked(value: asset), size: CGSize(width: side, height: side),
@@ -294,10 +315,15 @@ final class AlbumModel {
                 MainActor.assumeIsolated { deliver(box.value, degraded) }
             })
         },
-        cancel: { [unowned self] id in self.caching.cancelImageRequest(PHImageRequestID(id)) })
+        cancel: { [weak self] id in self?.caching.cancelImageRequest(PHImageRequestID(id)) })
 
     /// The grid cell's side in pixels (300 until the grid has measured itself).
     var thumbPixels: Int { thumbSize == .zero ? 300 : Int(thumbSize.width) }
+
+    /// The size every request is made at. The caching manager only answers from its cache for the exact
+    /// size, content mode and options of the request, so preheating uses this (whole pixels), not the
+    /// measured fractional `thumbSize`.
+    private var requestSize: CGSize { CGSize(width: thumbPixels, height: thumbPixels) }
 
     func thumbnailKey(for asset: PHAsset) -> GridThumbnailKey {
         GridThumbnailKey(id: asset.localIdentifier, pixels: thumbPixels,
@@ -305,6 +331,21 @@ final class AlbumModel {
     }
 
     init(nodeID: String) { self.nodeID = nodeID }
+
+    /// RAW / EDITED answers per asset, so a cell that scrolls back in does not read the asset's resources
+    /// again. A cell shows them from the cache on its first frame. Keyed by the asset's thumbnail version:
+    /// an edit bumps it, so the EDITED badge is read again then.
+    @ObservationIgnored private var badgeCache: [String: (version: Int, raw: Bool, edited: Bool)] = [:]
+
+    func cachedBadges(id: String, version: Int) -> (raw: Bool, edited: Bool)? {
+        guard let hit = badgeCache[id], hit.version == version else { return nil }
+        return (hit.raw, hit.edited)
+    }
+
+    func storeBadges(_ badges: (raw: Bool, edited: Bool), id: String, version: Int) {
+        if badgeCache.count > 20_000 { badgeCache.removeAll() }
+        badgeCache[id] = (version, badges.raw, badges.edited)
+    }
 
     func reload(rawOnly: Bool, gallery: GalleryModel) async {
         let id = nodeID
@@ -330,7 +371,7 @@ final class AlbumModel {
         if on { publish(rawMatches) } else {
             displayIndices = nil
             count = result?.count ?? 0
-            resetCaching()
+            stopCaching()
         }
     }
 
@@ -345,13 +386,13 @@ final class AlbumModel {
         guard let result else { return }
         let box = Unchecked(value: result)
         rawTask = Task { [weak self] in
-            let ids = await Task.detached(priority: .userInitiated) { GalleryKit.identifiers(of: box) }.value
+            let ids = await GalleryKit.detached(priority: .userInitiated) { GalleryKit.identifiers(of: box) }
             guard !Task.isCancelled, let self else { return }
             var classification = gallery.rawClassification
             // Hidden and Recently Deleted pictures are not in the RAW smart album: those two are scanned.
             if GalleryKit.excludedFromRAWAlbum(nodeID: self.nodeID) { classification = RAWClassification(authoritative: false) }
             else if classification == nil {
-                let album = await Task.detached(priority: .userInitiated) { GalleryKit.rawAlbumIdentifiers() }.value
+                let album = await GalleryKit.detached(priority: .userInitiated) { GalleryKit.rawAlbumIdentifiers() }
                 classification = album.map { RAWClassification(rawIDs: $0) } ?? RAWClassification(authoritative: false)
                 if album != nil { gallery.rawClassification = classification }
             }
@@ -361,16 +402,16 @@ final class AlbumModel {
                 return
             }
             if gallery.rawCandidates == nil {
-                gallery.rawCandidates = await Task.detached(priority: .userInitiated) { RAWScan.candidateIDs() }.value
+                gallery.rawCandidates = await GalleryKit.detached(priority: .userInitiated) { RAWScan.candidateIDs() }
             }
             let candidates = gallery.rawCandidates
             var matches: [Int] = []
             for range in RAWScanBatching.ranges(count: ids.count, size: 200) {
                 if Task.isCancelled { return }
                 let todo = Array(range)
-                let flags = await Task.detached(priority: .utility) {
+                let flags = await GalleryKit.detached(priority: .utility) {
                     await RAWScan.flags(in: box, indices: todo, candidates: candidates, store: RAWScanStore.shared)
-                }.value
+                }
                 for (i, raw) in flags { classification.record(id: ids[i], isRAW: raw) }
                 if Task.isCancelled { return }
                 matches += classification.matchingIndices(in: ids, range: range)
@@ -390,13 +431,9 @@ final class AlbumModel {
         if rawOnly { publish(matches) }
     }
 
-    private func publish(_ indices: [Int], replacing: Bool = true) {
+    private func publish(_ indices: [Int]) {
         displayIndices = indices
         count = indices.count
-        resetCaching()
-    }
-
-    private func resetCaching() {
         stopCaching()
     }
 
@@ -423,7 +460,7 @@ final class AlbumModel {
         guard summary.membershipChanged else { return }
         gallery.invalidateCover(nodeID: nodeID)
         if !removed.isEmpty {
-            caching.stopCachingImages(for: details.removedObjects, targetSize: thumbSize, contentMode: .aspectFill, options: thumbOptions)
+            caching.stopCachingImages(for: details.removedObjects, targetSize: requestSize, contentMode: .aspectFill, options: thumbOptions)
             metrics.recordStop()
         }
         cachedRange = 0..<0
@@ -452,23 +489,35 @@ final class AlbumModel {
         return source < result.count ? result.object(at: source) : nil
     }
 
-    func setThumbSize(_ size: CGSize) { thumbSize = size }
+    func setThumbSize(_ size: CGSize) {
+        guard size != thumbSize else { return }
+        let before = thumbPixels
+        thumbSize = size
+        // A window preheated at another size is never stopped (stop calls use the current size): drop it.
+        if thumbPixels != before, !cachedRange.isEmpty { stopCaching() }
+    }
 
-    /// Keeps a window of ±36 around the visible index warm in the caching manager.
+    /// Keeps a window of ±36 around the visible index warm in the caching manager. Cells appear in bursts that
+    /// are not in scroll order (the lazy grid builds a few rows ahead and behind), and every appearance used
+    /// to move the window: assets just dropped were started again a moment later. The window now moves once
+    /// the index is a dozen cells off its centre, so the part that matters (±24 cells) is always covered.
     func updateCaching(around index: Int) {
         guard result != nil, thumbSize != .zero else { return }
+        if !cachedRange.isEmpty, abs(index - cachedCenter) < Self.cachingSlack,
+           cachedRange.upperBound == min(count, cachedCenter + 36) { return }
         let window = max(0, index - 36)..<min(count, index + 36)
         guard window != cachedRange else { return }
+        cachedCenter = index
         let old = Set(cachedRange), new = Set(window)
         let add = new.subtracting(old).sorted(), drop = old.subtracting(new).sorted()
         if !add.isEmpty {
             let assets = add.compactMap { asset(at: $0) }
-            caching.startCachingImages(for: assets, targetSize: thumbSize, contentMode: .aspectFill, options: thumbOptions)
+            caching.startCachingImages(for: assets, targetSize: requestSize, contentMode: .aspectFill, options: thumbOptions)
             metrics.recordPreheat(assets: assets.count)
         }
         if !drop.isEmpty {
             caching.stopCachingImages(for: drop.compactMap { asset(at: $0) },
-                                      targetSize: thumbSize, contentMode: .aspectFill, options: thumbOptions)
+                                      targetSize: requestSize, contentMode: .aspectFill, options: thumbOptions)
             metrics.recordStop()
         }
         cachedRange = window

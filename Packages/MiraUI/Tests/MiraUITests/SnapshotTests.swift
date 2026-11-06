@@ -141,6 +141,9 @@ struct SnapshotTests {
         model.setViewport(pane: CGSize(width: 1280, height: 800), fitArea: CGSize(width: 1232, height: 752))
         model.zoomClick(atPane: CGPoint(x: 700, y: 300))
         try await HoverTests.waitFor { model.previewFrame?.placement != nil && model.isPreviewIdle }
+        // The film strip refills its tiles after the earlier crop; without this wait the shot caught them mid-refill.
+        try await HoverTests.waitFor(90) { model.thumbnailsSettled }
+        try await Task.sleep(for: .milliseconds(300))
         try Self.writePNG(EditorView(model: model, host: host), size: size, scheme: .dark, name: "editor-zoom-100")
         model.setImmersive(true)
         try Self.writePNG(EditorView(model: model, host: host), size: size, scheme: .light, name: "editor-immersive")
@@ -149,6 +152,8 @@ struct SnapshotTests {
 
         // The extension's bar: tabs only.
         model.selectTab(.films)
+        try await HoverTests.waitFor(90) { model.thumbnailsSettled }
+        try await Task.sleep(for: .milliseconds(300))
         try Self.writePNG(EditorView(model: model), size: size, scheme: .light, name: "editor-tab-films-extension-light")
         model.cancelWork()
     }
