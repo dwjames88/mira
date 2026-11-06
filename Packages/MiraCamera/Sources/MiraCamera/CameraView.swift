@@ -192,7 +192,7 @@ public struct CameraView<FilmDoor: View>: View {
     /// The shutter row is 84 pt and sinks up to 22 pt into the bottom safe area so the finder can fill the width (3:4).
     private func portrait(bottomInset: CGFloat) -> some View {
         VStack(spacing: 0) {
-            CameraHeader(filmName: filmName, developing: model.developingCount, onBack: onClose) { settingsShown = true }
+            CameraHeader(filmName: filmName, developing: model.developingCount, onLibrary: onClose) { settingsShown = true }
                 .reportFrame("header")
             FFHairline()
             MeterView(needle: model.needle, readout: model.readoutText, latitude: model.latitude)
@@ -234,7 +234,7 @@ public struct CameraView<FilmDoor: View>: View {
     private var landscape: some View {
         HStack(spacing: 0) {
             VStack(spacing: 0) {
-                CameraHeader(filmName: filmName, developing: 0, onBack: onClose, onSettings: { settingsShown = true }, showsFilmName: false)
+                CameraHeader(filmName: filmName, developing: 0, onLibrary: onClose, onSettings: { settingsShown = true }, showsFilmName: false)
                     .reportFrame("header")
                 FFHairline()
                 if let filmName, !filmName.isEmpty {
@@ -280,7 +280,7 @@ public struct CameraView<FilmDoor: View>: View {
 
     private var denied: some View {
         VStack(spacing: 0) {
-            CameraHeader(filmName: nil, developing: 0, onBack: onClose, onSettings: {}).opacity(1)
+            CameraHeader(filmName: nil, developing: 0, onLibrary: onClose, onSettings: {}).opacity(1)
             FFHairline()
             FFEmptyState(title: "Camera", subtitle: "CAMERA ACCESS IS OFF", buttonTitle: "OPEN SETTINGS") {
                 if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
