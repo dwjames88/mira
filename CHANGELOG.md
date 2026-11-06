@@ -39,6 +39,21 @@ Roll 1: a camera for iPhone. Not yet verified on an iPhone (see Notes).
 ### Notes
 - Not yet verified on an iPhone. The first device check is the 30 fps finder gate on an iPhone 16 Pro; see [TESTING.md](TESTING.md).
 
+### Added: Photos library management (Mac and iPhone)
+- **Favorites.** Favorite and unfavorite one picture or a selection; a heart badge on favorite thumbnails; the Favorites album in the library.
+- **Albums.** Create, rename and delete albums (the photos stay in the library), add a selection to an album or a new album, remove from the current album, and move (add to the target and remove from the current album in one change). Smart albums are read-only.
+- **Hide, duplicate, delete.** Hide and unhide (UNHIDE in the Hidden album), duplicate (a new asset with the same date, location and favorite; an edited picture is duplicated as it looks now), and delete to Recently Deleted (Photos asks to confirm). Recently Deleted stays read-only.
+- **Info.** Date, camera, lens, exposure, dimensions, file size, format (RAW + JPEG), location (place name where MapKit can resolve it, else coordinates), filename, favorite and the albums the picture is in. iPhone: an info sheet. Mac: an inspector panel (⌘I).
+- **iPhone.** SELECT in the album grid (tap to toggle, ALL / NONE, N SELECTED) with a bottom bar FAVORITE / ALBUM / SHARE / DELETE and a ••• menu (hide, duplicate, move, remove, info); long-press menu on a picture; an album sheet with search and NEW ALBUM; + NEW, rename and delete on the album list; share of up to 30 pictures.
+- **Mac.** Click, ⌘-click, ⇧-click, ⌘A and Esc selection; a context menu on pictures; FAVORITE, ALBUM ▾, INFO and DELETE in the grid header; a Photo menu (⌘. favorite, ⇧⌘N new album, ⌘L hide, ⌘D duplicate, ⌘I info, ⌘⌫ delete); + on the ALBUMS header, rename and delete on album rows; drag pictures onto an album (or Favorites) in the sidebar.
+- **Editor.** A heart and an album menu for the open picture in the editor header (iPhone) and editor strip (Mac); the Photos extension is unchanged.
+- **Limited access.** Album actions are hidden when Photos access is limited; picture actions still work, and ADD MORE (iPhone) stays.
+- Library views update live from Photos changes. A favorite, hide or album change no longer re-requests that picture's thumbnail; a real edit still does.
+- Code: `LibraryActions`, `LibraryModel`, `LibraryInteraction` and `AssetInfoReader` in MiraCore (every PhotoKit change block is built in a `nonisolated` context and is `@Sendable`); `iOSApp/Sources/Library/`; `App/Sources/PhotoLibrary/LibraryActions*`, `LibraryInspector`, `AlbumSheets`, `LibraryDrag`; `EditorHostBar.library` in MiraUI.
+
+### Tests: Photos library management
+- MiraCore: library model tests (selection, availability, album list, info formatting, thumbnail pin) and library interaction tests (499 tests in total). MiraUI: the editor strip shows the photo actions only when the host passes them (176). iOS: library snapshots (select bar, album sheet, info sheet), availability and pruning tests, and an opt-in PhotoKit probe (`TEST_RUNNER_MIRA_LIBRARY_PROBE=1`) on the simulator that only touches its own "Emulsion Test" assets. Mac: `--selftest-photos` now runs a favorite, album (add, move, remove, rename) and duplicate round trip; hide and delete steps need a click in Photos' confirmation and run only with `--selftest-photos-delete`.
+
 ## [Unreleased 1.0.2]
 
 ### Fixed

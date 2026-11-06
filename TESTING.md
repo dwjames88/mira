@@ -273,6 +273,37 @@ The camera cannot be fully tested in the simulator. Simulator tests: `swift test
 - [ ] Quit the app between capture and developed. The next launch attaches the recipe (pending prints).
 - [ ] Memory stays flat while switching films.
 
+## Library management (both platforms, manual)
+
+Automated: the iOS PhotoKit probe (`TEST_RUNNER_MIRA_LIBRARY_PROBE=1 xcodebuild test -scheme MiraiOS -destination id=<27.2 sim> -only-testing:MiraiOSTests/LibraryActionsSimTests`, simulator only, touches only its own "Emulsion Test" assets and the "Emulsion Test Scratch" albums) and the Mac `--selftest-photos` round trip (favorite, add, move, remove, rename, duplicate). Hide and delete raise a Photos confirmation that needs a click: on the Mac they run only with `--selftest-photos-delete`, on iOS they are not automated. Everything below needs a person, on a real library, using test pictures.
+
+**iPhone**
+- [ ] Album grid: SELECT, tap several pictures (lichen border and check), ALL, NONE, DONE. The count reads N SELECTED.
+- [ ] FAVORITE on a selection: hearts appear without the thumbnails flickering; FAVORITE becomes UNFAVORITE when all are favorites; the Favorites album count changes.
+- [ ] ALBUM: the sheet lists your albums (folder path, count), search filters, NEW ALBUM creates one and adds the selection.
+- [ ] Inside a user album: ••• ▸ MOVE TO ALBUM (pictures leave this album, appear in the target) and REMOVE FROM ALBUM (they stay in the library).
+- [ ] ••• ▸ HIDE (Photos asks), then in Hidden: UNHIDE.
+- [ ] ••• ▸ DUPLICATE: a copy appears with the same date; an edited picture copies as it looks.
+- [ ] DELETE: Photos' confirmation; cancel keeps the pictures and shows no error; confirm moves them to Recently Deleted.
+- [ ] SHARE: "PREPARING n", then the share sheet with the pictures.
+- [ ] Long press a picture: the same actions; INFO opens the info sheet (date, camera, lens, exposure, dimensions, file size, format, location name, albums).
+- [ ] Album list: + NEW; long press an album: RENAME, DELETE ALBUM (Mira confirms, then Photos; the pictures stay).
+- [ ] Editor: the heart toggles the favorite; ••• ▸ ADD TO ALBUM and INFO.
+- [ ] Recently Deleted and smart albums: no destructive or album actions.
+- [ ] Limited access: album actions hidden; favorite, hide and delete on selected pictures work; ADD MORE still opens the picker.
+- [ ] Change something in Photos while Mira is open (favorite, rename an album): Mira updates without reloading the grid.
+
+**Mac**
+- [ ] Click, ⌘-click, ⇧-click, ⇧-arrow, ⌘A, Esc in the grid; Return still opens the focused picture; double-click opens.
+- [ ] Right-click a picture (in and outside the selection): Open, Favorite, Add to Album ▸, Move to Album ▸ and Remove from Album (in a user album), Hide, Duplicate, Get Info, Share…, Delete….
+- [ ] Header: FAVORITE, ALBUM ▾ (popover with filter and NEW ALBUM…), INFO, DELETE appear with a selection.
+- [ ] Photo menu: ⌘. ⇧⌘N ⌘L ⌘D ⌘I ⌘⌫ act on the selection in the library and on the open picture in the editor; they do nothing while typing in a sheet.
+- [ ] Sidebar: + on ALBUMS, right-click an album: Rename…, Delete Album… (deleting the open album goes back to Library).
+- [ ] Drag pictures onto an album row (it highlights) and onto Favorites.
+- [ ] Inspector (⌘I): rows, FAVORITE toggle, IN ALBUMS, place name; with several selected: N PHOTOS SELECTED.
+- [ ] Editor strip: heart and ALBUM ▾ for a library picture; not shown for files from disk, read-only pictures or the Photos extension.
+- [ ] Thumbnails do not reload after a favorite or album change; they do after an edit.
+
 ## Known gaps and unverified
 
 - Quitting the app or closing its window does not guard unsaved Photos edits. Switching pictures or returning to the library inside the app does.
