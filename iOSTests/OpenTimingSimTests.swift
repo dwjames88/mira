@@ -14,8 +14,8 @@ import XCTest
 /// PhotoKit is left out on purpose (its fetch latency depends on the simulator's library, and the rules allow PhotoKit
 /// tests only on the "Emulsion Test" album): this times what the app does after Photos hands over a file.
 ///   - JPEG / HEIC (6000x4000): `PhotoEngine.load(data:)`, the import path (decode + the histogram and thumbnail bases)
-///   - RAW: `RawOpener.openDraft` (the first editable frame, `AssetEditSession` stage 1), then the full-quality
-///     develop that `rawSource(for:full: true)` runs in the background.
+///   - RAW: `RawOpener.openDraft` (the first editable frame, `AssetEditSession` stage 1), the full-quality preview-size
+///     develop, and the full-size develop that `rawSource(for:full: true)` runs in the background (both realised).
 /// Five runs each, run 1 cold; prints `OPENTIMING ...` lines and the process's own peak resident size.
 final class OpenTimingSimTests: XCTestCase {
     private static func ms(_ from: ContinuousClock.Instant) -> Double {
@@ -75,7 +75,17 @@ final class OpenTimingSimTests: XCTestCase {
             }
         }
         for (label, url) in raws where FileManager.default.fileExists(atPath: url.path) {
-            var draft: [Double] = [], full: [Double] = []
+            var draft: [Double] = [], refine: [Double] = [], full: [Double] = []
+            let space = try XCTUnwrap(CGColorSpace(name: CGColorSpace.extendedLinearDisplayP3))
+            let ctx = CIContext()
+            /// Forces the pixels to exist (the lazy develop result costs nothing until something renders it).
+            func realise(_ image: CIImage) {
+                let e = image.extent.integral
+                let rowBytes = Int(e.width) * 8
+                let buffer = UnsafeMutableRawPointer.allocate(byteCount: rowBytes * Int(e.height), alignment: 16)
+                defer { buffer.deallocate() }
+                ctx.render(image, toBitmap: buffer, rowBytes: rowBytes, bounds: e, format: .RGBAh, colorSpace: space)
+            }
             for i in 0..<5 {
                 RawAssetCache.shared.removeAll()
                 let t0 = ContinuousClock.now
@@ -83,12 +93,17 @@ final class OpenTimingSimTests: XCTestCase {
                                                               cacheKey: "open-timing-\(i)"))
                 draft.append(Self.ms(t0))
                 let t1 = ContinuousClock.now
-                let refined = RawOpener.refine(develop: frame.develop, settings: .identity, filmApplied: false)
-                full.append(Self.ms(t1))
-                XCTAssertNotNil(refined)
+                let refined = try XCTUnwrap(RawOpener.refine(develop: frame.develop, settings: .identity, filmApplied: false))
+                realise(refined.image)
+                refine.append(Self.ms(t1))
+                let t2 = ContinuousClock.now
+                let developed = try XCTUnwrap(frame.develop.develop(.identity, filmApplied: false, draft: false, scale: 1))
+                realise(developed.image)
+                full.append(Self.ms(t2))
             }
             emit("\(label)  openDraft (first editable frame)  \(Self.summary(draft))  peak RSS \(Int(Self.peakRSSMB)) MB")
-            emit("\(label)  refine (full quality, after draft)  \(Self.summary(full))  peak RSS \(Int(Self.peakRSSMB)) MB")
+            emit("\(label)  refine at preview size, realised  \(Self.summary(refine))")
+            emit("\(label)  full-size develop, realised (Save / zoom)  \(Self.summary(full))  peak RSS \(Int(Self.peakRSSMB)) MB")
         }
         let out = Snapshot.root.appendingPathComponent("build/perf-open-ios.txt")
         try? FileManager.default.createDirectory(at: out.deletingLastPathComponent(), withIntermediateDirectories: true)
