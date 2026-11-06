@@ -37,6 +37,9 @@ struct Options {
     var width = 900
     var exposureTime: Double?
     var reciprocity: ReciprocityMode?
+    var golden: String?
+    var ref: String?
+    var only: String?
 }
 
 func parseArguments() -> Options {
@@ -74,6 +77,9 @@ func parseArguments() -> Options {
         case "--films-list": o.filmsList = next(flag)
         case "--states": o.states = next(flag)
         case "--width": o.width = nextInt(flag)
+        case "--golden": o.golden = next(flag)
+        case "--ref": o.ref = next(flag)
+        case "--only": o.only = next(flag)
         case "--exposure-time":
             guard let t = Double(next(flag)), t > 0 else { fail("--exposure-time needs seconds > 0") }
             o.exposureTime = t
@@ -121,6 +127,13 @@ if let (sources, films) = opts.packFilms {
 if opts.timeLUTs {
     guard let p = opts.films else { fail("--time-luts needs --films <dir>") }
     timeLUTs(filmsPath: p)
+}
+
+if let mode = opts.golden {
+    guard let p = opts.films, let out = opts.out else {
+        fail("usage: mira-sheet --golden record|compare --films <dir> [--ref <refdir>] --out <dir> [--fixtures-dir Fixtures] [--only <text>]")
+    }
+    exit(Golden.run(mode: mode, filmsPath: p, refPath: opts.ref, outPath: out, fixtures: opts.fixtureDirectory, only: opts.only))
 }
 
 if opts.bench {
