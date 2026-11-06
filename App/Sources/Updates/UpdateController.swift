@@ -255,6 +255,11 @@ final class UpdateController {
         let saved = try await Task.detached(priority: .userInitiated) {
             try UpdateInstaller.saveForManualInstall(archive, in: downloads, name: name)
         }.value
+        // Cancel pressed while the copy ran (it used to block the main thread, so it could not be): honour it.
+        if Task.isCancelled {
+            try? FileManager.default.removeItem(at: saved)
+            throw UpdateError.cancelled
+        }
         savedFile = saved
         phase = .savedForManualInstall(info, fileName: saved.lastPathComponent, reason: reason)
         NSWorkspace.shared.activateFileViewerSelecting([saved])
