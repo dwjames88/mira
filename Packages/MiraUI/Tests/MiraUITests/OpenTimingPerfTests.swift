@@ -25,7 +25,7 @@ struct OpenTimingPerfTests {
     static var report = ""
 
     static func line(_ label: String, _ value: String) {
-        let l = label.padding(toLength: 34, withPad: " ", startingAt: 0) + value
+        let l = label.padding(toLength: 46, withPad: " ", startingAt: 0) + value
         print(l)
         report += l + "\n"
     }
