@@ -8,8 +8,8 @@ Roll 1: a camera for iPhone. Not yet verified on an iPhone (see Notes).
 
 ### Added
 - **Camera (iOS).** A live finder rendered through MiraCore with the film you chose. Hold the finder to see the bare scene.
-- **Film door.** Mirrors the editor's card flow (cards, then options) and adds GRAIN rows (finder off or live, amount, size).
-- **Exposure and focus.** An EV dial in thirds, tap to focus and meter, AE/AF lock, white balance presets and a WB lock.
+- **Film door.** Mirrors the editor's card flow (stock tiles, then options) and adds GRAIN rows (finder off or live, amount, size). The tiles are static stock names with ISO captions; the finder renders no live cards.
+- **Exposure and focus.** An EV dial in thirds, tap to focus and meter, AE/AF lock, and a Kelvin white balance dial (AUTO or 2500-9000 K, snapping to 3200/4000/5500/6500; the last value is remembered).
 - **Film-aware meter.** A needle plus UNDER and OVER counts, measured against the stock's latitude, so slide and negative film read differently.
 - **Capture.** ProRAW plus HEIC on phones that have ProRAW, HEIC elsewhere, at 12 MP.
 - **Two-step save.** The original is saved first and the recipe attached after, with a retry queue. When Photos access is limited, you get the original plus a baked copy and a notice. If the app quits between capture and developed, the next launch attaches the recipe.
@@ -17,9 +17,16 @@ Roll 1: a camera for iPhone. Not yet verified on an iPhone (see Notes).
 - **Lenses** shown in 35 mm equivalents, with chips and pinch to zoom.
 - **Hardware shutter.** Volume buttons, the Action button and Camera Control fire on release.
 - **Feedback.** Haptics and the system shutter sound. A silent option exists only where the region allows it, and is off by default.
-- **Rotation.** Readouts rotate; the chrome stays.
+- **Rotation.** The finder follows the interface orientation; the meter readout stays horizontal.
+- **Aspect.** Camera settings offer 4:3 (default), 3:2, 1:1, 16:9 and XPAN 65:24. The finder shows the crop, and the saved frame's recipe carries it as an editor crop (the original stays full frame).
+- **Opens to the camera.** The app launches on the camera. LIBRARY and the last-frame thumbnail bring up the library; the gallery's CAMERA returns.
+- **DEVELOP queue.** The first card in the library. Every frame shot with the Mira camera joins it when its save lands (the baked copy on limited access); long-press any photo to add or remove it; the queue view shows newest first, ticks edited frames, and offers REMOVE DEVELOPED and CLEAR. Persisted; missing assets are pruned.
 - **Privacy.** Camera permission only. Location is off by default and there is no microphone use.
 - **Entry points.** A CAMERA button in the gallery and a "Load film" Home Screen quick action.
+
+### Fixed (beta 2, after the first device run)
+- **Sideways, letterboxed finder on iPhone.** The rotation coordinator was created with no preview layer, and AVFoundation then reports 0° for the preview angle, so the landscape sensor buffer was drawn unrotated at 4:3 and the meter readout was turned -90° up under the Dynamic Island. The finder's Metal layer is now handed to the coordinator, so the preview angle is real (90 in portrait), and the readout no longer rotates.
+- **Portrait layout.** The meter is about half as tall (15 pt scale, one-line readout), the lens chips float over the bottom of the finder, and the shutter row is 84 pt and sits partly in the bottom safe area, so on an iPhone 16 Pro the 3:4 frame fills the width.
 
 ### Changed
 - `FilmsPanel` is now shared between the editor and the camera.

@@ -384,24 +384,28 @@ MiraCore changes (small, each with tests):
 ││                                        ││
 ││  ┆                                   ┆ ││  frame lines (Roll 2) in onPhotoDim hairline
 │└────────────────────────────────────────┘│
-│   13      ·24·      48      120          │  lens chips, mono; active paper + lichen underline
-│──────────────────────────────────────────│
 │  −1  −⅔  −⅓   [ 0 ]  +⅓  +⅔  +1   EV    │  EV dial, horizontal drag, thirds detents
 │──────────────────────────────────────────│
+│ AUTO  4000 4500 [5500] 6500 7000      K │  WB dial, 100 K steps, preset detents
+│──────────────────────────────────────────│
 │ ┌────┐                            FILM ▸ │  last-frame thumb (taps → editor) · FILM door
-│ │ ▣  │           ( ◯ )             WB ▸ │  shutter: 72 pt ring, paper hairline, ink fill
-│ └────┘                                   │  WB door; long-press shutter → nothing (no burst)
+│ │ ▣  │           ( ◯ )                   │  shutter: 72 pt ring, paper hairline, ink fill
+│ └────┘                                   │  long-press shutter → nothing (no burst)
 └──────────────────────────────────────────┘  home indicator
 ```
 
 - The header copies the editor header exactly: `chevron.left` with LIBRARY at 11 pt mono, paper, a 44 pt minimum hit area, and a 1 pt hairline under it. The camera is a sibling of the editor, so it gets the same back pattern. Whatever back and step pattern 1.0.1 ships (text tabs today, step icons if the new flow lands) is the one the camera's doors use. The camera does not get a third pattern.
 - **Shutter.** A 72 pt ring with a 1.5 pt paper hairline and an ink fill. On press it fills lichen for 120 ms. When readiness is `notReadyWaitingForProcessing` the ring dims to paperDim. It does not dim for `notReadyMomentarily`.
 - **Film door.** A bottom sheet on `ink-soft` with grain, laid out exactly like the editor's FILMS panel: family `FFTabBar`, card row, ISO and VARIATIONS chips, `OPTIONS +`, STRENGTH. Its last rows are GRAIN (FINDER OFF/LIVE, AMOUNT, SIZE) and, in Roll 2, LOAD A ROLL. The cards show your scene, live.
-- **WB door.** One `ChipRow`: AUTO · 5500 · 6500 · 3200 · 4000 · LOCK.
+- **As built (1.1.0 beta 2).** Portrait stack: header, meter (15 pt scale, one-line readout), finder with the lens chips floating over its bottom edge on an ink scrim, EV row, WB row, shutter row (84 pt, up to 22 pt into the bottom safe area). The 4:3 frame fills the width on a 402 pt phone. The last-frame thumbnail and LIBRARY both open the library (the app launches on the camera).
+- **WB row (replaces the WB door).** Under the EV row, same height and language: AUTO on the left (lichen when on; toggles to the last manual value, 5500 K the first time), a ruler with a tick every 100 K and a label every 500 K, the value in an opaque hairline box with a lichen underline, K on the right. 2500-9000 K, tint 0; a drag ending within ±150 K of 3200, 4000, 5500 or 6500 snaps. A value locks the device WB; AUTO is continuous auto. No lock-current-value. Persisted in the camera settings.
+- **Film door, as built.** Static stock name tiles (name in the display font, brand/ISO caption, selected outlined lichen); no live render of the frame (that path was removed to save finder time).
+- **Aspect.** Settings → ASPECT: 4:3, 3:2, 1:1, 16:9, XPAN 65:24. The crop is centred along the upright frame's long axis, so it is rotation-invariant; the finder shows it, and the saved frame's recipe records it as `crop.rect` + aspect id (the negative stays full frame).
+- **DEVELOP queue.** The library's first card: frames from the camera join automatically when their save lands; long-press to add/remove; queue view newest first with a lichen tick on edited frames, REMOVE DEVELOPED, CLEAR.
 - **Counter while developing.** "DEVELOPING 2" in mono paperDim replaces the counter.
 
 ### 5.3 Landscape
-The finder takes the long side. The meter and lens chips move to the left edge and the shutter column to the right. Only the readouts rotate (`videoRotationAngleForHorizonLevelPreview`), and the chrome reflows. The iOS target already supports landscape.
+The finder takes the long side. The meter and lens chips move to the left edge and the shutter column to the right. The chrome reflows and nothing rotates on its own. The preview angle comes from `AVCaptureDevice.RotationCoordinator(device:previewLayer:)` given the finder's `CAMetalLayer`: without a layer the coordinator answers 0°, which drew the first device build sideways. The capture angle drives the saved photo and the recipe crop. The iOS target already supports landscape.
 
 ### 5.4 Roll views (Roll 2)
 - **ROLLS** is a gallery section: rows of rolls, with the stock name in Cormorant, "36 EXP · 5 NOV" in mono, and UNDEVELOPED or DEVELOPED.

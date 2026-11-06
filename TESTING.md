@@ -229,7 +229,7 @@ Writes `build/contact-sheet.png` (every film) and `build/contact-sheet-effects.p
 
 ### Camera
 
-`MiraCameraKit` has 76 tests in `Packages/MiraCamera/Tests`: `CameraStateTests`, `CaptureSupportTests`, `ExposureTests`, `LensFormatTests`, `SaveTests`, `SettingsFinderTests` and more (retry queue, pending prints, fallback ladder). Run `swift test --package-path Packages/MiraCamera`. The device checklist is under "Camera (iPhone, device only)".
+`MiraCameraKit` has 89 tests in `Packages/MiraCamera/Tests`: `CameraStateTests`, `CaptureSupportTests`, `ExposureTests`, `LensFormatTests`, `SaveTests`, `SettingsFinderTests` and more (retry queue, pending prints, fallback ladder). Run `swift test --package-path Packages/MiraCamera`. The device checklist is under "Camera (iPhone, device only)". iOS: `FinderUprightTests` (pixel check of the rotation sign), `FakeFrameSourceRotationTests`, `CameraLayoutTests` (real safe-area insets; the 3:4 frame fills the width on 402×874), `DevelopQueueTests`; UI tests start on the camera and tap `camera.library` first. Landscape camera snapshot: `CameraOrientationSnapshotTests` with `TEST_RUNNER_MIRA_SNAPSHOT_OUT` (needs a simulator that rotates; the "iPhone Duo" QA sims do not).
 
 ## Manual checklist
 
@@ -254,16 +254,20 @@ The camera cannot be fully tested in the simulator. Simulator tests: `swift test
 
 - [ ] **30 fps gate (first).** On an iPhone 16 Pro, run the finder for 10 minutes with grain LIVE. Read frame time from the Instruments "finder frame" signpost, or from the `MIRA_CAMERA_STATS=1` readout (Camera settings, ADVANCED). Record median, p95 and thermal state. Pass is 30 fps sustained. If it fails, pin the fallback that holds 30 fps (on the Mac and simulator the half-texture level alone did not save time, so AUTO skips it; grain off and 0.75x did, see docs/PERFORMANCE.md) and make it the default.
 - [ ] Capture on a ProRAW phone. Photos shows the edit, Revert to Original works, and the asset is a RAW+HEIC pair.
-- [ ] Tap the last-frame thumbnail. The editor opens on that film with the recipe. Reopen the photo from the gallery and it does the same.
+- [ ] The app launches on the camera. LIBRARY and the last-frame thumbnail open the library; the gallery's CAMERA returns. Reopen a captured frame from the gallery: the editor opens on that film with the recipe.
+- [ ] **Finder upright (beta 2 fix).** Portrait: the scene is upright and the 4:3 frame fills the width (no bands above and below the picture beyond the chrome). Turn to both landscapes: upright again. The meter readout is horizontal and nothing sits under the Dynamic Island.
+- [ ] Tap focus lands where you tapped (portrait and landscape, and with a 1:1 aspect).
+- [ ] Lens chips over the finder are tappable; pinch and hold-to-compare still work.
+- [ ] **Aspect.** Settings → ASPECT 3:2, 1:1, 16:9, XPAN: the finder shows the crop; the captured frame opens in the editor with the same crop in the Crop step (portrait and landscape shots); 4:3 leaves the frame uncropped.
+- [ ] **DEVELOP queue.** A captured frame appears in the DEVELOP card (count and thumbnail); long-press add/remove works on library photos; edited items show the lichen tick; REMOVE DEVELOPED and CLEAR work; the queue survives a relaunch.
 - [ ] Non-ProRAW phone: the HEIC-only path saves and opens the same way.
 - [ ] Limited Photos access: you get the original, a baked copy and a notice.
 - [ ] Volume buttons, the Action button and Camera Control fire on release.
 - [ ] Haptics fire on capture.
 - [ ] The silent shutter toggle appears only where the system supports it, and is off by default.
-- [ ] Rotation: readouts rotate, chrome stays.
 - [ ] Interruptions: a call, Control Center and backgrounding. The finder resumes.
 - [ ] Lens chips and pinch labels match the phone's own (13/24/48/120 on an iPhone 16 Pro).
-- [ ] WB presets and WB lock hold.
+- [ ] **WB dial.** Drag 100 K per step with haptics; a drag ending near 3200/4000/5500/6500 snaps; AUTO toggles to the last manual value and back; the finder colour follows; the value is restored after relaunch.
 - [ ] AE/AF lock holds until released.
 - [ ] Meter: against a bright sky, the needle and UNDER/OVER behave differently on slide film than on negative film.
 - [ ] Quit the app between capture and developed. The next launch attaches the recipe (pending prints).
