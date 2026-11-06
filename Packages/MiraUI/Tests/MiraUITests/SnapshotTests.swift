@@ -30,6 +30,19 @@ struct SnapshotTests {
         try rep.representation(using: .png, properties: [:])!.write(to: dir.appendingPathComponent("\(name).png"))
     }
 
+    /// Renders `view` exactly as `writePNG` does and discards the picture (lays the view out so its cards report `onAppear`).
+    static func renderDiscard<V: View>(_ view: V, size: CGSize, scheme: ColorScheme) {
+        let renderer = ImageRenderer(content:
+            view
+                .frame(width: size.width, height: size.height)
+                .environment(\.ffInlineScroll, true)
+                .environment(\.ffImageCanvas, true)
+                .environment(\.colorScheme, scheme))
+        renderer.scale = 1
+        renderer.proposedSize = ProposedViewSize(size)
+        _ = renderer.cgImage
+    }
+
     enum SnapshotError: Error { case noImage(String) }
 
     static func makeModel() async throws -> EditorModel {
@@ -54,6 +67,7 @@ struct SnapshotTests {
         FieldFramesTheme.registerFonts()
         let model = try await Self.makeModel()
         for (scheme, tag) in [(ColorScheme.dark, "dark"), (.light, "light")] {
+            try await SnapshotSettle.settle(model, warm: { Self.renderDiscard(EditorView(model: model), size: CGSize(width: 1280, height: 800), scheme: scheme) })
             try Self.writePNG(EditorView(model: model), size: CGSize(width: 1280, height: 800), scheme: scheme, name: "editor-\(tag)")
         }
         try Self.writePNG(AboutView(library: model.library, version: "VERSION 0.1.0 (1)"),
@@ -64,10 +78,12 @@ struct SnapshotTests {
             let deadline = Date().addingTimeInterval(30)
             while model.hoverPreviewFilm == nil, Date() < deadline { try await Task.sleep(for: .milliseconds(50)) }
             #expect(model.hoverPreviewFilm?.id == bw.id)
+            try await SnapshotSettle.settle(model, warm: { Self.renderDiscard(EditorView(model: model), size: CGSize(width: 1280, height: 800), scheme: .dark) })
             try Self.writePNG(EditorView(model: model), size: CGSize(width: 1280, height: 800), scheme: .dark, name: "editor-hover-dark")
             model.endHover()
         }
         model.recipe.filmID = nil
+        try await SnapshotSettle.settle(model, warm: { Self.renderDiscard(EditorView(model: model), size: CGSize(width: 1280, height: 800), scheme: .dark) })
         try Self.writePNG(EditorView(model: model), size: CGSize(width: 1280, height: 800), scheme: .dark, name: "editor-original-dark")
         model.recipe.filmID = "fuji-velvia-50"
 
@@ -82,6 +98,7 @@ struct SnapshotTests {
         let canvasBefore = model.previewImage
         while model.previewImage === canvasBefore, Date() < deadline { try await Task.sleep(for: .milliseconds(50)) }
         try await Task.sleep(for: .milliseconds(300))
+        try await SnapshotSettle.settle(model)
         try Self.writePNG(EditorView(model: model).environment(\.ffCropForceGrid, true),
                           size: CGSize(width: 1280, height: 800), scheme: .dark, name: "editor-crop-dark")
         model.cancelCrop()
@@ -101,13 +118,18 @@ struct SnapshotTests {
                 .frame(maxHeight: .infinity, alignment: .top)
         }
         for (scheme, tag) in [(ColorScheme.dark, "dark"), (.light, "light")] {
+            try await SnapshotSettle.settle(model)
             try Self.writePNG(strip(.init(isEnabled: true, action: { _ in })), size: size, scheme: scheme, name: "share-strip-\(tag)")
         }
+        try await SnapshotSettle.settle(model)
         try Self.writePNG(strip(.init(isEnabled: false, action: { _ in })), size: size, scheme: .dark, name: "share-strip-disabled-dark")
-        try Self.writePNG(EditorView(model: model, host: EditorHostBar(
-            onLibrary: {}, status: "UNSAVED", save: .init(isEnabled: true, isSaved: false, action: {}),
-            share: .init(isEnabled: true, action: { _ in }))),
-            size: CGSize(width: 1280, height: 800), scheme: .dark, name: "editor-share-dark")
+        func shareEditor() -> EditorView<EmptyView> {
+            EditorView(model: model, host: EditorHostBar(
+                onLibrary: {}, status: "UNSAVED", save: .init(isEnabled: true, isSaved: false, action: {}),
+                share: .init(isEnabled: true, action: { _ in })))
+        }
+        try await SnapshotSettle.settle(model, warm: { Self.renderDiscard(shareEditor(), size: CGSize(width: 1280, height: 800), scheme: .dark) })
+        try Self.writePNG(shareEditor(), size: CGSize(width: 1280, height: 800), scheme: .dark, name: "editor-share-dark")
         model.cancelWork()
     }
 
@@ -120,10 +142,12 @@ struct SnapshotTests {
         let size = CGSize(width: 1280, height: 800)
 
         model.selectTab(.films)
+        try await SnapshotSettle.settle(model, warm: { Self.renderDiscard(EditorView(model: model, host: host), size: size, scheme: .dark) })
         try Self.writePNG(EditorView(model: model, host: host), size: size, scheme: .dark, name: "editor-tab-films")
 
         model.selectTab(.develop)
         await model.refreshHistogramNow()
+        try await SnapshotSettle.settle(model, warm: { Self.renderDiscard(EditorView(model: model, host: host), size: size, scheme: .dark) })
         try Self.writePNG(EditorView(model: model, host: host), size: size, scheme: .dark, name: "editor-tab-develop")
 
         model.selectTab(.crop)
@@ -133,22 +157,30 @@ struct SnapshotTests {
         let deadline = Date().addingTimeInterval(30)
         while model.previewImage === before, Date() < deadline { try await Task.sleep(for: .milliseconds(50)) }
         try await Task.sleep(for: .milliseconds(300))
-        try Self.writePNG(EditorView(model: model, host: host).environment(\.ffCropForceGrid, true),
-                          size: size, scheme: .dark, name: "editor-tab-crop")
+        try await SnapshotSettle.settle(model, warm: { Self.renderDiscard(EditorView(model: model, host: host).environment(\.ffCropForceGrid, true), size: size, scheme: .dark) })
+        try Self.writePNG(EditorView(model: model, host: host).environment(\.ffCropForceGrid, true), size: size, scheme: .dark, name: "editor-tab-crop")
 
         // Zoomed to 100% with the readout chip, panels hidden (F): only the photo on ink.
         model.selectTab(.films)
         model.setViewport(pane: CGSize(width: 1280, height: 800), fitArea: CGSize(width: 1232, height: 752))
         model.zoomClick(atPane: CGPoint(x: 700, y: 300))
         try await HoverTests.waitFor { model.previewFrame?.placement != nil && model.isPreviewIdle }
+        // The film strip refills its tiles after the earlier crop; without this wait the shot caught them mid-refill.
+        try await HoverTests.waitFor(90) { model.thumbnailsSettled }
+        try await Task.sleep(for: .milliseconds(300))
+        try await SnapshotSettle.settle(model, warm: { Self.renderDiscard(EditorView(model: model, host: host), size: size, scheme: .dark) })
         try Self.writePNG(EditorView(model: model, host: host), size: size, scheme: .dark, name: "editor-zoom-100")
         model.setImmersive(true)
+        try await SnapshotSettle.settle(model, warm: { Self.renderDiscard(EditorView(model: model, host: host), size: size, scheme: .light) })
         try Self.writePNG(EditorView(model: model, host: host), size: size, scheme: .light, name: "editor-immersive")
         model.setImmersive(false)
         model.zoomToFit()
 
         // The extension's bar: tabs only.
         model.selectTab(.films)
+        try await HoverTests.waitFor(90) { model.thumbnailsSettled }
+        try await Task.sleep(for: .milliseconds(300))
+        try await SnapshotSettle.settle(model, warm: { Self.renderDiscard(EditorView(model: model), size: size, scheme: .light) })
         try Self.writePNG(EditorView(model: model), size: size, scheme: .light, name: "editor-tab-films-extension-light")
         model.cancelWork()
     }

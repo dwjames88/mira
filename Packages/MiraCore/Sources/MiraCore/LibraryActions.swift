@@ -340,6 +340,7 @@ public enum LibraryActions {
 }
 
 /// What to import for one duplicated asset.
+// @unchecked Sendable: CLLocation is immutable; the plan is built on one task and read in the change block.
 private struct DuplicatePlan: @unchecked Sendable {
     struct File: Sendable {
         var type: PHAssetResourceType
@@ -353,6 +354,7 @@ private struct DuplicatePlan: @unchecked Sendable {
 }
 
 /// Identifiers produced inside a change block.
+// @unchecked Sendable: `stored` is only touched under `lock`.
 private final class IDSlot: @unchecked Sendable {
     private let lock = NSLock()
     private var stored: [String] = []

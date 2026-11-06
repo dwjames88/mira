@@ -73,7 +73,7 @@ struct RawOpenPolicyTests {
     }
 }
 
-@Suite("RAW asset cache")
+@Suite("RAW asset cache", .rawExclusive)
 struct RawAssetCacheTests {
     @Test func evictsLeastRecentlyUsedAssets() throws {
         let url = try #require(RawSamples.iphoneXS)

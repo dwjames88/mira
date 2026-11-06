@@ -220,6 +220,15 @@ struct AssetInfoFormatterTests {
         #expect(AssetInfoFormatter.shutter(0.8) == "0.8 s")
     }
 
+    @Test func garbageExposureValuesDoNotTrap() {
+        // 1 / 1e-30 and 1e30 overflow Int; corrupt EXIF can carry them.
+        #expect(AssetInfoFormatter.shutter(1e-30) == "0 s")
+        #expect(AssetInfoFormatter.shutter(.leastNonzeroMagnitude) == "0 s")
+        #expect(!AssetInfoFormatter.shutter(1e30).isEmpty)
+        let info = AssetInfo(focalLength: 1e30, fNumber: .infinity)
+        #expect(AssetInfoFormatter.rows(info, timeZone: TimeZone(identifier: "UTC")!).first { $0.label == "EXPOSURE" } != nil)
+    }
+
     @Test func fullInfoRowsInOrder() {
         let info = AssetInfo(
             filename: "IMG_0001.CR3", creationDate: Date(timeIntervalSince1970: 1_793_889_120), cameraName: "Canon EOS R5",

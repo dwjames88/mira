@@ -3,13 +3,20 @@
 # The in-app updater (MiraUpdates) reads the latest GitHub release and expects: tag v<version>, an asset named
 # Mira-<version>.zip holding one top-level Mira.app (the dmg is the fallback), and the release notes as the body.
 # This script checks that contract and prints the `gh release create` command; run that yourself to publish.
-# Usage: scripts/release.sh <version>
+# Usage: scripts/release.sh [--dry-run] <version>
+#   --dry-run  builds and verifies the signed Release app and the zip contract into build/release-dry-run, but writes no
+#              DMG and no release notes and prints no publish command. Nothing is tagged, published or notarized either way.
+# Env: DERIVED  derived-data directory (default: build/DerivedData).
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-VERSION="${1:?usage: scripts/release.sh <version>}"
+DRY_RUN=0
+if [ "${1:-}" = "--dry-run" ]; then DRY_RUN=1; shift; fi
+VERSION="${1:?usage: scripts/release.sh [--dry-run] <version>}"
+DERIVED="${DERIVED:-build/DerivedData}"
 OUT="build/release"
+[ "$DRY_RUN" = 1 ] && OUT="build/release-dry-run"
 APP="$OUT/Mira.app"
 APPEX="$APP/Contents/PlugIns/MiraPhotos.appex"
 VERIFY="$OUT/verify-$VERSION.txt"
@@ -17,12 +24,24 @@ ZIP="$OUT/Mira-$VERSION.zip"
 DMG="$OUT/Mira-$VERSION.dmg"
 NOTES="$OUT/notes-$VERSION.md"
 
+# The release body is the CHANGELOG section for this version; refuse to ship an empty one (checked first: a build takes minutes).
+if ! awk -v v="$VERSION" '$0 ~ "^## \\[" v "\\]" {on=1; next} on && /^## \[/ {exit} on && NF {found=1} END {exit !found}' CHANGELOG.md; then
+  if [ "$DRY_RUN" = 1 ]; then
+    echo "warning: CHANGELOG.md has no '## [$VERSION]' section with content (a real release would stop here)" >&2
+  else
+    echo "error: CHANGELOG.md has no '## [$VERSION]' section with content (rename Unreleased first)" >&2; exit 1
+  fi
+fi
+
+TMPDIRS=()
+trap 'rm -rf "${TMPDIRS[@]+"${TMPDIRS[@]}"}"' EXIT
+
 rm -rf "$OUT"; mkdir -p "$OUT"
 
 xcodegen generate
 # Generic identity name: the project uses automatic signing, and the team ID selects the Jon Wood certificate.
 xcodebuild -project Mira.xcodeproj -scheme Mira -configuration Release \
-  -derivedDataPath build/DerivedData \
+  -derivedDataPath "$DERIVED" \
   CODE_SIGN_IDENTITY="Apple Development" \
   DEVELOPMENT_TEAM=VF945J28YU \
   MIRA_BUNDLE_PREFIX=com.fieldframes \
@@ -30,7 +49,13 @@ xcodebuild -project Mira.xcodeproj -scheme Mira -configuration Release \
   OTHER_CODE_SIGN_FLAGS=--timestamp \
   build
 
-ditto build/DerivedData/Build/Products/Release/Mira.app "$APP"
+ditto "$DERIVED/Build/Products/Release/Mira.app" "$APP"
+# The shipped binaries are stripped of local symbols (project.yml, Release); keep the dSYMs next to the release so
+# crash reports of this exact build can be symbolicated later. They are not part of the zip, DMG or the publish command.
+mkdir -p "$OUT/dSYMs"
+for dsym in "$DERIVED/Build/Products/Release/Mira.app.dSYM" "$DERIVED/Build/Products/Release/MiraPhotos.appex.dSYM"; do
+  if [ -d "$dsym" ]; then ditto "$dsym" "$OUT/dSYMs/$(basename "$dsym")"; fi
+done
 
 BUILT="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")"
 if [ "$BUILT" != "$VERSION" ]; then
@@ -58,13 +83,18 @@ TOP="$(unzip -Z1 "$ZIP" | cut -d/ -f1 | grep -v '^__MACOSX$' | sort -u)"
 if [ "$TOP" != "Mira.app" ]; then
   echo "error: $ZIP must contain exactly Mira.app at the top level, found: $TOP" >&2; exit 1
 fi
-CHECK="$(mktemp -d)"
+CHECK="$(mktemp -d)"; TMPDIRS+=("$CHECK")
 ditto -x -k "$ZIP" "$CHECK"
 codesign --verify --deep --strict -R='anchor apple generic and identifier "com.fieldframes.mira" and certificate leaf[subject.OU] = "VF945J28YU"' "$CHECK/Mira.app"
 rm -rf "$CHECK"
 
-STAGE="$(mktemp -d)"
-trap 'rm -rf "$STAGE"' EXIT
+if [ "$DRY_RUN" = 1 ]; then
+  echo; echo "== dry run: built, verified and zipped $ZIP; no DMG, notes or publish step =="
+  du -h "$ZIP"
+  exit 0
+fi
+
+STAGE="$(mktemp -d)"; TMPDIRS+=("$STAGE")
 ditto "$APP" "$STAGE/Mira.app"
 ln -s /Applications "$STAGE/Applications"
 hdiutil create -volname "Mira $VERSION" -srcfolder "$STAGE" -ov -format UDZO "$DMG"
@@ -86,11 +116,6 @@ hdiutil create -volname "Mira $VERSION" -srcfolder "$STAGE" -ov -format UDZO "$D
 6. Updating from inside Mira (0.3.0 and later): the sandboxed updater cannot clear the quarantine flag on the downloaded app, so macOS may ask once more on the first launch after the update; right-click Mira and choose Open.
 INSTALL
 } > "$NOTES"
-
-# The release body is the CHANGELOG section for this version; refuse to ship an empty one.
-if ! awk -v v="$VERSION" '$0 ~ "^## \\[" v "\\]" {on=1; next} on && /^## \[/ {exit} on && NF {found=1} END {exit !found}' CHANGELOG.md; then
-  echo "error: CHANGELOG.md has no '## [$VERSION]' section with content (rename Unreleased first)" >&2; exit 1
-fi
 
 echo; echo "== artifacts =="
 du -h "$ZIP" "$DMG"

@@ -1,3 +1,4 @@
+import AppKit
 import CoreImage
 import Foundation
 import MiraCore
@@ -67,6 +68,27 @@ struct LazyThumbnailTests {
         // Cards 0...9 were rendered at the start: coming back to them costs nothing.
         try await Task.sleep(for: .milliseconds(300))
         #expect(model.engine.thumbnailRenderCount == renders + 4 + 2 * EditorModel.thumbnailPrefetch)
+        model.cancelWork()
+    }
+
+    /// Tiles are published in 60 ms batches. A run cancelled by a scroll leaves finished tiles in the per-crop
+    /// cache that it never published; the next run does not render them again (they are cached), so it must show them.
+    @Test func cachedTilesAreShownWhenARunWasCancelledBeforePublishingThem() async throws {
+        let cache = Self.tempCache()
+        defer { try? FileManager.default.removeItem(at: cache.directory) }
+        let model = try Self.makeModel(cache: cache)
+        try await HoverTests.waitFor(120) { model.thumbnailsSettled }
+        let cards = model.visibleFilms.map(\.id)
+        let id = cards[cards.count / 2]
+        #expect(model.thumbnails[id] == nil)
+        let stranded = NSImage(size: NSSize(width: 4, height: 4))
+        model.thumbnailCache[model.recipe.crop, default: [:]][id] = stranded
+        model.cardAppeared(id)
+        try await HoverTests.waitFor(30) { model.thumbnails[id] != nil }
+        #expect(model.thumbnails[id] === stranded)
+        // The tiles around it render, and the stranded one is not replaced.
+        try await HoverTests.waitFor(120) { model.thumbnailsSettled }
+        #expect(model.thumbnails[id] === stranded)
         model.cancelWork()
     }
 

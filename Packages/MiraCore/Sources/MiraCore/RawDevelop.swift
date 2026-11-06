@@ -175,6 +175,7 @@ public enum RawSettingsMapper {
 /// `outputImage` again, which is lazy and cheap. Calls are serialised with a lock, so one instance
 /// may be used from any thread. Preview decodes use draft mode and a reduced `scaleFactor`; export
 /// uses neither (see `ImageSource.developedSource`).
+// @unchecked Sendable: every access to the CIRAWFilter and the headroom cache is under `lock`; the other properties are immutable lets.
 public final class RawDevelop: @unchecked Sendable {
     private let filter: CIRAWFilter
     private let lock = NSLock()
@@ -232,6 +233,9 @@ public final class RawDevelop: @unchecked Sendable {
         var filmApplied: Bool
     }
     private var headroomCache: [HeadroomKey: CGFloat] = [:]
+    /// Dragging a RAW slider with a film on measures one headroom per distinct setting; the cache is
+    /// emptied past this many so a long session does not grow it without bound (a miss only re-measures).
+    private static let headroomCacheLimit = 256
 
     /// The upright image for `settings`. `draft` favours speed (previews); `scale` < 1 decodes smaller.
     /// The image is tagged with its headroom (`CIImage.miraHeadroom`).
@@ -256,6 +260,7 @@ public final class RawDevelop: @unchecked Sendable {
                 headroom = hit
             } else {
                 headroom = measureHeadroom(settings, filmApplied: filmApplied)
+                if headroomCache.count >= Self.headroomCacheLimit { headroomCache.removeAll() }
                 headroomCache[key] = headroom
             }
         }

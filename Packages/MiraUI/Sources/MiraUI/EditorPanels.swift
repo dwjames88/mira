@@ -32,17 +32,67 @@ struct SliderGroup: Identifiable {
     var id: String { title }
 }
 
+/// A slider that is handed its number. The section view reads the recipe once and builds one of these per
+/// slider; SwiftUI skips every one whose own number and settings did not change. A slider that read the recipe in
+/// its own body was re-evaluated (label, readout, track, thumb) by every tick of every other slider.
+///
+/// `get` and `set` are what the gestures use, so they must reach the model, never a copy of `shown`. Anything they
+/// captures that can change while the compared fields stay equal must go into `context`: a skipped slider keeps
+/// the closures it was first built with.
+struct RecipeSlider: View, Equatable {
+    let label: String
+    let shown: Double
+    let range: ClosedRange<Double>
+    let defaultValue: Double
+    let decimals: Int
+    let snap: Double?
+    /// Shows "Auto" instead of the number (a RAW setting that is not set).
+    let isAuto: Bool
+    let context: Int
+    let get: () -> Double
+    let set: (Double) -> Void
+
+    init(label: String, shown: Double, range: ClosedRange<Double>, defaultValue: Double, decimals: Int = 2,
+         snap: Double? = nil, isAuto: Bool = false, context: Int = 0, get: @escaping () -> Double, set: @escaping (Double) -> Void) {
+        self.label = label
+        self.shown = shown
+        self.range = range
+        self.defaultValue = defaultValue
+        self.decimals = decimals
+        self.snap = snap
+        self.isAuto = isAuto
+        self.context = context
+        self.get = get
+        self.set = set
+    }
+
+    nonisolated static func == (l: RecipeSlider, r: RecipeSlider) -> Bool {
+        let sameSettings = l.label == r.label && l.range == r.range && l.defaultValue == r.defaultValue
+            && l.decimals == r.decimals && l.snap == r.snap && l.isAuto == r.isAuto
+        guard sameSettings, l.shown == r.shown else { return false }
+        return l.context == r.context
+    }
+
+    var body: some View {
+        let _ = PerfCounters.recipeSlider += 1
+        FFSlider(label, shown: shown, get: get, set: set, in: range, default: defaultValue, decimals: decimals, snap: snap,
+                 format: isAuto ? { _ in "Auto" } : nil)
+    }
+}
+
 private struct SpecSliders: View {
     @Bindable var model: EditorModel
     let specs: [SliderSpec]
 
     var body: some View {
+        let recipe = model.recipe
         ForEach(specs) { spec in
-            FFSlider(spec.label,
-                     value: Binding(get: { model.recipe[keyPath: spec.keyPath] },
-                                    set: { model.recipe[keyPath: spec.keyPath] = $0 }),
-                     in: spec.range, default: spec.defaultValue)
-            .help(spec.help ?? "")
+            RecipeSlider(label: spec.label, shown: recipe[keyPath: spec.keyPath], range: spec.range,
+                         defaultValue: spec.defaultValue, context: spec.id.hashValue,
+                         get: { model.recipe[keyPath: spec.keyPath] },
+                         set: { model.recipe[keyPath: spec.keyPath] = $0 })
+                .equatable()
+                .help(spec.help ?? "")
         }
     }
 }
@@ -447,6 +497,7 @@ struct DevelopPanel: View {
     }
 
     var body: some View {
+        let _ = PerfCounters.developPanel += 1
         VStack(spacing: 0) {
             FFScrollView {
                 VStack(alignment: .leading, spacing: 0) {
@@ -479,11 +530,7 @@ struct DevelopPanel: View {
                             .help("Removing the anti-halation backing lets highlights bleed red")
                     }
                     label(.frame)
-                    FFToggle("Border", isOn: $model.recipe.borderEnabled)
-                        .padding(.bottom, 8)
-                    if model.recipe.borderEnabled {
-                        sliders(.frame)
-                    }
+                    BorderControls(model: model, sliders: sliders(.frame))
                 }
                 .padding(.horizontal, T.cells(2))
                 .padding(.bottom, T.rows(1))
@@ -503,27 +550,45 @@ struct DevelopPanel: View {
     }
 }
 
+/// FRAME: the border toggle and, while it is on, the border sliders. Its own view so that reading
+/// `borderEnabled` does not make the whole Develop panel depend on the recipe.
+private struct BorderControls<Sliders: View>: View {
+    @Bindable var model: EditorModel
+    let sliders: Sliders
+
+    var body: some View {
+        FFToggle("Border", isOn: $model.recipe.borderEnabled)
+            .padding(.bottom, 8)
+        if model.recipe.borderEnabled {
+            sliders
+        }
+    }
+}
+
 /// WHITE BALANCE: one temperature (kelvin) and tint pair for every photo, and "As shot" to clear both.
 private struct WhiteBalanceSliders: View {
     @Bindable var model: EditorModel
 
     var body: some View {
         let wb = WhiteBalanceControl(isRaw: model.isRawSource, asShot: model.rawAsShot)
-        FFSlider("Temperature (K)",
-                 value: Binding(get: { wb.temperature(of: model.recipe) },
-                                set: { wb.setTemperature($0, in: &model.recipe) }),
-                 in: wb.kelvinRange, default: wb.kelvinDefault, decimals: 0, snap: WhiteBalanceControl.kelvinSnap)
+        let recipe = model.recipe
+        RecipeSlider(label: "Temperature (K)", shown: wb.temperature(of: recipe), range: wb.kelvinRange,
+                     defaultValue: wb.kelvinDefault, decimals: 0, snap: WhiteBalanceControl.kelvinSnap, context: wb.hashValue,
+                     get: { wb.temperature(of: model.recipe) },
+                     set: { wb.setTemperature($0, in: &model.recipe) })
+            .equatable()
             .help(wb.isRaw ? "White balance in kelvin; the camera's value until you change it"
                            : "Warmer or cooler, in kelvin from a 6500 K neutral")
-        FFSlider("Tint",
-                 value: Binding(get: { wb.tint(of: model.recipe) },
-                                set: { wb.setTint($0, in: &model.recipe) }),
-                 in: wb.tintRange, default: wb.tintDefault, decimals: 0, snap: WhiteBalanceControl.tintSnap)
+        RecipeSlider(label: "Tint", shown: wb.tint(of: recipe), range: wb.tintRange, defaultValue: wb.tintDefault,
+                     decimals: 0, snap: WhiteBalanceControl.tintSnap, context: wb.hashValue,
+                     get: { wb.tint(of: model.recipe) },
+                     set: { wb.setTint($0, in: &model.recipe) })
+            .equatable()
         HStack {
             Spacer()
             Button("As shot") { WhiteBalanceControl.resetToAsShot(&model.recipe) }
                 .buttonStyle(.ff)
-                .disabled(wb.isAsShot(model.recipe))
+                .disabled(wb.isAsShot(recipe))
                 .help("Back to the camera's white balance")
         }
         .padding(.bottom, 8)

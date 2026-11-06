@@ -92,10 +92,14 @@ do {
 } catch { out("live", "FAILED \(error)"); exit(1) }
 SWIFT
 
-# The tag's own version, from its Info.plist source of truth (project.yml MARKETING_VERSION), else the tag name.
+# The version to pretend to run: the tag name without its "v" (set MIRA_COMPAT_CURRENT to override).
 TAGVER="${TAG#v}"
 case "$SRC" in live) ARG2=live ;; *) ARG2="$(cd "$(dirname "$SRC")" && pwd)/$(basename "$SRC")" ;; esac
 echo "== $TAG: building its MiraUpdates sources =="
-(cd "$WORK/cli" && swift build -c release --quiet 2>&1 | grep -E "error|warning: unre" || true)
+# A failed build must stop the script (the grep alone used to hide it and the run died on a missing binary).
+if ! (cd "$WORK/cli" && swift build -c release --quiet) >"$WORK/build.log" 2>&1; then
+  grep -E "error" "$WORK/build.log" >&2 || tail -20 "$WORK/build.log" >&2
+  echo "error: building $TAG's MiraUpdates failed" >&2; exit 1
+fi
 echo "== $TAG: result =="
 "$WORK/cli/.build/release/compat" "$TAGVER" "$ARG2"

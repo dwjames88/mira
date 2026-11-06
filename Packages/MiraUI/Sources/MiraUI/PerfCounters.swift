@@ -6,5 +6,7 @@ import Foundation
 enum PerfCounters {
     static var filmStrip = 0
     static var filmCard = 0
-    static var panels = 0
+    static var slider = 0
+    static var recipeSlider = 0
+    static var developPanel = 0
 }

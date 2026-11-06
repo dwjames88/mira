@@ -174,6 +174,7 @@ struct DodgeBurnUITests {
         let plain = try rgb(0.5, 0.5), plainFar = try rgb(0.05, 0.05)
         model.setMaskOverlay(true)
         try await Self.settle(model)
+        try await SnapshotSettle.settle(model)
         let wash = try rgb(0.5, 0.5), washFar = try rgb(0.05, 0.05)
         #expect(wash.r > wash.b + 0.2 && wash.r > plain.r)
         #expect(abs(washFar.r - plainFar.r) < 0.002 && abs(washFar.b - plainFar.b) < 0.002)
@@ -298,7 +299,7 @@ struct DodgeBurnUITests {
         model.toggleStrokeHidden(model.recipe.dodgeBurn.strokes[2].id)
         model.selectStroke(model.recipe.dodgeBurn.strokes[1].id)
         try await Self.settle(model)
-        await model.refreshHistogramNow()
+        try await SnapshotSettle.settle(model)
         for scheme in [ColorScheme.dark, .light] {
             let tag = scheme == .dark ? "dark" : "light"
             try SnapshotTests.writePNG(
@@ -309,6 +310,7 @@ struct DodgeBurnUITests {
         try SnapshotTests.writePNG(EditorView(model: model), size: size, scheme: .dark, name: "dodgeburn-editor-dark")
         model.setMaskOverlay(true)
         try await Self.settle(model)
+        try await SnapshotSettle.settle(model)
         try SnapshotTests.writePNG(EditorView(model: model), size: size, scheme: .dark, name: "dodgeburn-mask-overlay-dark")
         model.cancelWork()
     }

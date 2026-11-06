@@ -22,6 +22,7 @@ public enum FFGrain {
     /// Specks as white (for ink) or black (for paper) on transparent, premultiplied RGBA.
     public static func tile(white: Bool) -> CGImage { white ? cache.white : cache.black }
 
+    // @unchecked Sendable: immutable after the one-time build; CGImage is immutable.
     private struct Cache: @unchecked Sendable {
         let mask: [UInt8]
         let white: CGImage

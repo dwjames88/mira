@@ -167,7 +167,7 @@ struct DevelopQueueView: View {
             var byID: [String: PHAsset] = [:]
             fetched.enumerateObjects { asset, _, _ in byID[asset.localIdentifier] = asset }
             let ordered = ids.compactMap { byID[$0] }
-            let done = Set(ordered.filter { GalleryKit.badges(of: Unchecked(value: $0)).edited }.map(\.localIdentifier))
+            let done = Set(ordered.filter { GalleryKit.isEdited(Unchecked(value: $0)) }.map(\.localIdentifier))
             return (ordered.map { Unchecked(value: $0) }, done)
         }.value
         guard !Task.isCancelled else { return }

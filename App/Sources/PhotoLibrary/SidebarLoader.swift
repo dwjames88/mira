@@ -89,7 +89,7 @@ enum SidebarLoader {
                            count: imageCount(in: collection, includeHidden: includeHidden))
     }
 
-    nonisolated static func load() -> [SidebarSection] { loadAll().sections }
+    nonisolated static func load() -> [SidebarSection] { loadAll(withAlbumEntries: false).sections }
 
     /// The user's albums flattened out of the snapshot tree (counts already fetched for the sidebar, so
     /// this adds no second counting pass), with each album's capabilities.
@@ -108,7 +108,9 @@ enum SidebarLoader {
         return entries
     }
 
-    nonisolated static func loadAll() -> (sections: [SidebarSection], albums: [AlbumEntry]) {
+    /// `withAlbumEntries: false` skips the per-album capability lookups (one PhotoKit fetch each) for callers that
+    /// only want the sections.
+    nonisolated static func loadAll(withAlbumEntries: Bool = true) -> (sections: [SidebarSection], albums: [AlbumEntry]) {
         // LIBRARY
         var library = [
             SidebarNode(id: "all", title: "Library", kind: .library,
@@ -165,7 +167,7 @@ enum SidebarLoader {
 
         let sections = SidebarModel.sections(library: library, albums: albums, shared: shared,
                                              mediaTypes: media, utilities: utilities)
-        return (sections, albumEntries(from: tree))
+        return (sections, withAlbumEntries ? albumEntries(from: tree) : [])
     }
 
     /// The pictures of a sidebar node ("all", "fav", "recent", "smart:<raw>" or an album id), with the filter's fetch criteria.

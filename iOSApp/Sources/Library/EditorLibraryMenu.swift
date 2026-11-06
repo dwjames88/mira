@@ -11,6 +11,7 @@ final class EditorFavoriteWatcher: NSObject, PHPhotoLibraryChangeObserver {
     private(set) var isFavorite = false
     @ObservationIgnored private var assetID: String?
     @ObservationIgnored private var observing = false
+    @ObservationIgnored private var refreshTask: Task<Void, Never>?
 
     func watch(_ id: String?) {
         assetID = id
@@ -21,10 +22,12 @@ final class EditorFavoriteWatcher: NSObject, PHPhotoLibraryChangeObserver {
     func set(_ value: Bool) { isFavorite = value }
 
     func refresh() {
+        refreshTask?.cancel()
         guard let id = assetID else { isFavorite = false; return }
-        Task { [weak self] in
+        // Only the newest read may apply: an older one finishing late would show a stale heart.
+        refreshTask = Task { [weak self] in
             let value = await Task.detached { LibraryActions.isFavorite(id: id) }.value
-            guard let self, assetID == id else { return }
+            guard !Task.isCancelled, let self, assetID == id else { return }
             isFavorite = value ?? false
         }
     }

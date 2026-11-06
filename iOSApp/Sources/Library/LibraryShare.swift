@@ -11,6 +11,8 @@ enum LibraryShare {
     struct Prepared: Sendable {
         var urls: [URL]
         var truncated: Bool
+        /// The temporary folder holding `urls`; removed once the share sheet closes (or when nothing is shared).
+        var directory: URL
     }
 
     /// Writes the current image data of up to `cap` assets to temporary files. Runs off the main actor.
@@ -19,6 +21,7 @@ enum LibraryShare {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("mira-share-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         var urls: [URL] = []
+        var taken = Set<String>()
         let options = PHFetchOptions()
         options.includeHiddenAssets = true
         for (n, id) in chosen.enumerated() {
@@ -27,10 +30,14 @@ enum LibraryShare {
             let ext = uti.flatMap { UTType($0)?.preferredFilenameExtension } ?? "jpg"
             let name = PHAssetResource.assetResources(for: asset).first?.originalFilename
             let base = name.map { ($0 as NSString).deletingPathExtension } ?? "Mira-\(n + 1)"
-            let url = directory.appendingPathComponent("\(base).\(ext)")
+            // A picture and its duplicate share an original filename: the second must not overwrite the first.
+            var file = "\(base).\(ext)"
+            var copy = 2
+            while !taken.insert(file.lowercased()).inserted { file = "\(base) \(copy).\(ext)"; copy += 1 }
+            let url = directory.appendingPathComponent(file)
             if (try? data.write(to: url)) != nil { urls.append(url) }
         }
-        return Prepared(urls: urls, truncated: ids.count > chosen.count)
+        return Prepared(urls: urls, truncated: ids.count > chosen.count, directory: directory)
     }
 
     private nonisolated static func requestData(_ asset: Unchecked<PHAsset>) async -> (Data, String?)? {
@@ -49,11 +56,14 @@ enum LibraryShare {
 
     /// Presents the system share sheet from the top view controller; deletes the temp files when it closes.
     @MainActor
-    static func present(urls: [URL]) {
-        guard let top = topViewController() else { return }
+    static func present(urls: [URL], directory: URL) {
+        guard let top = topViewController() else {
+            try? FileManager.default.removeItem(at: directory)
+            return
+        }
         let controller = UIActivityViewController(activityItems: urls, applicationActivities: nil)
         controller.completionWithItemsHandler = { @Sendable _, _, _, _ in
-            for url in urls { try? FileManager.default.removeItem(at: url) }
+            try? FileManager.default.removeItem(at: directory)
         }
         controller.popoverPresentationController?.sourceView = top.view
         controller.popoverPresentationController?.sourceRect = CGRect(x: top.view.bounds.midX, y: top.view.bounds.maxY - 1, width: 1, height: 1)

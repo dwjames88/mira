@@ -83,6 +83,14 @@ private func identityHald(level: Int) -> CGImage {
         }
     }
 
+    /// "nan" parses as a Float; it must be refused, not carried into the cube (it would trap the 16-bit cache writer).
+    @Test func cubeRejectsNaNSamples() {
+        var text = "LUT_3D_SIZE 2\n"
+        for i in 0..<8 { text += i == 5 ? "0 nan 1\n" : "0 0 0\n" }
+        #expect(throws: LUTError.self) { try LUT.parseCube(text) }
+        #expect(throws: LUTError.self) { try LUT.parseCube("DOMAIN_MAX nan 1 1\nLUT_3D_SIZE 2\n") }
+    }
+
     @Test func haldIdentity() throws {
         for level in [2, 4] {
             let lut = try LUT.loadHald(cgImage: identityHald(level: level))

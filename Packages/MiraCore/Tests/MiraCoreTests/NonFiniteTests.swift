@@ -138,7 +138,7 @@ enum SweepSupport {
     }
 }
 
-@Suite(.serialized) struct DevelopSweepTests {
+@Suite(.serialized, .rawExclusive) struct DevelopSweepTests {
     static let urls = [RawSamples.iphoneXS, RawSamples.iphone12Pro, RawSamples.sony].compactMap { $0 }
 
     @Test(arguments: urls)

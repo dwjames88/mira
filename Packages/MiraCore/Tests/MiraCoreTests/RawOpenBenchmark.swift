@@ -6,7 +6,7 @@ import Testing
 
 /// Open-time measurements for RAW files. Skipped unless `MIRA_BENCH_RAW=1` (it prints, it does not assert
 /// speed). `MIRA_RAW_DIR` points at the folder holding sony-ilce7m3.arw. Medians of 3 runs, milliseconds.
-@Suite("RAW open benchmark", .serialized)
+@Suite("RAW open benchmark", .serialized, .rawExclusive)
 struct RawOpenBenchmark {
     static var enabled: Bool { ProcessInfo.processInfo.environment["MIRA_BENCH_RAW"] == "1" }
 
@@ -36,6 +36,18 @@ struct RawOpenBenchmark {
         defer { buffer.deallocate() }
         RawSamples.context.render(image, toBitmap: buffer, rowBytes: rowBytes, bounds: e, format: .RGBAh, colorSpace: space)
         return e.size
+    }
+
+    /// Round 3: `ImageSource.load` / `developedSource` no longer re-read the exposure time of a RAW that
+    /// `RawDevelop` already tagged. This times the removed read (one `exposureTime(url:)`) next to the load.
+    @Test(arguments: ["iphone-xs.dng", "sony-ilce7m3.arw"])
+    func exposureReadVersusLoad(_ name: String) throws {
+        guard Self.enabled else { return }
+        let url = try #require(RawSamples.url(name))
+        let read = Self.timed { _ = ImageSource.exposureTime(url: url) }
+        let load = Self.timed { _ = ImageSource.load(url: url) }
+        let developed = Self.timed { _ = ImageSource.developedSource(url: url, recipe: Recipe.neutral, draft: true) }
+        print("RAWBENCH exposure \(name): removed read \(read) | ImageSource.load (lazy) \(load) | developedSource draft \(developed)")
     }
 
     @Test(arguments: ["iphone-xs.dng", "sony-ilce7m3.arw"])

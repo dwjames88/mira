@@ -114,6 +114,10 @@ public struct Renderer: Sendable {
     /// export all share it, so its shaders, caches and Metal queue are warm. `CIContext` is thread safe.
     public static let sharedContext: CIContext = makeContext()
 
+    /// The context that decodes and resamples sources into the preview bitmaps (`PreviewEngine.materialise`), so a
+    /// lazy RAW decode never runs under `sharedContext`'s lock. Same configuration, created on first use.
+    public static let decodeContext: CIContext = makeContext()
+
     /// Builds a new context (tests and benchmarks that need a specific configuration).
     public static func makeContext(cacheIntermediates: Bool = false) -> CIContext {
         let options: [CIContextOption: Any] = [

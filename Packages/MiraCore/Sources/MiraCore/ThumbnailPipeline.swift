@@ -33,6 +33,7 @@ public struct GridThumbnailKey: Hashable, Sendable {
 
 /// Counts what the grid asks of PhotoKit, so "no thumbnail churn" can be asserted in tests and read
 /// in the log (`thumbs requested=N cached=M ...`, subsystem `com.fieldframes.mira`, category `thumbs`).
+/// `@unchecked Sendable`: `counts` is only read or written with `lock` held.
 public final class ThumbnailMetrics: @unchecked Sendable {
     public struct Snapshot: Equatable, Sendable {
         /// Thumbnail image requests actually sent to PhotoKit.

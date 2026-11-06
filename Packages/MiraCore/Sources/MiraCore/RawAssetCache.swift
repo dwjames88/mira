@@ -7,6 +7,7 @@ import ImageIO
 /// decoder state) and the developed draft proxy (a half-float linear bitmap at preview size, so showing
 /// it needs no decode) are kept for the last few assets. Bounded by asset count and by bytes; the least
 /// recently used asset goes first.
+// @unchecked Sendable: `entries` and `order` are only touched under `lock`.
 public final class RawAssetCache: @unchecked Sendable {
     public static let shared = RawAssetCache(capacity: 6, byteBudget: 400 << 20)
 
@@ -110,6 +111,7 @@ public final class RawAssetCache: @unchecked Sendable {
 // MARK: - Opening
 
 public enum RawOpener {
+    // @unchecked Sendable: CIImage and RawDevelop are immutable or internally locked; the frame is a value handed to one consumer.
     public struct Frame: @unchecked Sendable {
         public var develop: RawDevelop
         public var source: DevelopedSource

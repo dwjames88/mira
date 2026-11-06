@@ -5,6 +5,7 @@ import ImageIO
 /// A developed photo together with the largest linear value it holds (1 for SDR; a RAW decoded with
 /// extended dynamic range reports its measured peak, capped at 8). The renderer's exposure stage
 /// maps `headroom` to white through the film's shoulder instead of clipping.
+// @unchecked Sendable: CIImage is immutable; the struct is a pair of values.
 public struct DevelopedSource: @unchecked Sendable {
     public var image: CIImage
     public var headroom: CGFloat
@@ -68,10 +69,9 @@ extension ImageSource {
             return load(url: url, orientation: orientation).map { DevelopedSource(image: $0) }
         }
         let scale = draft ? develop.previewScale() : 1
-        let result = develop.develop(recipe.raw, filmApplied: recipe.filmID != nil, draft: draft, scale: scale)
+        // Both branches are already tagged with the exposure time: `RawDevelop.develop` with the one it read
+        // when it opened the file, `load` with its own read. A third read of the file would add nothing.
+        return develop.develop(recipe.raw, filmApplied: recipe.filmID != nil, draft: draft, scale: scale)
             ?? load(url: url, orientation: orientation).map { DevelopedSource(image: $0) }
-        guard var developed = result else { return nil }
-        developed.image = developed.image.withMiraExposureTime(exposureTime(url: url))
-        return developed
     }
 }

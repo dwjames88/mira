@@ -9,6 +9,7 @@ import Photos
 /// actor explicitly with the values these helpers hand back.
 enum PhotoKitBridge {
     /// Lock-protected slot for a value produced inside a change block.
+    // @unchecked Sendable: the only state is `stored`, guarded by `lock`.
     final class Slot<Value: Sendable>: @unchecked Sendable {
         private let lock = NSLock()
         private var stored: Value?

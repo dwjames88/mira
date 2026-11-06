@@ -155,6 +155,25 @@ import Testing
         #expect(PresetStore(directory: dir).all == [p])
     }
 
+    /// A file that cannot be read this time (permissions, a replace mid-read) is not an empty store: the presets
+    /// already loaded stay, and the file is read again once it can be.
+    @Test func unreadableFileKeepsLoadedPresetsAndIsRetried() throws {
+        let dir = Self.tempDir()
+        let store = PresetStore(directory: dir)
+        let p = try store.add(nickname: "Keep", recipe: .neutral, filmName: nil)
+        let file = dir.appendingPathComponent("Presets.json")
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: file.path) }
+        // Change the stamp (so a reload is attempted), then make the read fail.
+        try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-3600)], ofItemAtPath: file.path)
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: file.path)
+        guard (try? Data(contentsOf: file)) == nil else { return }   // running as a user who can read anyway
+        #expect(store.all == [p])
+        #expect(store.all == [p])
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: file.path)
+        #expect(store.all == [p])
+        #expect(PresetStore(directory: dir).all == [p])
+    }
+
     @Test func oneBadEntryDoesNotHideTheRest() throws {
         let dir = Self.tempDir()
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

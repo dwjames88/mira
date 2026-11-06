@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import XCTest
+@testable import Mira
 
 /// A phone screen the layout is rendered at, in points. Insets stand in for the status bar / Dynamic
 /// Island and home indicator, which an offscreen host does not have.
@@ -68,5 +69,22 @@ enum Snapshot {
             try? png.write(to: outputDir.appendingPathComponent("\(name)-\(device.name).png"))
         }
         return image
+    }
+}
+
+extension EditorViewModel {
+    /// Round 3: waits until the histogram of the open photo has been computed and has stopped changing, so a Develop panel
+    /// snapshot does not catch the empty or the previous histogram (it is recomputed off the main actor after every
+    /// recipe change, 100 ms after the change at the earliest). Test code only.
+    @MainActor
+    func settleHistogram(quiet: Duration = .milliseconds(400), timeout: Duration = .seconds(30)) async {
+        let start = ContinuousClock.now
+        var last = histogram
+        var stableSince = ContinuousClock.now
+        while start.duration(to: .now) < timeout {
+            try? await Task.sleep(for: .milliseconds(50))
+            if histogram != last { last = histogram; stableSince = .now }
+            if last != .empty, stableSince.duration(to: .now) >= quiet { return }
+        }
     }
 }

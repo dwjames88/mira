@@ -265,6 +265,12 @@ public struct FFSlider: View {
     private let snap: Double?
     private let format: ((Double) -> String)?
 
+    /// The number the body draws, when the caller read it already (`init(_:shown:live:...)`); nil reads `value`.
+    private let displayed: Double?
+    /// The gestures' read and write in that form. Closures, not a `Binding`: a `Binding` stored in a view is a
+    /// dependency SwiftUI re-checks on every update, which would bring back the re-evaluations this form avoids.
+    private let liveGet: (() -> Double)?
+    private let liveSet: ((Double) -> Void)?
     @FocusState private var focused: Bool
     @State private var dragging = false
     @State private var hovering = false
@@ -279,13 +285,38 @@ public struct FFSlider: View {
         self.range = range
         self.defaultValue = defaultValue
         self.decimals = decimals
+        self.displayed = nil
+        self.liveGet = nil
+        self.liveSet = nil
     }
+
+    /// A slider whose caller hands in the number to draw (`shown`) and closures for the gestures (`get`, `set`). The
+    /// body then never reads the model, so it is re-evaluated only when its inputs change, not by every change to
+    /// whatever `get` reads (see `RecipeSlider`). `get` must return the current value, not `shown`: the gestures
+    /// compare against it to skip writes that change nothing.
+    init(_ label: String, shown: Double, get: @escaping () -> Double, set: @escaping (Double) -> Void,
+         in range: ClosedRange<Double>, default defaultValue: Double, decimals: Int = 2, snap: Double? = nil,
+         format: ((Double) -> String)? = nil) {
+        self.snap = snap
+        self.format = format
+        self.label = label
+        self._value = .constant(shown)
+        self.range = range
+        self.defaultValue = defaultValue
+        self.decimals = decimals
+        self.displayed = shown
+        self.liveGet = get
+        self.liveSet = set
+    }
+
+    /// What the body draws.
+    private var shownValue: Double { displayed ?? value }
 
     private var span: Double { range.upperBound - range.lowerBound }
     private func fraction(_ v: Double) -> Double { span > 0 ? min(1, max(0, (v - range.lowerBound) / span)) : 0 }
     /// The fill starts at zero when the range straddles it, otherwise at the minimum.
     private var origin: Double { range.lowerBound < 0 && range.upperBound > 0 ? 0 : range.lowerBound }
-    private var readout: String { format?(value) ?? value.formatted(.number.precision(.fractionLength(decimals))) }
+    private var readout: String { format?(shownValue) ?? shownValue.formatted(.number.precision(.fractionLength(decimals))) }
     private var step: Double { snap ?? span / 20 }
 
     private var keyStep: Double { snap ?? step / 5 }
@@ -293,10 +324,19 @@ public struct FFSlider: View {
     private func set(_ v: Double) {
         let clamped = min(range.upperBound, max(range.lowerBound, v))
         let rounded = snap.map { (clamped / $0).rounded() * $0 } ?? (clamped * 100).rounded() / 100
-        if rounded != value { value = rounded }
+        if rounded != current { write(rounded) }
+    }
+
+    /// The value the gestures compare against: live, never the one the body drew.
+    private var current: Double { liveGet?() ?? value }
+    private func write(_ v: Double) {
+        if let liveSet { liveSet(v) } else { value = v }
     }
 
     public var body: some View {
+        let _ = PerfCounters.slider += 1
+        // Formatted once: `readout` runs a number formatter, and the body used it for the text and the accessibility value.
+        let readout = self.readout
         VStack(spacing: 0) {
             HStack {
                 Text(label)
@@ -308,7 +348,7 @@ public struct FFSlider: View {
                 Text(readout)
                     .font(T.mono(10))
                     .monospacedDigit()
-                    .foregroundStyle(value == defaultValue ? T.paperDim : T.paper)
+                    .foregroundStyle(shownValue == defaultValue ? T.paperDim : T.paper)
             }
             .frame(height: T.rows(1))
             track
@@ -320,8 +360,8 @@ public struct FFSlider: View {
         .accessibilityValue(readout)
         .accessibilityAdjustableAction { direction in
             switch direction {
-            case .increment: set(value + step)
-            case .decrement: set(value - step)
+            case .increment: set(current + step)
+            case .decrement: set(current - step)
             @unknown default: break
             }
         }
@@ -333,7 +373,7 @@ public struct FFSlider: View {
             let thumb: CGFloat = 8
             let usable = max(1, geo.size.width - thumb)
             let x = { (v: Double) in thumb / 2 + usable * fraction(v) }
-            let a = x(origin), b = x(value)
+            let a = x(origin), b = x(shownValue)
             ZStack(alignment: .leading) {
                 Rectangle().fill(T.hair).frame(height: 2)
                 Rectangle().fill(T.lichen)
@@ -362,10 +402,10 @@ public struct FFSlider: View {
         .focusable()
         .focused($focused)
         .focusEffectDisabled()
-        .onKeyPress(.leftArrow) { set(value - keyStep); return .handled }
-        .onKeyPress(.rightArrow) { set(value + keyStep); return .handled }
-        .onKeyPress(.downArrow) { set(value - keyStep); return .handled }
-        .onKeyPress(.upArrow) { set(value + keyStep); return .handled }
+        .onKeyPress(.leftArrow) { set(current - keyStep); return .handled }
+        .onKeyPress(.rightArrow) { set(current + keyStep); return .handled }
+        .onKeyPress(.downArrow) { set(current - keyStep); return .handled }
+        .onKeyPress(.upArrow) { set(current + keyStep); return .handled }
     }
 }
 

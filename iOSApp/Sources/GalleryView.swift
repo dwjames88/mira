@@ -200,7 +200,8 @@ private struct AlbumListView: View {
                     CoverTile(gallery: gallery, node: node, size: CGSize(width: side, height: side), titleSize: 17)
                 }
                 .buttonStyle(.plain)
-                .albumContextMenu(node: node, tools: albumTools, limited: gallery.status == .limited)
+                .albumContextMenu(node: node, tools: albumTools, limited: gallery.status == .limited,
+                                  known: gallery.albumCapabilities[node.id])
             }
         }
         .padding(.horizontal, padded ? margin : 0)
@@ -290,6 +291,8 @@ private struct CoverImage: View {
     }
 
     private func load() async {
+        // A request left over from the previous cover of this tile must not land after the new one.
+        if let id = requestID { gallery.covers.manager.cancelImageRequest(id); requestID = nil }
         guard let nodeID else { image = nil; return }
         let store = gallery.covers
         let pixels = CGSize(width: size.width * displayScale, height: size.height * displayScale)
@@ -535,11 +538,21 @@ private struct GalleryCell: View {
     private func refresh(_ key: GridThumbnailKey) {
         loader.update(key, asset: asset, pipeline: album.thumbnails)
         guard badgeKey?.id != key.id || badgeKey?.version != key.version else { return }
+        let otherAsset = badgeKey?.id != key.id
         badgeKey = key
+        if let hit = album.cachedBadges(id: key.id, version: key.version) { badges = hit; return }
+        // A cell handed another asset must not keep showing the previous one's badges while these load.
+        if otherAsset { badges = (false, false) }
         let boxed = Unchecked(value: asset)
+        let id = key.id, version = key.version
         Task.detached(priority: .utility) {
             let found = GalleryKit.badges(of: boxed)
-            await MainActor.run { badges = found }
+            await MainActor.run {
+                album.storeBadges(found, id: id, version: version)
+                // The cell may have been rebound to another asset while this was read.
+                guard badgeKey?.id == id, badgeKey?.version == version else { return }
+                badges = found
+            }
         }
     }
 }
