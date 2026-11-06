@@ -268,26 +268,30 @@ struct WBDial: View {
             let perK = Double(pointsPerStep) / Double(WhiteBalanceModel.step)
             let halfSpan = Int(geo.size.width / 2 / pointsPerStep) + 1
             ZStack {
-                // Ticks every 100 K; labels every 500 K, hidden under the readout.
+                // Ticks every 100 K (subtle); labels every 500 K, dim, hidden near the centre box.
                 ForEach(-halfSpan...halfSpan, id: \.self) { i in
                     let k = (Int(center) / WhiteBalanceModel.step + i) * WhiteBalanceModel.step
                     if WhiteBalanceModel.range.contains(k) {
                         let x = (Double(k) - center) * perK
                         let major = k % 500 == 0
-                        Rectangle().fill(major ? T.paperDim : T.hair)
-                            .frame(width: 1, height: major ? 8 : 4)
-                            .offset(x: x, y: 14)
-                        if major, abs(x) > 34 {
-                            Text("\(k)").ffLabel(size: 9, color: T.paperDim).fixedSize()
-                                .offset(x: x, y: -9)
+                        Rectangle().fill(T.hair)
+                            .frame(width: 1, height: major ? 4 : 2)
+                            .offset(x: x, y: 16)
+                        if major, abs(x) > 46 {
+                            Text(String(k)).ffLabel(size: 11, color: T.paperDim).fixedSize()
+                                .offset(x: x)
                         }
                     }
                 }
-                .opacity(kelvin == nil ? 0.4 : 1)
-                Rectangle().stroke(T.hair, lineWidth: 1).frame(width: 118, height: 22).offset(y: -9)
-                Text(readout).ffLabel(size: 11, color: kelvin == nil ? T.paperDim : T.paper, weight: .medium)
-                    .fixedSize().offset(y: -9)
-                Rectangle().fill(T.lichen).frame(width: 16, height: 2).offset(y: 17)
+                .opacity(kelvin == nil ? 0.5 : 1)
+                // The current value, as in the EV dial: a hairline box (opaque, hiding the ruler under it) with a lichen underline.
+                ZStack {
+                    Rectangle().fill(T.ink)
+                    Rectangle().stroke(T.hair, lineWidth: 1)
+                    Text(readout).ffLabel(size: 13, color: kelvin == nil ? T.paperDim : T.paper, weight: .medium).fixedSize()
+                }
+                .frame(width: 64, height: 28)
+                Rectangle().fill(T.lichen).frame(width: 16, height: 2).offset(y: 12)
             }
             .frame(width: geo.size.width, height: 40)
             .clipped()
@@ -307,7 +311,7 @@ struct WBDial: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("White balance")
-        .accessibilityValue(kelvin.map { "\($0) Kelvin" } ?? "Auto")
+        .accessibilityValue(kelvin.map { k in "\(k) Kelvin" + (WhiteBalanceModel.preset(at: k).map { ", \($0.name.lowercased())" } ?? "") } ?? "Auto")
         .accessibilityAdjustableAction { direction in
             let current = kelvin ?? WhiteBalanceModel.startKelvin
             switch direction {
@@ -319,8 +323,7 @@ struct WBDial: View {
     }
 
     private var readout: String {
-        guard let kelvin else { return "\u{2014}" }
-        return WhiteBalanceModel.preset(at: kelvin).map { "\(kelvin) \u{00B7} \($0.name)" } ?? "\(kelvin)"
+        kelvin.map { String($0) } ?? "AUTO"
     }
 }
 
