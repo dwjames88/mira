@@ -90,17 +90,14 @@ actor PhotoEngine {
         small = nil
     }
 
-    /// Small copies of the source for the histogram (480 px) and the film cards (220 px), materialised on first use and
-    /// kept. Left lazy, every histogram tick (about 10 Hz while a slider moves) and every card would scale the whole
-    /// source down again. Made here, not when the source is handed over, so opening a photo does not wait for them.
+    /// Small copies of the source for the histogram (480 px) and the film cards (220 px), made on first use and kept.
+    /// They stay lazy scale-down graphs: rendering them to a bitmap once would be faster per tick (measured 2x) but
+    /// shifts the histogram and card pixels by a few levels, so it is left as a proposal.
     private func smallCopies() -> (histogram: CIImage, thumb: CIImage)? {
         if let small { return small }
         guard let renderer, let source else { return nil }
-        func make(_ side: CGFloat) -> CIImage {
-            Self.tagged(PreviewProxy.make(from: source, renderer: renderer, context: Renderer.sharedContext, wanted: side),
-                        like: source)
-        }
-        let made = (histogram: make(480), thumb: make(220))
+        let made = (histogram: Self.tagged(renderer.previewImage(from: source, maxPixelSize: 480), like: source),
+                    thumb: Self.tagged(renderer.previewImage(from: source, maxPixelSize: 220), like: source))
         small = made
         return made
     }

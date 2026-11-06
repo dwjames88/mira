@@ -136,8 +136,8 @@ final class EditorLifecycleTests: XCTestCase {
         await engine.discard(upTo: 1)
     }
 
-    /// The film cards' small copy is made once and kept; it must look like the scale-down it replaces (a lazy Lanczos
-    /// of the source, graded and encoded the same way).
+    /// The film cards' small copy is made once and kept; it must be exactly the scale-down a card used before (a lazy
+    /// Lanczos of the source, graded and encoded the same way).
     func testMaterialisedThumbnailMatchesTheLazyScale() async throws {
         let data = try jpeg(width: 1600, height: 1200)
         let engine = PhotoEngine()
@@ -160,8 +160,8 @@ final class EditorLifecycleTests: XCTestCase {
         XCTAssertEqual(a.w, b.w); XCTAssertEqual(a.h, b.h)
         var worst = 0, total = 0
         for i in 0..<a.px.count { let d = abs(Int(a.px[i]) - Int(b.px[i])); worst = max(worst, d); total += d }
-        XCTAssertLessThanOrEqual(worst, 2, "max level difference")
-        XCTAssertLessThan(Double(total) / Double(a.px.count), 0.05, "mean level difference")
+        XCTAssertEqual(worst, 0, "max level difference")
+        XCTAssertEqual(total, 0, "total level difference")
         await engine.discard(upTo: 1)
     }
 }
