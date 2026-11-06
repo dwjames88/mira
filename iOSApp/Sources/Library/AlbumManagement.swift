@@ -138,11 +138,14 @@ extension View {
         modifier(AlbumToolsModifier(tools: tools))
     }
 
-    /// Long-press RENAME / DELETE ALBUM on a user-album tile. Capabilities are read when the menu opens.
-    func albumContextMenu(node: SidebarNode, tools: AlbumToolsModel, limited: Bool) -> some View {
+    /// Long-press RENAME / DELETE ALBUM on a user-album tile. `known` is the capability set the album list
+    /// already loaded off the main actor; without it (an album that list does not cover) PhotoKit is asked.
+    /// `contextMenu` runs its closure with every body pass, so the fallback is the only PhotoKit read here.
+    func albumContextMenu(node: SidebarNode, tools: AlbumToolsModel, limited: Bool,
+                          known: AlbumCapabilities? = nil) -> some View {
         contextMenu {
             if node.kind == .album, LibraryActionAvailability.canManageAlbums(limitedAccess: limited),
-               let caps = LibraryActions.albumCapabilities(id: node.id) {
+               let caps = known ?? LibraryActions.albumCapabilities(id: node.id) {
                 if caps.canRename {
                     Button { tools.rename(id: node.id, title: node.title) } label: { Label("RENAME", systemImage: "pencil") }
                 }

@@ -26,7 +26,6 @@ private struct LibraryCellModifier: ViewModifier {
     let asset: PHAsset
     let limited: Bool
     let showsFavorite: Bool
-    private let develop = DevelopStore.shared
 
     func body(content: Content) -> some View {
         let id = asset.localIdentifier
@@ -38,22 +37,37 @@ private struct LibraryCellModifier: ViewModifier {
             .overlay { if selected { LibrarySelectedOverlay() } }
             .accessibilityAddTraits(selected ? .isSelected : [])
             .contextMenu {
+                // `contextMenu` runs this closure with every body pass; the items (an availability pass and a
+                // Develop-queue lookup per cell) are built by the view below, when the menu is shown.
                 if !library.isSelecting {
-                    ForEach(library.items(for: asset, limited: limited)) { item in
-                        Button(role: item.isDestructive ? .destructive : nil) {
-                            library.perform(item.action, on: [id], fromSelection: false)
-                        } label: {
-                            Label(item.title, systemImage: item.systemImage)
-                        }
-                    }
-                    Divider()
-                    let queued = develop.contains(id)
-                    Button { develop.toggle(id) } label: {
-                        Label(queued ? "Remove from Develop" : "Add to Develop",
-                              systemImage: queued ? "minus.circle" : "plus.circle")
-                    }
+                    LibraryCellMenuItems(library: library, asset: asset, limited: limited)
                 }
             }
+    }
+}
+
+/// The long-press menu of one cell.
+private struct LibraryCellMenuItems: View {
+    let library: GallerySelectionModel
+    let asset: PHAsset
+    let limited: Bool
+    private let develop = DevelopStore.shared
+
+    var body: some View {
+        let id = asset.localIdentifier
+        ForEach(library.items(for: asset, limited: limited)) { item in
+            Button(role: item.isDestructive ? .destructive : nil) {
+                library.perform(item.action, on: [id], fromSelection: false)
+            } label: {
+                Label(item.title, systemImage: item.systemImage)
+            }
+        }
+        Divider()
+        let queued = develop.contains(id)
+        Button { develop.toggle(id) } label: {
+            Label(queued ? "Remove from Develop" : "Add to Develop",
+                  systemImage: queued ? "minus.circle" : "plus.circle")
+        }
     }
 }
 

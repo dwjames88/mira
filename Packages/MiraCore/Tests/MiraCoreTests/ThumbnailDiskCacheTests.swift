@@ -44,6 +44,21 @@ import Testing
         #expect(names.count == 9)
     }
 
+    /// A cache folder that cannot be created (a file is in the way) must cost nothing but the cache: no trap, no
+    /// throw, loads miss.
+    @Test func unwritableFolderIsHarmless() throws {
+        let blocker = Self.tempDir()
+        try Data("x".utf8).write(to: blocker)
+        defer { try? FileManager.default.removeItem(at: blocker) }
+        let cache = ThumbnailDiskCache(directory: blocker.appendingPathComponent("Thumbnails"))
+        let k = key("a")
+        cache.store(Self.solid(64, 48, 0.5), key: k)
+        #expect(cache.load(k) == nil)
+        #expect(!cache.contains(k))
+        cache.trim()
+        #expect(cache.totalBytes == 0)
+    }
+
     @Test func sourceHashFollowsPixelsAndCropNotIdentity() throws {
         let a = try engine(Self.solid(600, 400, 0.5))
         let same = try engine(Self.solid(600, 400, 0.5))

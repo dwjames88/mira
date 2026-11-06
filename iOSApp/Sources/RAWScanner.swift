@@ -30,7 +30,12 @@ enum RAWScan {
     }
 
     nonisolated static func isRAW(_ asset: PHAsset) -> Bool {
-        RAWResourceClassifier.isRAW(PHAssetResource.assetResources(for: asset).map(ResourceFields.init))
+        isRAW(resources: PHAssetResource.assetResources(for: asset))
+    }
+
+    /// Same rule on resources already read, so a caller that also needs them reads them once.
+    nonisolated static func isRAW(resources: [PHAssetResource]) -> Bool {
+        RAWResourceClassifier.isRAW(resources.map(ResourceFields.init))
     }
 
     private struct ResourceFields: RAWResourceDescribing {
@@ -137,11 +142,6 @@ final class RAWChangeTracker: @unchecked Sendable {
     nonisolated func prime() {
         lock.lock(); defer { lock.unlock() }
         if result == nil { result = PHAsset.fetchAssets(with: SidebarLoader.imageOptions()) }
-    }
-
-    /// Identifiers of changed or removed images, or nil when the change cannot be itemised (clear everything).
-    nonisolated func invalidatedIDs(for change: PHChange) -> [String]? {
-        inspect(change).invalidated
     }
 
     /// What a change did to the library's pictures: which ids to forget (nil: everything) and whether

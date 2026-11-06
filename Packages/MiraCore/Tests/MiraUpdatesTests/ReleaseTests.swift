@@ -69,5 +69,13 @@ struct ReleaseTests {
         #expect(ReleaseNotes.parse("Plain line one\nline two\n\n- a\n  wrapped") ==
                 [.paragraph("Plain line one line two"), .bullet("a wrapped")])
     }
+
+    /// A body edited on github.com has CRLF line endings; "\r\n" is one Character, so splitting on "\n" alone missed it.
+    @Test func notesDropTheInstallBoilerplateFromCRLFBodies() {
+        let body = "### Fixed\r\n- A bug.\r\n\r\n## Install\r\n\r\n1. Download the DMG.\r\n"
+        let notes = ReleaseNotes.updateNotes(from: body)
+        #expect(notes == "### Fixed\n- A bug.")
+        #expect(ReleaseNotes.parse(notes) == [.heading("Fixed"), .bullet("A bug.")])
+    }
 }
 #endif

@@ -220,7 +220,8 @@ public enum PackedLUT {
 
     // MARK: Decode
 
-    public static func unpackSamples(_ data: Data) throws -> (dimension: Int, rgb: [UInt16]) {
+    /// Parses the header and decompresses the payload: the raw (still transformed) bytes.
+    private static func decodePayload(_ data: Data) throws -> (n: Int, transform: Transform, raw: [UInt8]) {
         guard data.count >= headerSize else { throw PackedLUTError.corrupt("truncated header") }
         let b = [UInt8](data.prefix(headerSize))
         guard Array(b[0..<4]) == magic else { throw PackedLUTError.notPacked }
@@ -236,18 +237,58 @@ public enum PackedLUT {
         let texels = n * n * n
         guard rawLength == texels * 6 else { throw PackedLUTError.corrupt("payload length \(rawLength)") }
 
-        var raw = [UInt8](repeating: 0, count: rawLength)
-        let produced = data.withUnsafeBytes { buf -> Int in
-            let src = buf.bindMemory(to: UInt8.self)
-            return compression_decode_buffer(&raw, rawLength, src.baseAddress! + headerSize, src.count - headerSize, nil, codec.algorithm)
+        var produced = 0
+        let raw = [UInt8](unsafeUninitializedCapacity: rawLength) { dst, count in
+            produced = data.withUnsafeBytes { buf -> Int in
+                let src = buf.bindMemory(to: UInt8.self)
+                return compression_decode_buffer(dst.baseAddress!, rawLength, src.baseAddress! + headerSize, src.count - headerSize, nil, codec.algorithm)
+            }
+            count = produced   // a short or failed decode throws below; never exposes bytes the decoder did not write
         }
         guard produced == rawLength else { throw PackedLUTError.corrupt("payload decompresses to \(produced) bytes") }
+        return (n, transform, raw)
+    }
+
+    public static func unpackSamples(_ data: Data) throws -> (dimension: Int, rgb: [UInt16]) {
+        let (n, transform, raw) = try decodePayload(data)
         return (n, inverse(raw, n: n, transform: transform))
     }
 
+    /// The cube the app uses: `dimension^3` RGBA Float32 texels (alpha 1), each sample scaled by 1/65535.
+    /// Equal, byte for byte, to `LUT(dimension:rgb16:)` of `unpackSamples`, without the intermediate arrays.
     public static func unpack(_ data: Data) throws -> LUT {
-        let (n, rgb) = try unpackSamples(data)
-        return LUT(dimension: n, rgb16: rgb)
+        let (n, transform, raw) = try decodePayload(data)
+        let texels = n * n * n
+        let scale: Float = 1.0 / 65535.0
+        var cube = Data(count: texels * 16)
+        cube.withUnsafeMutableBytes { dstRaw in
+            let dst = dstRaw.bindMemory(to: Float.self).baseAddress!
+            for i in 0..<texels { dst[i * 4 + 3] = 1 }
+            raw.withUnsafeBufferPointer { src in
+                if transform == .standard {
+                    // Left predictor, split byte planes, no zigzag: a running sum along each red row.
+                    for c in 0..<3 {
+                        let lo = src.baseAddress! + c * texels * 2, hi = lo + texels
+                        var i = 0
+                        for _ in 0..<(n * n) {
+                            var sum: UInt16 = 0
+                            for _ in 0..<n {
+                                sum = sum &+ (UInt16(lo[i]) | UInt16(hi[i]) << 8)
+                                dst[i * 4 + c] = Float(sum) * scale
+                                i += 1
+                            }
+                        }
+                    }
+                } else {
+                    var plane = [UInt16](repeating: 0, count: texels)
+                    for c in 0..<3 {
+                        inversePlane(src, n: n, transform: transform, channel: c, into: &plane)
+                        for i in 0..<texels { dst[i * 4 + c] = Float(plane[i]) * scale }
+                    }
+                }
+            }
+        }
+        return LUT(dimension: n, data: cube)
     }
 
     // MARK: Transform
@@ -311,23 +352,33 @@ public enum PackedLUT {
         let texels = n * n * n
         var rgb = [UInt16](repeating: 0, count: texels * 3)
         var plane = [UInt16](repeating: 0, count: texels)
-        for c in 0..<3 {
-            plane.withUnsafeMutableBufferPointer { p in
-                var i = 0
-                for b in 0..<n { for g in 0..<n { for r in 0..<n {
-                    var d: UInt16
-                    if t.split {
-                        d = UInt16(raw[c * texels * 2 + i]) | UInt16(raw[c * texels * 2 + texels + i]) << 8
-                    } else {
-                        d = UInt16(raw[(i * 3 + c) * 2]) | UInt16(raw[(i * 3 + c) * 2 + 1]) << 8
-                    }
-                    if t.zigzag { d = unzig(d) }
-                    p[i] = d &+ predict(UnsafePointer(p.baseAddress!), i, r, g, b, n, t.predictor)
-                    i += 1
-                } } }
+        raw.withUnsafeBufferPointer { src in
+            for c in 0..<3 {
+                inversePlane(src, n: n, transform: t, channel: c, into: &plane)
+                for i in 0..<texels { rgb[i * 3 + c] = plane[i] }
             }
-            for i in 0..<texels { rgb[i * 3 + c] = plane[i] }
         }
         return rgb
+    }
+
+    /// Undoes the transform for one colour channel: the `n`^3 samples of `channel` into `plane`.
+    private static func inversePlane(
+        _ raw: UnsafeBufferPointer<UInt8>, n: Int, transform t: Transform, channel c: Int, into plane: inout [UInt16]
+    ) {
+        let texels = n * n * n
+        plane.withUnsafeMutableBufferPointer { p in
+            var i = 0
+            for b in 0..<n { for g in 0..<n { for r in 0..<n {
+                var d: UInt16
+                if t.split {
+                    d = UInt16(raw[c * texels * 2 + i]) | UInt16(raw[c * texels * 2 + texels + i]) << 8
+                } else {
+                    d = UInt16(raw[(i * 3 + c) * 2]) | UInt16(raw[(i * 3 + c) * 2 + 1]) << 8
+                }
+                if t.zigzag { d = unzig(d) }
+                p[i] = d &+ predict(UnsafePointer(p.baseAddress!), i, r, g, b, n, t.predictor)
+                i += 1
+            } } }
+        }
     }
 }

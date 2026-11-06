@@ -90,7 +90,7 @@ final class GallerySelectionModel {
         let ids = selection.ids
         guard !ids.isEmpty else { allFavorite = false; allHidden = false; return }
         flagsTask = Task { [weak self] in
-            let flags = await Task.detached(priority: .userInitiated) { Self.flags(of: ids) }.value
+            let flags = await GalleryKit.detached(priority: .userInitiated) { Self.flags(of: ids) }
             guard !Task.isCancelled, let self else { return }
             allFavorite = flags.favorite
             allHidden = flags.hidden
@@ -104,6 +104,8 @@ final class GallerySelectionModel {
         guard result.count > 0 else { return (false, false) }
         var favorite = true, hidden = true
         for index in 0..<result.count {
+            // A newer tap supersedes this read (its caller drops the answer): stop walking a long selection.
+            if index % 512 == 0, Task.isCancelled { break }
             let asset = result.object(at: index)
             if !asset.isFavorite { favorite = false }
             if !asset.isHidden { hidden = false }
@@ -243,8 +245,12 @@ final class GallerySelectionModel {
         preparing = min(ids.count, LibraryShare.cap)
         let result = await LibraryShare.prepare(ids: ids)
         preparing = nil
-        if result.urls.isEmpty { show("NOTHING TO SHARE"); return }
+        if result.urls.isEmpty {
+            try? FileManager.default.removeItem(at: result.directory)
+            show("NOTHING TO SHARE")
+            return
+        }
         if result.truncated { show("SHARING THE FIRST \(LibraryShare.cap)") }
-        LibraryShare.present(urls: result.urls)
+        LibraryShare.present(urls: result.urls, directory: result.directory)
     }
 }

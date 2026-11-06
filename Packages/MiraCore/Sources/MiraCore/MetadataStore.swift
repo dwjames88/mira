@@ -5,13 +5,17 @@ import Foundation
 /// Storage is JSON lines, one entry per line, appended in batches; a later line for the same id wins when
 /// the file is loaded, and the file is compacted (rewritten atomically) when it has accumulated many
 /// superseded lines. A truncated or corrupt line is skipped, so a crash mid-write loses at most that line.
+// @unchecked Sendable: `entries` and `touched` are under `lock`; the file is only touched under `fileLock`.
 public final class MetadataStore: @unchecked Sendable {
     public static let formatVersion = 1
     private let lock = NSLock()
+    /// Serialises everything that touches the file (append, compact, remove). Appends seek to the end and
+    /// then write, so two at once could overwrite each other's lines, and a compaction renames a new file
+    /// over the one an append is writing to. Never taken while holding `lock`; `lock` may be taken inside it.
+    private let fileLock = NSLock()
     private var entries: [String: AssetMetadata] = [:]
     private var touched: Set<String> = []
     private let fileURL: URL?
-    private var lineCount = 0
 
     /// `fileURL` nil keeps the store in memory only (tests, previews).
     public init(fileURL: URL?) {
@@ -54,7 +58,6 @@ public final class MetadataStore: @unchecked Sendable {
             entries[entry.id] = entry
             touched.insert(entry.id)
         }
-        lineCount += batch.count
         lock.unlock()
         append(batch)
     }
@@ -64,9 +67,11 @@ public final class MetadataStore: @unchecked Sendable {
         lock.lock()
         entries = [:]
         touched = []
-        lineCount = 0
         lock.unlock()
-        if let fileURL { try? FileManager.default.removeItem(at: fileURL) }
+        if let fileURL {
+            fileLock.lock(); defer { fileLock.unlock() }
+            try? FileManager.default.removeItem(at: fileURL)
+        }
     }
 
     // MARK: Persistence
@@ -74,7 +79,11 @@ public final class MetadataStore: @unchecked Sendable {
     /// Reads the file; returns the number of entries loaded. Skips corrupt lines and compacts when worthwhile.
     @discardableResult
     public func load() -> Int {
-        guard let fileURL, let data = try? Data(contentsOf: fileURL) else { return 0 }
+        guard let fileURL else { return 0 }
+        fileLock.lock()
+        let contents = try? Data(contentsOf: fileURL)
+        fileLock.unlock()
+        guard let data = contents else { return 0 }
         let decoder = Self.decoder()
         var loaded: [String: AssetMetadata] = [:]
         var lines = 0
@@ -84,7 +93,6 @@ public final class MetadataStore: @unchecked Sendable {
         }
         lock.lock()
         entries = loaded
-        lineCount = lines
         lock.unlock()
         if lines > loaded.count + max(1000, loaded.count / 2) { compact() }
         return loaded.count
@@ -93,6 +101,8 @@ public final class MetadataStore: @unchecked Sendable {
     /// Rewrites the file with one line per entry.
     public func compact() {
         guard let fileURL else { return }
+        fileLock.lock(); defer { fileLock.unlock() }
+        // The snapshot is taken inside the file lock, so every entry appended before this point is in it.
         lock.lock()
         let snapshot = Array(entries.values)
         lock.unlock()
@@ -104,12 +114,12 @@ public final class MetadataStore: @unchecked Sendable {
         do {
             try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             try out.write(to: fileURL, options: .atomic)
-            lock.lock(); lineCount = snapshot.count; lock.unlock()
         } catch {}
     }
 
     private func append(_ batch: [AssetMetadata]) {
         guard let fileURL else { return }
+        fileLock.lock(); defer { fileLock.unlock() }
         let encoder = Self.encoder()
         var out = Data()
         for entry in batch {
