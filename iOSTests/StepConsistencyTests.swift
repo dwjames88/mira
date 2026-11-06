@@ -135,24 +135,14 @@ final class StepConsistencyTests: XCTestCase {
         return bitmap(lanczos.outputImage!, live.ciContext, rect: CGRect(x: 0, y: 0, width: 48, height: 32))
     }
 
-    /// What the Metal view puts on screen for the model's current state: `LivePreview.render` into an offscreen
-    /// texture of the drawable's size (the same call `MetalPreviewView.draw` makes), read back as RGBA.
+    /// What the Metal view puts on screen for the model's current state: `LivePreview.render` into a real
+    /// CAMetalLayer drawable of the drawable's size (the same call, on the same kind of texture, as
+    /// `MetalPreviewView.draw`), read back as RGBA with the top row first. Core Image writes a drawable top-row-first
+    /// but a plain offscreen texture bottom-row-first, so only a drawable shows what the screen shows.
     func appFrame(_ model: EditorViewModel, size: CGSize, scale: CGFloat, zoom: CGFloat = 1) -> Bitmap {
-        let live = model.live
-        let w = Int(size.width), h = Int(size.height)
-        let d = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: w, height: h, mipmapped: false)
-        d.usage = [.shaderRead, .shaderWrite, .renderTarget]
-        d.storageMode = .shared
-        let tex = live.device!.makeTexture(descriptor: d)!
-        let cb = live.commandQueue!.makeCommandBuffer()!
-        live.render(into: tex, commandBuffer: cb, recipe: model.liveRecipe, cropping: false, showingOriginal: false,
-                    zoom: zoom, offset: .zero, contentScale: scale, ink: Self.ink)
-        cb.commit()
-        cb.waitUntilCompleted()
-        var px = [UInt8](repeating: 0, count: w * h * 4)
-        tex.getBytes(&px, bytesPerRow: w * 4, from: MTLRegionMake2D(0, 0, w, h), mipmapLevel: 0)
-        for i in stride(from: 0, to: px.count, by: 4) { px.swapAt(i, i + 2) }   // BGRA -> RGBA
-        return Bitmap(w: w, h: h, px: px)
+        let frame = DrawableCanvas.render(model.live, size: size, recipe: model.liveRecipe, zoom: zoom,
+                                          contentScale: scale, ink: Self.ink)!
+        return Bitmap(w: frame.w, h: frame.h, px: frame.px)
     }
 
     func graded(_ model: EditorViewModel, zoom: CGFloat = 1) -> Bitmap {
@@ -351,6 +341,18 @@ extension StepConsistencyTests {
         let d = diff(staged, bitmap(lazy, m.live.ciContext, rect: CGRect(origin: .zero, size: size)))
         print("STAGED vs lazy: mean \(d.mean) max \(d.max)")
         XCTAssertLessThan(d.mean, 0.5, "the stage must neither flip nor shift nor re-tone the picture")
+        // The lazy frame is rendered with `render(toBitmap:)` (top row first, CI flipped for us), the staged frame
+        // through a drawable: they agree only if both are upright. Also check the sample's own orientation: the
+        // sunset has bright sky on top and dark trees below.
+        func luma(_ b: Bitmap, rows: Range<Int>) -> Double {
+            var sum = 0.0, n = 0.0
+            for y in rows { for x in (b.w / 4)..<(3 * b.w / 4) { let i = (y * b.w + x) * 4
+                sum += 0.3 * Double(b.px[i]) + 0.59 * Double(b.px[i + 1]) + 0.11 * Double(b.px[i + 2]); n += 1 } }
+            return sum / n
+        }
+        let band = staged.h / 5
+        let top = luma(staged, rows: band..<(2 * band)), bottom = luma(staged, rows: (3 * band)..<(4 * band))
+        XCTAssertGreaterThan(top, bottom, "sample.jpg: bright sky above dark ground (top \(top), bottom \(bottom))")
     }
 }
 
