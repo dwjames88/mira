@@ -518,9 +518,16 @@ final class EditorViewModel {
         guard hasPhoto, thumbnails[key] == nil, !thumbInFlight.contains(key) else { return }
         thumbInFlight.insert(key)
         let epoch = thumbEpoch
-        if let data = try? await engine.renderThumbnail(filmID: id), let img = UIImage(data: data),
-           epoch == thumbEpoch {
-            thumbnails[key] = img
+        // A render that fails (the GPU busy, the source not handed over yet) is tried once more: nothing else asks
+        // again for this card until the thumbnails are discarded, so a single miss would leave its tile blank.
+        for attempt in 0..<2 {
+            if let data = try? await engine.renderThumbnail(filmID: id), let img = UIImage(data: data) {
+                if epoch == thumbEpoch { thumbnails[key] = img }
+                break
+            }
+            guard attempt == 0, !Task.isCancelled, epoch == thumbEpoch else { break }
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled, epoch == thumbEpoch else { break }
         }
         if epoch == thumbEpoch { thumbInFlight.remove(key) }
     }
