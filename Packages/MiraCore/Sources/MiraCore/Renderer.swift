@@ -436,10 +436,9 @@ public struct Renderer: Sendable {
         guard abs(recipe.warmth) > eps || abs(recipe.tint) > eps else { return image }
         let f = CIFilter.temperatureAndTint()
         f.inputImage = image
-        f.neutral = CIVector(x: 6500, y: 0)
-        f.targetNeutral = CIVector(
-            x: 6500 - 1500 * clamp(recipe.warmth, -1, 1),
-            y: -40 * clamp(recipe.tint, -1, 1))
+        f.neutral = CIVector(x: PipelineWhiteBalance.neutralKelvin, y: 0)
+        let target = PipelineWhiteBalance.targetNeutral(warmth: recipe.warmth, tint: recipe.tint)
+        f.targetNeutral = CIVector(x: target.temperature, y: target.tint)
         return f.outputImage ?? image
     }
 

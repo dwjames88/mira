@@ -4,39 +4,6 @@ import SwiftUI
 
 private typealias T = FieldFramesTheme
 
-/// A `Double?` setting shown as a slider: while the setting is nil ("as shot" / "Auto") the slider sits
-/// at `fallback`, and moving it back onto `fallback` (which double-clicking the label does) clears it.
-enum OptionalValue {
-    static func binding(get: @escaping () -> Double?, set: @escaping (Double?) -> Void,
-                        fallback: Double, tolerance: Double = 0.005) -> Binding<Double> {
-        // Binding's closures are @Sendable in the macOS 26 SDK, but SwiftUI only calls them on the main
-        // actor, which is where the caller's closures (which touch the editor model) live.
-        nonisolated(unsafe) let get = get
-        nonisolated(unsafe) let set = set
-        return Binding(get: { get() ?? fallback },
-                       set: { new in set(abs(new - fallback) <= tolerance ? nil : new) })
-    }
-}
-
-/// Which RAW controls to show for the open photo.
-struct RawControlVisibility: Equatable {
-    var isRaw: Bool
-    var localToneMap: Bool
-    var luminanceNoiseReduction: Bool
-    var colorNoiseReduction: Bool
-    var sharpness: Bool
-    var lensCorrection: Bool
-
-    init(isRaw: Bool, supported s: RawSupportedControls) {
-        self.isRaw = isRaw
-        localToneMap = isRaw && s.localToneMap
-        luminanceNoiseReduction = isRaw && s.luminanceNoiseReduction
-        colorNoiseReduction = isRaw && s.colorNoiseReduction
-        sharpness = isRaw && s.sharpness
-        lensCorrection = isRaw && s.lensCorrection
-    }
-}
-
 extension EditorModel {
     var rawControlVisibility: RawControlVisibility {
         RawControlVisibility(isRaw: isRawSource, supported: rawSupportedControls)
