@@ -4,11 +4,11 @@
 
 Mira is an original film-emulation app for macOS. It ships as a **Photos editing extension**, so you can apply a film look to any picture from inside Photos, plus a **host app** that browses your Photos library and also edits files from disk. There is no watermark, no paywall and no account.
 
-Status: v1.0.0. See [CHANGELOG.md](CHANGELOG.md) for what changed. See [TESTING.md](TESTING.md) for what has and has not been verified, and [docs/ROADMAP.md](docs/ROADMAP.md) for what comes next.
+Status: v1.0.1. See [CHANGELOG.md](CHANGELOG.md) for what changed. See [TESTING.md](TESTING.md) for what has and has not been verified, and [docs/ROADMAP.md](docs/ROADMAP.md) for what comes next.
 
 ## Install
 
-1. Download `Mira-1.0.0.dmg` (or the `.zip`) from the release page and drag **Mira** to Applications.
+1. Download `Mira-1.0.1.dmg` (or the `.zip`) from the release page and drag **Mira** to Applications.
 2. Mira is signed with a free Personal Team development certificate. There is no Developer ID and it is not notarized, so on other Macs macOS blocks the first launch. Right-click Mira, choose Open, then Open again. Or try to open it once, then go to System Settings ▸ Privacy & Security and click "Open Anyway".
 3. Development-signed builds may refuse to run at all on a Mac that is not registered to the signing team. If so, build from source (see Build and run the Mac app: Xcode, XcodeGen and your own team ID in `Local.xcconfig`) and run `scripts/install.sh`.
 4. Enable the extension in System Settings ▸ General ▸ Login Items & Extensions ▸ Photos Editing ▸ Mira, and grant Photos access on first launch.
@@ -16,30 +16,30 @@ Status: v1.0.0. See [CHANGELOG.md](CHANGELOG.md) for what changed. See [TESTING.
 
 ## Features
 
-- 264 bundled film looks, shown as 86 stock cards: 260 from the RawTherapee Film Simulation Collection by Pat David and contributors (CC BY-SA 4.0) and 4 Mira originals generated in code (500T Tungsten, 250D Daylight, Cinema Print, Color Paper; no affiliation with Kodak or Fujifilm). The other 178 looks are push/pull and tone variants of a stock (for example Pro 160C −1 or Portra 400 NC) and are chosen with the Variant picker in the FILMS panel. Families (stocks, variants): Color Negative 26 (46), Slide 15 (3), Kodachrome 3 (1), Black & White 22 (18), Instant 16 (110), Motion Picture 2 (0), Print 2 (0); all seven family tabs are populated. The Motion Picture and Print stocks are Mira originals because no freely licensed data exists for them (the print and picturefx folders of the cyangraphics/NatronGitHub clut repository and G'MIC's Fuji X-Trans III set carry no redistribution licence, and the Pat David material there duplicates the RawTherapee set). Stocks only:
+- 264 bundled film looks, shown as 51 stock cards: 260 from the RawTherapee Film Simulation Collection by Pat David and contributors (CC BY-SA 4.0) and 4 Mira originals generated in code (500T Tungsten, 250D Daylight, Cinema Print, Color Paper; no affiliation with Kodak or Fujifilm). A card is a stock; the other 213 looks are its further ISOs and its push/pull and tone variations (for example Pro 160C −1 or Portra 400 NC), chosen with the ISO and Variations chips in the FILMS panel. Families (stocks, looks): Color Negative 9 (72), Slide 10 (18), Kodachrome 1 (4), Black & White 15 (40), Instant 13 (126), Motion Picture 1 (2), Print 2 (2); all seven family tabs are populated. The Motion Picture and Print stocks are Mira originals because no freely licensed data exists for them (the print and picturefx folders of the cyangraphics/NatronGitHub clut repository and G'MIC's Fuji X-Trans III set carry no redistribution licence, and the Pat David material there duplicates the RawTherapee set). Stocks only:
 
 | Family | Brand | Stocks (ISO) |
 |--------|-------|--------------|
-| Color Negative (C-41): 26 stocks, 46 variants | Agfa | Ultra Color 100 (100), Vista 200 (200) |
-|  | Fujifilm | Pro 160C (160), Pro 400H (400), Pro 800Z (800), Superia 100 (100), Superia 1600 (1600), Superia 200 (200), Superia 400 (400), Superia 800 (800), Superia HG 1600 (1600), Superia Reala 100 (100), Superia X-Tra 800 (800) |
-|  | Kodak | Ektar 100 (100), Elite 100 XPRO (100), Elite Color 200 (200), Elite Color 400 (400), Portra 160 (160), Portra 160 NC (160), Portra 160 VC (160), Portra 400 (400), Portra 400 NC (400), Portra 400 UC (400), Portra 400 VC (400), Portra 800 (800) |
+| Color Negative (C-41): 9 stocks, 72 looks | Agfa | Ultra Color 100 (100), Vista 200 (200) |
+|  | Fujifilm | Pro (160, 400, 800), Superia (100, 200, 400, 800, 1600) |
+|  | Kodak | Ektar 100 (100), Elite 100 XPRO (100), Elite Color (200, 400), Portra (160, 400, 800) |
 |  | Lomography | Redscale 100 (100) |
-| Slide (E-6): 15 stocks, 3 variants | Agfa | Precisa 100 (100) |
-|  | Fujifilm | Astia 100F (100), Provia 100F (100), Provia 400F (400), Provia 400X (400), Sensia 100 (100), Superia 200 XPRO (200), Velvia 100 (100), Velvia 50 (50) |
-|  | Kodak | E100GX (100), Ektachrome 100 VS (100), Elite Chrome 200 (200), Elite Chrome 400 (400), Elite ExtraColor 100 (100) |
+| Slide (E-6): 10 stocks, 18 looks | Agfa | Precisa 100 (100) |
+|  | Fujifilm | Astia 100F (100), Provia (100, 400), Sensia 100 (100), Superia 200 XPRO (200), Velvia (50, 100) |
+|  | Kodak | E100GX (100), Ektachrome 100 VS (100), Elite Chrome (100, 200, 400) |
 |  | Lomography | X-Pro Slide 200 (200) |
-| Kodachrome (K-14): 3 stocks, 1 variants | Kodak | Kodachrome 200 (200), Kodachrome 25 (25), Kodachrome 64 (64) |
-| Black & White: 22 stocks, 18 variants | Agfa | APX 100 (100), APX 25 (25) |
-|  | Fujifilm | Neopan 1600 (1600), Neopan Acros 100 (100) |
-|  | Ilford | Delta 100 (100), Delta 3200 (3200), Delta 400 (400), FP4 Plus 125 (125), HP5 Plus 400 (400), HPS 800 (800), Pan F Plus 50 (50), XP2 400 (400) |
-|  | Kodak | BW 400 CN (400), HIE (HS Infra) (400), T-Max 100 (100), T-Max 3200 (3200), T-Max 400 (400), Tri-X 400 (400) |
-|  | Rollei | IR 400 (400), Ortho 25 (25), Retro 100 Tonal (100), Retro 80s (80) |
-| Instant: 16 stocks, 110 variants | Fujifilm | FP-100C (100), FP-100C Negative (100), FP-3000B (3000), FP-3000B Negative (3000) |
-|  | Polaroid | 664 (100), 665 (80), 665 Negative (80), 667 (3000), 669 (80), 672 (3000), 690 (80), PX-100UV+ (100), PX-680 (600), PX-70 (80), Polachrome (40), Time Zero Expired (80) |
-| Motion Picture (ECN-2): 2 stocks | Mira | 500T Tungsten (500), 250D Daylight (250) |
-| Print: 2 stocks | Mira | Cinema Print, Color Paper (print stocks, no ISO) |
+| Kodachrome (K-14): 1 stock, 4 looks | Kodak | Kodachrome (25, 64, 200) |
+| Black & White: 15 stocks, 40 looks | Agfa | APX (25, 100) |
+|  | Fujifilm | Neopan (100, 1600) |
+|  | Ilford | Delta (100, 400, 3200), FP4 Plus 125 (125), HP5 Plus (400), HPS 800 (800), Pan F Plus 50 (50), XP2 400 (400) |
+|  | Kodak | BW 400 CN (400), HIE (HS Infra) (400), T-Max (100, 400, 3200), Tri-X (400) |
+|  | Rollei | IR 400 (400), Ortho 25 (25), Retro (80, 100) |
+| Instant: 13 stocks, 126 looks | Fujifilm | FP-100C (100), FP-3000B (3000) |
+|  | Polaroid | 664 (100), 665 (80), 667 (3000), 669 (80), 672 (3000), 690 (80), PX-100UV+ (100), PX-680 (600), PX-70 (80), Polachrome (40), Time Zero Expired (80) |
+| Motion Picture (ECN-2): 1 stock, 2 looks | Mira | Vision3 (250, 500) |
+| Print: 2 stocks, 2 looks | Mira | Cinema Print, Color Paper |
 
-- **Film science (pipeline 2).** Choosing a film opts a recipe into `Recipe.pipeline` 2, where the order follows the light: crop, exposure (with the film's latitude, so highlights roll off like a negative's shoulder, the push/pull gain, and for RAW and HDR sources a scene-referred headroom shoulder), white balance, reciprocity (the exposure time), dodge & burn, mixer, curves, halation (highlights are blurred at two radii and put back tinted, with partial compensation so clipped lights keep their cores; rem-jet for motion-picture stocks), film LUT (a float tetrahedral kernel on the sRGB-encoded cube), Paper or scan profile with push contrast and black lift, B&W toning, contrast / tone / presence, bloom, grain, vignette and border. Each film has a character derived from its family and ISO (`FilmCharacter`), with overrides in `films.json`. Grain is per film, density dependent, chromatic for colour films, and measured relative to the frame diagonal and band-limited so previews match exports. The Grain and Halation sliders read 50% as the film's own amount. FILMS panel: Variant picker; Push/Pull from −2 to +2 stops in thirds; Exposure time and Reciprocity; Scan (Neutral, Frontier-like, Noritsu-like, our own transforms, not the vendors'); Paper (None, Cinema Print, Color Paper; replaces Scan, hidden on print cards and on monochrome films, which are toned instead); Toning for monochrome films; a rem-jet toggle that appears only on motion-picture stocks (the two Mira motion-picture looks). A Latitude readout under the histogram and in FILMS shows how many stops of the scene the film holds. Recipes saved without a `pipeline` key (legacy) render exactly as before. Recipes with pipeline 2 are saved as Photos adjustment format version 4, which older builds refuse; versions 1 to 3 still read. Stage by stage, with every number and the reasoning behind it, in [Design/FILM-SCIENCE.md](Design/FILM-SCIENCE.md).
+- **Film science (pipeline 2).** Choosing a film opts a recipe into `Recipe.pipeline` 2, where the order follows the light: crop, exposure (with the film's latitude, so highlights roll off like a negative's shoulder, the push/pull gain, and for RAW and HDR sources a scene-referred headroom shoulder), white balance, reciprocity (the exposure time), dodge & burn, mixer, curves, halation (highlights are blurred at two radii and put back tinted, with partial compensation so clipped lights keep their cores; rem-jet for motion-picture stocks), film LUT (a float tetrahedral kernel on the sRGB-encoded cube), Paper or scan profile with push contrast and black lift, B&W toning, contrast / tone / presence, bloom, grain, vignette and border. Each film has a character derived from its family and ISO (`FilmCharacter`), with overrides in `films.json`. Grain is per film, density dependent, chromatic for colour films, and measured relative to the frame diagonal and band-limited so previews match exports. The Grain and Halation sliders read 50% as the film's own amount. FILMS panel: ISO and Variations chips; Push/Pull from −2 to +2 stops in thirds; Exposure time and Reciprocity; Scan (Neutral, Frontier-like, Noritsu-like, our own transforms, not the vendors'); Paper (None, Cinema Print, Color Paper; replaces Scan, hidden on print cards and on monochrome films, which are toned instead); Toning for monochrome films; a rem-jet toggle that appears only on motion-picture stocks (the two Mira motion-picture looks). A Latitude readout under the histogram and in FILMS shows how many stops of the scene the film holds. Recipes saved without a `pipeline` key (legacy) render exactly as before. Recipes with pipeline 2 are saved as Photos adjustment format version 4, which older builds refuse; versions 1 to 3 still read. Stage by stage, with every number and the reasoning behind it, in [Design/FILM-SCIENCE.md](Design/FILM-SCIENCE.md).
 - **Exposure time and reciprocity.** Long exposures make film lose speed, shift colour, gain contrast and get grainier in the shadows. The EXPOSURE TIME slider (log scale, snapping to standard shutter speeds) starts at the photo's EXIF time and double-click on its label returns to it; Reciprocity is Off, Compensated (the default: brightness kept, the cast, contrast and shadow grain of the datasheet remain) or Uncompensated (also darker by the lost stops). 41 stocks carry manufacturer datasheet data (Ilford's `t^p` rule, Kodak, Fuji, Agfa and Polaroid tables, each with its source URL in `films.json`); every other film uses its family's default, and the panel says when the time is beyond the datasheet. At 1/125 s every film is an exact no-op. The research, the model and its limits are in section 4 of [Design/FILM-SCIENCE.md](Design/FILM-SCIENCE.md).
 - **RAW development.** For RAW sources `RawDevelop` and `SourceDevelop` (MiraCore) drive `CIRAWFilter`, and the DEVELOP tab adds the decoder's own controls to the sections they belong to: Boost (Auto means 0 when a film is chosen, so the film supplies the curve), Highlight Recovery (extended dynamic range; Auto means maximum with a film) and local tone map under LIGHT; sharpness and noise reduction under DETAIL; lens correction under LENS. White balance (as shot, or kelvin and tint) is the camera's own for a RAW. The camera's baseline exposure is respected. Previews use a draft decode and re-develop after a short debounce; export develops at full quality. Presets keep only boost, tone map and highlight recovery, not white balance or per-camera settings. In the Mac library an ALL / RAW toggle next to Filter limits the grid to RAW files.
 - Sliders, grouped by what they do (the same groups on Mac and iPhone): LIGHT: Exposure, Contrast, Highlights, Shadows, Whites, Blacks (plus Boost, Highlight Recovery and Local Tone Map for a RAW); WHITE BALANCE: Temperature in kelvin and Tint, with As Shot (one pair for every photo; for a RAW it is the camera's white balance, otherwise kelvin from a 6500 K neutral, see [Design/FILM-SCIENCE.md](Design/FILM-SCIENCE.md)); COLOR: Vibrance, Saturation, Curves, Color Mix; DETAIL: Texture, Clarity (plus Sharpness and noise reduction for a RAW); LENS: Lens Correction (RAW) and Vignette; FILM: Grain and Grain Size, Halation and Halation Radius, Bloom (and Remove rem-jet on motion-picture stocks); FRAME: an optional paper Border with width. Strength (film blend) is in FILMS. Double-click a slider label to reset it. Edits that use Highlights, Shadows, Whites, Blacks, Texture, Clarity or Vibrance are saved as adjustment format version 2, and edits with Dodge & Burn strokes as version 3; older builds do not open them, and recipes that use neither are still written as version 1.
@@ -61,18 +61,19 @@ Status: v1.0.0. See [CHANGELOG.md](CHANGELOG.md) for what changed. See [TESTING.
 ## Repository layout
 
 ```
-App/                     Host app (SwiftUI): window, Photos library browser, open/drop, export sheet, films browser; SelfTest/ sample
+App/                     Host app (SwiftUI): window, Photos library browser, open/drop, export sheet, About window with the film list; SelfTest/ sample
 PhotosExtension/         Photos editing extension (PHContentEditingController)
 Packages/MiraCore/   Pipeline: Recipe, Film, FilmLibrary, LUT, Renderer, MiraAdjustment, ImageSource, SidecarStore; MiraUpdates (updater logic); tests; mira-sheet CLI
-Packages/MiraUI/     Shared SwiftUI editor (EditorView, EditorModel, FilmsBrowserView) and FieldFramesTheme with bundled fonts
+Packages/MiraUI/     Shared SwiftUI editor (EditorView, EditorModel, FilmsPanel) and FieldFramesTheme with bundled fonts
+Packages/MiraCamera/ iOS camera: MiraCameraKit (pure layer, tested without a device) and MiraCamera (AVFoundation, Metal finder, PhotoKit)
 Films/                   Bundled (126 MB per copy): films.json, Packed/*.mlut (260 cubes, 48^3, 56^3 or 64^3), ATTRIBUTION.md, LICENSE-LUTS
 FilmSources/             Not in git (git-ignored): HaldCLUT/*.png originals (361 MB, provenance only, not bundled), fetched by scripts/fetch-film-sources.sh and listed in FilmSources.sha256; scripts/pack-films.sh rebuilds Films/Packed
 Config/                  Base.xcconfig: team and bundle id prefix defaults; an untracked Local.xcconfig (see Local.xcconfig.example) overrides them
 iOSApp/                  iPhone and iPad app (SwiftUI, shares MiraCore and MiraUI)
 Fixtures/                sample.jpg (CC0), SOURCE.md, raw/ (iPhone XS DNG committed; Sony ARW and iPhone 12 Pro DNG listed for download)
-scripts/                 run.sh, install.sh, release.sh, contact-sheet.sh, fetch-film-sources.sh, pack-films.sh
-Design/                  THEME.md (Field Frames theme), FILM-SCIENCE.md (pipeline, parameters, reciprocity, packed payload, adding a film)
-docs/                    ROADMAP.md
+scripts/                 run.sh, install.sh, release.sh, updater-compat.sh, contact-sheet.sh, fetch-film-sources.sh, pack-films.sh, build-kernels.sh, make-icons.swift, ios-snapshots.sh, ios-uitests.sh, add-film-stocks.py, apply-grain-params.py
+Design/                  THEME.md (Field Frames theme), FILM-SCIENCE.md (pipeline, parameters, reciprocity, packed payload, adding a film), GRAIN.md, CAMERA.md, COMPETITIVE-NOTES.md
+docs/                    ROADMAP.md, PERFORMANCE.md, UPDATES.md (what every shipped build accepts)
 project.yml              XcodeGen spec (the .xcodeproj is generated and git-ignored)
 ```
 
@@ -112,7 +113,7 @@ Pipeline 1 (recipes without a `pipeline` key, saved before film science) runs th
 
 **MiraUI** holds `EditorModel` (source, recipe, tab, zoom, rendering) and `EditorView` (sub-toolbar with the CROP / FILMS / DEVELOP / DODGE & BURN steps, preview, and the film strip and right panel each tab brings; `EditorKeyMap` is the table of single-key shortcuts). `EditorView` reports the canvas size in pixels to the model; `FrameCanvas` hands each frame's IOSurface to a layer. Large files open from a quick ImageIO reduced decode and are decoded in full in the background (`isSourceFull`, `fullSource()`); orientation is applied once, when the file is loaded. Film-strip thumbnails (256 px) come from one small base made from the full-size source with the current crop applied, are rendered a few at a time, and are cached per crop. Hovering a film card renders it over the preview after a short debounce (60 ms) without touching the recipe.
 
-**App** has two modes. The library mode (`LibraryStore`, `LibraryView`) shows the Photos library through a `PHCachingImageManager` grid whose thumbnail size follows the cell size times the backing scale. Opening a Photos picture shows the cached grid thumbnail at once, then a larger one, then the full-size photo once the editing input has loaded. The editor mode wraps `EditorView` with `← LIBRARY`, the status and SAVE in the editor strip (the rest is in the File and Edit menus), plus a footer under the canvas showing the sidecar or Photos status, notes and progress. `AssetEditSession` loads an asset's editing input and saves or reverts through PhotoKit. Files from disk open through the Open panel, drag and drop, or the launch arguments, and a films browser carries the licence credit. In-app switching away from a Photos edit with unsaved changes asks whether to save or discard.
+**App** has two modes. The library mode (`LibraryStore`, `LibraryView`) shows the Photos library through a `PHCachingImageManager` grid whose thumbnail size follows the cell size times the backing scale. Opening a Photos picture shows the cached grid thumbnail at once, then a larger one, then the full-size photo once the editing input has loaded. The editor mode wraps `EditorView` with `← LIBRARY`, the status and SAVE in the editor strip (the rest is in the File and Edit menus), plus a footer under the canvas showing the sidecar or Photos status, notes and progress. `AssetEditSession` loads an asset's editing input and saves or reverts through PhotoKit. Files from disk open through the Open panel, drag and drop, or the launch arguments, and the About window lists the films with the licence credit. In-app switching away from a Photos edit with unsaved changes asks whether to save or discard.
 
 **PhotosExtension** hosts the same `EditorView`. On start it decodes any existing adjustment data into the recipe and loads `fullSizeImageURL`; on Save it encodes the recipe as adjustment data and renders the full-size image to the type Photos prefers (JPEG, HEIC or TIFF), falling back to JPEG. Cancel asks for confirmation only if the recipe has changed.
 
@@ -214,12 +215,12 @@ scripts/pack-films.sh           # swift run mira-sheet --pack-films FilmSources 
 ## Tests
 
 ```sh
-swift test --package-path Packages/MiraCore   # 398 tests (MiraCore 358 + MiraUpdates 40); 3 skip without FilmSources/ (see below)
-swift test --package-path Packages/MiraUI     # 153 tests (opt-in perf tests skip without MIRA_PERF=1)
-swift test --package-path Packages/MiraCamera # 75 tests (camera pure layer, simulator-free)
+swift test --no-parallel --package-path Packages/MiraCore   # 555 tests (MiraCore 511 + MiraUpdates 44); 3 skip without FilmSources/ (see below)
+swift test --no-parallel --package-path Packages/MiraUI     # 184 tests (opt-in perf tests skip without MIRA_PERF=1)
+swift test --package-path Packages/MiraCamera               # 89 tests (camera pure layer, simulator-free)
 ```
 
-MiraUI also writes headless snapshots to `build/snapshots`. The test list is in [TESTING.md](TESTING.md).
+`--no-parallel` matters for MiraCore and MiraUI: concurrent Core Image renders can deadlock in the shared `CIContext`. MiraUI also writes headless snapshots to `build/snapshots`. The test list is in [TESTING.md](TESTING.md).
 
 ### Photos self-test
 

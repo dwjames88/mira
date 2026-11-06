@@ -47,7 +47,7 @@ The first launch of the app asks for access to your Photos library (`NSPhotoLibr
 scripts/run.sh
 ```
 
-Check: the app opens; Open (or drag a photo onto the window) loads it; the film strip shows thumbnails and the family picker filters them; selecting a film updates the preview; holding C or the HOLD TO COMPARE button shows the original; the Films window (Shift-Command-L) lists all 264 looks (86 stocks) and the credit; File ▸ Export… (⌘E) offers JPEG, HEIC and TIFF, and the written files open correctly with orientation and colour intact.
+Check: the app opens; Open (or drag a photo onto the window) loads it; the film strip shows thumbnails and the family picker filters them; selecting a film updates the preview; holding C or the HOLD TO COMPARE button shows the original; Mira ▸ About Mira lists all 264 looks and the credit; File ▸ Export… (⌘E) offers JPEG, HEIC and TIFF, and the written files open correctly with orientation and colour intact.
 
 ### Library browser
 
@@ -186,18 +186,21 @@ Check by hand after a change to the editor chrome:
 Dodge & burn adds `DodgeBurnModelTests`, `DodgeBurnMaskTests`, `DodgeBurnRenderTests` (MiraCore, 28) and `DodgeBurnUITests` (MiraUI, 12, writing `dodgeburn-*.png` snapshots), plus the opt-in `DodgeBurnPerf`.
 
 ```sh
-swift test --package-path Packages/MiraCore
-swift test --package-path Packages/MiraUI
+swift test --no-parallel --package-path Packages/MiraCore   # 511 MiraCore tests, then 44 MiraUpdates tests
+swift test --no-parallel --package-path Packages/MiraUI     # 184 tests
+swift test --package-path Packages/MiraCamera               # 89 tests
 ```
+
+Use `--no-parallel` for MiraCore and MiraUI: Swift Testing runs render tests concurrently by default, and concurrent Core Image renders can deadlock inside the shared `CIContext`. Run one package at a time.
 
 iOS: `MiraiOSTests` holds the unit and snapshot tests (`xcodebuild test -scheme MiraiOS -only-testing:MiraiOSTests`).
 `MiraiOSUITests` needs a prepared simulator (Photos granted, media seeded): run `scripts/ios-uitests.sh [UDID]`; on an unprepared simulator a plain `xcodebuild test` reports them as skipped.
 
 **Tests that need `FilmSources/`.** The Hald PNGs are not in git (run `scripts/fetch-film-sources.sh` to get them). Without them, three MiraCore tests skip with a printed note (`FilmSources/ is absent (clean clone)...`) and everything else runs: `everySourcePNGIsReferencedOnceAndValid` (every PNG referenced once and a valid Hald CLUT), `packedCubesMeetTheErrorLimitsOrAreExact` (each packed cube within the error limits of, or equal to, its PNG) and `cacheHitMatchesAndCorruptFileIsTolerated` (the LUT disk cache, which needs one real PNG). With `FilmSources/` present they all run.
 
-With presets the suites hold 186 (MiraCore) and 87 (MiraUI) tests (new: `PresetTests`, `PresetStoreTests` incl. two stores on one directory, `PresetModelTests`, `PresetSnapshotTests` writing `presets-tab-*.png` and `save-preset-sheet-*.png`). Before that, as of the editor-workflow change the suites hold 170 (MiraCore) and 68 (MiraUI) tests; the lists below are the original groups. New: `ZoomTests` (click, step, pan, clamping, viewport-to-image rect with crop, zoomed render pixels), `EditorTabTests`, `ViewingKeysTests` (key map table, zoom model, compare key, full screen), `ExtensionHostingTests` (editor fills a resizing window), plus the `editor-tab-*.png`, `editor-zoom-100.png` and `editor-immersive.png` snapshots.
+History of the counts: with presets the suites held 186 (MiraCore) and 87 (MiraUI) tests (new: `PresetTests`, `PresetStoreTests` incl. two stores on one directory, `PresetModelTests`, `PresetSnapshotTests` writing `presets-tab-*.png` and `save-preset-sheet-*.png`). Before that, as of the editor-workflow change the suites held 170 (MiraCore) and 68 (MiraUI) tests; the lists below are the original groups. New: `ZoomTests` (click, step, pan, clamping, viewport-to-image rect with crop, zoomed render pixels), `EditorTabTests`, `ViewingKeysTests` (key map table, zoom model, compare key, full screen), `ExtensionHostingTests` (editor fills a resizing window), plus the `editor-tab-*.png`, `editor-zoom-100.png` and `editor-immersive.png` snapshots.
 
-MiraCore has 36 tests:
+The original MiraCore groups (36 tests at the time):
 
 - Renderer (6): neutral recipe returns the input unchanged; rendering is deterministic; extents are preserved except with a border; warmth and tint move in the right direction; grain is resolution independent; export keeps orientation and size.
 - Recipe (4): JSON round trip; empty object gives defaults; unknown keys are ignored; adjustment format identifiers.
@@ -207,7 +210,7 @@ MiraCore has 36 tests:
 - Adjustment, sidecar, source and cache (14): adjustment encode/decode round trip; foreign identifier and version rejected; legacy `com.dwjames.emulsion` still decodes and new saves write `com.fieldframes.mira`; legacy `.emulsion.json` sidecar is read, migrated on save and removed on revert; `PHAdjustmentData` round trip; sidecar URL keeps the extension; save, load and remove; fallback when the folder is read-only; foreign sidecar format rejected; RAW detection; explicit orientation swaps dimensions; LUT cache hit matches and a corrupt cache file is tolerated; prewarm loads every film.
 - Photo library logic (3): RAW identifiers; dirty check; sidecar status lines.
 
-MiraUI has 12 tests:
+The original MiraUI groups (12 tests at the time):
 
 - Theme (6): every token has the exact value in both appearances; CSS names are custom properties; fonts register and resolve; the display weight axis applies; the cell grid; the grain tile is generated and not uniform.
 - Hover (5): hover shows the preview after the debounce and ending it returns; hover never mutates the recipe; a rapid sweep ends on the last card; applied film and Compare behaviour.
@@ -369,7 +372,7 @@ Not verified live: Space-drag pan, mixer eyedropper, SAVE through the new sub-to
 
 One real RAW fixture is committed (`Fixtures/raw/iphone-xs.dng`, CC0) and drives `RawIntegrationTests`; the Sony ARW and iPhone 12 Pro DNG listed in `Fixtures/raw/README.md` are optional downloads (those tests skip a missing file). For the checks below, open any RAW/DNG file in the app.
 
-1. Variant picker: choose a stock with variants (Portra 400); the FILMS panel's Variant picker lists them (−1, +1, NC, VC…), and picking one changes the preview without adding a card to the strip, which shows stocks only (86).
+1. ISO and Variations chips: choose a stock with several ISOs or variations (Portra); the FILMS panel's ISO chips list the ISOs and the Variations chips the variations at that ISO (−1, +1, NC, VC…), and picking one changes the preview without adding a card to the strip, which shows stocks only (51).
 2. Push/Pull: drag from −2 to +2 stops in thirds; the image gets brighter, harder and grainier with push, softer with pull; reset returns to 0.
 3. Scan: Neutral, Frontier-like and Noritsu-like each shift colour and contrast slightly; Neutral is the unchanged film.
 4. Toning: on a black and white stock the Toning control is present and tints the image; on a colour stock it is absent.
