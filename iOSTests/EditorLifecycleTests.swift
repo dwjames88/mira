@@ -1,4 +1,5 @@
 import CoreImage
+import ImageIO
 import MiraCore
 import UIKit
 import XCTest
@@ -132,6 +133,35 @@ final class EditorLifecycleTests: XCTestCase {
         XCTAssertNil(data)
         let live = try await engine.renderThumbnail(filmID: nil)   // an uncancelled request still renders
         XCTAssertFalse(live.isEmpty)
+        await engine.discard(upTo: 1)
+    }
+
+    /// The film cards' small copy is made once and kept; it must look like the scale-down it replaces (a lazy Lanczos
+    /// of the source, graded and encoded the same way).
+    func testMaterialisedThumbnailMatchesTheLazyScale() async throws {
+        let data = try jpeg(width: 1600, height: 1200)
+        let engine = PhotoEngine()
+        let loadedSource = try await engine.load(data: data, epoch: 1)
+        let film = StepConsistencyTests.film(mono: false)
+        let kept = try await engine.renderThumbnail(filmID: film.id)
+        let again = try await engine.renderThumbnail(filmID: film.id)
+        XCTAssertEqual(kept, again, "the same copy is reused")
+
+        let library = try XCTUnwrap(PhotoEngine.library)
+        let renderer = Renderer(library: library)
+        var lazy = renderer.previewImage(from: loadedSource.image, maxPixelSize: 220)
+        lazy = lazy.withMiraExposureTime(loadedSource.image.miraExposureTime).withMiraHeadroom(loadedSource.image.miraHeadroom)
+        let recipe = Recipe(filmID: film.id, reciprocity: .off).applyingNativeTexture(filmID: film.id)
+        let reference = try XCTUnwrap(Renderer.sharedContext.jpegRepresentation(
+            of: renderer.apply(recipe, to: lazy), colorSpace: loadedSource.colorSpace,
+            options: [kCGImageDestinationLossyCompressionQuality as CIImageRepresentationOption: 0.85]))
+        let a = DrawableCanvas.frame(of: try XCTUnwrap(UIImage(data: kept)?.cgImage))
+        let b = DrawableCanvas.frame(of: try XCTUnwrap(UIImage(data: reference)?.cgImage))
+        XCTAssertEqual(a.w, b.w); XCTAssertEqual(a.h, b.h)
+        var worst = 0, total = 0
+        for i in 0..<a.px.count { let d = abs(Int(a.px[i]) - Int(b.px[i])); worst = max(worst, d); total += d }
+        XCTAssertLessThanOrEqual(worst, 2, "max level difference")
+        XCTAssertLessThan(Double(total) / Double(a.px.count), 0.05, "mean level difference")
         await engine.discard(upTo: 1)
     }
 }

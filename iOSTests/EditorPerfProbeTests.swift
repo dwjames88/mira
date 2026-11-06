@@ -47,9 +47,9 @@ final class EditorPerfProbeTests: XCTestCase {
         let engine = PhotoEngine()
         var loadSamples: [Double] = []
         var loaded: LoadedSource?
-        for i in 0..<3 {
+        for _ in 0..<3 {
             let t0 = DispatchTime.now().uptimeNanoseconds
-            loaded = try await engine.load(data: data, epoch: i + 1)
+            loaded = try await engine.load(data: data)
             loadSamples.append(Double(DispatchTime.now().uptimeNanoseconds - t0) / 1e6)
         }
         report("engine.load 12MP JPEG", loadSamples)
