@@ -117,7 +117,8 @@ final class LivePreview {
         var t = CGAffineTransform(translationX: -e.minX, y: -e.minY)
         t = t.concatenating(CGAffineTransform(scaleX: fit, y: fit))
         t = t.concatenating(CGAffineTransform(translationX: tx, y: ty))
-        // CIContext.render(to: MTLTexture) already maps Core Image bottom-left space onto the drawable upright.
+        // Rendering to a CAMetalLayer drawable texture maps Core Image's bottom-left space onto the screen upright
+        // (Core Image recognises drawables and writes them top-row-first), so no flip is needed here.
         output = graded.transformed(by: t).cropped(to: bounds).composited(over: output)
         return output
     }
@@ -191,8 +192,9 @@ final class LivePreview {
             stageOrigin = box.origin
         }
         guard let image = CIImage(mtlTexture: stage, options: [.colorSpace: Self.stageSpace]) else { return nil }
-        // A texture's row 0 is the top; Core Image's origin is the bottom-left.
-        return image.transformed(by: CGAffineTransform(scaleX: 1, y: -1).translatedBy(x: 0, y: -CGFloat(h)))
-            .transformed(by: CGAffineTransform(translationX: stageOrigin.x, y: stageOrigin.y))
+        // Core Image writes a plain Metal texture in its own bottom-left convention and `CIImage(mtlTexture:)` reads
+        // it back the same way, so the round trip is the identity: no flip, only the extent's origin to restore.
+        // (Only a CAMetalLayer drawable is written top-row-first, and only `place`'s final render targets one.)
+        return image.transformed(by: CGAffineTransform(translationX: stageOrigin.x, y: stageOrigin.y))
     }
 }
