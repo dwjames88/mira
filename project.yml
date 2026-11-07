@@ -18,8 +18,8 @@ settings:
     CODE_SIGN_IDENTITY: "Apple Development"
     ENABLE_HARDENED_RUNTIME: YES
     ENABLE_USER_SCRIPT_SANDBOXING: YES
-    MARKETING_VERSION: "1.0.1"
-    CURRENT_PROJECT_VERSION: "8"
+    MARKETING_VERSION: "1.1.0"
+    CURRENT_PROJECT_VERSION: "15"
   configs:
     Release:
       # Strip local symbols from the shipped app, extension and iOS binaries (about 19 MB less on the Mac). `xcodebuild

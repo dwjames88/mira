@@ -4,11 +4,11 @@
 
 Mira is an original film-emulation app for macOS. It ships as a **Photos editing extension**, so you can apply a film look to any picture from inside Photos, plus a **host app** that browses your Photos library and also edits files from disk. There is no watermark, no paywall and no account.
 
-Status: v1.0.1. See [CHANGELOG.md](CHANGELOG.md) for what changed. See [TESTING.md](TESTING.md) for what has and has not been verified, and [docs/ROADMAP.md](docs/ROADMAP.md) for what comes next.
+Status: v1.1.0. See [CHANGELOG.md](CHANGELOG.md) for what changed. See [TESTING.md](TESTING.md) for what has and has not been verified, and [docs/ROADMAP.md](docs/ROADMAP.md) for what comes next.
 
 ## Install
 
-1. Download `Mira-1.0.1.dmg` (or the `.zip`) from the release page and drag **Mira** to Applications.
+1. Download `Mira-1.1.0.dmg` (or the `.zip`) from the release page and drag **Mira** to Applications.
 2. Mira is signed with a free Personal Team development certificate. There is no Developer ID and it is not notarized, so on other Macs macOS blocks the first launch. Right-click Mira, choose Open, then Open again. Or try to open it once, then go to System Settings ▸ Privacy & Security and click "Open Anyway".
 3. Development-signed builds may refuse to run at all on a Mac that is not registered to the signing team. If so, build from source (see Build and run the Mac app: Xcode, XcodeGen and your own team ID in `Local.xcconfig`) and run `scripts/install.sh`.
 4. Enable the extension in System Settings ▸ General ▸ Login Items & Extensions ▸ Photos Editing ▸ Mira, and grant Photos access on first launch.

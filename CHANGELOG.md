@@ -2,9 +2,9 @@
 
 All notable changes to Mira. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased 1.1.0]
+## [1.1.0] - 2026-11-07
 
-Roll 1: a camera for iPhone. Not yet verified on an iPhone (see Notes).
+Roll 1: a camera for iPhone. Also: Photos library management on the Mac and iPhone, Develop sections grouped by function, a DEVELOP queue, a faster iPhone library with a PERSONAL / SHARED / ALL scope, and a quality pass (Round 3) with bug fixes and speed-ups across the app. Verified on iPhone 16 Pro builds; see [TESTING.md](TESTING.md) for the device checklist.
 
 ### Added
 - **Camera (iOS).** A live finder rendered through MiraCore with the film you chose. Hold the finder to see the bare scene.
@@ -37,7 +37,7 @@ Roll 1: a camera for iPhone. Not yet verified on an iPhone (see Notes).
 - `FilmsPanel` is now shared between the editor and the camera.
 - The latitude meter computes its percentiles with a selection instead of a full sort (same values, about 5x faster); the camera reads it from a 256 px frame at 4 Hz.
 - MiraCore `Renderer` gains `withGrainSeed` and `withTextureScale` for the finder. Capture and export use the defaults and render as before.
-- **Camera and library headers (iOS).** The camera's top-left is a plain LIBRARY label (no back chevron); the library's CAMERA button moved to the top-left, before the title.
+- **Camera header (iOS).** The camera's top-left is a plain LIBRARY label (no back chevron). (The library's CAMERA control is now an icon on the right of the gallery header; see Library header icons below.)
 
 ### Tests
 - New `MiraCamera` package: `swift test --package-path Packages/MiraCamera` runs 89 tests (camera state, exposure and readouts, lenses, capture format, white balance, finder quality ladder, finder touch, pending prints, two-step save with fakes). MiraCore adds finder tests (seed override, texture scale parity, finder vs capture parity) and an opt-in finder budget benchmark. iOS: camera layout snapshots (16 Pro, SE, landscape), camera door snapshots, camera model tests with the fake backend, a RAW+HEIC save round trip against the simulator's Photos library, and an opt-in simulator finder benchmark (MiraiOSTests 63, 5 opt-in skips). Beta 2 adds the finder rotation pixel test, fake-sensor rotation tests, real-safe-area layout tests, aspect/crop geometry, WB dial rules and the DEVELOP queue model; UI tests (8, 4 opt-in skips) start on the camera. Develop regroup: MiraCore `PipelineWhiteBalanceTests` (6), MiraUI `WhiteBalanceControlTests` (4) plus section-order, RAW-by-section, Reset and `editor-develop-panel-raw-*.png` snapshot tests, iOS `DevelopGroupsTests` (9). Totals: MiraCore 505, MiraUI 182, MiraiOSTests 79 (6 skipped), UI tests 8 (4 skipped).
@@ -93,9 +93,6 @@ Every render is pinned by 136 golden artifacts (`mira-sheet --golden`: previews,
   - `scripts/release.sh --dry-run`, `scripts/ios-snapshots.sh` accepts a UDID and refuses iOS 27.0, and `updater-compat.sh` stops on build errors.
   - Totals: MiraCore 520 + MiraUpdates 44, MiraUI 194, MiraCamera 91, MiraiOSTests 107 (9 opt-in skips), MiraiOSUITests 16 (11 opt-in skips), all passing.
 
-### Notes
-- Not yet verified on an iPhone. The first device check is the 30 fps finder gate on an iPhone 16 Pro; see [TESTING.md](TESTING.md).
-
 ### Added: Photos library management (Mac and iPhone)
 - **Favorites.** Favorite and unfavorite one picture or a selection; a heart badge on favorite thumbnails; the Favorites album in the library.
 - **Albums.** Create, rename and delete albums (the photos stay in the library), add a selection to an album or a new album, remove from the current album, and move (add to the target and remove from the current album in one change). Smart albums are read-only.
@@ -120,10 +117,14 @@ Every render is pinned by 136 golden artifacts (`mira-sheet --golden`: previews,
 - `FFTabBar` (MiraUI) takes an optional `height` (default unchanged) so the scope control is a 44-pt target.
 - Tests: `LibraryScopeTests` (MiraCore: scope cases, source kinds, activeCount; iOS: section filtering, persistence, DEVELOP filtering), `DevelopQueueSaveTests` (in-place save, new-asset save, unknown original, failure, cancel, other entries untouched), opt-in `GalleryRootPerfProbe` (`TEST_RUNNER_MIRA_GALLERY_PROBE=1`) and `LibrarySeedTool` (`TEST_RUNNER_MIRA_SEED_LIBRARY=1`, "Mira QA Library" only). MiraCore 526, MiraUI 194, MiraCamera 91, MiraiOSTests 124 (11 opt-in skips), MiraiOSUITests 16 (11 opt-in skips).
 
-## [Unreleased 1.0.2]
-
-### Fixed
+### Fixed: opening a photo (Mac and iPhone)
 - **Opening a photo can no longer hang on "OPENING" (Mac and iPhone).** If Photos does not hand over the editable original within 8 s (or within 30 s of its last iCloud download progress, shown as "DOWNLOADING FROM ICLOUD · NN%"), the request is cancelled and retried once; if that also fails a card says "Photos didn't hand over this photo." with RETRY and BACK, and other photos open normally. A late or repeated answer from Photos is ignored and never replaces a newer open.
+
+### Notes
+- Verified on iPhone 16 Pro builds (1.1.0 betas, builds 12-15); the device checklist is in [TESTING.md](TESTING.md).
+- The Mac build is signed with an Apple Development certificate and is not notarized. On first launch macOS may refuse to open it: right-click Mira and choose Open.
+- The in-app updater (0.3.0 and later) installs 1.1.0. The sandboxed updater cannot clear the quarantine flag on the downloaded app, so macOS may ask once more on the first launch after the update; right-click Mira and choose Open. 0.2.0 has no updater; install 1.1.0 by hand.
+- iOS has no self-updater. Build it from source (supported; see the README), or use the attached development-signed ipa, which installs only on devices registered to the publisher's team.
 
 ## [1.0.1] - 2026-11-05
 
